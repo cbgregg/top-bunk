@@ -1,0 +1,44 @@
+{
+ "night_brown_noise": {
+  "file": "assets/sfx/night_brown_noise.mp3",
+  "kind": "noise",
+  "loop": true,
+  "len": 60.029
+ },
+ "bunk_shove": {
+  "file": "assets/sfx/bunk_shove.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 2.508
+ },
+ "waterphone": {
+  "file": "assets/sfx/waterphone.mp3",
+  "kind": "music",
+  "loop": true,
+  "len": 59.611
+ },
+ "music_box": {
+  "file": "assets/sfx/music_box.mp3",
+  "kind": "music",
+  "loop": true,
+  "len": 45.061
+ },
+ "scare_synth": {
+  "file": "assets/sfx/scare_synth.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 2.508
+ },
+ "scare_strings": {
+  "file": "assets/sfx/scare_strings.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 2.508
+ },
+ "scare_bang": {
+  "file": "assets/sfx/scare_bang.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 2.038
+ }
+}

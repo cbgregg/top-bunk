@@ -1,0 +1,22 @@
+{
+ "moving_day": {
+  "file": "assets/music/moving_day.mp3",
+  "loop": true,
+  "len": 120.033
+ },
+ "night": {
+  "file": "assets/music/night.mp3",
+  "loop": true,
+  "len": 119.902
+ },
+ "chase": {
+  "file": "assets/music/chase.mp3",
+  "loop": true,
+  "len": 120.059
+ },
+ "morning": {
+  "file": "assets/music/morning.mp3",
+  "loop": true,
+  "len": 120.059
+ }
+}
