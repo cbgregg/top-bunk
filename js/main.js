@@ -150,17 +150,17 @@ function setPhase(p) {
   scene.fog = day ? new THREE.Fog(0xa9c2d6, 35, 190) : p === 'title' ? new THREE.FogExp2(0x03050a, 0.03) : night ? new THREE.FogExp2(0x060a14, 0.055) : new THREE.Fog(0xe8dcc6, 30, 170);
   W.hemi.color.set(day ? 0xcfe0ff : night ? 0x4f6190 : 0xffe6c4);
   W.hemi.groundColor.set(day ? 0x5a4a35 : night ? 0x0a0a10 : 0x6a5238);
-  W.hemi.intensity = day ? 0.8 : p === 'title' ? 0.35 : night ? 0.38 : 1.1;
+  W.hemi.intensity = day ? 0.62 : p === 'title' ? 0.32 : night ? 0.3 : 0.9;
   W.sun.color.set(day ? 0xfff1dc : night ? 0x8ea6ff : 0xffd2a0);
   W.sun.intensity = day ? 3.2 : p === 'title' ? 0.6 : night ? 0.5 : 2.6;
   if (day) W.sun.position.set(40, 45, -30); else if (night) W.sun.position.set(-60, 50, 40); else W.sun.position.set(55, 18, 5);
   W.stars.visible = W.moon.visible = night;
   W.winMat.map = day ? W.T.winDay : night ? W.T.winNight : W.T.winMorning;
   W.winMat.color.set(night ? 0x8899bb : 0xffffff); W.winMat.needsUpdate = true;
-  for (const k in W.bulbs) { const b = W.bulbs[k]; const on = day; b.light.visible = on || k === 'bath'; b.light.intensity = on ? b.base * 0.7 : 0; b.dome.material.emissiveIntensity = on ? 2 : 0; }
+  for (const k in W.bulbs) { const b = W.bulbs[k]; const on = day; b.light.visible = on || k === 'bath'; b.light.intensity = on ? b.base * 0.55 : 0; b.dome.material.emissiveIntensity = on ? 2 : 0; }
   W.fills.forEach((f, i) => {
     f.visible = !night;
-    if (day) { f.color.set(0xdde8ff); f.intensity = 0.9; }
+    if (day) { f.color.set(0xdde8ff); f.intensity = 0.65; }
     else if (night) { f.color.set(0x6f86c8); f.intensity = i < 2 ? 0.45 : 0.3; }
     else { f.color.set(0xffd7a0); f.intensity = i < 2 ? 4.5 : 3; }
   });
@@ -172,7 +172,7 @@ function setPhase(p) {
   W.bathSpot.intensity = 0;
   W.frontDoor.setOpen(day);
   W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
-  renderer.toneMappingExposure = day ? 1.0 : night ? 1.4 : 1.05;
+  renderer.toneMappingExposure = day ? 0.88 : night ? 1.25 : 0.92;
   mom.group.visible = dad.group.visible = day;
   if (sfx.ctx) {
     sfx.wind(day ? 0.035 : night ? 0.06 : 0.025, 2);
