@@ -16,6 +16,7 @@ export class Entity {
 
     const black = new THREE.MeshLambertMaterial({ color: 0x060607 });
     const glow = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, fog: false });
+    glow.color.setRGB(2.4, 2.4, 2.4);   // brighter than white, so the bloom pass makes the eyes glow
     const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
     const cyl = (rt, rb, h, seg = 10) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), black); m.castShadow = true; return m; };
 

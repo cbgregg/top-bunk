@@ -25,6 +25,9 @@ SFX = {
                       'deep impact hit, very loud and sudden', 2.5, -9, False),
     'scare_bang': ('sfx', 'A sudden, extremely loud impact boom slam with a big reverb tail, like a door being thrown shut '
                    'in an empty house', 2.0, -9, False),
+    # from a childhood memory: a huge pale face drifting past each bedroom window at night, moaning; and the car it might have been
+    'face_wail': ('sfx', 'A faint, haunting, distant ghostly male voice drawn out in one long wavering "eeeeyyyeeee" wail, slowly rising and falling, airy and eerie, with a little reverb, as if drifting past outside a window at night', 8.0, -17, False),
+    'car_pass': ('sfx', 'A single car driving past a house on a quiet rural road at night, tires on asphalt and engine whoosh, doppler pass from one side to the other, muffled and distant as heard from inside a bedroom', 6.0, -23, False),
     'bunk_shove': ('sfx', 'A heavy thud of a child falling from a top bunk bed onto a wooden floor, wooden bed frame rattling, '
                    'then a short gasp of air', 2.5, -14, False),
     # the creepy horror-movie instruments

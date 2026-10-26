@@ -40,5 +40,17 @@
   "kind": "sfx",
   "loop": false,
   "len": 2.038
+ },
+ "face_wail": {
+  "file": "assets/sfx/face_wail.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 8.046
+ },
+ "car_pass": {
+  "file": "assets/sfx/car_pass.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 5.407
  }
 }

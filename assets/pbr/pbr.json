@@ -12,5 +12,6 @@
  "ceiling": 1.998,
  "wall": 1.8,
  "grass": 2.0,
- "tile": 0.9
+ "tile": 0.9,
+ "counter": 2.0
 }

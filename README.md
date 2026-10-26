@@ -9,7 +9,7 @@ A short first-person horror game built with [Three.js](https://threejs.org), run
 | Beat | What happens |
 |---|---|
 | **Moving day** | Your family pulls up to the rented farmhouse. Carry your boxes from the truck to your room at the end of the hall. Top bunk is yours. Someone left a crayon drawing taped in the hallway. |
-| **2:47 AM** | You wake up and need the bathroom. The hallway is long and dark. Bring the flashlight. |
+| **2:47 AM** | You wake up and need the bathroom. A car's headlights slide across the bedroom, and then something huge and pale drifts past the windows, moaning. The hallway is long and dark, lit only by a few green plug-in night lights. |
 | **The hallway** | Those aren't your footsteps. The bathroom light snaps on behind you and something tall, black, with huge white eyes and a huge white smile is standing in the doorway. Run. |
 | **Hide** | Get up the ladder and under the blanket. It comes to the side of the bed. Hold your breath. |
 | **Morning** | Sunlight, birds, Mom calling you for breakfast. It was just a dream. Get up. |
@@ -22,7 +22,6 @@ A short first-person horror game built with [Three.js](https://threejs.org), run
 | Mouse | Look |
 | Shift | Sprint (limited stamina) |
 | E | Interact |
-| F | Flashlight |
 | Space | Hold your breath (while hiding) |
 | Esc | Pause |
 
@@ -78,3 +77,17 @@ To change anything: edit the table in the script, then `ELEVENLABS_API_KEY=... p
 | The spirit | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze |
 
 The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`) retargeted onto the Rocketbox skeleton. How the models are built: `tools/models/`. The game works without the model files: the old low-poly people and spirit take over. Credits and licenses: [CREDITS.md](CREDITS.md).
+
+## Graphics
+
+Rendered with three.js and a post-processing pipeline: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). There is a **Graphics** setting on the title screen (Auto, Ultra, High, Medium, Low). Auto starts on High and steps down if the frame rate stays low.
+
+| Part | Source |
+|---|---|
+| Surfaces: floors, walls, siding, roof, grass, tile, counters | PBR materials from Poly Haven and ambientCG (CC0), packed by `tools/assets/fetch_pbr.py` into `assets/pbr/` |
+| Sky and ambient light | Poly Haven HDRIs (CC0), `tools/assets/fetch_sky.py` into `assets/sky/` |
+| Furniture, plants, a tree, rocks, grass | Poly Haven models (CC0), compressed by `tools/assets/fetch_models.py` into `assets/props/` |
+| Kitchen, bathroom, windows, house | built in code (`js/world.js`) |
+
+Everything has a fallback: if an asset file is missing, the older procedural look takes over for that item.
+

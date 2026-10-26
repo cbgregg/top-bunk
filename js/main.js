@@ -5,6 +5,8 @@ import { Entity } from './entity.js';
 import { Sound } from './audio.js';
 import { makePerson } from './people.js';
 import { Gfx } from './gfx.js';
+import { WindowFace } from './windowface.js';
+import { Dust } from './dust.js';
 import * as UI from './ui.js';
 
 const V3 = THREE.Vector3;
@@ -30,18 +32,24 @@ scene.add(camera);
 const W = buildWorld(scene);
 const E = new Entity(scene);
 const sfx = new Sound();
+const WF = new WindowFace(scene, W.faceLight, W.carLight);
 const mom = makePerson({ model: 'mom', height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
 const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
 scene.add(mom.group, dad.group);
 
-const FL_I = 34;
-const flash = new THREE.SpotLight(0xfff1d8, 0, 20, 0.44, 0.55, 1.6);
-flash.position.set(0.16, -0.18, 0.05);
-flash.castShadow = true; flash.shadow.mapSize.set(1024, 1024); flash.shadow.bias = -0.0006;
-flash.shadow.camera.near = 0.1; flash.shadow.camera.far = 20;
-camera.add(flash); flash.target.position.set(0.04, -0.2, -4); camera.add(flash.target);
-(scene.userData.shadowLights ||= []).push({ light: flash, sun: false });
 const gfx = new Gfx(renderer, scene, camera);
+const dust = new Dust(scene, camera);
+{   // graphics setting on the title screen
+  const sel = $('quality');
+  if (sel) {
+    sel.value = gfx.auto ? 'auto' : gfx.quality;
+    sel.addEventListener('change', () => {
+      if (sel.value === 'auto') { try { localStorage.removeItem('topbunk.quality'); } catch (e) { /* ignore */ } gfx.auto = true; gfx.setQuality('high', { save: false }); }
+      else gfx.setQuality(sel.value);
+    });
+    sel.addEventListener('click', (e) => e.stopPropagation()); sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  }
+}
 const BATH_I = 95;
 
 // ---------- constants ----------
@@ -95,7 +103,6 @@ addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyE') pressE = true;
-  if (e.code === 'KeyF') toggleFlash();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -116,9 +123,21 @@ $('retry').addEventListener('click', retry);
 $('again').addEventListener('click', () => location.reload());
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); gfx.resize(); });
 
-function toggleFlash() {
-  if (!started || F.dead || (F.phase !== 'night') || P.mode === 'hide') return;
-  F.flashOn = !F.flashOn; flash.intensity = F.flashOn ? FL_I : 0; sfx.click();
+// a car goes by outside (its light slides through the windows), and a while later something huge and pale drifts past them
+function carPass() { WF.carPass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); UI.subtitle('<i>Headlights slide across the ceiling.</i>', 3); }
+function faceAtWindow() {
+  WF.face(); sfx.moving('sfx/face_wail', { gain: 0.8, from: 0.6, to: -0.8, dur: 13 });
+  later(1.6, () => UI.subtitle('<i>Something huge and pale is going past the windows.</i>', 4));
+}
+
+// the green night lights: a steady faint pulse; they stutter and dim when the thing is near
+let nlBase = 0;
+function nlMult(m, flick = true) {
+  for (const n of W.nightLights) {
+    let k = m;
+    if (flick && E.visible && m > 0) { const d = Math.hypot(n.pos.x - E.root.position.x, n.pos.z - E.root.position.z); if (d < 7) k *= Math.random() < 0.09 * (1 - d / 7) * 3 ? 0.08 : 1 - 0.35 * (1 - d / 7); }
+    n.light.intensity = n.base * k; n.mat.emissiveIntensity = 2.4 * k;
+  }
 }
 
 // ---------- phases (lighting) ----------
@@ -126,30 +145,33 @@ function setPhase(p) {
   F.phase = p;
   const day = p === 'day', night = p === 'night' || p === 'title', morn = p === 'morning';
   gfx.setPhase(p);
-  scene.fog = day ? new THREE.Fog(0xa9c2d6, 35, 190) : p === 'title' ? new THREE.FogExp2(0x03050a, 0.03) : night ? new THREE.FogExp2(0x020308, 0.075) : new THREE.Fog(0xe8dcc6, 30, 170);
-  W.hemi.color.set(day ? 0xcfe0ff : night ? 0x31406a : 0xffe6c4);
+  scene.fog = day ? new THREE.Fog(0xa9c2d6, 35, 190) : p === 'title' ? new THREE.FogExp2(0x03050a, 0.03) : night ? new THREE.FogExp2(0x060a14, 0.055) : new THREE.Fog(0xe8dcc6, 30, 170);
+  W.hemi.color.set(day ? 0xcfe0ff : night ? 0x4f6190 : 0xffe6c4);
   W.hemi.groundColor.set(day ? 0x5a4a35 : night ? 0x0a0a10 : 0x6a5238);
-  W.hemi.intensity = day ? 0.8 : p === 'title' ? 0.25 : night ? 0.07 : 1.1;
+  W.hemi.intensity = day ? 0.8 : p === 'title' ? 0.35 : night ? 0.38 : 1.1;
   W.sun.color.set(day ? 0xfff1dc : night ? 0x8ea6ff : 0xffd2a0);
-  W.sun.intensity = day ? 3.2 : p === 'title' ? 0.6 : night ? 0.18 : 2.6;
+  W.sun.intensity = day ? 3.2 : p === 'title' ? 0.6 : night ? 0.5 : 2.6;
   if (day) W.sun.position.set(40, 45, -30); else if (night) W.sun.position.set(-60, 50, 40); else W.sun.position.set(55, 18, 5);
   W.stars.visible = W.moon.visible = night;
   W.winMat.map = day ? W.T.winDay : night ? W.T.winNight : W.T.winMorning;
   W.winMat.color.set(night ? 0x8899bb : 0xffffff); W.winMat.needsUpdate = true;
-  for (const k in W.bulbs) { const b = W.bulbs[k]; const on = day; b.light.intensity = on ? b.base : 0; b.dome.material.emissiveIntensity = on ? 2 : 0; }
+  for (const k in W.bulbs) { const b = W.bulbs[k]; const on = day; b.light.visible = on || k === 'bath'; b.light.intensity = on ? b.base * 0.7 : 0; b.dome.material.emissiveIntensity = on ? 2 : 0; }
   W.fills.forEach((f, i) => {
-    if (day) { f.color.set(0xdde8ff); f.intensity = 2.2; }
-    else if (night) { f.color.set(0x6f86c8); f.intensity = i < 2 ? 1.1 : 0.7; }
+    f.visible = !night;
+    if (day) { f.color.set(0xdde8ff); f.intensity = 0.9; }
+    else if (night) { f.color.set(0x6f86c8); f.intensity = i < 2 ? 0.45 : 0.3; }
     else { f.color.set(0xffd7a0); f.intensity = i < 2 ? 4.5 : 3; }
   });
-  W.nightLight.intensity = night ? 1.5 : 0; W.nlMesh.material.emissiveIntensity = night ? 3 : 0;
+  nlBase = night ? 1 : 0; nlMult(nlBase, false);
+  // which lights exist this phase (changing this recompiles the shaders, so it happens only here, behind the fade)
+  for (const n of W.nightLights) n.light.visible = night;
+  W.faceLight.visible = W.carLight.visible = night;
   W.porchLight.intensity = p === 'title' ? 7 : 0; W.porchBulb.material.emissiveIntensity = p === 'title' ? 4 : 0;
   W.bathSpot.intensity = 0;
   W.frontDoor.setOpen(day);
   W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
-  renderer.toneMappingExposure = day ? 1.0 : night ? 1.3 : 1.05;
+  renderer.toneMappingExposure = day ? 1.0 : night ? 1.4 : 1.05;
   mom.group.visible = dad.group.visible = day;
-  flash.intensity = p === 'night' && F.flashOn ? FL_I : 0;
   if (sfx.ctx) {
     sfx.wind(day ? 0.035 : night ? 0.06 : 0.025, 2);
     sfx.drone(p === 'night' ? 0.05 : p === 'title' ? 0.03 : 0, 3);
@@ -277,7 +299,6 @@ async function climbUp() {
   F.cutscene = false;
   if (hiding || F.chase) {
     P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); UI.objective('Stay quiet.');
-    if (F.flashOn) { F.flashOn = false; flash.intensity = 0; sfx.click(); }
   } else P.mode = 'bunk';
 }
 async function climbDown() {
@@ -365,8 +386,8 @@ async function reveal() {
   E.root.position.set(20.95, 0, 0); E.root.rotation.y = -Math.PI / 2; E.lookTarget = camera.position;
   sfx.stinger(); shake = 0.35;
   F.flicker = true;
-  await tween(0.55, (k) => { W.bathSpot.intensity = Math.random() < k ? BATH_I : BATH_I * 0.05; W.nightLight.intensity = Math.random() < k ? 0 : 1.5; }, ease.lin);
-  W.bathSpot.intensity = BATH_I; W.nightLight.intensity = 0.2;
+  await tween(0.55, (k) => { W.bathSpot.intensity = Math.random() < k ? BATH_I : BATH_I * 0.05; nlMult(Math.random() < k ? 0 : 1, false); }, ease.lin);
+  W.bathSpot.intensity = BATH_I; nlMult(0.2, false);
   UI.objective('<b class="red">RUN.</b> Get back to bed');
   sfx.tension(0.03, 0.4);
   await tween(1.0, (k) => { E.tilt = k * 0.55; });
@@ -380,10 +401,10 @@ function startChase() {
   chase.trail.push(P.pos.clone());
   // it doesn't walk the whole hall — the lights blink and it's suddenly closer
   if (room === 'hall' && E.root.position.x - P.pos.x > 6.5) {
-    const savedSpot = W.bathSpot.intensity, savedFlash = flash.intensity;
-    W.bathSpot.intensity = 0; flash.intensity = 0; sfx.whoosh(panFor(E.root.position));
+    const savedSpot = W.bathSpot.intensity;
+    W.bathSpot.intensity = 0; sfx.whoosh(panFor(E.root.position));
     E.root.position.x = P.pos.x + 5.6; E.root.position.z = 0;
-    later(0.22, () => { W.bathSpot.intensity = savedSpot; flash.intensity = savedFlash; });
+    later(0.22, () => { W.bathSpot.intensity = savedSpot; });
   }
   F.chase = true; E.mode = 'run';
   sfx.drone(0.09, 0.5);
@@ -472,7 +493,6 @@ function retry() {
   UI.hide('death'); uiMode = 'playing'; lock();
   F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false;
   setPhase('night');
-  F.flashOn = true; flash.intensity = FL_I;
   E.visible = false; E.reach = 0; E.lean = 0; E.smileScale = 1; E.tilt = 0;
   P.mode = 'walk'; P.pos.set(19.3, 0, 0); P.yaw = Math.PI / 2; P.pitch = 0; P.roll = 0; P.vel.set(0, 0, 0);
   P.stamina = 1; P.exhausted = false; P.breath = 1; shake = 0;
@@ -533,7 +553,6 @@ async function dayScript() {
 }
 
 async function nightScript() {
-  F.flashOn = true;
   setPhase('night');
   P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.yaw = 0.25; P.pitch = -0.18; P.roll = 0;
   UI.card('2:47 AM', 'Night one', 4.5);
@@ -541,9 +560,10 @@ async function nightScript() {
   await wait(2.0);
   sfx.creak(0.3, -0.6);
   UI.subtitle('<i>You really, really need to pee.</i>', 4);
+  later(3.5, carPass); later(10.5, faceAtWindow);
   await wait(1.2);
   UI.objective('Go to the bathroom at the end of the hall');
-  UI.hint('<b>F</b> flashlight &nbsp;·&nbsp; <b>E</b> climb down', 6);
+  UI.hint('<b>E</b> climb down', 6);
   if (DEBUG === 'chase') { P.mode = 'walk'; P.pos.set(19.3, 0, 0); P.yaw = Math.PI / 2; F.splashed = true; UI.objective('Go back to bed'); await chaseScript(); return; }
   await waitFor(() => P.mode === 'walk' && P.pos.x > 2);
   later(2.5, () => { if (!F.splashed) sfx.knock(panFor(new V3(10, 1.5, 1.2)), 0.25); });
@@ -578,7 +598,6 @@ async function chaseScript() {
 }
 
 async function morningScript() {
-  F.flashOn = false;
   setPhase('morning');
   E.visible = false; E.lean = 0; E.reach = 0; E.smileScale = 1; F.chase = false;
   P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.yaw = 0.15; P.pitch = -0.12; P.roll = 0;
@@ -665,11 +684,11 @@ function update(dt) {
   }
   UI.breath(P.breath, F.breathUI && !F.dead, P.breath < 0.3);
 
+  if (nlBase > 0 && !F.flicker) nlMult(nlBase * (0.93 + 0.07 * Math.sin(gameTime * 0.9)));
   // light flicker
   if (F.flicker) {
     if (W.bathSpot.intensity > 0) W.bathSpot.intensity = BATH_I * (0.82 + Math.sin(gameTime * 23) * 0.08 + (Math.random() < 0.03 ? -0.7 : 0));
-    W.nightLight.intensity = Math.random() < 0.15 ? 0 : 0.25;
-    if (F.flashOn && F.chase) flash.intensity = Math.random() < 0.04 ? FL_I * 0.15 : FL_I;
+    nlMult(Math.random() < 0.15 ? 0 : 0.25, false);
   }
 
   // ambience
@@ -690,6 +709,7 @@ function update(dt) {
       }
     }
   }
+  WF.update(dt); dust.update(dt);
   E.update(dt);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
 }
@@ -713,4 +733,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, flash, FL_I, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

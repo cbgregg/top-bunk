@@ -115,6 +115,29 @@ export class Sound {
     src.connect(this.bus(gain, pan, wet, b.duration)); src.start(this.now + delay);
     return b.duration;
   }
+  // a loaded file that moves across the stereo field; without the file, a synthesized stand-in
+  moving(id, { gain = 1, from = 0.8, to = -0.8, dur = 0 } = {}) {
+    if (!this.ctx) return 0;
+    const b = this.buf && this.buf[id];
+    if (!b) return this.movingSynth(id, from, to, dur || 4);
+    const ctx = this.ctx, src = ctx.createBufferSource(); src.buffer = b;
+    const g = ctx.createGain(); g.gain.value = gain; const p = ctx.createStereoPanner(), t = this.now, len = dur || b.duration;
+    p.pan.setValueAtTime(from, t); p.pan.linearRampToValueAtTime(to, t + len);
+    const wet = ctx.createGain(); wet.gain.value = 0.35;
+    src.connect(g).connect(p).connect(this.master); p.connect(wet).connect(this.reverb); src.start(t);
+    return b.duration;
+  }
+  movingSynth(id, from, to, dur) {
+    const ctx = this.ctx, t = this.now, car = id.includes('car');
+    const o = ctx.createOscillator(); o.type = car ? 'sawtooth' : 'sine';
+    o.frequency.setValueAtTime(car ? 140 : 520, t); o.frequency.exponentialRampToValueAtTime(car ? 80 : 380, t + dur);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = car ? 400 : 900; bp.Q.value = 3;
+    const vib = ctx.createOscillator(); vib.frequency.value = 5; const vg = ctx.createGain(); vg.gain.value = car ? 2 : 14; vib.connect(vg).connect(o.frequency);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(car ? 0.12 : 0.05, t + dur * 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const p = ctx.createStereoPanner(); p.pan.setValueAtTime(from, t); p.pan.linearRampToValueAtTime(to, t + dur);
+    o.connect(bp).connect(g).connect(p).connect(this.master); o.start(t); vib.start(t); o.stop(t + dur + 0.1); vib.stop(t + dur + 0.1);
+    return dur;
+  }
   say(id, gain = 1.3) { return this.play('vo/' + id, { gain, wet: 0.12 }); }
   // loudness of a loaded clip, 30 values a second, 0..1 (drives the mouth)
   envelope(id) {

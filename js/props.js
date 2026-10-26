@@ -44,7 +44,7 @@ export function scatter(parent, name, mats, { cast = true } = {}) {
       if (!o.isMesh) return;
       const im = new THREE.InstancedMesh(o.geometry, o.material, mats.length), local = new THREE.Matrix4().multiplyMatrices(norm, o.matrixWorld);
       mats.forEach((m, i) => im.setMatrixAt(i, t.multiplyMatrices(m, local)));
-      im.castShadow = cast; im.receiveShadow = true; im.frustumCulled = false; out.add(im);
+      im.castShadow = cast; im.receiveShadow = true; im.computeBoundingSphere(); out.add(im);   // culled as a group, by the sphere around every copy
     });
     parent.add(out);
   }).catch((e) => console.warn('scatter failed:', name, e));

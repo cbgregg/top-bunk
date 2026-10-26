@@ -4,3 +4,5 @@
 - **Animation:** idle, walk, run and gesture clips from Mixamo (Adobe), as shipped in the [three.js](https://github.com/mrdoob/three.js) example `Xbot.glb`, retargeted onto the Rocketbox skeleton. Mixamo animations may be used royalty-free in projects; the original files are not redistributed here, only the baked rotation curves in `assets/models/anims.glb`.
 - **3D engine:** [three.js](https://threejs.org) (MIT), loaded from the jsDelivr CDN.
 - **Voices and music:** generated with ElevenLabs (see `tools/`).
+- **Surfaces, models and sky:** [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), all CC0 (no attribution required): the PBR materials in `assets/pbr/`, the HDRI skies in `assets/sky/`, and the furniture, plant, tree, grass and rock models in `assets/props/`.
+

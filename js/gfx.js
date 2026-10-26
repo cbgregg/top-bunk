@@ -22,10 +22,10 @@ const KEY = 'topbunk.quality';
 const SKY_ROT = -1.125;
 
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.045 }, vignette: { value: 0.32 }, ca: { value: 0.0011 }, sat: { value: 0.97 }, contrast: { value: 1.04 } },
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.045 }, vignette: { value: 0.32 }, ca: { value: 0.0011 }, sat: { value: 0.97 }, contrast: { value: 1.04 }, night: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float time, grain, vignette, ca, sat, contrast; uniform vec2 res; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float time, grain, vignette, ca, sat, contrast, night; uniform vec2 res; varying vec2 vUv;
     float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
     void main() {
       vec2 d = vUv - 0.5; float r2 = dot(d, d);
@@ -33,6 +33,10 @@ const GradeShader = {
       vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, sat);
+      // dark-adapted eyes: dim areas lose colour and lean blue-grey, and blacks never quite reach black (the green lights stay green)
+      float dark = 1.0 - smoothstep(0.04, 0.32, l);
+      c = mix(c, vec3(l) * vec3(0.78, 0.95, 1.28), 0.55 * night * dark);
+      c += night * 0.013 * vec3(0.65, 0.85, 1.2);
       c = (c - 0.5) * contrast + 0.5;
       c *= 1.0 - vignette * smoothstep(0.28, 0.95, length(d) * 1.25);
       float n = hash(vUv * res + fract(time) * 91.7) - 0.5;
@@ -44,10 +48,10 @@ const GradeShader = {
 export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
-    let q = quality; try { q = q || localStorage.getItem(KEY); } catch (e) { /* private window */ }
-    this.quality = QUALITY[q] ? q : 'high';
-    this.time = 0; this.phase = 'title'; this.env = {}; this.daySky = null;
-    this.ft = 16; this.slow = 0; this.age = 0; this.auto = true; this.onChange = null;
+    let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* private window */ }
+    this.quality = QUALITY[q] ? q : 'high'; this.auto = !(QUALITY[saved] || quality);
+    this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
+    this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null;
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.loadEnv();
     this.build();
@@ -71,11 +75,12 @@ export class Gfx {
   apply() {
     const s = this.scene, p = this.phase, day = p === 'day', morn = p === 'morning';
     s.environmentRotation.y = s.backgroundRotation.y = SKY_ROT;
+    this.nightGoal = (p === 'day' || p === 'morning') ? 0 : 1;
     if (day || morn) {
       s.environment = this.env.day || null; s.environmentIntensity = day ? 0.5 : 0.4;
       if (this.daySky) { s.background = this.daySky; s.backgroundIntensity = day ? 1 : 0.9; }
     } else {
-      s.environment = this.env.night || null; s.environmentIntensity = p === 'title' ? 0.35 : 0.5;
+      s.environment = this.env.night || null; s.environmentIntensity = p === 'title' ? 0.5 : 0.7;
       s.background = new THREE.Color(0x020308); s.backgroundIntensity = 1;
     }
   }
@@ -138,7 +143,7 @@ export class Gfx {
 
   render(dt) {
     this.time += dt; this.watch(dt);
-    if (this.pass.grade) this.pass.grade.uniforms.time.value = this.time;
+    if (this.pass.grade) { const u = this.pass.grade.uniforms; u.time.value = this.time; this.night += ((this.nightGoal ?? 0) - this.night) * Math.min(1, dt * 1.2); u.night.value = this.night; }
     if (this.composer) this.composer.render(dt); else this.r.render(this.scene, this.camera);
   }
 }

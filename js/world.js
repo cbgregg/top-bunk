@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as TX from './textures.js';
 import { applyPBR } from './pbr.js';
 import { place, scatter } from './props.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export const H = 2.7;      // ceiling height
 export const WT = 0.16;    // wall thickness
@@ -142,6 +143,14 @@ export function buildWorld(scene) {
     (o.parent || house).add(mesh);
     if (curTag) curTag.push(mesh);
     return mesh;
+  }
+
+  // Box with rounded edges (the fixtures: they catch the light like real ones). Same bounds as box().
+  function rbox(x0, x1, y0, y1, z0, z1, mat, r = 0.02, o = {}) {
+    const geo = new RoundedBoxGeometry(x1 - x0, y1 - y0, z1 - z0, 3, Math.min(r, (x1 - x0) / 2.01, (y1 - y0) / 2.01, (z1 - z0) / 2.01));
+    geo.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    if (mat && mat.userData && mat.userData.worldUV) worldUV(geo);
+    const m = new THREE.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = true; (o.parent || house).add(m); return m;
   }
 
   // ---------- walls ----------
@@ -406,17 +415,39 @@ export function buildWorld(scene) {
   solid(16.55, 17.35, -0.95, -0.58);
 
   // ---------- bathroom ----------
-  box(21.2, 23.9, 0, 0.55, -2.42, -1.62, M.porcelain, { uv: false });
-  box(21.3, 23.8, 0.42, 0.56, -2.32, -1.72, std({ color: 0x9a9a92, roughness: 0.2 }), { uv: false });
-  solid(21.15, 23.95, -2.45, -1.58);
-  box(23.35, 23.92, 0, 0.42, 1.95, 2.45, M.porcelain, { uv: false });
-  box(23.7, 23.92, 0.42, 0.85, 1.85, 2.55, M.porcelain, { uv: false });
-  solid(23.3, 24, 1.8, 2.6);
-  box(22.05, 22.35, 0, 0.78, 2.62, 2.9, M.porcelain, { uv: false });
-  box(21.85, 22.55, 0.78, 0.9, 2.42, 2.92, M.porcelain, { uv: false });
-  box(22.15, 22.25, 0.9, 1.0, 2.82, 2.9, M.metal, { uv: false });
-  solid(21.8, 22.6, 2.4, 3);
-  box(21.8, 22.6, 1.25, 1.95, 2.9, 2.915, M.mirror, { uv: false });
+  {
+    const porc = new THREE.MeshPhysicalMaterial({ color: 0xe9e7df, roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.06 });
+    const chrome = std({ color: 0xdfe2e4, roughness: 0.12, metalness: 1 });
+    const cyl = (r, h, mat, x, y, z, rx = 0, rz = 0, parent = house) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 16), mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; parent.add(m); return m; };
+    // tub: a rounded shell with a real hollow, and a floor inside it
+    {
+      const rr = (w, d, r) => { const sh = new THREE.Shape(); sh.moveTo(-w / 2 + r, -d / 2); sh.lineTo(w / 2 - r, -d / 2); sh.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r); sh.lineTo(w / 2, d / 2 - r); sh.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2); sh.lineTo(-w / 2 + r, d / 2); sh.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r); sh.lineTo(-w / 2, -d / 2 + r); sh.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2); return sh; };
+      const shape = rr(2.7, 0.8, 0.14), hole = rr(2.4, 0.52, 0.2); shape.holes.push(hole);
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.5, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 3, curveSegments: 8 });
+      geo.rotateX(-Math.PI / 2); const tub = new THREE.Mesh(geo, porc); tub.position.set(22.55, 0.06, -2.02); tub.castShadow = tub.receiveShadow = true; house.add(tub);
+      rbox(21.4, 23.7, 0.16, 0.22, -2.29, -1.75, porc, 0.02);
+      cyl(0.018, 0.17, chrome, 22.0, 0.82, -2.4, Math.PI / 2); cyl(0.03, 0.03, chrome, 21.8, 0.8, -2.46, Math.PI / 2); cyl(0.03, 0.03, chrome, 22.2, 0.8, -2.46, Math.PI / 2);   // spout and two taps
+    }
+    solid(21.15, 23.95, -2.45, -1.58);
+    // toilet: pedestal, bowl, ring, closed lid, tank against the east wall
+    {
+      const t = new THREE.Group(); t.position.set(23.55, 0, 2.2); house.add(t);
+      cyl(0.1, 0.4, porc, -0.12, 0.2, 0, 0, 0, t);
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), porc); bowl.scale.set(0.27, 0.17, 0.2); bowl.position.set(-0.1, 0.43, 0); bowl.castShadow = true; t.add(bowl);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.03, 8, 28), porc); ring.rotation.x = Math.PI / 2; ring.scale.set(1.4, 1, 1); ring.position.set(-0.1, 0.52, 0); t.add(ring);
+      const lid = cyl(0.19, 0.022, porc, -0.1, 0.545, 0, 0, 0, t); lid.scale.set(1.4, 1, 1);
+      rbox(0.14, 0.42, 0.45, 0.88, -0.26, 0.26, porc, 0.03, { parent: t });
+      cyl(0.022, 0.02, chrome, 0.28, 0.9, 0, 0, 0, t);
+    }
+    solid(23.3, 24, 1.8, 2.6);
+    // pedestal sink, tap and a framed mirror
+    cyl(0.075, 0.74, porc, 22.2, 0.37, 2.74);
+    rbox(21.92, 22.48, 0.74, 0.9, 2.46, 2.92, porc, 0.06); rbox(22.0, 22.4, 0.885, 0.905, 2.54, 2.88, std({ color: 0xd8d6cd, roughness: 0.1 }), 0.05);
+    cyl(0.016, 0.1, chrome, 22.2, 0.95, 2.86); cyl(0.014, 0.13, chrome, 22.2, 1.0, 2.8, Math.PI / 2); cyl(0.022, 0.02, chrome, 22.1, 0.915, 2.86); cyl(0.022, 0.02, chrome, 22.3, 0.915, 2.86);
+    solid(21.8, 22.6, 2.4, 3);
+    rbox(21.76, 22.64, 1.2, 2.0, 2.9, 2.93, M.white, 0.01);
+    box(21.8, 22.6, 1.25, 1.95, 2.9, 2.94, M.mirror, { uv: false });
+  }
 
   // ---------- living / kitchen ----------
   tagStart('couch');
@@ -435,11 +466,28 @@ export function buildWorld(scene) {
   tagEnd();
   const cTv = solid(8.05, 9.45, -8.9, -8.2);
   // kitchen
-  box(19.3, 19.92, 0, 0.9, -8.9, -3.2, M.cabinet, { uv: false });
-  box(19.25, 19.92, 0.9, 0.95, -8.9, -3.2, M.counter, { uv: false });
-  box(19.6, 19.92, 1.5, 2.3, -8.9, -3.2, M.cabinet, { uv: false });
-  solid(19.2, 20, -8.95, -3.15);
-  box(19.1, 19.9, 0, 1.8, -2.4, -1.4, M.fridge, { uv: false }); solid(19.05, 20, -2.45, -1.35);
+  {
+    const steel = std({ color: 0xc9cccf, roughness: 0.25, metalness: 1 }), dark = std({ color: 0x1c1c1a, roughness: 0.6 });
+    M.counter.userData.worldUV = true; applyPBR(M.counter, 'counter', { tint: 0xd8d2c4 });
+    // base cabinets with doors and handles (a gap where the stove stands), a stone counter, tiles behind it, upper cabinets and a hood
+    const run = (z0, z1, upper) => {
+      const n = Math.max(1, Math.round((z1 - z0) / 0.6)), w = (z1 - z0) / n;
+      rbox(19.3, 19.92, 0, 0.9, z0, z1, M.cabinet, 0.012);
+      rbox(19.2, 19.95, 0.9, 0.95, z0 - (z0 < -8.8 ? 0 : 0.02), z1 + (z1 > -3.3 ? 0.02 : 0.0), M.counter, 0.012);
+      for (let i = 0; i < n; i++) { const a = z0 + i * w, b = a + w; rbox(19.283, 19.305, 0.07, 0.86, a + 0.012, b - 0.012, M.cabinet, 0.006); rbox(19.25, 19.285, 0.52, 0.78, b - 0.075, b - 0.06, steel, 0.004); }
+      if (upper) { rbox(19.6, 19.92, 1.5, 2.3, z0, z1, M.cabinet, 0.012); for (let i = 0; i < n; i++) { const a = z0 + i * w, b = a + w; rbox(19.583, 19.603, 1.53, 2.27, a + 0.012, b - 0.012, M.cabinet, 0.006); rbox(19.55, 19.585, 1.55, 1.78, b - 0.075, b - 0.06, steel, 0.004); } }
+    };
+    run(-8.9, -6.3, true); run(-5.7, -3.2, true);
+    box(19.9, 19.915, 0.95, 1.5, -8.9, -3.2, M.tile, { uv: true });
+    rbox(19.5, 19.92, 1.55, 1.78, -6.3, -5.7, steel, 0.02); rbox(19.78, 19.92, 1.78, 2.3, -6.15, -5.85, steel, 0.02);   // hood
+    rbox(19.4, 19.84, 0.945, 0.965, -4.6, -3.9, steel, 0.03); rbox(19.44, 19.8, 0.95, 0.968, -4.55, -3.95, dark, 0.03);   // sink and tap
+    { const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.28, 12), steel); tap.position.set(19.86, 1.1, -4.25); house.add(tap); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.18, 12), steel); sp.rotation.z = Math.PI / 2; sp.position.set(19.78, 1.23, -4.25); house.add(sp); }
+    solid(19.2, 20, -8.95, -3.15);
+    // fridge: rounded body, seam, handles
+    rbox(19.12, 19.9, 0.04, 1.8, -2.4, -1.4, M.fridge, 0.05); rbox(19.108, 19.125, 1.12, 1.14, -2.4, -1.4, dark, 0.004);
+    rbox(19.07, 19.125, 1.2, 1.65, -1.56, -1.53, steel, 0.01); rbox(19.07, 19.125, 0.5, 1.0, -1.56, -1.53, steel, 0.01);
+    solid(19.05, 20, -2.45, -1.35);
+  }
   tagStart('dining');
   box(14.5, 16, 0.7, 0.75, -6, -4.8, M.furn, { uv: false });
   for (const [x, z] of [[14.6, -5.95], [15.9, -5.95], [14.6, -4.85], [15.9, -4.85]]) box(x - 0.03, x + 0.03, 0, 0.7, z - 0.03, z + 0.03, M.furn, { uv: false });
@@ -466,9 +514,9 @@ export function buildWorld(scene) {
   prop('table_round', { x: 15.25, z: -5.4, s: 0.77 }, { tag: 'dining', old: [cDining], box: [14.7, 15.8, -5.95, -4.85] });
   for (const [x, z, r] of [[14.35, -5.4, PI / 2], [16.15, -5.4, -PI / 2], [15.25, -6.3, 0], [15.25, -4.5, PI]]) prop('chair', { x, z, rot: r }, { tag: 'dining' });
   // kitchen
-  prop('stove', { x: 19.0, z: -6.0, rot: -PI / 2 }, { box: [18.65, 19.3, -6.3, -5.7] });
-  prop('kettle', { x: 19.0, y: 0.86, z: -5.9, rot: -PI / 2 });
-  prop('pot', { x: 19.6, y: 0.95, z: -4.4, rot: -PI / 2 });
+  prop('stove', { x: 19.6, z: -6.0, rot: -PI / 2 });
+  prop('kettle', { x: 19.6, y: 0.86, z: -5.85, rot: -PI / 2 });
+  prop('pot', { x: 19.62, y: 0.95, z: -7.3, rot: -PI / 2 });
   // plants, clock, pictures
   prop('plant2', { x: 6.8, z: -8.35 }, { box: [6.5, 7.1, -8.7, -8.05] });
   prop('plant1', { x: 6.8, z: -1.55 }, { box: [6.5, 7.1, -1.9, -1.25] });
@@ -500,16 +548,47 @@ export function buildWorld(scene) {
   const fixture = (name, x, z, intensity = 9) => {
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.lamp.clone());
     dome.rotation.x = Math.PI; dome.position.set(x, H - 0.005, z); house.add(dome);
-    const L = new THREE.PointLight(0xffd29a, 0, 9, 2); L.position.set(x, H - 0.25, z); scene.add(L);
+    // a downward cone from under the shade (so the ceiling right above it isn't blown out) plus a faint bounce for the ceiling and upper walls
+    const spot = new THREE.SpotLight(0xffd29a, 0, 11, 1.3, 1.0, 2); spot.position.set(x, H - 0.3, z); spot.target.position.set(x, 0, z);
+    const bounce = new THREE.PointLight(0xffd29a, 0, 7, 2); bounce.position.set(x, H - 0.9, z);
+    scene.add(spot, spot.target, bounce);
+    // (visibility only changes with the story phase: a changing number of lights recompiles every shader)
+    const L = { get intensity() { return spot.intensity / 1.5; }, set intensity(v) { spot.intensity = v * 1.5; bounce.intensity = v * 0.22; }, set visible(v) { spot.visible = bounce.visible = v; } };
     bulbs[name] = { light: L, dome, base: intensity };
   };
   fixture('bed', -3, 0); fixture('hall1', 5, 0); fixture('hall2', 15, 0); fixture('bath', 22, 0.4, 7);
   fixture('living', 9.5, -5.5, 10); fixture('kitchen', 16.5, -5, 10);
 
-  // night light near the bedroom
-  const nlMesh = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.09, 0.03), std({ color: 0xffb070, emissive: 0xff8a3a, emissiveIntensity: 0 }));
-  nlMesh.position.set(1.6, 0.35, -1 + WT / 2 + 0.015); house.add(nlMesh);
-  const nightLight = new THREE.PointLight(0xff8a3a, 0, 5, 2); nightLight.position.set(1.6, 0.4, -0.75); scene.add(nightLight);
+  // ---------- outlets, and a few green plug-in night lights (the only light you get at night) ----------
+  const outletMat = std({ color: 0xe4ded0, roughness: 0.5 }), holeMat = std({ color: 0x14140f, roughness: 0.9 }), nlBody = std({ color: 0xe9e4d4, roughness: 0.45 });
+  const nightLights = [];
+  // (px, pz) on the wall's inner face, (nx, nz) pointing into the room, y = height of the outlet; lit = a night light is plugged into it
+  function outlet(px, y, pz, nx, nz, lit) {
+    const g = new THREE.Group(); g.position.set(px, y, pz); g.rotation.y = Math.atan2(nx, nz);   // local +Z points into the room
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.12, 0.01), outletMat); plate.position.z = 0.005; g.add(plate);
+    for (const dy of [0.028, -0.028]) for (const dx of [-0.011, 0.011]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.016, 0.004), holeMat); h.position.set(dx, dy, 0.011); g.add(h); }
+    house.add(g);
+    if (!lit) return;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.09, 0.034), nlBody); body.position.set(0, -0.026, 0.027); body.castShadow = true; g.add(body);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x163a20, emissive: 0x40ff72, emissiveIntensity: 0, roughness: 0.35 });
+    const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.046, 0.052), mat); lens.position.set(0, -0.018, 0.0445); g.add(lens);
+    const light = new THREE.PointLight(0x55ff88, 0, 6.5, 2); light.position.set(0, -0.02, 0.2); g.add(light);
+    const pos = new THREE.Vector3(); g.updateMatrixWorld(true); light.getWorldPosition(pos);
+    nightLights.push({ light, mat, base: 2.6, pos });
+  }
+  outlet(1.6, 0.33, -0.92, 0, 1, true);       // hall, by the bedroom
+  outlet(8.8, 0.35, 0.92, 0, -1, true);       // hall, by the drawing
+  outlet(18.7, 0.33, -0.92, 0, 1, true);      // hall, by the bathroom
+  outlet(-0.08, 0.32, 1.7, -1, 0, true);      // bedroom, by the door
+  outlet(20.08, 0.34, 1.9, 1, 0, true);       // bathroom
+  outlet(6.08, 0.34, -3.6, 1, 0, true);       // living room
+  for (const [x, y, z, nx, nz] of [[2.6, 0.33, 0.92, 0, -1], [9.9, 0.4, -8.92, 0, 1], [-3.0, 0.3, -2.92, 0, 1], [13.6, 0.32, -0.92, 0, 1], [19.92, 1.05, -4.1, -1, 0]]) outlet(x, y, z, nx, nz, false);
+
+  // for the night event: the face's glow, and a passing car's headlights (a shadow-casting spot, so the light only comes in through the windows)
+  const faceLight = new THREE.PointLight(0xdce6ff, 0, 20, 2); faceLight.visible = false; scene.add(faceLight);
+  const carLight = new THREE.SpotLight(0xfff2d6, 0, 48, 0.3, 0.55, 1.5); carLight.visible = false;
+  carLight.castShadow = true; carLight.shadow.mapSize.set(1024, 1024); carLight.shadow.camera.near = 1; carLight.shadow.camera.far = 48; carLight.shadow.bias = -0.0006; carLight.shadow.autoUpdate = false;
+  carLight.position.set(30, 0.8, 9.5); scene.add(carLight, carLight.target);
 
   // window fill lights (no shadows — cheap "light through glass")
   const fills = [
@@ -585,7 +664,24 @@ export function buildWorld(scene) {
     const m4 = new THREE.Matrix4(); posts.forEach(([x, z], i) => { m4.makeTranslation(x, 0.65, z); im.setMatrixAt(i, m4); }); im.castShadow = true; yard.add(im);
     for (const y of [0.5, 1.05]) { box(-60, 60, y, y + 0.1, -48.04, -47.96, M.fence, { uv: false, parent: yard }); box(39.96, 40.04, y, y + 0.1, -48, 20, M.fence, { uv: false, parent: yard }); }
   }
-  // trees (instanced douglas firs)
+  // trees (instanced douglas firs): four drooping tiers with scalloped skirts, textured with needles
+  const coniferGeo = () => {
+    const pos = [], uv = [], idx = [], N = 18, r = TX.rng(31);
+    const vtx = (x, y, z, u, v) => { pos.push(x, y, z); uv.push(u, v); return pos.length / 3 - 1; };
+    for (let k = 0; k < 4; k++) {
+      const y0 = 1.2 + k * 1.45, h = 2.7 - k * 0.32, R = 1.95 * (1 - k * 0.22);
+      const apex = vtx(0, y0 + h, 0, 0.5, 1), mid = [], base = [];
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2, scal = i % 2 ? 1.0 : 0.62, jit = 0.9 + r() * 0.2;
+        mid.push(vtx(Math.cos(a) * R * 0.6 * jit, y0 + h * 0.42, Math.sin(a) * R * 0.6 * jit, i / N * 3, 0.55));
+        base.push(vtx(Math.cos(a) * R * scal * jit, y0 - 0.22 * (i % 2 ? 1 : 0.2), Math.sin(a) * R * scal * jit, i / N * 3, 0));
+      }
+      for (let i = 0; i < N; i++) { const j = (i + 1) % N; idx.push(apex, mid[i], mid[j], mid[i], base[i], base[j], mid[i], base[j], mid[j]); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  M.leaves.map = TX.needles(); M.leaves.side = THREE.DoubleSide; M.leaves.color.set(0xd8e8d8); M.leaves.roughness = 0.95;
+  applyPBR(M.trunk, 'darkwood', { tint: 0x7a6248 });
   {
     const r = TX.rng(777), spots = [];
     while (spots.length < 110) {
@@ -595,15 +691,38 @@ export function buildWorld(scene) {
     }
     for (const [x, z] of [[-14, 8], [-19, 14], [-12, 18], [30, 10], [34, 0], [-36, -12]]) spots.push([x, z, 1.1, 1]);
     const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.3, 4, 7), M.trunk, spots.length);
-    const cone = new THREE.InstancedMesh(new THREE.ConeGeometry(1.9, 5.5, 8), M.leaves, spots.length * 3);
+    const cone = new THREE.InstancedMesh(coniferGeo(), M.leaves, spots.length);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     spots.forEach(([x, z, sc, rot], i) => {
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
       m4.compose(p.set(x, 2 * sc, z), q, s.set(sc, sc, sc)); trunk.setMatrixAt(i, m4);
-      for (let k = 0; k < 3; k++) { const ks = sc * (1 - k * 0.24); m4.compose(p.set(x, (3.4 + k * 2.6) * sc, z), q, s.set(ks, sc, ks)); cone.setMatrixAt(i * 3 + k, m4); }
+      m4.compose(p.set(x, 0.9 * sc, z), q, s.set(sc * (0.85 + (rot % 1) * 0.3), sc, sc * (0.85 + ((rot * 7) % 1) * 0.3))); cone.setMatrixAt(i, m4);
       if (Math.hypot(x - 5, z + 15) < 50) solid(x - 0.35 * sc, x + 0.35 * sc, z - 0.35 * sc, z + 0.35 * sc);
     });
     trunk.castShadow = cone.castShadow = true; yard.add(trunk, cone);
+  }
+  // real trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
+  {
+    const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const ok = (x, z, pad = 0) => !(x > -7 - pad && x < 25 + pad && z > -10 - pad && z < 4 + pad) && !(x > 10 - pad && x < 16 + pad && z < -10 && z > -30);   // not on the house, porch path or truck
+    const trees = [[-14, 7], [-19, -4], [-13, -16], [29, 9], [33, -6], [27, -24], [-9, -28], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2]];
+    const tm = trees.map(([x, z]) => { const k = 1.5 + r() * 1.1; q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k, k)); });
+    scatter(yard, 'tree_small', tm);
+    trees.forEach(([x, z]) => solid(x - 0.5, x + 0.5, z - 0.5, z + 0.5));
+    const grass = (name, n, rmin, rmax, k0, k1) => {
+      const ms = [];
+      while (ms.length < n) {
+        const a = r() * 6.283, d = rmin + r() * (rmax - rmin), x = 9 + Math.cos(a) * d * 1.6, z = -3 + Math.sin(a) * d;
+        if (!ok(x, z, 1.5)) continue;
+        const k = k0 + r() * (k1 - k0); q.setFromAxisAngle(up, r() * 6.28); ms.push(m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k * (0.8 + r() * 0.5), k)));
+      }
+      scatter(yard, name, ms, { cast: false });
+    };
+    grass('grass2', 1500, 5, 36, 1.0, 2.0); grass('grass1', 260, 6, 32, 0.8, 1.4);
+    const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [6, -33, 1.6], [-6, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
+    scatter(yard, 'rock1', rocks);
+    const small = []; for (let i = 0; i < 40; i++) { const x = -20 + r() * 60, z = -35 + r() * 50; if (!ok(x, z, 2)) continue; q.setFromAxisAngle(up, r() * 6.28); const k = 1 + r() * 2.5; small.push(m4.clone().compose(new THREE.Vector3(x, -0.03, z), q, sc.set(k, k, k))); }
+    scatter(yard, 'rock2', small);
   }
   // invisible yard boundary
   solid(-70, 60, -60, -58); solid(-70, 60, 30, 32); solid(-72, -70, -60, 32); solid(60, 62, -60, 32);
@@ -628,7 +747,7 @@ export function buildWorld(scene) {
   scene.userData.shadowLights = [{ light: sun, sun: true }, { light: bathSpot, sun: false }];
 
   return {
-    colliders, T, M, house, yard, bulbs, nightLight, nlMesh, fills, bathSpot, porchLight, porchBulb,
+    colliders, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, winMat, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK,
   };
 }

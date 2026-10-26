@@ -395,3 +395,17 @@ export function smile() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
+
+// dense fir needles: a tileable mat of short strokes in several greens
+export function needles() {
+  const S = 256, [c, g] = mk(S), r = rng(91);
+  g.fillStyle = '#183020'; g.fillRect(0, 0, S, S);
+  const cols = ['#27502b', '#173019', '#336a38', '#10231a', '#2d5a30', '#3d7440'];
+  for (let i = 0; i < 2800; i++) {
+    const x = r() * S, y = r() * S, a = r() * Math.PI, l = 6 + r() * 14;
+    g.strokeStyle = cols[(r() * cols.length) | 0]; g.lineWidth = 0.8 + r() * 1.4;
+    wrapDraw(S, S, (ox, oy) => { g.beginPath(); g.moveTo(x + ox, y + oy); g.lineTo(x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l); g.stroke(); });
+  }
+  return toTex(c, { repeat: [2, 2] });
+}
+
