@@ -81,7 +81,9 @@ The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.g
 
 ## Graphics
 
-Rendered with three.js and a post-processing pipeline: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). There is a **Graphics** setting on the title screen (Auto, Ultra, High, Medium, Low). Auto starts on High and steps down if the frame rate stays low.
+Rendered with three.js and a post-processing pipeline: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). There is a **Graphics** setting on the title screen (Auto, Ultra, High, Medium, Low). Auto starts on High, lowers the render resolution a little when frames get slow (and raises it again when there is headroom), and only then steps down a preset.
+
+Performance work (so it runs well on ordinary laptops and phones): the house's static geometry is merged into a few dozen meshes (about 2,000 draw calls became about 500), the props were simplified with `tools/assets/slim_models.mjs` (3.4 M triangles in the scene became 0.8 M), the grass is chunked so the camera only draws what it can see, there is one fewer light per ceiling fixture, the shadow maps are only re-rendered when something can change, the ambient occlusion is computed at half resolution, and every shader variant is compiled behind the black screen when you press play.
 
 | Part | Source |
 |---|---|

@@ -144,8 +144,8 @@ function nlMult(m, flick = true) {
 }
 
 // ---------- phases (lighting) ----------
-function setPhase(p) {
-  F.phase = p;
+function setPhase(p, silent = false) {
+  F.phase = p; W.sun.shadow.needsUpdate = true;
   const day = p === 'day', night = p === 'night' || p === 'title', morn = p === 'morning';
   gfx.setPhase(p);
   scene.fog = day ? new THREE.Fog(0xa9c2d6, 35, 190) : p === 'title' ? new THREE.FogExp2(0x02040c, 0.03) : night ? new THREE.FogExp2(0x040818, 0.062) : new THREE.Fog(0xe8dcc6, 30, 170);
@@ -175,7 +175,7 @@ function setPhase(p) {
   W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
   renderer.toneMappingExposure = day ? 0.8 : night ? 1.0 : 0.85;
   mom.group.visible = dad.group.visible = day;
-  if (sfx.ctx) {
+  if (sfx.ctx && !silent) {
     sfx.wind(day ? 0.035 : night ? 0.06 : 0.025, 2);
     sfx.drone(p === 'night' ? 0.05 : p === 'title' ? 0.03 : 0, 3);
     sfx.hum(p === 'night' ? 0.012 : 0, 2);
@@ -535,6 +535,11 @@ function titleScene() {
   E.faceTowards(-9, -26);
 }
 
+// compile every shader variant (day, night, morning light setups) while the screen is black, so the phase changes later don't hitch
+async function warmShaders() {
+  const rt = gfx.composer && gfx.composer.renderTarget1;   // (shaders differ for a render target and for the screen)
+  try { for (const p of ['night', 'morning', 'day']) { setPhase(p, true); if (rt) renderer.setRenderTarget(rt); await renderer.compileAsync(scene, camera); renderer.setRenderTarget(null); } } catch (e) { renderer.setRenderTarget(null); /* compiled on first use instead */ }
+}
 const STAGES = {
   day: () => dayScript(), n1: () => night1(), b1: () => breakfast(1), n2: () => night2(), b2: () => breakfast(2), n3: (resume) => night3(resume),
 };
@@ -551,6 +556,7 @@ async function startGame() {
   UI.hide('title'); lock();
   E.visible = false; E.lookTarget = null;
   UI.fade(1, 0.01);
+  await warmShaders();
   if (DEBUG === 'night' || DEBUG === 'night1') { await playFrom('n1'); return; }
   if (DEBUG === 'night2') { await playFrom('n2'); return; }
   if (DEBUG === 'breakfast') { await playFrom('b1'); return; }
@@ -857,7 +863,7 @@ function update(dt) {
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
 }
 
-let last = performance.now(), titleT = 0;
+let last = performance.now(), titleT = 0, frameN = 0;
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -868,6 +874,11 @@ function loop(now) {
     camera.lookAt(1, 1.6, -4);
     E.update(dt);
   }
+  // the shadow maps are re-rendered only when something can have changed: the sun and moon every third frame (the people move slowly), the
+  // bathroom spot only while it is lit, the headlights only while the car passes (see windowface.js)
+  frameN++; W.sun.shadow.autoUpdate = false; W.bathSpot.shadow.autoUpdate = false;
+  if (frameN % 3 === 0) W.sun.shadow.needsUpdate = true;
+  if (W.bathSpot.intensity > 0) W.bathSpot.shadow.needsUpdate = true;
   if (!window.__norender) gfx.render(dt);
 }
 

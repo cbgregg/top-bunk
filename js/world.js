@@ -4,6 +4,7 @@ import * as TX from './textures.js';
 import { applyPBR } from './pbr.js';
 import { place, scatter } from './props.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const H = 2.7;      // ceiling height
 export const WT = 0.16;    // wall thickness
@@ -698,7 +699,7 @@ export function buildWorld(scene) {
   prop('sofa', { x: -2.6, z: -2.4, rot: PI / 2 }, { tag: 'couch', old: [cCouch], box: [-3.05, -2.15, -3.3, -1.5] });
   prop('table', { x: -1.2, z: -2.4, rot: PI / 2 }, { tag: 'coffee', old: [cCoffee], box: [-1.6, -0.8, -3.3, -1.5] });
   prop('armchair', { x: 0.7, z: -2.7, rot: 2.1 }, { box: [0.2, 1.2, -3.2, -2.2] });
-  prop('cabinet', { x: -2.8, z: -3.9, rot: PI / 2 }, { box: [-3.25, -2.35, -4.4, -3.4] });
+  prop('cabinet', { x: -2.55, z: -4.12, rot: 0, s: 0.9 }, { box: [-3.27, -1.83, -4.42, -3.8] });   // against the front wall between the picture window and the utility wing, clear of both
   prop('plant2', { x: 2.9, z: -2.0 }, { box: [2.6, 3.2, -2.3, -1.7] });
   prop('clock_wall', { x: 3.21, y: 1.74, z: -3.05, rot: -PI / 2 });
   // kitchen and dining: the round table, chairs, a kettle and a pot on the stove
@@ -716,12 +717,11 @@ export function buildWorld(scene) {
   const fixture = (name, x, z, intensity = 9) => {
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.lamp.clone());
     dome.rotation.x = Math.PI; dome.position.set(x, H - 0.005, z); house.add(dome);
-    // a downward cone from under the shade (so the ceiling right above it isn't blown out) plus a faint bounce for the ceiling and upper walls
+    // a downward cone from under the shade (so the ceiling right above it isn't blown out); no separate bounce light, every light costs every pixel
     const spot = new THREE.SpotLight(0xffd29a, 0, 11, 1.3, 1.0, 2); spot.position.set(x, H - 0.3, z); spot.target.position.set(x, 0, z);
-    const bounce = new THREE.PointLight(0xffd29a, 0, 7, 2); bounce.position.set(x, H - 0.9, z);
-    scene.add(spot, spot.target, bounce);
+    scene.add(spot, spot.target);
     // (visibility only changes with the story phase: a changing number of lights recompiles every shader)
-    const L = { get intensity() { return spot.intensity / 1.5; }, set intensity(v) { spot.intensity = v * 1.5; bounce.intensity = v * 0.22; }, set visible(v) { spot.visible = bounce.visible = v; } };
+    const L = { get intensity() { return spot.intensity / 1.7; }, set intensity(v) { spot.intensity = v * 1.7; }, set visible(v) { spot.visible = v; } };
     bulbs[name] = { light: L, dome, base: intensity };
   };
   fixture('bed', 6.5, 1.4); fixture('hall1', 4.8, -0.9); fixture('hall2', 7.0, -0.9); fixture('bath', 4.15, 1.0, 7);
@@ -897,7 +897,8 @@ export function buildWorld(scene) {
     const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -17 - pad && x < -8 + pad && z > -11 - pad && z < -3);   // not on the house, porch path or truck
     const trees = [[-14, 7], [-19, -4], [-13, -16], [29, 9], [33, -6], [27, -24], [-12, -22], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2], [6, -8]];   // the last is the cherry tree by the front
     const tm = trees.map(([x, z]) => { const k = 1.5 + r() * 1.1; q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k, k)); });
-    scatter(yard, 'tree_small', tm);
+    const near = tm.filter((m) => Math.hypot(m.elements[12], m.elements[14]) < 32);   // only the trees by the house cast shadows (the rest are too far to matter)
+    scatter(yard, 'tree_small', near); scatter(yard, 'tree_small', tm.filter((m) => !near.includes(m)), { cast: false });
     trees.forEach(([x, z]) => solid(x - 0.5, x + 0.5, z - 0.5, z + 0.5));
     const grass = (name, n, rmin, rmax, k0, k1) => {
       const ms = [];
@@ -906,7 +907,9 @@ export function buildWorld(scene) {
         if (!ok(x, z, 1.5)) continue;
         const k = k0 + r() * (k1 - k0); q.setFromAxisAngle(up, r() * 6.28); ms.push(m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k * (0.8 + r() * 0.5), k)));
       }
-      scatter(yard, name, ms, { cast: false });
+      const cells = new Map();   // chunks, so the camera only draws the tufts it can see
+      for (const m of ms) { const key = Math.floor(m.elements[12] / 12) + ',' + Math.floor(m.elements[14] / 12); (cells.get(key) || cells.set(key, []).get(key)).push(m); }
+      for (const list of cells.values()) scatter(yard, name, list, { cast: false });
     };
     grass('grass2', 1500, 5, 36, 1.0, 2.0); grass('grass1', 260, 6, 32, 0.8, 1.4);
     const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [6, -33, 1.6], [-6, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
@@ -935,6 +938,44 @@ export function buildWorld(scene) {
   sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.025; sun.shadow.radius = 3;
   scene.add(sun, sun.target);
   scene.userData.shadowLights = [{ light: sun, sun: true }, { light: bathSpot, sun: false }];
+
+  // ---------- merge the static geometry: hundreds of little boxes become a few dozen meshes (one per material and 6 m cell) ----------
+  {
+    const mergeable = new Set(Object.values(M).filter((m) => !m.transparent && m !== M.lamp));
+    const skip = new Set([...Object.values(tagged).flat(), drawingMesh, ...pickups]);
+    const mergeInto = (root) => {
+      const buckets = new Map(), old = [], v = new THREE.Vector3();
+      for (const m of [...root.children]) {
+        if (!m.isMesh || m.isInstancedMesh || skip.has(m) || m.renderOrder !== 0 || m.userData.keep) continue;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        if (!mats.every((x) => mergeable.has(x))) continue;
+        m.updateMatrix();
+        let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+        g.applyMatrix4(m.matrix);
+        for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+        if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+        g.computeBoundingBox(); g.boundingBox.getCenter(v);
+        const cell = Math.floor(v.x / 6) + ',' + Math.floor(v.z / 6), flags = (m.castShadow ? 1 : 0) + (m.receiveShadow ? 2 : 0);
+        const parts = Array.isArray(m.material) && g.groups.length ? g.groups : [{ start: 0, count: g.attributes.position.count, materialIndex: 0 }];
+        for (const pt of parts) {
+          let sub = g;
+          if (parts.length > 1 || Array.isArray(m.material)) {   // one geometry per face group, each with its own material
+            sub = new THREE.BufferGeometry();
+            for (const name of ['position', 'normal', 'uv']) { const a = g.attributes[name]; sub.setAttribute(name, new THREE.BufferAttribute(a.array.slice(pt.start * a.itemSize, (pt.start + pt.count) * a.itemSize), a.itemSize)); }
+          }
+          const mat = mats[pt.materialIndex || 0], key = mat.uuid + '|' + flags + '|' + cell;
+          (buckets.get(key) || buckets.set(key, { mat, flags, list: [] }).get(key)).list.push(sub);
+        }
+        old.push(m);
+      }
+      for (const m of old) { root.remove(m); m.geometry.dispose(); }
+      for (const { mat, flags, list } of buckets.values()) {
+        const mesh = new THREE.Mesh(mergeGeometries(list, false), mat); mesh.castShadow = !!(flags & 1); mesh.receiveShadow = !!(flags & 2); root.add(mesh);
+        list.forEach((g) => g.dispose());
+      }
+    };
+    mergeInto(house); mergeInto(yard);
+  }
 
   return {
     colliders, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
