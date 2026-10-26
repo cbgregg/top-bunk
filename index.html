@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Top Bunk</title>
+  <meta name="description" content="A first-person horror game. Your family just moved into an old rented farmhouse. Something tall lives in the hallway.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <div id="blanket"></div>
+  <div id="flash"></div>
+  <div id="fade"></div>
+
+  <div id="hud">
+    <div id="objective"></div>
+    <div id="crosshair"></div>
+    <div id="prompt"></div>
+    <div id="hint"></div>
+    <div id="subtitle"></div>
+    <div id="stamina"><div></div></div>
+    <div id="breath"><span>breath</span><div><i></i></div></div>
+  </div>
+  <div id="card"><div class="big"></div><div class="small"></div></div>
+
+  <div id="title" class="screen">
+    <div class="panel">
+      <h1>TOP BUNK</h1>
+      <p class="tag">The rent on the old farmhouse was cheap.<br>Now we know why.</p>
+      <table class="controls">
+        <tr><td>WASD</td><td>Move</td></tr>
+        <tr><td>Mouse</td><td>Look</td></tr>
+        <tr><td>Shift</td><td>Sprint</td></tr>
+        <tr><td>E</td><td>Interact</td></tr>
+        <tr><td>F</td><td>Flashlight</td></tr>
+        <tr><td>Space</td><td>Hold your breath</td></tr>
+        <tr><td>Esc</td><td>Pause</td></tr>
+      </table>
+      <p class="begin">Click to begin</p>
+      <p class="note">Headphones recommended. Contains jump scares.</p>
+      <p id="mobile" class="note warn">Needs a keyboard and mouse.</p>
+    </div>
+  </div>
+  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><p class="begin">Click to resume</p></div></div>
+  <div id="death" class="screen hidden"><div class="panel"><h2 class="red">It found you.</h2><button id="retry">Try again</button></div></div>
+  <div id="end" class="screen hidden">
+    <div class="panel">
+      <h1>TOP BUNK</h1>
+      <p class="tag">Night one survived.<br>Mostly.</p>
+      <p class="note">To be continued…</p>
+      <button id="again">Play again</button>
+    </div>
+  </div>
+  <div id="loading">Unpacking…</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

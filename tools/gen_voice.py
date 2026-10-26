@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate TOP BUNK's voice lines with ElevenLabs.
+"""Generate TOP BUNK's voice lines (Mom and Dad) with ElevenLabs.
 
     ELEVENLABS_API_KEY=... python3 tools/gen_voice.py [--only vo/mom] [--force]
 
@@ -21,11 +21,12 @@ def el(voice_id, speed=1.0):
     return (voice_id, speed)
 
 
-# the same account voices Breachpoint uses: Lily for Mom, Bill for Dad
-MOM = el('pFZP5JQG7iQjIQuC4Bku', 1.0)
-DAD = el('pqHfZKP75CvOlQylNhV4', 1.0)
+# account voices (the same ones Breachpoint uses): Sarah for Mom, Chris for Dad
+MOM = el('EXAVITQu4vr4xnSDxMaL', 1.0)
+DAD = el('iP95p4xoKVk53GoZ742B', 1.0)
 
-# id -> (voice, line). Takes: several ways of saying one thing, as vo/mom/<id>_<n>.
+# id -> (voice, line). These are exactly the lines the game shows as subtitles (js/main.js); the game plays
+# sfx.say('<mom|dad>/<name>') next to each one. Change the wording in both places.
 LINES = {}
 
 
@@ -33,37 +34,23 @@ def add(id_, voice, line):
     LINES[id_] = (voice, line)
 
 
-# moving day: the kitchen, Mom is calm and busy
-for n, line in enumerate([
-    '[warm, tired] Easy with that box, sweetie. Top bunk is yours if you want it.',
-    '[warm] Almost everything is in. Go see your room, it has a window.',
-    '[cheerful, tired] Thanks for carrying. The hall is long, isn\'t it?',
-], 1):
-    add(f'vo/mom/moving_{n}', MOM, line)
-for n, line in enumerate([
-    "[calm] Don't touch the crayon drawing in the hall, honey. It's the old tenant's. We'll take it down later.",
-    '[calm, distracted] Oh, the drawing. Kids find everything in an old house.',
-], 1):
-    add(f'vo/mom/drawing_{n}', MOM, line)
-add('vo/dad/moving_1', DAD, '[tired, joking] The truck is empty. That means we did it, or it means we left something behind.')
-add('vo/dad/moving_2', DAD, '[calm] Lamp goes in the living room. Careful, the shade is cracked.')
+# moving day
+add('vo/dad/welcome', DAD, "[warm, cheerful] Welcome home, bud! Grab your boxes off the truck behind you. Your room's at the very end of the hall.")
+add('vo/dad/line_1', DAD, '[warm] Three boxes with your name on them. Go on.')
+add('vo/dad/line_2', DAD, '[dry, amused] Landlord says the place has "character." I think that means creaky floors.')
+add('vo/dad/line_3', DAD, "[warm] End of the hall, bud. Can't miss it.")
+add('vo/dad/mom_looking', DAD, "[warm] Your mom's looking for you.")
+add('vo/mom/boxes_first', MOM, '[warm, gentle] Boxes first, kiddo. Then you can explore.')
+add('vo/mom/helper', MOM, "[warm, tired] There's my helper. All unpacked?")
+add('vo/mom/landlord', MOM, '[thoughtful, a little uneasy] The landlord said the last family left in a real hurry. Left half their things behind.')
+add('vo/dad/cheap', DAD, "[dry, deadpan] Can't imagine why. Cheapest rent in the county.")
+add('vo/mom/teeth', MOM, '[warm, firm] Okay, mister. Teeth, then bed. Big day tomorrow.')
 
-# morning: sunlight, birds, breakfast
-for n, line in enumerate([
-    '[bright, calling up the stairs] Breakfast! Come on, sleepyhead!',
-    '[bright] Pancakes are ready. Hurry up before your brother eats them all.',
-], 1):
-    add(f'vo/mom/breakfast_{n}', MOM, line)
-for n, line in enumerate([
-    '[concerned, teasing] Did you fall out of bed again?',
-    '[concerned] Honey, you have a bruise on your arm. Did you fall out of bed again?',
-], 1):
-    add(f'vo/mom/fell_out_{n}', MOM, line)
-add('vo/dad/breakfast_1', DAD, '[calm] Your mom made pancakes. Eat before they go cold.')
-
-# night: hallway whispers the family makes in their sleep, and Dad at the door
-add('vo/dad/night_check_1', DAD, '[whispering, tired] Go back to bed. It\'s just the house settling.')
-add('vo/mom/night_check_1', MOM, '[whispering, sleepy] Sweetie? Is everything okay?')
+# morning
+add('vo/mom/breakfast', MOM, "[bright, calling up the stairs] Breakfast's ready! Come on down, sleepyhead!")
+add('vo/mom/thump', MOM, '[concerned] Honey? What was that thump?')
+add('vo/mom/again', MOM, '[teasing, concerned] Did you fall out of bed again?')
+add('vo/mom/bottom_bunk', MOM, '[gentle, amused] Maybe you should sleep on the bottom bunk tonight.')
 
 
 def ssml_safe(s):
