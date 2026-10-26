@@ -8,11 +8,12 @@ A short first-person horror game built with [Three.js](https://threejs.org), run
 
 | Beat | What happens |
 |---|---|
-| **Moving day** | Your family pulls up to the rented farmhouse. Carry your boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Top bunk is yours. Someone left a crayon drawing taped in the hallway. |
-| **2:47 AM** | You wake up and need the bathroom. A car's headlights slide across the bedroom, and then something huge and pale drifts past the windows, moaning. The narrow hallway is dark, lit only by a few green plug-in night lights. |
-| **The hallway** | Those aren't your footsteps. The lights snap on behind you and something tall, black, with huge white eyes and a huge white smile is standing at the far end of the hall, where it opens into the living room. Run. |
-| **Hide** | Get up the ladder and under the blanket. It comes to the side of the bed. Hold your breath. |
-| **Morning** | Sunlight, birds, Mom calling you for breakfast. It was just a dream. Get up. |
+| **Moving day** | Your family pulls up to the rented house. Carry your boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Top bunk is yours. Your parents are tired, short-tempered, and not interested. Someone left a crayon drawing taped in the hallway. |
+| **Night one** | You get up for the bathroom. Headlights slide across the room, and something huge and pale drifts past the window, moaning. In the hallway, at the far end where it opens into the living room, something tall and black is **just standing there** while screaming violins build. It doesn't move. Get back under the covers and hold your breath. |
+| **Breakfast** | You tell them. Nobody believes you. |
+| **Night two** | You hear your parents arguing about you through the wall. Something scratches inside the closet. Then it is standing in your room, looking at you. Pull the covers over your head. It walks to the side of your bunk. |
+| **Night three** | Your parents hear it too, and still say it's you. The bathroom light goes out. It comes for you down the hall. Run. Hide. Hold your breath. |
+| **The last morning** | Sunlight, birds, Mom calling you for breakfast. It was just a dream. Get up. |
 
 ## Controls
 

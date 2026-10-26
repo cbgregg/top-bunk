@@ -1,0 +1,36 @@
+{
+  "dad/welcome": { "voice": "dad", "say": "[tired, flat] Alright. Truck's behind you. Three boxes with your name on them. Take them to your room and then stay out from underfoot, okay?", "html": "<b>Dad:</b> Alright. Truck's behind you. Three boxes with your name on them. Take 'em to your room and then stay out from underfoot, okay?" },
+  "dad/line_1": { "voice": "dad", "say": "[tired, muttering] Three boxes. Go on. I'm not carrying them for you.", "html": "<b>Dad:</b> Three boxes. Go on. I'm not carrying them for you." },
+  "dad/line_2": { "voice": "dad", "say": "[sighing, flat] Place smells like wet dog and old cigarettes. Whatever. It's cheap, and that's all that matters right now.", "html": "<b>Dad:</b> Place smells like wet dog and old cigarettes. Whatever. It's cheap, and that's all that matters right now." },
+  "dad/line_3": { "voice": "dad", "say": "[irritated] Your room's the one at the end of the hall. The bunk's already up. And don't jump on it.", "html": "<b>Dad:</b> Your room's the one at the end of the hall. The bunk's already up. And don't jump on it." },
+  "dad/mom_looking": { "voice": "dad", "say": "[flat] Your mother's in the kitchen. Go on, before she starts yelling.", "html": "<b>Dad:</b> Your mother's in the kitchen. Go on, before she starts yelling." },
+  "mom/boxes_first": { "voice": "mom", "say": "[irritated, distracted] Not now. I'm looking for the box with the kettle in it. Boxes first, then you can wander.", "html": "<b>Mom:</b> Not now. I'm looking for the box with the kettle in it. Boxes first, then you can wander." },
+  "mom/helper": { "voice": "mom", "say": "[tired, short] There you are. Is that all of them? Good. And don't leave anything in the hallway, I am not tripping over your stuff all week.", "html": "<b>Mom:</b> There you are. Is that all of them? Good. And don't leave anything in the hallway, I am not tripping over your stuff all week." },
+  "mom/landlord": { "voice": "mom", "say": "[quiet, uneasy] The landlord said the last family left in a hurry. Left half their things out in the barn.", "html": "<b>Mom:</b> The landlord said the last family left in a hurry. Left half their things out in the barn." },
+  "dad/cheap": { "voice": "dad", "say": "[dismissive, flat] People leave. Rent's eleven hundred a month. I'm not asking questions.", "html": "<b>Dad:</b> People leave. Rent's eleven hundred a month. I'm not asking questions." },
+  "mom/teeth": { "voice": "mom", "say": "[firm, exhausted] Teeth, then bed. I mean it. I don't want to hear a peep out of you tonight, we are all exhausted.", "html": "<b>Mom:</b> Teeth, then bed. I mean it. I don't want to hear a peep out of you tonight. We are all exhausted." },
+
+  "you/m1_a": { "voice": null, "html": "<b>You:</b> Mom... there was somebody standing at the end of the hallway last night." },
+  "mom/m1_a": { "voice": "mom", "say": "[tired, dismissive] Nobody was in the hallway. You had a nightmare. It's a new house, it happens.", "html": "<b>Mom:</b> Nobody was in the hallway. You had a nightmare. It's a new house, it happens." },
+  "you/m1_b": { "voice": null, "html": "<b>You:</b> I wasn't asleep." },
+  "dad/m1_a": { "voice": "dad", "say": "[flat, not looking up] It's a house. It settles. Eat your cereal.", "html": "<b>Dad:</b> It's a house. It settles. Eat your cereal." },
+  "mom/m1_b": { "voice": "mom", "say": "[sharp, exhausted] And no more wandering around at three in the morning. I have to be at work by seven and I can't do this every night.", "html": "<b>Mom:</b> And no more wandering around at three in the morning. I have to be at work by seven and I can't do this every night." },
+
+  "dad/n2_a": { "voice": "dad", "say": "[whispering, angry] He's doing it for attention. You baby him and he knows it.", "html": "<i>Through the wall, your dad:</i> He's doing it for attention. You baby him and he knows it." },
+  "mom/n2_a": { "voice": "mom", "say": "[whispering, tired] Then why did he draw that thing on the wall?", "html": "<i>Your mom:</i> Then why did he draw that thing on the wall?" },
+  "dad/n2_b": { "voice": "dad", "say": "[whispering, irritated] The kid before him drew it. It's crayon, for God's sake. Go to sleep.", "html": "<i>Your dad:</i> The kid before him drew it. It's crayon, for God's sake. Go to sleep." },
+
+  "you/m2_a": { "voice": null, "html": "<b>You:</b> It was in my room. It stood right next to my bed. It was smiling." },
+  "mom/m2_a": { "voice": "mom", "say": "[exasperated] In your room. Standing there. Smiling. Okay. And did it say anything?", "html": "<b>Mom:</b> In your room. Standing there. Smiling. Okay. And did it say anything?" },
+  "dad/m2_a": { "voice": "dad", "say": "[low, angry] That's enough. I am not doing this every morning. You want attention, you ask for it. You don't make up monsters.", "html": "<b>Dad:</b> That's enough. I am not doing this every morning. You want attention, you ask for it. You don't make up monsters." },
+  "mom/m2_b": { "voice": "mom", "say": "[cold, quiet] Don't look at me like that. There is nothing in this house. Nothing. Finish your toast.", "html": "<b>Mom:</b> Don't look at me like that. There is nothing in this house. Nothing. Finish your toast." },
+
+  "mom/n3_a": { "voice": "mom", "say": "[whispering, frightened] Did you hear that? Mark. Mark, there's someone in the hall.", "html": "<i>Your mom, through the wall:</i> Did you hear that? Mark. Mark, there's someone in the hall." },
+  "dad/n3_a": { "voice": "dad", "say": "[whispering, groggy] Go back to sleep. It's the kid.", "html": "<i>Your dad:</i> Go back to sleep. It's the kid." },
+
+  "mom/breakfast": { "voice": "mom", "say": "[calling, irritated] Breakfast! I'm not calling you again!", "html": "<b>Mom:</b> Breakfast! I'm not calling you again!" },
+  "mom/thump": { "voice": "mom", "say": "[sharp, alarmed] What was that?", "html": "<b>Mom:</b> What was that?" },
+  "mom/again": { "voice": "mom", "say": "[exasperated] Did you fall out of bed? Again? You're fine. You are always fine.", "html": "<b>Mom:</b> Did you fall out of bed? <i>Again?</i> You're fine. You are always fine." },
+  "dad/ending": { "voice": "dad", "say": "[flat, tired] Stop jumping on that bunk. I'm not buying another mattress.", "html": "<b>Dad:</b> Stop jumping on that bunk. I'm not buying another mattress." },
+  "mom/bottom_bunk": { "voice": "mom", "say": "[low, whispering, to her husband] He keeps talking to somebody in that room. All night. Every night.", "html": "<i>Your mom, quietly, to your dad:</i> He keeps talking to somebody in that room. All night. Every night." }
+}

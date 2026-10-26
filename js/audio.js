@@ -109,10 +109,14 @@ export class Sound {
     for (const [k, m] of Object.entries(music || {})) load('music/' + k, m.file);   // the big loops arrive in the background
   }
   // plays a loaded file once; returns its length in seconds (0 if it isn't loaded, so callers can fall back)
-  play(id, { gain = 1, pan = 0, wet = 0.15, delay = 0 } = {}) {
+  play(id, { gain = 1, pan = 0, wet = 0.15, delay = 0, muffle = false } = {}) {
     const b = this.buf && this.buf[id]; if (!this.ctx || !b) return 0;
     const src = this.ctx.createBufferSource(); src.buffer = b;
-    src.connect(this.bus(gain, pan, wet, b.duration)); src.start(this.now + delay);
+    if (muffle) {   // heard through a wall: low-passed and quiet
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; lp.Q.value = 0.5;
+      src.connect(lp).connect(this.bus(gain * 0.7, pan, wet + 0.1, b.duration));
+    } else src.connect(this.bus(gain, pan, wet, b.duration));
+    src.start(this.now + delay);
     return b.duration;
   }
   // a loaded file that moves across the stereo field; without the file, a synthesized stand-in
@@ -138,7 +142,7 @@ export class Sound {
     o.connect(bp).connect(g).connect(p).connect(this.master); o.start(t); vib.start(t); o.stop(t + dur + 0.1); vib.stop(t + dur + 0.1);
     return dur;
   }
-  say(id, gain = 1.3) { return this.play('vo/' + id, { gain, wet: 0.12 }); }
+  say(id, { gain = 1.3, muffle = false } = {}) { return this.play('vo/' + id, { gain, wet: 0.12, muffle }); }
   // loudness of a loaded clip, 30 values a second, 0..1 (drives the mouth)
   envelope(id) {
     const b = this.buf && this.buf[id]; if (!b) return null;
@@ -209,6 +213,30 @@ export class Sound {
     this.noiseHit({ dur: 1.2, type: 'bandpass', f: 2200, q: 0.5, gain: 0.9, attack: 0.01, wet: 0.3 });
     this.tone({ f: 60, f2: 25, dur: 1.0, gain: 1, wet: 0.2 });
   }
+  // ---- the horror layer: screaming violins (Insidious), a low dread bed, and the small paranormal knocks ----
+  // violins(v): 0 silences them, 1 is the full storm. A looping recording, or a synthesized stand-in: detuned sawtooth "violins" with frantic vibrato.
+  violins(v, t = 1.5) {
+    if (!this.ctx) return;
+    this.bed('sfx/violin_storm', v * 0.95, t);
+    const have = !!(this.buf && this.buf['sfx/violin_storm']);
+    if (!this.strings) {
+      const ctx = this.ctx, g = ctx.createGain(); g.gain.value = 0;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.6;
+      const vib = ctx.createOscillator(); vib.frequency.value = 6.5; const vg = ctx.createGain(); vg.gain.value = 22; vib.connect(vg); vib.start();
+      const slide = ctx.createOscillator(); slide.frequency.value = 0.37; const sg = ctx.createGain(); sg.gain.value = 120; slide.connect(sg); slide.start();
+      for (const f of [740, 784, 1109, 1480, 1865, 2217, 2960]) {
+        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; vg.connect(o.frequency); sg.connect(o.frequency); o.connect(bp); o.start();
+      }
+      bp.connect(g).connect(this.master); this.strings = { g };
+    }
+    this.set(this.strings.g.gain, have ? 0 : v * 0.05, t);
+  }
+  stab() { if (!this.play('sfx/violin_stab', { gain: 1.15, wet: 0.1 })) this.scream(); }
+  swell() { if (!this.play('sfx/violin_swell', { gain: 1, wet: 0.1 })) this.tone({ type: 'sawtooth', f: 900, f2: 2400, dur: 6, gain: 0.06, attack: 5, wet: 0.5 }); }
+  dread(v, t = 3) { if (!this.ctx) return; this.bed('sfx/low_drone', v, t); this.bed('sfx/whispers', v * 0.8, t); }
+  scratch(pan = 0) { if (!this.play('sfx/closet_scratch', { gain: 0.9, pan, wet: 0.3 })) for (let i = 0; i < 7; i++) this.noiseHit({ dur: 0.25, type: 'highpass', f: 2500, gain: 0.18, pan, wet: 0.3, delay: i * 0.35 }); }
+  ceilingThump() { if (!this.play('sfx/ceiling_thump', { gain: 0.9, wet: 0.35 })) this.tone({ f: 70, f2: 30, dur: 0.5, gain: 0.8, wet: 0.5 }); }
+  slamFar(pan = 0) { if (!this.play('sfx/door_slam_far', { gain: 0.8, pan, wet: 0.4 })) { this.tone({ f: 90, f2: 40, dur: 0.4, gain: 0.7, pan, wet: 0.6 }); this.noiseHit({ dur: 0.2, f: 500, gain: 0.5, pan, wet: 0.6 }); } }
   pop() {
     this.noiseHit({ dur: 0.05, type: 'highpass', f: 2500, gain: 0.7, wet: 0.4 });
     this.tone({ f: 1400, f2: 200, dur: 0.06, gain: 0.25, wet: 0.4 });

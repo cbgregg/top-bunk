@@ -34,9 +34,12 @@ const GradeShader = {
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, sat);
       // dark-adapted eyes: dim areas lose colour and lean blue-grey, and blacks never quite reach black (the green lights stay green)
-      float dark = 1.0 - smoothstep(0.04, 0.32, l);
-      c = mix(c, vec3(l) * vec3(0.78, 0.95, 1.28), 0.55 * night * dark);
-      c += night * 0.013 * vec3(0.65, 0.85, 1.2);
+      float dark = 1.0 - smoothstep(0.04, 0.36, l);
+      float gr = clamp((c.g - max(c.r, c.b)) * 5.0, 0.0, 1.0);                 // the green night lights stay green
+      c = mix(c, vec3(l) * vec3(0.5, 0.82, 1.5), 0.72 * night * dark * (1.0 - gr));
+      c *= mix(vec3(1.0), vec3(0.7, 0.84, 1.12), 0.65 * night * (1.0 - gr));      // a deep blue cast over everything else
+      c *= 1.0 - 0.14 * night;
+      c += night * 0.016 * vec3(0.4, 0.7, 1.3);
       c = (c - 0.5) * contrast + 0.5;
       c *= 1.0 - vignette * smoothstep(0.28, 0.95, length(d) * 1.25);
       float n = hash(vUv * res + fract(time) * 91.7) - 0.5;
@@ -80,7 +83,7 @@ export class Gfx {
       s.environment = this.env.day || null; s.environmentIntensity = day ? 0.5 : 0.4;
       if (this.daySky) { s.background = this.daySky; s.backgroundIntensity = day ? 1 : 0.9; }
     } else {
-      s.environment = this.env.night || null; s.environmentIntensity = p === 'title' ? 0.5 : 0.7;
+      s.environment = this.env.night || null; s.environmentIntensity = p === 'title' ? 0.35 : 0.42;
       s.background = new THREE.Color(0x020308); s.backgroundIntensity = 1;
     }
   }

@@ -25,32 +25,12 @@ def el(voice_id, speed=1.0):
 MOM = el('EXAVITQu4vr4xnSDxMaL', 1.0)
 DAD = el('iP95p4xoKVk53GoZ742B', 1.0)
 
-# id -> (voice, line). These are exactly the lines the game shows as subtitles (js/main.js); the game plays
-# sfx.say('<mom|dad>/<name>') next to each one. Change the wording in both places.
+# The lines live in assets/audio/lines.json, which the game reads too (subtitles and voice stay in sync): {id: {voice, say, html}}.
+# id -> (voice, line). Lines without a voice (what the kid says, shown as subtitles only) are skipped.
 LINES = {}
-
-
-def add(id_, voice, line):
-    LINES[id_] = (voice, line)
-
-
-# moving day
-add('vo/dad/welcome', DAD, "[warm, cheerful] Welcome home, bud! Grab your boxes off the truck behind you. Your room's at the very end of the hall.")
-add('vo/dad/line_1', DAD, '[warm] Three boxes with your name on them. Go on.')
-add('vo/dad/line_2', DAD, '[dry, amused] Landlord says the place has "character." I think that means creaky floors.')
-add('vo/dad/line_3', DAD, "[warm] End of the hall, bud. Can't miss it.")
-add('vo/dad/mom_looking', DAD, "[warm] Your mom's looking for you.")
-add('vo/mom/boxes_first', MOM, '[warm, gentle] Boxes first, kiddo. Then you can explore.')
-add('vo/mom/helper', MOM, "[warm, tired] There's my helper. All unpacked?")
-add('vo/mom/landlord', MOM, '[thoughtful, a little uneasy] The landlord said the last family left in a real hurry. Left half their things behind.')
-add('vo/dad/cheap', DAD, "[dry, deadpan] Can't imagine why. Cheapest rent in the county.")
-add('vo/mom/teeth', MOM, '[warm, firm] Okay, mister. Teeth, then bed. Big day tomorrow.')
-
-# morning
-add('vo/mom/breakfast', MOM, "[bright, calling up the stairs] Breakfast's ready! Come on down, sleepyhead!")
-add('vo/mom/thump', MOM, '[concerned] Honey? What was that thump?')
-add('vo/mom/again', MOM, '[teasing, concerned] Did you fall out of bed again?')
-add('vo/mom/bottom_bunk', MOM, '[gentle, amused] Maybe you should sleep on the bottom bunk tonight.')
+for _id, _l in json.load(open(os.path.join(OUT, 'lines.json'))).items():
+    if _l.get('voice'):
+        LINES['vo/' + _id] = (MOM if _l['voice'] == 'mom' else DAD, _l['say'])
 
 
 def ssml_safe(s):

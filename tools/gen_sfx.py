@@ -30,6 +30,20 @@ SFX = {
     'car_pass': ('sfx', 'A single car driving past a house on a quiet rural road at night, tires on asphalt and engine whoosh, doppler pass from one side to the other, muffled and distant as heard from inside a bedroom', 6.0, -23, False),
     'bunk_shove': ('sfx', 'A heavy thud of a child falling from a top bunk bed onto a wooden floor, wooden bed frame rattling, '
                    'then a short gasp of air', 2.5, -14, False),
+    # the screaming strings (Insidious / Paranormal Activity): the thing stands there and the violins go insane
+    'violin_storm': ('sfx', 'Relentless shrieking horror violins in the style of the Insidious soundtrack: extreme high screeching string glissandi, harsh '
+                     'sul ponticello tremolo, dissonant clusters piling on top of each other, frantic and terrifying, no melody, no drums, '
+                     'continuous and constant intensity from start to finish', 22, -13, True),
+    'violin_stab': ('sfx', 'A single sudden shrieking violin stab: a harsh, very high dissonant screech with a razor sharp attack and a short reverb tail, '
+                    'like a horror movie jump scare', 3.0, -9, False),
+    'violin_swell': ('sfx', 'A slow terrifying swell of dissonant high violins over a low cello drone, rising from near silence to a painful shrieking '
+                     'peak, then an abrupt cut to silence', 12.0, -14, False),
+    'low_drone': ('sfx', 'A deep ominous dissonant drone with slow sub bass pulses, like the night tension in the Paranormal Activity films, '
+                  'quiet, slowly throbbing, constant', 22, -26, True),
+    'whispers': ('sfx', 'A faint chorus of creepy unintelligible whispers in an empty house at night, close and breathy, drifting left and right', 20, -27, True),
+    'closet_scratch': ('sfx', 'Slow dry scratching of fingernails on the inside of a wooden closet door at night, quiet and unsettling', 6.0, -20, False),
+    'ceiling_thump': ('sfx', 'A single deep heavy thump from the ceiling of a quiet house at night, then silence', 2.5, -16, False),
+    'door_slam_far': ('sfx', 'A distant heavy door slamming somewhere deep in a big quiet house at night, with a long echo', 3.0, -15, False),
     # the creepy horror-movie instruments
     'waterphone': ('music', 'Instrumental only. A single creepy horror-movie instrument: a waterphone with bowed metal, eerie '
                    'rising and falling glissando whines and shimmering overtones, very sparse, lots of silence between '

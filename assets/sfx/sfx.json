@@ -52,5 +52,53 @@
   "kind": "sfx",
   "loop": false,
   "len": 5.407
+ },
+ "violin_storm": {
+  "file": "assets/sfx/violin_storm.mp3",
+  "kind": "sfx",
+  "loop": true,
+  "len": 21.891
+ },
+ "violin_stab": {
+  "file": "assets/sfx/violin_stab.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 3.03
+ },
+ "violin_swell": {
+  "file": "assets/sfx/violin_swell.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 10.815
+ },
+ "low_drone": {
+  "file": "assets/sfx/low_drone.mp3",
+  "kind": "sfx",
+  "loop": true,
+  "len": 22.047
+ },
+ "whispers": {
+  "file": "assets/sfx/whispers.mp3",
+  "kind": "sfx",
+  "loop": true,
+  "len": 19.487
+ },
+ "closet_scratch": {
+  "file": "assets/sfx/closet_scratch.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 3.396
+ },
+ "ceiling_thump": {
+  "file": "assets/sfx/ceiling_thump.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 2.508
+ },
+ "door_slam_far": {
+  "file": "assets/sfx/door_slam_far.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 3.03
  }
 }
