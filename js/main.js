@@ -54,12 +54,12 @@ const BATH_I = 95;
 
 // ---------- constants ----------
 const EYE = 1.32, R = 0.28;
-const BUNK_SEAT = new V3(2.7, 2.24, 4.42);
-const BUNK_LIE = new V3(2.7, 1.9, 4.55);
-const LADDER_MID = new V3(4.1, 1.55, 4.42);
-const LADDER_FLOOR = new V3(4.3, 0, 4.42);
-const BUNK_SIDE = new V3(2.75, 0, 3.02);
-const HALL_DOOR = new V3(0, 0, 3.3);       // the hall in front of your door
+const BUNK_SEAT = new V3(-3.6, 2.24, 4.42);
+const BUNK_LIE = new V3(-3.6, 1.9, 4.55);
+const LADDER_MID = new V3(-2.2, 1.55, 4.42);
+const LADDER_FLOOR = new V3(-2.0, 0, 4.42);
+const BUNK_SIDE = new V3(-3.55, 0, 3.02);
+const HALL_DOOR = new V3(0, 0, 3.0);       // the hall in front of your door
 const HALL_MOUTH = new V3(0, 0, -1.3);     // where the hall opens into the living room
 
 // ---------- helpers ----------
@@ -194,7 +194,7 @@ W.pickups.forEach((b) => addI({ obj: b, r: 2.2, label: 'Pick up the box', when: 
 addI({ obj: W.drawingMesh, r: 2.3, label: 'Look at the drawing', when: () => F.phase !== 'morning', act: lookDrawing });
 addI({ obj: mom.head, r: 2.6, label: 'Talk to Mom', when: () => F.phase === 'day' && mom.group.visible, act: talkMom });
 addI({ obj: dad.head, r: 2.6, label: 'Talk to Dad', when: () => F.phase === 'day' && dad.group.visible, act: talkDad });
-addI({ p: new V3(3.9, 1.0, 4.42), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
+addI({ p: new V3(-2.4, 1.0, 4.42), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
 addI({ p: W.bathSink, r: 1.9, label: 'Splash water on your face', when: () => F.phase === 'night' && !F.splashed, act: splash });
 
 function updateInteract() {
@@ -295,7 +295,7 @@ async function climbUp() {
   sfx.creak(0.25, 0);
   await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, Math.PI / 2, k); P.pitch = lerp(p0, 0.3, k); });
   sfx.footstep(0.2, 0, 0.1);
-  if (hiding) { chase.approach = [new V3(4.25, 0, 3.1), BUNK_SIDE.clone()]; }
+  if (hiding) { chase.approach = [new V3(-2.05, 0, 3.1), BUNK_SIDE.clone()]; }
   const dest = hiding ? BUNK_LIE : BUNK_SEAT;
   await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(Math.PI / 2, 0, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
   F.cutscene = false;
@@ -399,7 +399,7 @@ function startChase() {
   chase = { trail: [], approach: [], last: P.pos.clone(), t0: gameTime, stepAcc: 0, hb: 0, arrived: false };
   const room = roomAt(P.pos.x, P.pos.z);
   // if you're already in your room, it follows through the door
-  if (room === 'bed') chase.trail.push(HALL_DOOR.clone(), new V3(1.0, 0, 3.3));
+  if (room === 'bed') chase.trail.push(HALL_DOOR.clone(), new V3(-1.0, 0, 3.0));
   chase.trail.push(P.pos.clone());
   F.chase = true; E.mode = 'run';
   sfx.drone(0.09, 0.5);
@@ -450,7 +450,7 @@ async function hideScript() {
   await wait(2.2);
   F.breathCheck = false;
   UI.hint(null);
-  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(0, -Math.PI / 2, k); E.smileScale = 1.18 - 0.18 * k; });
+  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(0, Math.PI / 2, k); E.smileScale = 1.18 - 0.18 * k; });
   E.mode = 'walk'; E.speed = 0.6;
   const from = E.root.position.clone(), to = HALL_DOOR.clone();
   await tween(3.2, (k) => { E.root.position.lerpVectors(from, to, k); }, ease.lin);
@@ -615,7 +615,7 @@ async function pushScene() {
   const y0 = P.yaw, p0 = P.pitch;
   await tween(1.6, (k) => { P.yaw = lerpAngle(y0, Math.PI, k); P.pitch = lerp(p0, 0.02, k); });
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.35; E.smileScale = 1; E.lookTarget = camera.position;
-  E.root.position.set(2.7, -2.6, 5.12); E.root.rotation.y = Math.PI;
+  E.root.position.set(-3.6, -2.6, 5.12); E.root.rotation.y = Math.PI;
   sfx.drone(0.07, 2); sfx.tension(0.025, 2);
   await wait(0.3);
   await tween(2.8, (k) => { E.root.position.y = -2.6 + 2.6 * k; P.pitch = lerp(0.02, 0.1, k); }, ease.out);
@@ -625,7 +625,7 @@ async function pushScene() {
   sfx.whoosh(0);
   await tween(0.16, (k) => { E.reach = k; }, ease.lin);
   sfx.shove(); shake = 0.6;
-  const start = BUNK_SEAT.clone(), end = new V3(2.7, 0.26, 2.9), pitch0 = P.pitch;
+  const start = BUNK_SEAT.clone(), end = new V3(-3.6, 0.26, 2.9), pitch0 = P.pitch;
   await tween(0.62, (k) => {
     P.cam.set(start.x, lerp(start.y, end.y, k * k), lerp(start.z, end.z, Math.min(1, k * 1.4)));
     P.pitch = lerp(pitch0, 1.02, k); P.roll = lerp(0, 0.42, k);
