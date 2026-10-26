@@ -90,7 +90,7 @@ function panFor(pos) {
 
 // ---------- state ----------
 const P = {
-  pos: new V3(-2.7, 0, -10.2), vel: new V3(), yaw: Math.PI, pitch: 0, roll: 0, mode: 'walk',
+  pos: new V3(1.0, 0, -10.2), vel: new V3(), yaw: Math.PI, pitch: 0, roll: 0, mode: 'walk',
   cam: new V3(), stamina: 1, exhausted: false, carrying: null, stepAcc: 0, bob: 0, speed: 0,
   breath: 1, breathT: 0, inhale: true,
 };
@@ -517,7 +517,7 @@ async function startGame() {
 
 async function dayScript() {
   setPhase('day');
-  P.pos.set(-2.7, 0, -10.2); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
+  P.pos.set(1.0, 0, -10.2); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
   mom.group.position.set(-1.4, 0, -2.9); mom.group.rotation.y = Math.PI / 2;
   dad.group.position.set(-0.9, 0, -13.4); dad.group.rotation.y = -0.5;
   await wait(0.3);

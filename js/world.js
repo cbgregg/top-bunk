@@ -103,7 +103,7 @@ export function buildWorld(scene) {
     brick: std({ color: 0xa0553f, roughness: 0.95 }), panel: std({ color: 0xc89a64, roughness: 0.7 }), butter: std({ color: 0xe6d28c, roughness: 0.92 }),
     floralA: std({ map: T.floralA, roughness: 0.92 }), floralB: std({ map: T.floralB, roughness: 0.92 }), floralC: std({ map: T.floralC, roughness: 0.92 }), hallpaper: std({ map: T.wall, roughness: 0.92 }),
     borderRose: std({ map: T.borderRose, roughness: 0.8 }), borderTeal: std({ map: T.borderTeal, roughness: 0.8 }), borderBlue: std({ map: T.borderBlue, roughness: 0.8 }),
-    doorW: std({ color: 0xece8de, roughness: 0.5 }), doorInsetW: std({ color: 0xdcd7ca, roughness: 0.6 }), barnDoor: std({ color: 0x4a3828, roughness: 0.7 }),
+    doorW: std({ color: 0xece8de, roughness: 0.5 }), doorInsetW: std({ color: 0xdcd7ca, roughness: 0.6 }), barnDoor: std({ color: 0xd8d3c4, roughness: 0.8 }),
     cabW: std({ color: 0xe9e6dc, roughness: 0.42 }), cabLine: std({ color: 0xc9c5b8, roughness: 0.6 }), appW: std({ color: 0xf1efe9, roughness: 0.28 }),
     brass: std({ color: 0xc9a14a, roughness: 0.28, metalness: 0.9 }), oak: std({ color: 0x9c6b3c, roughness: 0.55 }), heater: std({ color: 0xe6e2d6, roughness: 0.5 }),
     steelSink: std({ color: 0xc9cccf, roughness: 0.25, metalness: 1 }), carpetLid: std({ color: 0x8e4a5c, roughness: 1 }),
@@ -122,7 +122,7 @@ export function buildWorld(scene) {
   applyPBR(M.carpet, 'carpet', { normal: 1.4 });
   applyPBR(M.lino, 'tile', { tint: 0xd8ccb0, tile: 0.5 });
   applyPBR(M.bathFloor, 'tile', { tint: 0xd8b8bd, tile: 0.3 });
-  applyPBR(M.slate, 'concrete', { tint: 0x66625c });
+  applyPBR(M.slate, 'concrete', { tint: 0xa8a49a });
   applyPBR(M.brick, 'concrete', { tint: 0xb4604a, tile: 1.2 });
   applyPBR(M.oak, 'pine', { tint: 0xa8743f });
   applyPBR(M.plaster, 'ceiling', { tint: 0xdcd6c8, normal: 1.0 });
@@ -271,7 +271,7 @@ export function buildWorld(scene) {
   }
 
   // exterior shell. Seen from the front (the road side, z = -6.5): the viewer's left is +x. Your room is the back-right corner.
-  wall(-4.8, -6.5, 4.8, -6.5, [{ c: -2.7, w: 1.1 }, { c: 2.9, w: 2.4, sill: 0.55, h: 1.35 }]);                       // front: door, picture window
+  wall(-4.8, -6.5, 4.8, -6.5, [{ c: -2.7, w: 1.3, sill: 1.0, h: 1.0 }, { c: 2.5, w: 2.0, sill: 0.55, h: 1.35 }, { c: 4.2, w: 1.0 }]);   // front: utility window, picture window, front door (into the living room)
   wall(-4.8, 5.5, 4.8, 5.5, [{ c: -2.7, w: 1.2, sill: 0.85, h: 1.25 }, { c: 2.7, w: 1.1, sill: 0.85, h: 1.25 }]);    // back: your room (right), parents' room
   wall(4.8, -6.5, 4.8, 5.5, [{ c: -4.3, w: 1.2, sill: 0.85, h: 1.25 }, { c: 0.2, w: 1.1, sill: 0.85, h: 1.25 }, { c: 3.0, w: 1.0, sill: 0.85, h: 1.25 }]);   // left side
   wall(-4.8, -6.5, -4.8, 5.5, [{ c: -3.2, w: 1.1, sill: 1.0, h: 0.9 }, { c: 3.6, w: 1.2, sill: 0.85, h: 1.25 }]);    // right side: kitchen, your room
@@ -368,7 +368,8 @@ export function buildWorld(scene) {
       else box(off - 0.015, off + 0.015, sill + h + 0.3, sill + h + 0.33, c - w / 2 - 0.4, c + w / 2 + 0.4, M.darkWood, { uv: false });
     }
   }
-  windowAt(true, -6.5, 2.9, 1, { sill: 0.55, w: 2.4, h: 1.35, curtains: true, real: true });
+  windowAt(true, -6.5, 2.5, 1, { sill: 0.55, w: 2.0, h: 1.35, curtains: true, real: true });
+  windowAt(true, -6.5, -2.7, 1, { sill: 1.0, w: 1.3, h: 1.0, real: true });                                     // utility room
   windowAt(true, 5.5, 2.7, -1, { w: 1.1, curtains: true, real: true });          // parents' room, back wall
   windowAt(true, 5.5, -2.7, -1, { w: 1.2, curtains: true, real: true });         // your room, back wall (behind the top bunk)
   windowAt(false, 4.8, -4.3, -1, { w: 1.2, curtains: true, real: true });        // living room
@@ -402,16 +403,17 @@ export function buildWorld(scene) {
     box(-3.5, -0.8, 2.12, 2.17, -4.47, -4.4, M.black, { uv: false });
     for (const x of [-1.9, -1.3]) box(x - 0.03, x + 0.03, 2.05, 2.15, -4.47, -4.4, M.black, { uv: false });
     box(-2.2, -1.0, 0.9, 0.95, -4.41, -4.39, M.black, { uv: false });
+    { const br = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 0.03), M.barnDoor); br.position.set(-1.6, 1.1, -4.4); br.rotation.z = 0.95; house.add(br); const hd = box(-1.15, -1.1, 0.9, 1.3, -4.4, -4.36, M.black, { uv: false }); }
   }
 
   // front door (open in the day, shut at night)
-  const frontPivot = new THREE.Group(); frontPivot.position.set(-3.25, 0, -6.5 + WT / 2); house.add(frontPivot);
+  const frontPivot = new THREE.Group(); frontPivot.position.set(3.7, 0, -6.5 + WT / 2); house.add(frontPivot);
   {
     const d = new THREE.Mesh(new THREE.BoxGeometry(1.08, 2.08, 0.05), M.door); d.position.set(0.54, 1.04, 0.0); d.castShadow = true; frontPivot.add(d);
     const lite = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.06), M.glassOut); lite.position.set(0.54, 1.45, 0); frontPivot.add(lite);
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), M.brass); knob.position.set(0.98, 1.0, 0.05); frontPivot.add(knob);
   }
-  const frontCollider = solid(-3.3, -2.1, -6.6, -6.4, { on: false });
+  const frontCollider = solid(3.65, 4.75, -6.6, -6.4, { on: false });
   const frontDoor = {
     setOpen(o) { frontPivot.rotation.y = o ? -1.5 : 0; frontCollider.on = !o; },
   };
@@ -601,9 +603,9 @@ export function buildWorld(scene) {
   shelf(-0.45, -0.1, 1.45, -5.0, -3.7); knick(-0.28, 1.475, -4.35, 5, 1.1, 'z');
   shelf(-0.45, -0.1, 1.05, -5.0, -3.7); knick(-0.28, 1.075, -4.35, 4, 1.1, 'z');
   plate(-0.508, 1.8, -4.0, Math.PI / 2, 0.12, 0x4a6fa8); plate(-0.508, 1.8, -4.7, Math.PI / 2, 0.12, 0xa84a5a);
-  plate(0.2, 1.95, -6.41, 0, 0.13, 0x4a8a6a); plate(1.7, 1.95, -6.41, 0, 0.13, 0xa84a5a);
-  wreath(4.71, 1.55, -2.2, -Math.PI / 2);
-  heater(0.7, 3.2, 0.1, -1.95, -1.87); heater(4.62, 4.7, 0.1, -3.6, -2.4);
+  plate(0.15, 1.95, -6.41, 0, 0.13, 0x4a8a6a); plate(0.15, 1.5, -6.41, 0, 0.13, 0xa84a5a);
+  wreath(4.71, 1.55, -5.4, -Math.PI / 2);
+  heater(0.7, 3.2, 0.1, -1.95, -1.87); heater(1.6, 3.4, 0.1, -6.4, -6.32);
   // a little table with a doily by the sofa
   rbox(4.1, 4.65, 0, 0.55, -1.95, -1.45, M.oak, 0.01); solid(4.05, 4.7, -2.0, -1.4); knick(4.38, 0.55, -1.7, 3, 0.3, 'z');
 
@@ -662,6 +664,7 @@ export function buildWorld(scene) {
     // coat hooks on the right-hand wall and a row of shoes
     box(-4.72, -4.68, 1.6, 1.68, -6.1, -5.4, M.oak, { uv: false });
     for (const z of [-6.0, -5.75, -5.5]) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.3), std({ color: [0x3a4a6a, 0x6a3a3a, 0x4a5a3a][(rnd() * 3) | 0], roughness: 1 })); c.position.set(-4.58, 1.25, z); house.add(c); }
+    for (const y of [1.0, 1.45, 1.9]) box(-4.7, -3.5, y, y + 0.04, -6.42, -6.2, M.black, { uv: false });   // black floating shelves
     // the step up/down at the doorway
     box(-3.35, -2.05, 0, 0.0, -6.5, -6.2, M.concrete, { uv: false });
   }
@@ -695,16 +698,16 @@ export function buildWorld(scene) {
     onLoad: () => { old.forEach((c) => { c.on = false; }); if (sb) solid(...sb); if (after) after(); },
   });
   // living room
-  prop('table', { x: 0.95, z: -6.1, rot: 0 }, { tag: 'tv', old: [cTv], box: [0.3, 1.6, -6.42, -5.78] });
-  prop('tv', { x: 0.95, y: 0.55, z: -6.1, rot: 0 });
+  prop('table', { x: 0.85, z: -6.1, rot: 0 }, { tag: 'tv', old: [cTv], box: [0.25, 1.45, -6.42, -5.78] });
+  prop('tv', { x: 0.85, y: 0.55, z: -6.1, rot: 0 });
   prop('sofa', { x: 3.0, z: -2.55, rot: PI }, { tag: 'couch', old: [cCouch], box: [2.1, 3.9, -2.9, -2.2] });
-  prop('armchair', { x: 4.1, z: -5.0, rot: -2.0 }, { box: [3.65, 4.55, -5.4, -4.6] });
+  prop('armchair', { x: 4.25, z: -4.1, rot: -2.0 }, { box: [3.8, 4.7, -4.5, -3.7] });
   prop('table', { x: 3.0, z: -4.45, rot: 0 }, { tag: 'coffee', old: [cCoffee], box: [2.1, 3.9, -4.8, -4.1] });
-  prop('cabinet', { x: 4.4, z: -3.05, rot: -PI / 2 }, { box: [4.0, 4.78, -3.75, -2.35] });
-  prop('plant1', { x: 4.35, z: -6.05 }, { box: [4.05, 4.65, -6.35, -5.75] });
+  prop('cabinet', { x: 4.4, z: -2.75, rot: -PI / 2 }, { box: [4.0, 4.78, -3.45, -2.05] });
+  prop('plant1', { x: 3.0, z: -6.1 }, { box: [2.7, 3.3, -6.4, -5.8] });
   prop('plant2', { x: 0.18, z: -2.15 }, { box: [-0.1, 0.5, -2.45, -1.85] });
   prop('clock_wall', { x: -0.51, y: 1.74, z: -4.35, rot: PI / 2 });
-  frameX(3.0, 1.55, -1.8, 0.7, 0.7, T.paint3, -1); frameX(1.1, 1.75, -6.5, 0.5, 0.5, T.paint2, 1);
+  frameX(3.0, 1.55, -1.8, 0.7, 0.7, T.paint3, -1); frameX(0.85, 1.85, -6.5, 0.5, 0.5, T.paint2, 1);
   // kitchen: round table (the chairs are placed around it)
   {
     const cx = -2.0, cz = -3.5;
@@ -782,17 +785,17 @@ export function buildWorld(scene) {
   scene.add(bathSpot, bathSpot.target);
 
   // brick-edged planter along the front wall, left of the stoop, with shrubs
-  box(-1.2, 4.3, 0, 0.3, -7.3, -6.7, M.brick, { uv: true }); box(-1.1, 4.2, 0.28, 0.32, -7.2, -6.8, M.dirt, { cast: false });
-  for (const x of [-0.4, 0.6, 1.6, 3.4]) { const sh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), M.leaves); sh.position.set(x, 0.55, -7.0); sh.scale.y = 0.8; sh.castShadow = true; house.add(sh); }
+  box(-1.2, 3.0, 0, 0.3, -7.3, -6.7, M.brick, { uv: true }); box(-1.1, 2.9, 0.28, 0.32, -7.2, -6.8, M.dirt, { cast: false });
+  for (const x of [-0.4, 0.5, 1.4, 2.4]) { const sh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), M.leaves); sh.position.set(x, 0.55, -7.0); sh.scale.y = 0.8; sh.castShadow = true; house.add(sh); }
   // stoop and porch light by the front door
-  box(-4.3, -1.3, -0.05, 0.14, -7.5, -6.5, M.concrete, { uv: false }); box(-3.9, -1.7, -0.05, 0.07, -8.0, -7.5, M.concrete, { uv: false });
-  const porchLight = new THREE.PointLight(0xffc880, 0, 6, 2); porchLight.position.set(-1.7, 2.1, -6.9); scene.add(porchLight);
-  const porchBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M.lamp.clone()); porchBulb.position.set(-1.7, 2.15, -6.6); house.add(porchBulb);
+  box(3.3, 5.0, -0.05, 0.14, -7.5, -6.5, M.concrete, { uv: false }); box(3.6, 4.8, -0.05, 0.07, -8.0, -7.5, M.concrete, { uv: false });
+  const porchLight = new THREE.PointLight(0xffc880, 0, 6, 2); porchLight.position.set(3.0, 2.1, -6.9); scene.add(porchLight);
+  const porchBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M.lamp.clone()); porchBulb.position.set(3.0, 2.15, -6.6); house.add(porchBulb);
 
   // ---------- yard ----------
   M.asphalt = std({ color: 0x2b2b2d, roughness: 0.92 }); M.asphalt.userData.worldUV = true; applyPBR(M.asphalt, 'concrete', { tint: 0x3a3a3c });
   box(-260, 260, -0.4, -0.02, -260, 260, M.grass, { cast: false, parent: yard });
-  box(-5.2, 0.6, -0.02, -0.008, -29, -7.9, M.dirt, { cast: false, parent: yard });   // the gravel drive up from the road
+  box(-5.2, 8.5, -0.02, -0.008, -29, -7.9, M.dirt, { cast: false, parent: yard });   // the gravel drive up from the road
   box(-260, 260, -0.4, -0.005, -33.5, -27.5, M.asphalt, { cast: false, parent: yard });   // the road along the front of the property
   for (let x = -120; x < 120; x += 6) box(x, x + 3, -0.006, -0.004, -30.6, -30.4, std({ color: 0xc9b24a, roughness: 0.8 }), { uv: false, cast: false, parent: yard });
   // moving truck (parked on the gravel, backed toward the house)
