@@ -1,6 +1,6 @@
 # TOP BUNK
 
-A short first-person horror game built with [Three.js](https://threejs.org), runs straight from GitHub Pages — no build step. Every texture is drawn on canvas at load. Sound is synthesized with WebAudio and layered with recorded voices, music and jump scares (see Audio); if those files are missing, the synth covers everything.
+A short first-person horror game built with [Three.js](https://threejs.org), runs straight from GitHub Pages — no build step. Every texture is drawn on canvas at load. Sound is synthesized with WebAudio and layered with recorded voices, music and jump scares (see Audio); if those files are missing, the synth covers everything. Mom, Dad and the spirit are real rigged character models (see Characters).
 
 > The rent on the old farmhouse was cheap. Now we know why.
 
@@ -69,3 +69,12 @@ The files in `assets/` are generated with ElevenLabs and committed; the game pla
 | Night brown-noise bed, jump scares (synth blast, violin screech, slam), the shove, waterphone and music box | `assets/sfx/` + `sfx.json` | `tools/gen_sfx.py` |
 
 To change anything: edit the table in the script, then `ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --only vo/mom --force` (needs Python 3 and ffmpeg). The key is read from the environment only — never put it in a file. The brown noise is made locally with ffmpeg and needs no key.
+
+## Characters
+
+| Who | Model | Animation |
+|---|---|---|
+| Mom, Dad | [Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) adults (`Female_Adult_01`, `Male_Adult_05`), MIT | Idle clip, head follows you when you're near, mouth moves with their voice |
+| The spirit | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze |
+
+The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`) retargeted onto the Rocketbox skeleton. How the models are built: `tools/models/`. The game works without the model files: the old low-poly people and spirit take over. Credits and licenses: [CREDITS.md](CREDITS.md).

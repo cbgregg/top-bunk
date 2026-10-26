@@ -1,8 +1,11 @@
 // The tall one. Black, long-limbed, huge white eyes with big black pupils, and that smile.
 import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
+import { Rig, loadModel, loadAnims } from './rig.js';
 
 const _v = new THREE.Vector3();
+const ARM_STRETCH = 1.4;
+const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
 
 export class Entity {
   constructor(scene) {
@@ -66,6 +69,31 @@ export class Entity {
     this.lean = 0; this.reach = 0; this.tilt = 0; this.smileScale = 1;
     this.lookTarget = null;
     this.root.visible = false;
+
+    // the real body: a black Rocketbox man stretched tall, animated with baked Mixamo clips (the cylinder body stays as the fallback)
+    this.rig = null;
+    Promise.all([loadModel('spirit'), loadAnims()]).then(([gltf, clips]) => this.useRig(new Rig(gltf, clips)))
+      .catch((e) => console.warn('spirit model failed, keeping the simple body:', e));
+  }
+
+  useRig(rig) {
+    const K = 1.43;                                   // a 1.82 m man -> about 2.6 m
+    rig.setHeight(1.82 * K); rig.hideMaterials(/opacity/);
+    const black = new THREE.MeshLambertMaterial({ color: 0x060607 });
+    rig.root.traverse((o) => { if (o.isSkinnedMesh) o.material = Array.isArray(o.material) ? o.material.map((m) => (/opacity/.test(m.name) ? Object.assign(m, { visible: false }) : black)) : black; });
+    // long arms: stretch each arm along its bone; the forearm keeps scale 1 so it inherits the same stretch
+    for (const s of ['L', 'R']) rig.bones[s + '_UpperArm'].scale.x = ARM_STRETCH;
+    this.root.add(rig.root);
+    // the face (skull, glowing eyes, smile) rides on the head bone, upright in model space
+    const hb = rig.bones.Head;
+    this.torso.remove(this.head); hb.add(this.head);
+    this.head.rotation.order = 'XYZ';
+    this.head.position.set(...FACE_POS);
+    this.head.quaternion.copy(rig.restQ.Head).invert();
+    this.head.scale.setScalar(1 / rig.scale);
+    this.body.visible = false;
+    rig.play('idle', { fade: 0, speed: 0.3 });
+    this.rig = rig;
   }
 
   get visible() { return this.root.visible; }
@@ -78,9 +106,39 @@ export class Entity {
     this.root.rotation.y = cur + d * Math.min(1, k);
   }
 
+  updateRig(dt) {
+    const r = this.rig, t = this.t, run = this.mode === 'run', walk = this.mode === 'walk';
+    if (run) r.play('run', { fade: 0.2, speed: 1.1 });
+    else if (walk) r.play('walk', { fade: 0.35, speed: 0.55 });
+    else r.play('idle', { fade: 0.4, speed: 0.3 });
+    r.update(dt);
+    // posture on top of the clip: stooped when moving, plus the story's lean and head tilt
+    r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0));
+    r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt + Math.sin(t * 0.7) * 0.05);
+    // arms out toward you
+    if (this.reach > 0.01) {
+      const dir = r.axisWorld(0, 0.1, 1).normalize();
+      for (const s of ['L', 'R']) {
+        r.aim(r.bones[s + '_UpperArm'], r.bones[s + '_Forearm'], dir, this.reach);
+        r.aim(r.bones[s + '_Forearm'], r.bones[s + '_Hand'], dir, this.reach);
+      }
+    }
+    r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 6 });
+    this.smile.scale.set(this.smileScale, 1 + (this.smileScale - 1) * 1.6, 0.93);
+    if (this.lookTarget) {
+      this.head.updateMatrixWorld(true);
+      _v.copy(this.lookTarget); this.head.worldToLocal(_v); _v.normalize();
+      for (let i = 0; i < 2; i++) {
+        const b = this.eyeBase[i];
+        this.pupils[i].position.set(b.x + THREE.MathUtils.clamp(_v.x, -1, 1) * 0.022, b.y + THREE.MathUtils.clamp(_v.y, -1, 1) * 0.04, b.z + 0.012);
+      }
+    }
+  }
+
   update(dt) {
     if (!this.root.visible) return;
     this.t += dt; const t = this.t;
+    if (this.rig) { this.updateRig(dt); return; }
     const [hl, hr] = this.legs, [al, ar] = this.arms;
     let armSwing = 0, bob = 0, runLean = 0;
     if (this.mode === 'run' || this.mode === 'walk') {

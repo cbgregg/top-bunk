@@ -1,7 +1,8 @@
-// Simple low-poly family members.
+// The family: real Rocketbox models (assets/models), with the old low-poly people as a fallback until they load.
 import * as THREE from 'three';
+import { Rig, loadModel, loadAnims } from './rig.js';
 
-export function makePerson({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair = '#3a2a1e', skin = '#d6a882', longHair = false, cap = null } = {}) {
+function makeLowPoly({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair = '#3a2a1e', skin = '#d6a882', longHair = false, cap = null } = {}) {
   const g = new THREE.Group();
   const m = (c, r = 0.9) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
   const S = m(skin, 0.7), SH = m(shirt), P = m(pants), HR = m(hair, 1);
@@ -39,4 +40,33 @@ export function makePerson({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644'
       torso.scale.y = 1 + Math.sin(t * 1.6 + seed) * 0.01;
     },
   };
+}
+
+// model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
+export function makePerson({ model, height = 1.75, ...look } = {}) {
+  const lp = makeLowPoly({ height, ...look });
+  const g = new THREE.Group(); g.add(lp.group);
+  const head = new THREE.Object3D(); head.position.y = 1.64 * height / 1.75; g.add(head);   // the interaction target, always there
+  const person = {
+    group: g, head, arms: lp.arms, rig: null, lookAt: null,
+    update(t, dt = 0.016) {
+      if (!this.rig) { lp.update(t); return; }
+      const r = this.rig;
+      r.update(dt);
+      r.lookAt(this.lookAt, dt);
+      r.updateJaw(dt);
+    },
+    talk(env) { if (this.rig) this.rig.talk(env); },
+  };
+  if (model) {
+    Promise.all([loadModel(model), loadAnims()]).then(([gltf, clips]) => {
+      const rig = new Rig(gltf, clips).setHeight(height);
+      rig.hideMaterials(/NONE/);
+      g.add(rig.root); lp.group.visible = false;
+      rig.play('idle', { fade: 0, offset: Math.random() });
+      rig.jawSign = person.jawSign || 1;
+      person.rig = rig;
+    }).catch((e) => console.warn('person model failed, keeping the low-poly one:', e));
+  }
+  return person;
 }

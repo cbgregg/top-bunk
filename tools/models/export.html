@@ -1,0 +1,20 @@
+<!doctype html><meta charset=utf-8><canvas id=c width=100 height=100></canvas>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { retargetClip, buildAvatar, loadGLB, loadFBX } from './rblib.js';
+const exp = (obj, animations = []) => new Promise((res, rej) => new GLTFExporter().parse(obj, (buf) => {
+  let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); res(btoa(s));
+}, rej, { binary: true, animations, onlyVisible: false, maxTextureSize: 1024 }));
+const xbot = await loadGLB('models/Xbot.glb');
+const dad = await buildAvatar('Male_Adult_05'), mom = await buildAvatar('Female_Adult_01');
+const spirit = await loadFBX('rb/Male_Adult_06.fbx'); spirit.children.filter((c) => c.isLight).forEach((l) => spirit.remove(l));
+spirit.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; const ms = [].concat(o.material).map((m) => new THREE.MeshStandardMaterial({ name: m.name, color: 0x000000, roughness: 1, metalness: 0 })); o.material = Array.isArray(o.material) ? ms : ms[0]; } });
+const names = { idle: 'idle', walk: 'walk', run: 'run', agree: 'agree', headShake: 'headShake', sneak_pose: 'sneak', sad_pose: 'sad' };
+const clips = Object.entries(names).map(([src, dst]) => retargetClip(dad, xbot.scene, xbot.animations.find((a) => a.name === src), dst));
+const rig = new THREE.Group(); rig.name = 'rig'; rig.add(dad.getObjectByName('Bip01').clone(true));
+const out = {};
+out.dad = await exp(dad); out.mom = await exp(mom); out.spirit = await exp(spirit); out.anims = await exp(rig, clips);
+window.out = out; window.done = true; window.info = Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Math.round(v.length * 0.75 / 1024) + ' KB']));
+</script>

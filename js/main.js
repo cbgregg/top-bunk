@@ -29,8 +29,8 @@ scene.add(camera);
 const W = buildWorld(scene);
 const E = new Entity(scene);
 const sfx = new Sound();
-const mom = makePerson({ height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
-const dad = makePerson({ height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
+const mom = makePerson({ model: 'mom', height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
+const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
 scene.add(mom.group, dad.group);
 
 const FL_I = 34;
@@ -196,6 +196,36 @@ function updateInteract() {
   pressE = false;
 }
 
+// The held box is pulled back and down as a wall gets close, so it never pokes through (the player's circle is smaller than the box's reach).
+const BOX_HALF = 0.23, BOX_Z = 0.62;
+function wallAhead(ox, oz, dx, dz, max) {
+  let best = max;
+  for (const c of W.colliders) {
+    if (!c.on) continue;
+    let t0 = 0, t1 = best;
+    for (const [o, d, lo, hi] of [[ox, dx, c.minX, c.maxX], [oz, dz, c.minZ, c.maxZ]]) {
+      if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) { t1 = -1; break; } continue; }
+      let a = (lo - o) / d, b = (hi - o) / d; if (a > b) [a, b] = [b, a];
+      t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) break;
+    }
+    if (t1 >= t0 && t0 > 0 && t0 < best) best = t0;
+  }
+  return best;
+}
+function holdBox(dt) {
+  const b = P.carrying; if (!b) return;
+  camera.getWorldDirection(fwd); fwd.y = 0; const l = Math.hypot(fwd.x, fwd.z);
+  let z = BOX_Z, y = -0.4;
+  if (l > 1e-3) {
+    const dx = fwd.x / l, dz = fwd.z / l, rx = -dz, rz = dx, reach = BOX_Z + BOX_HALF + 0.06;
+    let t = reach;
+    for (const o of [-0.27, 0, 0.27]) t = Math.min(t, wallAhead(camera.position.x + rx * o, camera.position.z + rz * o, dx, dz, reach));
+    z = Math.max(0.08, t - BOX_HALF - 0.04); z = Math.min(z, BOX_Z);
+    y = -0.4 - (BOX_Z - z) * 0.45;       // tuck it lower as it comes in
+  }
+  const k = Math.min(1, dt * 16);
+  b.position.z += (-z - b.position.z) * k; b.position.y += (y - b.position.y) * k;
+}
 function pickUp(b) {
   P.carrying = b; W.yard.remove(b); camera.add(b);
   b.position.set(0.02, -0.4, -0.62); b.rotation.set(0.08, 0.12, 0);
@@ -215,7 +245,7 @@ function lookDrawing() {
   sfx.creak(0.12, 0.6, 0.4);
 }
 // subtitle + recorded voice; returns how long the line is held (the longer of the subtitle time and the audio)
-function speak(id, html, dur) { const d = sfx.say(id); const t = Math.max(dur, d + 0.4); UI.subtitle(html, t); return t; }
+function speak(id, html, dur) { const d = sfx.say(id); (id.startsWith('mom') ? mom : dad).talk(sfx.envelope('vo/' + id)); const t = Math.max(dur, d + 0.4); UI.subtitle(html, t); return t; }
 function talkMom() {
   if (!F.momReady) { speak('mom/boxes_first', '<b>Mom:</b> Boxes first, kiddo. Then you can explore.', 3.5); return; }
   if (!F.talkedMom) F.talkedMom = true;
@@ -321,6 +351,7 @@ function updateCamera(dt) {
     camera.rotation.z += (Math.random() - 0.5) * shake * 0.04;
     shake = Math.max(0, shake - dt * 1.6);
   }
+  holdBox(dt);
 }
 
 // ---------- the chase ----------
@@ -646,10 +677,11 @@ function update(dt) {
 
   // family idle
   if (mom.group.visible) {
-    mom.update(gameTime); dad.update(gameTime);
+    mom.update(gameTime, dt); dad.update(gameTime, dt);
     for (const p of [mom, dad]) {
-      const g = p.group.position;
-      if (Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5) {
+      const g = p.group.position, near = Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5;
+      p.lookAt = near ? camera.position : null;
+      if (near) {
         const want = Math.atan2(P.pos.x - g.x, P.pos.z - g.z);
         p.group.rotation.y = lerpAngle(p.group.rotation.y, want, Math.min(1, dt * 3));
       }

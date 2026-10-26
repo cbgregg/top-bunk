@@ -130,15 +130,16 @@ export function buildWorld(scene) {
     }
   }
   function casing(alongX, fixed, gp) {
-    const top = gp.top ?? 2.1, t = WT / 2 + 0.025, a = gp.c - gp.w / 2, b = gp.c + gp.w / 2, cw = 0.08;
+    // The trim sits 1.2 cm proud of the jamb and the lintel: flush faces would z-fight the wall and flicker as you move.
+    const top = gp.top ?? 2.1, t = WT / 2 + 0.025, a = gp.c - gp.w / 2, b = gp.c + gp.w / 2, cw = 0.08, e = 0.012;
     if (alongX) {
-      box(a - cw, a, 0, top, fixed - t, fixed + t, M.white, { uv: false });
-      box(b, b + cw, 0, top, fixed - t, fixed + t, M.white, { uv: false });
-      box(a - cw, b + cw, top, top + 0.09, fixed - t, fixed + t, M.white, { uv: false });
+      box(a - cw, a + e, 0, top - e, fixed - t, fixed + t, M.white, { uv: false });
+      box(b - e, b + cw, 0, top - e, fixed - t, fixed + t, M.white, { uv: false });
+      box(a - cw, b + cw, top - e, top + 0.09, fixed - t, fixed + t, M.white, { uv: false });
     } else {
-      box(fixed - t, fixed + t, 0, top, a - cw, a, M.white, { uv: false });
-      box(fixed - t, fixed + t, 0, top, b, b + cw, M.white, { uv: false });
-      box(fixed - t, fixed + t, top, top + 0.09, a - cw, b + cw, M.white, { uv: false });
+      box(fixed - t, fixed + t, 0, top - e, a - cw, a + e, M.white, { uv: false });
+      box(fixed - t, fixed + t, 0, top - e, b - e, b + cw, M.white, { uv: false });
+      box(fixed - t, fixed + t, top - e, top + 0.09, a - cw, b + cw, M.white, { uv: false });
     }
   }
   function wall(x1, z1, x2, z2, gaps = []) {

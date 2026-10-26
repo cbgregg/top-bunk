@@ -116,6 +116,15 @@ export class Sound {
     return b.duration;
   }
   say(id, gain = 1.3) { return this.play('vo/' + id, { gain, wet: 0.12 }); }
+  // loudness of a loaded clip, 30 values a second, 0..1 (drives the mouth)
+  envelope(id) {
+    const b = this.buf && this.buf[id]; if (!b) return null;
+    this.envs ||= {}; if (this.envs[id]) return this.envs[id];
+    const d = b.getChannelData(0), step = Math.floor(b.sampleRate / 30), n = Math.floor(d.length / step), out = new Float32Array(n);
+    let peak = 1e-4; for (let i = 0; i < n; i++) { let s2 = 0; for (let j = 0; j < step; j++) s2 += d[i * step + j] ** 2; out[i] = Math.sqrt(s2 / step); peak = Math.max(peak, out[i]); }
+    for (let i = 0; i < n; i++) out[i] = Math.min(1, (out[i] / peak) * 1.25);
+    return (this.envs[id] = out);
+  }
   // a looping file held at a level; asking again moves the level (and starts it once it has loaded)
   bed(id, v, time = 2) {
     if (!this.ctx || !this.want) return;
