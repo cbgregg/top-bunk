@@ -39,7 +39,7 @@ export function breakTiling(mat, { scale = 0.05, strength = 0.28 } = {}) {
 
 // tint: colour multiplied onto the texture. tile: metres per texture repeat (default from pbr.json). rough: roughness multiplier,
 // or flat: a constant roughness that ignores the map.
-export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, flat = null, anti = false, keepMap = false } = {}) {
+export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, flat = null, anti = false, keepMap = false, rotate = 0 } = {}) {
   const meta = await metaP, t = tile ?? meta[name];
   if (!t) return;
   const rep = 1 / t, base = `assets/pbr/${name}_`;
@@ -50,6 +50,7 @@ export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, f
   mat.roughness = rough; mat.metalness = 1; mat.aoMapIntensity = 1;
   if (flat !== null) { mat.roughnessMap = null; mat.roughness = flat; }   // ignore the map: a constant roughness
   if (!keepMap) mat.color.set(tint ?? 0xffffff);
+  if (rotate) for (const t of [mat.map, mat.normalMap, a]) t.rotation = rotate;   // e.g. vertical boards from a horizontal siding texture
   if (anti) breakTiling(mat, typeof anti === 'object' ? anti : undefined);
   mat.needsUpdate = true;
 }

@@ -127,7 +127,7 @@ export function buildWorld(scene) {
   applyPBR(M.oak, 'pine', { tint: 0xa8743f });
   applyPBR(M.plaster, 'ceiling', { tint: 0xdcd6c8, normal: 1.0 });
   applyPBR(M.tile, 'tile');
-  applyPBR(M.siding, 'siding', { tint: 0x9a7552, normal: 1.1 });
+  applyPBR(M.siding, 'siding', { tint: 0xe0a468, normal: 1.1, tile: 1.19, rotate: Math.PI / 2 });   // vertical boards on the walls (the gable ends stay horizontal lap)
   applyPBR(M.grass, 'grass', { anti: true, tile: 2.4, flat: 0.95 });
   applyPBR(M.dirt, 'dirt', { anti: true, flat: 0.95 });
   applyPBR(M.roof, 'roof', { tint: 0xcfcfcf, anti: { scale: 0.08, strength: 0.18 } });
@@ -142,7 +142,7 @@ export function buildWorld(scene) {
   applyPBR(M.mattress, 'linen', { tint: 0xe8e2d4 });
   applyPBR(M.pillow, 'linen', { tint: 0xf2eee4 });
   applyPBR(M.silo, 'metal', { tint: 0xb8bcc0, anti: true });
-  M.gable = std({ map: T.siding, side: THREE.DoubleSide, roughness: 0.86 }); applyPBR(M.gable, 'siding', { tint: 0x9a7552, normal: 1.1 });
+  M.gable = std({ map: T.siding, side: THREE.DoubleSide, roughness: 0.86 }); applyPBR(M.gable, 'siding', { tint: 0xe0a468, normal: 1.1 });
   const winMat = new THREE.MeshBasicMaterial({ map: T.winDay });
 
   const house = new THREE.Group(); scene.add(house);
@@ -781,6 +781,9 @@ export function buildWorld(scene) {
   bathSpot.castShadow = true; bathSpot.shadow.mapSize.set(1024, 1024); bathSpot.shadow.camera.near = 0.3; bathSpot.shadow.camera.far = 32; bathSpot.shadow.bias = -0.0005;
   scene.add(bathSpot, bathSpot.target);
 
+  // brick-edged planter along the front wall, left of the stoop, with shrubs
+  box(-1.2, 4.3, 0, 0.3, -7.3, -6.7, M.brick, { uv: true }); box(-1.1, 4.2, 0.28, 0.32, -7.2, -6.8, M.dirt, { cast: false });
+  for (const x of [-0.4, 0.6, 1.6, 3.4]) { const sh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), M.leaves); sh.position.set(x, 0.55, -7.0); sh.scale.y = 0.8; sh.castShadow = true; house.add(sh); }
   // stoop and porch light by the front door
   box(-4.3, -1.3, -0.05, 0.14, -7.5, -6.5, M.concrete, { uv: false }); box(-3.9, -1.7, -0.05, 0.07, -8.0, -7.5, M.concrete, { uv: false });
   const porchLight = new THREE.PointLight(0xffc880, 0, 6, 2); porchLight.position.set(-1.7, 2.1, -6.9); scene.add(porchLight);
@@ -827,6 +830,7 @@ export function buildWorld(scene) {
     for (const x of [8.99, 15.61]) { const g = new THREE.ShapeGeometry(gshape); g.rotateY(Math.PI / 2); const m = new THREE.Mesh(g, M.gable); m.position.x = x; yard.add(m); }
     box(9.6, 15.0, 0.1, 2.5, -10.03, -10.0, M.garageDoor, { uv: false, parent: yard });
     for (let y = 0.7; y < 2.5; y += 0.6) box(9.6, 15.0, y, y + 0.03, -10.06, -10.03, M.black, { uv: false, parent: yard });
+    { const d = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.04, 0.05), M.doorW); d.position.set(9.0 + 0.0, 1.02, -9.0); d.rotation.y = Math.PI / 2; d.position.set(8.97, 1.02, -9.0); yard.add(d); }
     solid(8.9, 15.7, -10.1, -3.5);
     const hedge = new THREE.InstancedMesh(new THREE.ConeGeometry(0.55, 3.6, 10), M.leaves, 12), m4 = new THREE.Matrix4();
     for (let i = 0; i < 12; i++) { m4.makeTranslation(7.2, 1.8, -5.5 + i * 1.0); hedge.setMatrixAt(i, m4); }
