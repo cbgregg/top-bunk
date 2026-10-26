@@ -4,6 +4,7 @@ import { buildWorld, roomAt } from './world.js';
 import { Entity } from './entity.js';
 import { Sound } from './audio.js';
 import { makePerson } from './people.js';
+import { Gfx } from './gfx.js';
 import * as UI from './ui.js';
 
 const V3 = THREE.Vector3;
@@ -39,6 +40,8 @@ flash.position.set(0.16, -0.18, 0.05);
 flash.castShadow = true; flash.shadow.mapSize.set(1024, 1024); flash.shadow.bias = -0.0006;
 flash.shadow.camera.near = 0.1; flash.shadow.camera.far = 20;
 camera.add(flash); flash.target.position.set(0.04, -0.2, -4); camera.add(flash.target);
+(scene.userData.shadowLights ||= []).push({ light: flash, sun: false });
+const gfx = new Gfx(renderer, scene, camera);
 const BATH_I = 95;
 
 // ---------- constants ----------
@@ -111,7 +114,7 @@ $('pause').addEventListener('click', lock);
 $('title').addEventListener('click', startGame);
 $('retry').addEventListener('click', retry);
 $('again').addEventListener('click', () => location.reload());
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); gfx.resize(); });
 
 function toggleFlash() {
   if (!started || F.dead || (F.phase !== 'night') || P.mode === 'hide') return;
@@ -122,11 +125,11 @@ function toggleFlash() {
 function setPhase(p) {
   F.phase = p;
   const day = p === 'day', night = p === 'night' || p === 'title', morn = p === 'morning';
-  scene.background = new THREE.Color(day ? 0x9fbcd6 : night ? 0x020308 : 0xe9d9bf);
+  gfx.setPhase(p);
   scene.fog = day ? new THREE.Fog(0xa9c2d6, 35, 190) : p === 'title' ? new THREE.FogExp2(0x03050a, 0.03) : night ? new THREE.FogExp2(0x020308, 0.075) : new THREE.Fog(0xe8dcc6, 30, 170);
   W.hemi.color.set(day ? 0xcfe0ff : night ? 0x31406a : 0xffe6c4);
   W.hemi.groundColor.set(day ? 0x5a4a35 : night ? 0x0a0a10 : 0x6a5238);
-  W.hemi.intensity = day ? 1.3 : p === 'title' ? 0.25 : night ? 0.07 : 1.1;
+  W.hemi.intensity = day ? 0.8 : p === 'title' ? 0.25 : night ? 0.07 : 1.1;
   W.sun.color.set(day ? 0xfff1dc : night ? 0x8ea6ff : 0xffd2a0);
   W.sun.intensity = day ? 3.2 : p === 'title' ? 0.6 : night ? 0.18 : 2.6;
   if (day) W.sun.position.set(40, 45, -30); else if (night) W.sun.position.set(-60, 50, 40); else W.sun.position.set(55, 18, 5);
@@ -702,7 +705,7 @@ function loop(now) {
     camera.lookAt(8, 1.6, -9);
     E.update(dt);
   }
-  if (!window.__norender) renderer.render(scene, camera);
+  if (!window.__norender) gfx.render(dt);
 }
 
 UI.makeGrain();
@@ -710,4 +713,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { sfx, P, F, W, E, camera, scene, renderer, setPhase, flash, FL_I, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, flash, FL_I, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

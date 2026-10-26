@@ -1,0 +1,144 @@
+// Rendering pipeline: HDR sky and image-based light, ambient occlusion, bloom, and a film grade.
+// Quality presets trade looks for speed; "low" skips post-processing entirely.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+export const QUALITY = {
+  ultra:  { dpr: 2,    msaa: 4, ao: { samples: 16, radius: 0.55 }, bloom: 0.45, grade: true,  sun: 4096, spot: 2048 },
+  high:   { dpr: 1.5,  msaa: 4, ao: { samples: 8,  radius: 0.55 }, bloom: 0.4,  grade: true,  sun: 2048, spot: 1024 },
+  medium: { dpr: 1.25, msaa: 0, ao: null,                          bloom: 0.32, grade: true,  sun: 2048, spot: 1024 },
+  low:    { dpr: 1,    msaa: 0, ao: null,                          bloom: 0,    grade: false, sun: 1024, spot: 512, direct: true },
+};
+const ORDER = ['ultra', 'high', 'medium', 'low'];
+const KEY = 'topbunk.quality';
+
+// radians to turn the sky so its sun lines up with the game's sun light (tuned by eye in the yard)
+const SKY_ROT = -1.125;
+
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) }, grain: { value: 0.045 }, vignette: { value: 0.32 }, ca: { value: 0.0011 }, sat: { value: 0.97 }, contrast: { value: 1.04 } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float time, grain, vignette, ca, sat, contrast; uniform vec2 res; varying vec2 vUv;
+    float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+    void main() {
+      vec2 d = vUv - 0.5; float r2 = dot(d, d);
+      vec2 off = d * r2 * ca * 8.0;                       // lens colour fringing, stronger toward the corners
+      vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(vec3(l), c, sat);
+      c = (c - 0.5) * contrast + 0.5;
+      c *= 1.0 - vignette * smoothstep(0.28, 0.95, length(d) * 1.25);
+      float n = hash(vUv * res + fract(time) * 91.7) - 0.5;
+      c += n * grain * (1.15 - l);                        // film grain, heavier in the shadows
+      gl_FragColor = vec4(max(c, 0.0), 1.0);
+    }`,
+};
+
+export class Gfx {
+  constructor(renderer, scene, camera, { quality } = {}) {
+    this.r = renderer; this.scene = scene; this.camera = camera;
+    let q = quality; try { q = q || localStorage.getItem(KEY); } catch (e) { /* private window */ }
+    this.quality = QUALITY[q] ? q : 'high';
+    this.time = 0; this.phase = 'title'; this.env = {}; this.daySky = null;
+    this.ft = 16; this.slow = 0; this.age = 0; this.auto = true; this.onChange = null;
+    this.pmrem = new THREE.PMREMGenerator(renderer);
+    this.loadEnv();
+    this.build();
+  }
+
+  loadEnv() {
+    const rgbe = new RGBELoader();
+    const mk = (url, key) => rgbe.load(url, (t) => {
+      t.mapping = THREE.EquirectangularReflectionMapping;
+      this.env[key] = this.pmrem.fromEquirectangular(t).texture; t.dispose(); this.apply();
+    }, undefined, () => { /* no sky file: the flat colours and lights still work */ });
+    mk('assets/sky/day_env.hdr', 'day'); mk('assets/sky/night_env.hdr', 'night');
+    new THREE.TextureLoader().load('assets/sky/day.jpg', (t) => {
+      t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      this.daySky = t; this.apply();
+    }, undefined, () => {});
+  }
+
+  // sky, background and ambient light for a story phase
+  setPhase(p) { this.phase = p; this.apply(); }
+  apply() {
+    const s = this.scene, p = this.phase, day = p === 'day', morn = p === 'morning';
+    s.environmentRotation.y = s.backgroundRotation.y = SKY_ROT;
+    if (day || morn) {
+      s.environment = this.env.day || null; s.environmentIntensity = day ? 0.5 : 0.4;
+      if (this.daySky) { s.background = this.daySky; s.backgroundIntensity = day ? 1 : 0.9; }
+    } else {
+      s.environment = this.env.night || null; s.environmentIntensity = p === 'title' ? 0.35 : 0.5;
+      s.background = new THREE.Color(0x020308); s.backgroundIntensity = 1;
+    }
+  }
+
+  build() {
+    const p = QUALITY[this.quality], r = this.r, scene = this.scene, camera = this.camera;
+    if (this.composer) { this.composer.dispose?.(); this.composer = null; }
+    const dpr = Math.min(devicePixelRatio || 1, p.dpr);
+    r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight);
+    for (const l of scene.userData.shadowLights || []) { l.light.shadow.mapSize.set(l.sun ? p.sun : p.spot, l.sun ? p.sun : p.spot); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } }
+    this.pass = {};
+    if (p.direct) return;
+    const c = this.composer = new EffectComposer(r);
+    c.renderTarget1.samples = c.renderTarget2.samples = p.msaa;
+    c.addPass(new RenderPass(scene, camera));
+    if (p.ao) {
+      const ao = this.pass.ao = new GTAOPass(scene, camera, innerWidth * dpr, innerHeight * dpr);
+      ao.updateGtaoMaterial({ radius: p.ao.radius, distanceExponent: 1.2, thickness: 1.2, scale: 1.0, samples: p.ao.samples, distanceFallOff: 1, screenSpaceRadius: false });
+      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+      ao.blendIntensity = 1;
+      const hide = ao.overrideVisibility.bind(ao);
+      ao.overrideVisibility = function () {   // glass and light domes would read as solid walls to the AO pass
+        hide(); scene.traverse((o) => { if (o.userData && o.userData.noAO) o.visible = false; });
+      };
+      c.addPass(ao);
+    }
+    if (p.bloom) c.addPass(this.pass.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), p.bloom, 0.55, 1.0));
+    c.addPass(new OutputPass());
+    if (p.grade) c.addPass(this.pass.grade = new ShaderPass(GradeShader));
+    c.setPixelRatio(dpr); c.setSize(innerWidth, innerHeight);
+    if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
+  }
+
+  resize() {
+    const p = QUALITY[this.quality], dpr = Math.min(devicePixelRatio || 1, p.dpr);
+    this.r.setSize(innerWidth, innerHeight);
+    if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(innerWidth, innerHeight); }
+    if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
+  }
+
+  setQuality(q, { save = true } = {}) {
+    if (!QUALITY[q] || q === this.quality) return;
+    this.quality = q; this.build();
+    if (save) try { localStorage.setItem(KEY, q); this.auto = false; } catch (e) { /* ignore */ }
+    this.slow = 0; if (this.onChange) this.onChange(q);
+  }
+
+  // adaptive: if the frame time stays high, step down one preset (never back up)
+  watch(dt) {
+    this.age += dt;
+    if (this.age < 6 || !this.auto) return;
+    this.ft += (dt * 1000 - this.ft) * 0.05;
+    this.slow = this.ft > 32 ? this.slow + dt : Math.max(0, this.slow - dt);
+    if (this.slow > 3) {
+      const i = ORDER.indexOf(this.quality);
+      if (i < ORDER.length - 1) { console.info('graphics: stepping down to', ORDER[i + 1]); this.setQuality(ORDER[i + 1], { save: false }); }
+      this.slow = 0; this.ft = 16;
+    }
+  }
+
+  render(dt) {
+    this.time += dt; this.watch(dt);
+    if (this.pass.grade) this.pass.grade.uniforms.time.value = this.time;
+    if (this.composer) this.composer.render(dt); else this.r.render(this.scene, this.camera);
+  }
+}

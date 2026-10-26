@@ -1,0 +1,51 @@
+// Real furniture and plants: Poly Haven models (CC0), compressed to assets/props/*.glb by tools/assets/fetch_models.py.
+// Model front is +Z, units are metres, and each one is placed by its footprint centre with its base on y.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const cache = new Map();
+
+function prepare(g) {
+  g.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = o.receiveShadow = true;
+    for (const m of [].concat(o.material)) if (m.map && (m.transparent || m.alphaTest > 0)) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.depthWrite = true; }   // leaf cards
+  });
+  g.scene.updateMatrixWorld(true);
+  g.box = new THREE.Box3().setFromObject(g.scene);
+  return g;
+}
+export const loadProp = (name) => {
+  if (!cache.has(name)) cache.set(name, new Promise((res, rej) => loader.load(`assets/props/${name}.glb`, res, undefined, rej)).then(prepare));
+  return cache.get(name);
+};
+
+// One model: footprint centre (x, z), base on y, facing rot (radians, front = +Z), uniform scale s.
+// hide: the old stand-in meshes, hidden once the model is in. onLoad(holder, box) runs then too (for colliders).
+export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, hide = [], onLoad } = {}) {
+  const holder = new THREE.Group(); holder.position.set(x, y, z); holder.rotation.y = rot; parent.add(holder);
+  loadProp(name).then((g) => {
+    const m = g.scene.clone(true), b = g.box;
+    m.scale.setScalar(s); m.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
+    holder.add(m);
+    for (const h of hide) h.visible = false;
+    if (onLoad) onLoad(holder, b);
+  }).catch((e) => console.warn('prop failed, keeping the stand-in:', name, e));
+  return holder;
+}
+
+// Many copies of one model as instanced meshes. mats: Matrix4[] of where each copy goes (feet at the local origin).
+export function scatter(parent, name, mats, { cast = true } = {}) {
+  loadProp(name).then((g) => {
+    const b = g.box, norm = new THREE.Matrix4().makeTranslation(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2), out = new THREE.Group(), t = new THREE.Matrix4();
+    g.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const im = new THREE.InstancedMesh(o.geometry, o.material, mats.length), local = new THREE.Matrix4().multiplyMatrices(norm, o.matrixWorld);
+      mats.forEach((m, i) => im.setMatrixAt(i, t.multiplyMatrices(m, local)));
+      im.castShadow = cast; im.receiveShadow = true; im.frustumCulled = false; out.add(im);
+    });
+    parent.add(out);
+  }).catch((e) => console.warn('scatter failed:', name, e));
+}
