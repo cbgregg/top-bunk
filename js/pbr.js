@@ -39,17 +39,17 @@ export function breakTiling(mat, { scale = 0.05, strength = 0.28 } = {}) {
 
 // tint: colour multiplied onto the texture. tile: metres per texture repeat (default from pbr.json). rough: roughness multiplier,
 // or flat: a constant roughness that ignores the map.
-export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, flat = null, anti = false } = {}) {
+export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, flat = null, anti = false, keepMap = false } = {}) {
   const meta = await metaP, t = tile ?? meta[name];
   if (!t) return;
   const rep = 1 / t, base = `assets/pbr/${name}_`;
   const a = tex(base + 'a.webp', false, rep);
-  mat.map = tex(base + 'c.webp', true, rep);
+  if (!keepMap) mat.map = tex(base + 'c.webp', true, rep);   // keepMap: a patterned (wallpaper) colour map stays, the PBR only adds relief
   mat.normalMap = tex(base + 'n.webp', false, rep); mat.normalScale.set(normal, normal);
   mat.roughnessMap = mat.metalnessMap = mat.aoMap = a;
   mat.roughness = rough; mat.metalness = 1; mat.aoMapIntensity = 1;
   if (flat !== null) { mat.roughnessMap = null; mat.roughness = flat; }   // ignore the map: a constant roughness
-  mat.color.set(tint ?? 0xffffff);
+  if (!keepMap) mat.color.set(tint ?? 0xffffff);
   if (anti) breakTiling(mat, typeof anti === 'object' ? anti : undefined);
   mat.needsUpdate = true;
 }

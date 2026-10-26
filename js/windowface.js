@@ -19,10 +19,11 @@ export class WindowFace {
     }
     this.mouth = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 16), hollow);
     this.mouth.position.set(0, -0.62, 0.5); this.mouth.scale.set(1.1, 1, 0.3); this.root.add(this.mouth);
-    // along the south wall, around the corner, up the west side: past the south window and then the west window of the bedroom
-    this.path = new THREE.CatmullRomCurve3([new V(12, 1.8, 4.9), new V(2, 1.8, 4.6), new V(-5, 1.8, 4.5), new V(-7.7, 1.8, 3.2), new V(-7.9, 1.8, 0.2), new V(-7.9, 1.8, -4)]);
-    this.carPath = new THREE.LineCurve3(new V(32, 0.8, 9.5), new V(-26, 0.8, 9.5));
-    this.look = new V(-3, 1.6, 0);
+    // outside the left wall (past the living room, second bedroom and your side window), around the back corner and along the back wall
+    // (past your back window, behind the top bunk), then on past the den
+    this.path = new THREE.CatmullRomCurve3([new V(6.3, 1.8, -4.4), new V(6.2, 1.8, -0.2), new V(6.1, 1.8, 3.0), new V(5.6, 1.8, 6.0), new V(3.4, 1.8, 6.5), new V(2.7, 1.8, 6.5), new V(0, 1.8, 6.6), new V(-2.7, 1.8, 6.5), new V(-5.8, 1.8, 5.6), new V(-6.4, 1.8, 3.6)]);
+    this.carPath = new THREE.LineCurve3(new V(40, 0.8, -30), new V(-40, 0.8, -30));   // along the road in front of the house
+    this.look = new V(1.5, 1.6, 2.5);
   }
   face() { this.t = 0; this.root.visible = true; }
   carPass() { this.ct = 0; this.car.shadow.autoUpdate = true; }
@@ -47,7 +48,7 @@ export class WindowFace {
       if (this.ct >= 1) { this.ct = -1; this.car.intensity = 0; this.car.shadow.autoUpdate = false; }
       else {
         this.carPath.getPointAt(this.ct, this.car.position);
-        this.car.target.position.set(this.car.position.x - 3, 1.3, 2); this.car.target.updateMatrixWorld();
+        this.car.target.position.set(this.car.position.x * 0.55 + 1.5, 1.3, 1.0); this.car.target.updateMatrixWorld();
         this.car.intensity = 420 * Math.min(1, this.ct * 8, (1 - this.ct) * 8);
       }
     }

@@ -13,5 +13,7 @@
  "wall": 1.8,
  "grass": 2.0,
  "tile": 0.9,
- "counter": 2.0
+ "counter": 2.0,
+ "carpet": 0.8,
+ "panel": 0.6
 }

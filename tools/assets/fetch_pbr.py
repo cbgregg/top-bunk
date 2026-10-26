@@ -34,6 +34,8 @@ SETS = {
     'grass':    ('acg', 'Grass004', 1024, 2.0),
     'tile':     ('acg', 'Tiles105', 512, 0.9),
     'counter':  ('ph', 'terrazzo_tiles', 512, None),
+    'carpet':   ('acg', 'Carpet012', 512, 0.8),
+    'panel':    ('ph', 'coated_pine', 512, 0.6),
 }
 
 
@@ -77,9 +79,22 @@ def acg(id_, size, name):
     return rd('_Color.jpg'), rd('_NormalGL.jpg'), pack_arm(rd('_AmbientOcclusion.jpg', 'L'), rd('_Roughness.jpg', 'L'), rd('_Metalness.jpg', 'L'), size), None
 
 
+# colour maps recoloured to a target average colour (keeps the texture's light/dark detail): the carpet is dark brown
+RECOLOR = {'carpet': (104, 74, 52), 'panel': (214, 168, 112)}
+
+
+def recolor(c, rgb):
+    from PIL import ImageStat
+    g = c.convert('L'); m = ImageStat.Stat(g).mean[0] or 1
+    k = [v / 255.0 for v in rgb]
+    ch = [g.point(lambda p, kk=kk: min(255, int(p / m * 255 * kk))) for kk in k]
+    return Image.merge('RGB', ch)
+
+
 def one(name):
     src, id_, size, tile = SETS[name]
     c, n, a, dim = (ph if src == 'ph' else acg)(id_, size, name)
+    if name in RECOLOR: c = recolor(c, RECOLOR[name])
     save(c, os.path.join(OUT, f'{name}_c.webp'), size, 80)
     save(n, os.path.join(OUT, f'{name}_n.webp'), size, 88)
     save(a, os.path.join(OUT, f'{name}_a.webp'), size, 80)

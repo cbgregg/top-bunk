@@ -8,9 +8,9 @@ A short first-person horror game built with [Three.js](https://threejs.org), run
 
 | Beat | What happens |
 |---|---|
-| **Moving day** | Your family pulls up to the rented farmhouse. Carry your boxes from the truck to your room at the end of the hall. Top bunk is yours. Someone left a crayon drawing taped in the hallway. |
-| **2:47 AM** | You wake up and need the bathroom. A car's headlights slide across the bedroom, and then something huge and pale drifts past the windows, moaning. The hallway is long and dark, lit only by a few green plug-in night lights. |
-| **The hallway** | Those aren't your footsteps. The bathroom light snaps on behind you and something tall, black, with huge white eyes and a huge white smile is standing in the doorway. Run. |
+| **Moving day** | Your family pulls up to the rented farmhouse. Carry your boxes from the truck to your room, the back-left bedroom off the hall. Top bunk is yours. Someone left a crayon drawing taped in the hallway. |
+| **2:47 AM** | You wake up and need the bathroom. A car's headlights slide across the bedroom, and then something huge and pale drifts past the windows, moaning. The narrow hallway is dark, lit only by a few green plug-in night lights. |
+| **The hallway** | Those aren't your footsteps. The lights snap on behind you and something tall, black, with huge white eyes and a huge white smile is standing at the end of the hall, where it opens into the living room. Run. |
 | **Hide** | Get up the ladder and under the blanket. It comes to the side of the bed. Hold your breath. |
 | **Morning** | Sunlight, birds, Mom calling you for breakfast. It was just a dream. Get up. |
 
@@ -47,7 +47,7 @@ Settings → Pages → **Deploy from a branch** → `main` / `(root)`. The site 
 | `index.html` | HUD, title/pause/death/end screens, import map for Three.js (CDN) |
 | `css/style.css` | HUD and screen styling, film grain, vignette, blanket overlay |
 | `js/main.js` | Game loop, player controller, collisions, story script, chase/hide logic |
-| `js/world.js` | Farmhouse layout, furniture, yard, truck, barn, lights |
+| `js/world.js` | The 2002 ranch house (carpet, floral wallpaper, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights |
 | `js/entity.js` | The tall one — model, animation, head/pupil tracking |
 | `js/textures.js` | Procedural canvas textures (wallpaper, floors, the crayon drawing, the grin) |
 | `js/audio.js` | Procedural sound: footsteps, creaks, drone, heartbeat, stinger, scream |
