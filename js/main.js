@@ -54,13 +54,13 @@ const BATH_I = 95;
 
 // ---------- constants ----------
 const EYE = 1.32, R = 0.28;
-const BUNK_SEAT = new V3(-3.6, 2.24, 4.42);
-const BUNK_LIE = new V3(-3.6, 1.9, 4.55);
-const LADDER_MID = new V3(-2.2, 1.55, 4.42);
-const LADDER_FLOOR = new V3(-2.0, 0, 4.42);
-const BUNK_SIDE = new V3(-3.55, 0, 3.02);
-const HALL_DOOR = new V3(0, 0, 3.0);       // the hall in front of your door
-const HALL_MOUTH = new V3(0, 0, -1.3);     // where the hall opens into the living room
+const BUNK_SEAT = new V3(7.0, 2.24, 2.52);
+const BUNK_LIE = new V3(7.0, 1.9, 2.65);
+const LADDER_MID = new V3(5.6, 1.55, 2.52);
+const LADDER_FLOOR = new V3(5.4, 0, 2.52);
+const BUNK_SIDE = new V3(7.0, 0, 1.65);
+const HALL_DOOR = new V3(7.2, 0, -0.9);    // the hall in front of your door
+const HALL_MOUTH = new V3(1.6, 0, -0.9);   // just inside the living room, where the hall opens into it
 
 // ---------- helpers ----------
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
@@ -90,7 +90,7 @@ function panFor(pos) {
 
 // ---------- state ----------
 const P = {
-  pos: new V3(1.0, 0, -10.2), vel: new V3(), yaw: Math.PI, pitch: 0, roll: 0, mode: 'walk',
+  pos: new V3(2.2, 0, -9.0), vel: new V3(), yaw: Math.PI, pitch: 0, roll: 0, mode: 'walk',
   cam: new V3(), stamina: 1, exhausted: false, carrying: null, stepAcc: 0, bob: 0, speed: 0,
   breath: 1, breathT: 0, inhale: true,
 };
@@ -194,7 +194,7 @@ W.pickups.forEach((b) => addI({ obj: b, r: 2.2, label: 'Pick up the box', when: 
 addI({ obj: W.drawingMesh, r: 2.3, label: 'Look at the drawing', when: () => F.phase !== 'morning', act: lookDrawing });
 addI({ obj: mom.head, r: 2.6, label: 'Talk to Mom', when: () => F.phase === 'day' && mom.group.visible, act: talkMom });
 addI({ obj: dad.head, r: 2.6, label: 'Talk to Dad', when: () => F.phase === 'day' && dad.group.visible, act: talkDad });
-addI({ p: new V3(-2.4, 1.0, 4.42), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
+addI({ p: new V3(5.8, 1.0, 2.52), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
 addI({ p: W.bathSink, r: 1.9, label: 'Splash water on your face', when: () => F.phase === 'night' && !F.splashed, act: splash });
 
 function updateInteract() {
@@ -261,7 +261,7 @@ function pickUp(b) {
 }
 function dropBox() {
   const b = P.carrying, spot = W.dropSpots[Math.min(F.boxes, W.dropSpots.length - 1)];
-  camera.remove(b); W.house.add(b); b.position.set(spot.x, 0.22, spot.z); b.rotation.set(0, (Math.random() - 0.5) * 0.6, 0);
+  camera.remove(b); W.house.add(b); b.position.set(spot.x, spot.y + 0.22, spot.z); b.rotation.set(0, (Math.random() - 0.5) * 0.6, 0);
   P.carrying = null; F.boxes++; sfx.thump();
   if (F.boxes < 3) UI.objective(`Carry your boxes to your room <span>${F.boxes} / 3</span>`);
   if (F.boxes === 1) UI.subtitle('<i>Top bunk is yours. The bottom one is for boxes.</i>', 4);
@@ -293,11 +293,11 @@ async function climbUp() {
   P.cam.copy(camera.position);
   const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, hiding = F.chase;
   sfx.creak(0.25, 0);
-  await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, Math.PI / 2, k); P.pitch = lerp(p0, 0.3, k); });
+  await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, -Math.PI / 2, k); P.pitch = lerp(p0, 0.3, k); });
   sfx.footstep(0.2, 0, 0.1);
-  if (hiding) { chase.approach = [new V3(-2.05, 0, 3.1), BUNK_SIDE.clone()]; }
+  if (hiding) { chase.approach = [new V3(5.5, 0, 1.7), BUNK_SIDE.clone()]; }
   const dest = hiding ? BUNK_LIE : BUNK_SEAT;
-  await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(Math.PI / 2, 0, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
+  await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(-Math.PI / 2, 0, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
   F.cutscene = false;
   if (hiding || F.chase) {
     P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); UI.objective('Stay quiet.');
@@ -308,9 +308,9 @@ async function climbDown() {
   F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
   const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
   sfx.creak(0.25, 0);
-  await tween(0.4, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, Math.PI / 2, k); P.pitch = lerp(p0, 0.1, k); });
+  await tween(0.4, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, -Math.PI / 2, k); P.pitch = lerp(p0, 0.1, k); });
   const end = new V3(LADDER_FLOOR.x, 1.32, LADDER_FLOOR.z);
-  await tween(0.35, (k) => { P.cam.lerpVectors(LADDER_MID, end, k); P.yaw = lerpAngle(Math.PI / 2, 0.3, k); P.pitch = lerp(0.1, 0, k); });
+  await tween(0.35, (k) => { P.cam.lerpVectors(LADDER_MID, end, k); P.yaw = lerpAngle(-Math.PI / 2, -0.3, k); P.pitch = lerp(0.1, 0, k); });
   sfx.footstep(0.3);
   P.pos.set(LADDER_FLOOR.x, 0, LADDER_FLOOR.z); P.vel.set(0, 0, 0);
   P.mode = 'walk'; F.cutscene = false;
@@ -381,11 +381,11 @@ function updateCamera(dt) {
 }
 
 // ---------- the chase ----------
-function lookingBack() { camera.getWorldDirection(fwd); return fwd.z < -0.55; }   // toward the living room end of the hall
+function lookingBack() { camera.getWorldDirection(fwd); return fwd.x < -0.55; }   // toward the living room end of the hall
 
 async function reveal() {
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0; E.smileScale = 1;
-  E.root.position.copy(HALL_MOUTH); E.root.rotation.y = 0; E.lookTarget = camera.position;
+  E.root.position.copy(HALL_MOUTH); E.root.rotation.y = Math.PI / 2; E.lookTarget = camera.position;
   sfx.stinger(); shake = 0.35;
   F.flicker = true;
   await tween(0.55, (k) => { W.bathSpot.intensity = Math.random() < k ? BATH_I : BATH_I * 0.05; nlMult(Math.random() < k ? 0 : 1, false); }, ease.lin);
@@ -399,7 +399,7 @@ function startChase() {
   chase = { trail: [], approach: [], last: P.pos.clone(), t0: gameTime, stepAcc: 0, hb: 0, arrived: false };
   const room = roomAt(P.pos.x, P.pos.z);
   // if you're already in your room, it follows through the door
-  if (room === 'bed') chase.trail.push(HALL_DOOR.clone(), new V3(-1.0, 0, 3.0));
+  if (room === 'bed') chase.trail.push(HALL_DOOR.clone(), new V3(7.2, 0, 0.3));
   chase.trail.push(P.pos.clone());
   F.chase = true; E.mode = 'run';
   sfx.drone(0.09, 0.5);
@@ -450,7 +450,7 @@ async function hideScript() {
   await wait(2.2);
   F.breathCheck = false;
   UI.hint(null);
-  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(0, Math.PI / 2, k); E.smileScale = 1.18 - 0.18 * k; });
+  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(0, Math.PI, k); E.smileScale = 1.18 - 0.18 * k; });
   E.mode = 'walk'; E.speed = 0.6;
   const from = E.root.position.clone(), to = HALL_DOOR.clone();
   await tween(3.2, (k) => { E.root.position.lerpVectors(from, to, k); }, ease.lin);
@@ -489,7 +489,7 @@ function retry() {
   F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false;
   setPhase('night');
   E.visible = false; E.reach = 0; E.lean = 0; E.smileScale = 1; E.tilt = 0;
-  P.mode = 'walk'; P.pos.set(0, 0, -0.2); P.yaw = Math.PI; P.pitch = 0; P.roll = 0; P.vel.set(0, 0, 0);
+  P.mode = 'walk'; P.pos.set(4.3, 0, -0.9); P.yaw = -Math.PI / 2; P.pitch = 0; P.roll = 0; P.vel.set(0, 0, 0);
   P.stamina = 1; P.exhausted = false; P.breath = 1; shake = 0;
   F.splashed = true;
   UI.fade(0, 1.5); UI.objective('Go back to bed');
@@ -499,7 +499,7 @@ function retry() {
 // ---------- story ----------
 function titleScene() {
   setPhase('title');
-  E.visible = true; E.mode = 'idle'; E.root.position.set(1.5, 0, -17); E.lookTarget = camera.position;
+  E.visible = true; E.mode = 'idle'; E.root.position.set(5, 0, -16); E.lookTarget = camera.position;
   E.faceTowards(-9, -26);
 }
 
@@ -517,9 +517,9 @@ async function startGame() {
 
 async function dayScript() {
   setPhase('day');
-  P.pos.set(1.0, 0, -10.2); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
-  mom.group.position.set(-1.4, 0, -2.9); mom.group.rotation.y = Math.PI / 2;
-  dad.group.position.set(-0.9, 0, -13.4); dad.group.rotation.y = -0.5;
+  P.pos.set(2.2, 0, -9.0); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
+  mom.group.position.set(0.6, 0, 1.6); mom.group.rotation.y = -Math.PI / 2;
+  dad.group.position.set(4.3, 0, -13.4); dad.group.rotation.y = -0.5;
   await wait(0.3);
   UI.fade(0, 2.5); UI.card('Saturday', 'Moving day', 3.5);
   F.birds = true;
@@ -531,7 +531,7 @@ async function dayScript() {
   await wait(0.8);
   UI.subtitle("<i>That's the last one.</i>", 3);
   UI.objective('Find Mom in the kitchen');
-  dad.group.position.set(1.7, 0, -3.9); dad.group.rotation.y = -Math.PI / 2;
+  dad.group.position.set(-0.9, 0, -1.4); dad.group.rotation.y = -Math.PI / 2;
   F.momReady = true;
   await waitFor(() => F.talkedMom);
   F.cutscene = true; P.vel.set(0, 0, 0);
@@ -559,10 +559,10 @@ async function nightScript() {
   await wait(1.2);
   UI.objective('Go to the bathroom at the end of the hall');
   UI.hint('<b>E</b> climb down', 6);
-  if (DEBUG === 'chase') { P.mode = 'walk'; P.pos.set(0, 0, -0.2); P.yaw = Math.PI; F.splashed = true; UI.objective('Go back to bed'); await chaseScript(); return; }
+  if (DEBUG === 'chase') { P.mode = 'walk'; P.pos.set(4.3, 0, -0.9); P.yaw = -Math.PI / 2; F.splashed = true; UI.objective('Go back to bed'); await chaseScript(); return; }
   await waitFor(() => P.mode === 'walk' && roomAt(P.pos.x, P.pos.z) === 'hall');
-  later(2.5, () => { if (!F.splashed) sfx.knock(panFor(new V3(-0.6, 1.5, 3.0)), 0.25); });
-  await waitFor(() => P.pos.z > 0.5 && P.pos.z < 1.9 && Math.abs(P.pos.x) < 0.7);
+  later(2.5, () => { if (!F.splashed) sfx.knock(panFor(new V3(4.5, 1.5, -1.5)), 0.25); });
+  await waitFor(() => P.pos.x > 5.0 && P.pos.x < 6.2 && P.pos.z < -0.4);
   sfx.whisper(panFor(W.drawingMesh.getWorldPosition(tmp)), 0.08);
   await waitFor(() => roomAt(P.pos.x, P.pos.z) === 'bath');
   const bb = W.bulbs.bath; sfx.click();
@@ -582,7 +582,7 @@ async function chaseScript() {
   F.echo = true; const t0 = gameTime;
   sfx.tension(0.012, 3);
   later(2.4, () => { if (F.echo) UI.subtitle("<i>Those aren't your footsteps.</i>", 3.5); });
-  await waitFor(() => P.pos.z > 2.4 || (lookingBack() && gameTime - t0 > 1.1) || gameTime - t0 > 16);
+  await waitFor(() => P.pos.x > 6.0 || (lookingBack() && gameTime - t0 > 1.1) || gameTime - t0 > 16);
   F.echo = false;
   await reveal();
   startChase();
@@ -615,7 +615,7 @@ async function pushScene() {
   const y0 = P.yaw, p0 = P.pitch;
   await tween(1.6, (k) => { P.yaw = lerpAngle(y0, Math.PI, k); P.pitch = lerp(p0, 0.02, k); });
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.35; E.smileScale = 1; E.lookTarget = camera.position;
-  E.root.position.set(-3.6, -2.6, 5.12); E.root.rotation.y = Math.PI;
+  E.root.position.set(7.0, -2.6, 3.24); E.root.rotation.y = Math.PI;
   sfx.drone(0.07, 2); sfx.tension(0.025, 2);
   await wait(0.3);
   await tween(2.8, (k) => { E.root.position.y = -2.6 + 2.6 * k; P.pitch = lerp(0.02, 0.1, k); }, ease.out);
@@ -625,7 +625,7 @@ async function pushScene() {
   sfx.whoosh(0);
   await tween(0.16, (k) => { E.reach = k; }, ease.lin);
   sfx.shove(); shake = 0.6;
-  const start = BUNK_SEAT.clone(), end = new V3(-3.6, 0.26, 2.9), pitch0 = P.pitch;
+  const start = BUNK_SEAT.clone(), end = new V3(7.0, 0.26, 1.0), pitch0 = P.pitch;
   await tween(0.62, (k) => {
     P.cam.set(start.x, lerp(start.y, end.y, k * k), lerp(start.z, end.z, Math.min(1, k * 1.4)));
     P.pitch = lerp(pitch0, 1.02, k); P.roll = lerp(0, 0.42, k);
@@ -716,8 +716,8 @@ function loop(now) {
   if (started) { if (!paused && !window.__freeze) update(dt); }
   else {
     titleT += dt;
-    camera.position.set(-9 + Math.sin(titleT * 0.05) * 3, 2.0 + Math.sin(titleT * 0.3) * 0.05, -25 + Math.cos(titleT * 0.05) * 2);
-    camera.lookAt(0, 1.6, -6);
+    camera.position.set(-6 + Math.sin(titleT * 0.05) * 3, 2.0 + Math.sin(titleT * 0.3) * 0.05, -22 + Math.cos(titleT * 0.05) * 2);
+    camera.lookAt(1, 1.6, -4);
     E.update(dt);
   }
   if (!window.__norender) gfx.render(dt);
