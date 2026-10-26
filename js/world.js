@@ -283,7 +283,7 @@ export function buildWorld(scene) {
   wall(3.3, -1.5, 8.1, -1.5, [{ c: 4.5, w: 0.9, top: 2.05 }, { c: 7.0, w: 0.9, top: 2.05 }]);    // hall | the two front bedrooms
   wall(3.3, -0.3, 8.1, -0.3, [{ c: 4.15, w: 0.9, top: 2.05 }, { c: 7.2, w: 0.9, top: 2.05 }]);   // hall | bathroom, YOUR room
   wall(5.8, -4.5, 5.8, -1.5); wall(5.0, -0.3, 5.0, 3.6);
-  wall(-3.3, -0.3, 3.3, -0.3, [{ c: 1.0, w: 1.4, top: 1.85, arch: true }]);   // living room | kitchen and dining, with the arch
+  wall(-1.4, -0.3, 3.3, -0.3, [{ c: 1.7, w: 1.4, top: 1.85, arch: true }]);   // the middle wall between the living room and the kitchen, with the arch (the dining end is open to the living room)
 
   // floors & ceiling: dark brown carpet through the whole house except the wet rooms
   const FLOORMAT = { bath: M.bathFloor, kitchen: M.lino, dining: M.lino, entry: M.slate };
@@ -599,7 +599,7 @@ export function buildWorld(scene) {
   shelf(-3.22, -2.9, 1.45, -4.3, -3.4); knick(-3.06, 1.475, -3.85, 4, 0.8, 'z');
   shelf(-3.22, -2.9, 1.05, -4.3, -3.4); knick(-3.06, 1.075, -3.85, 3, 0.8, 'z');
   plate(3.21, 1.9, -1.9, -Math.PI / 2, 0.12, 0xa84a5a); plate(3.21, 1.9, -4.0, -Math.PI / 2, 0.12, 0x4a6fa8);
-  wreath(-2.0, 1.55, -0.38, Math.PI);
+  wreath(-0.6, 1.55, -0.38, Math.PI);
   frameZ(-2.9, 1.75, 3.3, 0.5, 0.5, T.paint3, -1); frameZ(-4.0, 1.6, -3.3, 0.4, 0.4, T.paint2, 1);
   heater(-1.9, 0.7, 0.1, -4.42, -4.34);
   knick(-3.1, 0.0, -0.7, 0, 0);
@@ -637,7 +637,7 @@ export function buildWorld(scene) {
     solid(2.55, 3.25, 0.3, 2.8);
     box(-1.3, 2.4, 0.95, 1.5, 3.5, 3.51, M.lino, { uv: true });   // backsplash
     knick(1.2, 0.95, 3.3, 3, 0.3); knick(-1.2, 0.95, 3.3, 2, 0.2);
-    plate(-0.5, 1.5, -0.21, 0, 0.14, 0x4a6fa8); plate(0.0, 1.5, -0.21, 0, 0.14, 0xa84a5a); plate(2.2, 1.6, -0.21, 0, 0.14, 0x4a8a6a);
+    plate(-0.5, 1.5, -0.21, 0, 0.14, 0x4a6fa8); plate(0.0, 1.5, -0.21, 0, 0.14, 0xa84a5a); plate(-1.0, 1.6, -0.21, 0, 0.14, 0x4a8a6a);
   }
   tagStart('dining');
   box(-2.8, -1.6, 0.7, 0.75, 1.0, 2.2, M.oak, { uv: false });
@@ -740,8 +740,8 @@ export function buildWorld(scene) {
   outlet(8.02, 0.33, -0.9, -1, 0, true);       // hall, at the dead end by your door
   outlet(7.85, 0.32, -0.22, 0, 1, true);       // your room, beside the door
   outlet(3.38, 0.34, 1.0, 1, 0, true);         // bathroom
-  outlet(-1.5, 0.34, -0.38, 0, -1, true);      // living room, on the arch wall
-  for (const [x, y, z, nx, nz] of [[-2.0, 0.33, -0.38, 0, -1], [5.08, 0.4, 2.6, 1, 0], [3.5, 0.3, -1.42, 0, 1], [1.5, 1.05, 3.5, 0, -1]]) outlet(x, y, z, nx, nz, false);
+  outlet(-1.0, 0.34, -0.38, 0, -1, true);      // living room, on the arch wall
+  for (const [x, y, z, nx, nz] of [[0.4, 0.33, -0.38, 0, -1], [5.08, 0.4, 2.6, 1, 0], [3.5, 0.3, -1.42, 0, 1], [1.5, 1.05, 3.5, 0, -1]]) outlet(x, y, z, nx, nz, false);
 
   // for the night event: the face's glow, and a passing car's headlights (a shadow-casting spot, so the light only comes in through the windows)
   const faceLight = new THREE.PointLight(0xdce6ff, 0, 20, 2); faceLight.visible = false; scene.add(faceLight);
