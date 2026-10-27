@@ -170,10 +170,21 @@ export class Sound {
   }
 
   // ---- one-shots ----
-  footstep(gain = 0.35, pan = 0, wet = 0.15, wood = true) {
-    this.noiseHit({ dur: 0.07, f: wood ? 900 : 1600, gain: gain * 0.8, pan, wet });
-    this.tone({ f: 110 + Math.random() * 20, f2: 55, dur: 0.08, gain: gain * 0.7, pan, wet });
-    if (wood && Math.random() < 0.12) this.creak(gain * 0.25, pan);
+  // a footfall is a heel strike then the ball of the foot, a few ms apart, and it sounds different on each floor (each one slightly different from the last)
+  footstep(gain = 0.35, pan = 0, wet = 0.15, surface = 'carpet') {
+    const v = 0.88 + Math.random() * 0.26, side = (Math.random() - 0.5) * 0.12, gap = 0.055 + Math.random() * 0.025;
+    if (surface === 'tile' || surface === false) {   // hard floor: a sharp heel click, a hollow body and a lighter toe tick
+      this.noiseHit({ type: 'bandpass', f: 2100 * v, q: 1.4, dur: 0.03, gain: gain * 1.0, pan: pan + side, wet: wet + 0.12, attack: 0.001 });
+      this.tone({ f: 190 * v, f2: 95, dur: 0.07, gain: gain * 0.55, pan: pan + side, wet: wet + 0.1 });
+      this.noiseHit({ type: 'bandpass', f: 3000 * v, q: 1.1, dur: 0.025, gain: gain * 0.55, pan: pan + side, wet: wet + 0.1, attack: 0.001, delay: gap });
+      this.tone({ f: 150 * v, f2: 90, dur: 0.05, gain: gain * 0.25, pan: pan + side, wet, delay: gap });
+    } else {   // carpet: a soft, dull thud, the cushioned heel and a little rustle of fibres
+      this.noiseHit({ type: 'lowpass', f: 380 * v, dur: 0.1, gain: gain * 1.1, pan: pan + side, wet, attack: 0.006 });
+      this.tone({ f: 80 * v, f2: 42, dur: 0.11, gain: gain * 0.8, pan: pan + side, wet, attack: 0.004 });
+      this.noiseHit({ type: 'lowpass', f: 650 * v, dur: 0.07, gain: gain * 0.5, pan: pan + side, wet, attack: 0.008, delay: gap });
+      this.noiseHit({ type: 'bandpass', f: 2600, q: 0.8, dur: 0.07, gain: gain * 0.1, pan: pan + side, wet: 0.02, attack: 0.01, delay: 0.01 });
+      if (Math.random() < 0.1) this.creak(gain * 0.22, pan);   // a board somewhere under the carpet
+    }
   }
   grassStep(gain = 0.3, pan = 0) { this.noiseHit({ dur: 0.12, type: 'highpass', f: 1800, gain: gain * 0.5, pan, wet: 0.02 }); }
   heavyStep(gain = 0.6, pan = 0) {

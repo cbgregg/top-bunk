@@ -36,6 +36,7 @@ const sfx = new Sound();
 const WF = new WindowFace(scene, W.faceLight, W.carLight);
 const mom = makePerson({ model: 'mom', height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
 const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
+mom.group.position.set(0.6, 0, 1.6); dad.group.position.set(4.3, 0, -13.4);   // where the day starts them
 scene.add(mom.group, dad.group);
 
 const gfx = new Gfx(renderer, scene, camera);
@@ -198,7 +199,7 @@ function setPhase(p, silent = false) {
   mom.group.visible = dad.group.visible = day;
   if (sfx.ctx && !silent) {
     sfx.wind(day ? 0.035 : night ? 0.06 : 0.025, 2);
-    sfx.drone(p === 'night' ? 0.05 : p === 'title' ? 0.03 : 0, 3);
+    sfx.drone(p === 'night' ? 0.12 : p === 'title' ? 0.05 : 0, 3);
     sfx.hum(p === 'night' ? 0.012 : 0, 2);
     sfx.tension(0, 1);
     if (p !== 'night') { sfx.dread(0, 2); sfx.violins(0, 0.5); }
@@ -206,7 +207,6 @@ function setPhase(p, silent = false) {
     sfx.bed('music/night', night ? 0.4 : 0, 3);
     sfx.bed('music/morning', morn ? 0.45 : 0, 3);
     sfx.bed('music/chase', 0, 1);
-    sfx.bed('sfx/music_box', night ? 0.7 : 0, 4);
   }
 }
 
@@ -393,7 +393,7 @@ function movePlayer(dt) {
 }
 function playerStep(sprint) {
   const room = roomAt(P.pos.x, P.pos.z), vol = sprint ? 0.42 : 0.26;
-  if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' ? 0.3 : 0.15, room !== 'bath');
+  if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' ? 0.3 : 0.15, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'entry' ? 'tile' : 'carpet');
   if (F.echo) echoes.push(gameTime + 0.27 + Math.random() * 0.06);
 }
 function updateCamera(dt) {
@@ -440,8 +440,8 @@ function startChase() {
   if (room === 'bed') chase.trail.push(HALL_DOOR.clone(), new V3(7.05, 0, 0.3));
   chase.trail.push(P.pos.clone());
   F.chase = true; E.mode = 'run';
-  sfx.drone(0.09, 0.5);
-  sfx.bed('music/chase', 0.6, 0.6); sfx.bed('music/night', 0, 1.5); sfx.bed('sfx/music_box', 0, 1);
+  sfx.drone(0.17, 0.5);
+  sfx.bed('music/chase', 0.6, 0.6); sfx.bed('music/night', 0, 1.5);
   UI.hint(`Hold <b>${L('sprint')}</b> to sprint`, 3);
 }
 function updateChase(dt) {
@@ -500,7 +500,7 @@ async function loomOverBed(level, walkIn = true) {
   const from = E.root.position.clone(), to = HALL_DOOR.clone();
   await tween(3.2, (k) => { E.root.position.lerpVectors(from, to, k); }, ease.lin);
   E.visible = false; E.mode = 'idle';
-  sfx.tension(0, 3); sfx.drone(0.035, 4);
+  sfx.tension(0, 3); sfx.drone(0.085, 4);
   W.bathSpot.intensity = 0; F.flicker = false; F.scare = false;
   await wait(2.5);
   UI.subtitle('<i>You stay under the blanket until the window turns grey.</i>', 4.5);
@@ -588,6 +588,199 @@ async function startGame() {
   await playFrom('day');
 }
 
+// ---------- the family at work: Dad carries boxes in from the truck and unpacks them, Mom unpacks the kitchen ----------
+const chore = { run: 0, stop: false, dadHome: false };
+const dressing = [];                                    // everything they set down (cleared when the day restarts)
+const TRUCK_PICK = new V3(2.3, 0.55, -15.2), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(1.9, 0, -6.5), DOOR_IN = new V3(1.9, 0, -3.7), DOOR_OUT = new V3(1.9, 0, -5.4);
+const LIVING_SPOTS = [new V3(0.85, 0, -3.75), new V3(-0.2, 0, -3.85), new V3(0.35, 0, -2.7)];
+const KITCHEN_BOX = new V3(1.2, 0, 1.4), DAD_HOME = new V3(0.2, 0, 0.6), ARCH = new V3(1.7, 0, -1.0), ARCH_IN = new V3(1.7, 0, 0.3);
+const COUNTER = [[2.8, 0.95, 1.95], [2.8, 0.95, 2.25], [2.8, 0.95, 2.55], [0.0, 0.95, 3.3], [-0.3, 0.95, 3.3], [2.2, 0.95, 3.3]];   // where Mom puts things (the east counter and the back counter)
+const rampY = (x, z) => (Math.abs(x - 2.3) < 0.9 ? clamp((-11.4 - z) * 0.18, 0, 0.55) : 0);
+const stillOn = (run) => run === chore.run;
+function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
+  const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
+  const room = roomAt(g.x, g.z), hard = room === 'kitchen' || room === 'dining' || room === 'bath' || room === 'entry';
+  if (room === 'out') sfx.grassStep(0.3 / (1 + d * 0.35), panFor(tmp2.set(g.x, 1, g.z))); else sfx.footstep(0.3 / (1 + d * 0.3), panFor(tmp2.set(g.x, 1, g.z)), 0.25, hard ? 'tile' : 'carpet');
+}
+const idle = (who) => { if (who.rig) who.rig.play('idle', { fade: 0.3, speed: 1 }); };
+
+async function walkTo(who, pts, speed = 1.25) {
+  const run = chore.run, g = who.group.position;
+  for (const p of pts) {
+    if (!stillOn(run)) return false;
+    const x0 = g.x, z0 = g.z, d = Math.hypot(p.x - x0, p.z - z0);
+    if (d < 0.03) continue;
+    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed; let stride = 0;
+    if (who.rig) who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 });
+    await tween(dur, (k) => {
+      if (!stillOn(run)) return;
+      g.x = x0 + (p.x - x0) * k; g.z = z0 + (p.z - z0) * k; g.y = rampY(g.x, g.z);
+      if ((stride += speed * 0.0167) > 0.72) { stride = 0; stepSound(g); }
+      who.group.rotation.y = lerpAngle(yaw0, want, Math.min(1, k * dur / 0.35));
+    }, ease.lin);
+  }
+  if (!stillOn(run)) return false;
+  idle(who); return true;
+}
+function turnToward(who, x, z, dur = 0.45) {
+  const y0 = who.group.rotation.y, w = Math.atan2(x - who.group.position.x, z - who.group.position.z);
+  return tween(dur, (k) => { who.group.rotation.y = lerpAngle(y0, w, k); });
+}
+// a box with flaps that open, and a few things to take out of it
+function openable(b) {
+  const h = b.geometry.parameters.height, w = b.geometry.parameters.width, d = b.geometry.parameters.depth, pivots = [];
+  for (const s of [-1, 1]) {
+    const pv = new THREE.Object3D(); pv.position.set(0, h / 2, s * d / 2); const f = new THREE.Mesh(new THREE.BoxGeometry(w, 0.008, d / 2), b.material);
+    f.position.set(0, 0.004, -s * d / 4); f.castShadow = true; pv.add(f); b.add(pv); pivots.push([pv, s]);
+  }
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.04, d - 0.04), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 1 }));
+  inner.rotation.x = -Math.PI / 2; inner.position.y = h / 2 + 0.004; inner.visible = false; b.add(inner);
+  return (k) => { inner.visible = k > 0.15; for (const [pv, s] of pivots) pv.rotation.x = s * 2.0 * k; };
+}
+const thingMats = {};
+const mat = (c, r = 0.6) => (thingMats[c + '_' + r] ||= new THREE.MeshStandardMaterial({ color: c, roughness: r }));
+function makeThing(kind) {
+  const g = new THREE.Group(), add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+  if (kind === 'mug') { add(new THREE.CylinderGeometry(0.042, 0.04, 0.09, 14), mat(0xd8d2c2), 0, 0.045, 0); add(new THREE.TorusGeometry(0.03, 0.008, 6, 12), mat(0xd8d2c2), 0.05, 0.05, 0).rotation.y = 0; }
+  else if (kind === 'plates') for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(0.11, 0.1, 0.018, 18), mat(i % 2 ? 0xe6e1d2 : 0xc9d2d6), 0, 0.01 + i * 0.02, 0);
+  else if (kind === 'books') [[0x8a3a32, 0.24, 0.04], [0x3a5a7a, 0.22, 0.035], [0x6a7a4a, 0.2, 0.03]].forEach(([c, w, hh], i) => add(new THREE.BoxGeometry(w, hh, 0.17), mat(c, 0.8), 0.01 * i, 0.02 + i * 0.037, 0).rotation.y = i * 0.2);
+  else if (kind === 'lamp') { add(new THREE.CylinderGeometry(0.06, 0.07, 0.04, 14), mat(0x3a2e24), 0, 0.02, 0); add(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 8), mat(0x3a2e24), 0, 0.19, 0); add(new THREE.CylinderGeometry(0.1, 0.16, 0.16, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0xe8dcb4, roughness: 0.9, side: THREE.DoubleSide }), 0, 0.4, 0); }
+  else if (kind === 'pot') { add(new THREE.CylinderGeometry(0.1, 0.09, 0.12, 16), mat(0x56595c, 0.4), 0, 0.06, 0); add(new THREE.CylinderGeometry(0.105, 0.105, 0.012, 16), mat(0x56595c, 0.4), 0, 0.126, 0); }
+  else { add(new THREE.BoxGeometry(0.16, 0.12, 0.12), mat(0xb98a5a, 0.8), 0, 0.06, 0); }
+  return g;
+}
+const wpos = (o) => o.getWorldPosition(new V3());
+function reachTo(who, target) { who.pose = { ...(who.pose || {}), reach: target }; }
+const bodyH = (who) => who.group.userData.h || 1.75;
+
+// pick up a box and carry it; when done, the box is in the arms
+function holdUp(who, box) {
+  const h = bodyH(who); who.group.add(box); box.position.set(0, 0.98 * h / 1.75, 0.42); box.rotation.set(0, 0, 0);
+  who.pose = { hold: box };
+}
+async function setDown(who, box, spot) {
+  const run = chore.run, h = bodyH(who), y0 = box.position.y, z0 = box.position.z;
+  await tween(0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k - 0.0; box.position.z = z0 + 0.16 * k; });
+  if (!stillOn(run)) return false;
+  scene.attach(box); box.position.set(spot.x, box.geometry.parameters.height / 2, spot.z); box.rotation.set(0, who.group.rotation.y + 0.15, 0); sfx.thump();
+  W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
+  who.pose = { lean: 0.75, reach: wpos(box).add(new V3(0, 0.25, 0)) };
+  await tween(0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.75 * (1 - k) }; });
+  who.pose = null; return stillOn(run);
+}
+// open a box on the floor and take things out of it; each thing ends up beside it
+async function unpackFloor(who, box, kinds, stand) {
+  const run = chore.run, open = box.userData.open || (box.userData.open = openable(box));
+  if (!(await walkTo(who, [stand]))) return false;
+  await turnToward(who, box.position.x, box.position.z);
+  const top = new V3(box.position.x, box.geometry.parameters.height + 0.02, box.position.z);
+  await tween(0.7, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * k, reach: top }; });
+  await tween(0.6, (k) => { if (stillOn(run)) open(k); });
+  const side = new V3(Math.cos(who.group.rotation.y), 0, -Math.sin(who.group.rotation.y)), fwdv = new V3(Math.sin(who.group.rotation.y), 0, Math.cos(who.group.rotation.y));
+  let i = 0;
+  for (const kind of kinds) {
+    if (!stillOn(run)) return false;
+    const th = makeThing(kind); scene.add(th); dressing.push(th);
+    const a = top.clone().add(new V3(0, 0.02, 0)), b = box.position.clone().addScaledVector(side, 0.55 + 0.2 * i).addScaledVector(fwdv, -0.1 * i); b.y = 0.0;
+    const c = new V3(), lift = new V3();
+    await tween(0.9, (k) => {
+      if (!stillOn(run)) return;
+      lift.lerpVectors(a, b, k); lift.y = a.y + Math.sin(Math.min(1, k * 1.15) * Math.PI) * 0.35 * (1 - k) + (b.y - a.y) * k + 0.1;
+      th.position.copy(lift); c.copy(lift); c.y += 0.08; who.pose = { lean: 0.8, reach: c.clone() }; th.position.y = lift.y - 0.05;
+    });
+    th.position.copy(b); sfx.thump(0.35);
+    i++;
+  }
+  await tween(0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * (1 - k) }; });
+  who.pose = null; return stillOn(run);
+}
+
+async function dadChores() {
+  const run = chore.run, g = dad.group.position;
+  dad.busy = true;
+  const done = new Set();
+  for (let i = 0; stillOn(run) && !chore.stop && i < LIVING_SPOTS.length; i++) {
+    const spot = LIVING_SPOTS[i], box = W.cardboardBox(0, 0, 0, 0.46, 0.4, 0.46, i % 4, 0, scene); box.visible = false; dressing.push(box);
+    // up the ramp, lean into the truck and lift a box out
+    if (!(await walkTo(dad, i === 0 ? [RAMP_FOOT, TRUCK_PICK] : [DOOR_IN, DOOR_OUT, PORCH, RAMP_FOOT, TRUCK_PICK]))) return;   // back out through the front door, never through the wall
+    await turnToward(dad, g.x, g.z - 1);
+    const grab = new V3(g.x, 0.55 + 0.55, g.z - 0.7);
+    await tween(0.8, (k) => { if (stillOn(run)) dad.pose = { lean: 0.5 * Math.sin(k * Math.PI / 2), reach: grab }; });
+    if (!stillOn(run)) return;
+    holdUp(dad, box); box.visible = true; sfx.thump(0.4);
+    // down the ramp, along the path and in the front door, to the spot in the living room
+    if (!(await walkTo(dad, [new V3(2.3, 0.2, -13.3), RAMP_FOOT, PORCH, DOOR_OUT, DOOR_IN, new V3(spot.x, 0, spot.z + 0.85)], 1.15))) return;
+    await turnToward(dad, spot.x, spot.z);
+    if (!(await setDown(dad, box, spot))) return;
+    if (chore.stop) break;
+    // open it and take a few things out
+    const kinds = [['books', 'lamp'], ['plates', 'books'], ['lamp', 'mug']][i % 3];
+    if (!(await unpackFloor(dad, box, kinds, new V3(spot.x + 0.1, 0, spot.z + 0.85)))) return;
+    if (chore.stop) break;
+  }
+  if (!stillOn(run)) return;
+  // nothing left to fetch: walk to the kitchen, where Mom is waiting
+  if (!(await walkTo(dad, [new V3(g.x, 0, Math.max(g.z, -3.7)), ARCH, ARCH_IN, DAD_HOME]))) return;
+  await turnToward(dad, 0.6, 1.6, 0.6);
+  chore.dadHome = true;
+}
+async function momChores() {
+  const run = chore.run, g = mom.group.position;
+  mom.busy = true;
+  const box = W.cardboardBox(KITCHEN_BOX.x, 0, KITCHEN_BOX.z, 0.55, 0.42, 0.5, 0, 0.3, scene); dressing.push(box);
+  W.colliders.push({ minX: KITCHEN_BOX.x - 0.3, maxX: KITCHEN_BOX.x + 0.3, minZ: KITCHEN_BOX.z - 0.3, maxZ: KITCHEN_BOX.z + 0.3, on: true, dressing: true });
+  const open = openable(box); box.userData.open = open;
+  const things = ['plates', 'mug', 'pot', 'mug', 'plates', 'mug'];
+  const stand = new V3(KITCHEN_BOX.x - 0.75, 0, KITCHEN_BOX.z);
+  if (!(await walkTo(mom, [stand]))) return;
+  await turnToward(mom, box.position.x, box.position.z);
+  const top = new V3(box.position.x, 0.44, box.position.z);
+  await tween(0.8, (k) => { if (stillOn(run)) mom.pose = { lean: 0.75 * k, reach: top }; });
+  await tween(0.6, (k) => { if (stillOn(run)) open(k); });
+  for (let i = 0; i < things.length && stillOn(run); i++) {
+    const th = makeThing(things[i]); scene.add(th); dressing.push(th);
+    const [cx, cy, cz] = COUNTER[i], hold = new V3();
+    // lift it out of the box, then stand up with it
+    await tween(0.9, (k) => { if (!stillOn(run)) return; th.position.set(top.x, 0.44 + 0.3 * k, top.z); hold.copy(th.position).add(new V3(0, 0.08, 0)); mom.pose = { lean: 0.75 * (1 - 0.5 * k), reach: hold.clone() }; });
+    // carry it to its place on the counter
+    const east = cx > 2.5, sx = east ? cx - 0.65 : cx, sz = east ? cz : cz - 0.9;
+    mom.pose = { reach: null };
+    let walking = true;
+    const follow = (async () => {   // the thing rides in her hands while she walks
+      while (walking && stillOn(run)) {
+        const h = bodyH(mom), fx = Math.sin(mom.group.rotation.y), fz = Math.cos(mom.group.rotation.y);
+        th.position.set(g.x + fx * 0.35, 0.95 * h / 1.75 - 0.12, g.z + fz * 0.35); mom.pose = { reach: th.position.clone().add(new V3(0, 0.05, 0)) };
+        await wait(0.02);
+      }
+    })();
+    const okp = await walkTo(mom, [new V3(sx, 0, sz)], 1.1); walking = false; await follow;
+    if (!okp) return;
+    await turnToward(mom, cx, cz, 0.4);
+    const c0 = th.position.clone(), c1 = new V3(cx, cy, cz);
+    await tween(0.7, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(c0, c1, k); mom.pose = { lean: 0.25 * Math.sin(k * Math.PI), reach: th.position.clone().add(new V3(0, 0.05, 0)) }; });
+    sfx.thump(0.3); mom.pose = null;
+    if (i < things.length - 1) { if (!(await walkTo(mom, [stand]))) return; await turnToward(mom, box.position.x, box.position.z, 0.4); }
+  }
+  // all out: she wipes the counter until somebody needs her
+  while (stillOn(run)) {
+    const a = new V3(2.6, 0.97, 2.0), t0 = gameTime;
+    if (!(await walkTo(mom, [new V3(2.1, 0, 2.2)]))) return;
+    await turnToward(mom, 2.8, 2.2, 0.4);
+    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, reach: new V3(2.75, 0.97, 2.2 + Math.sin(t * 2.2) * 0.45) }; await wait(0.03); if (t > 30) break; }
+  }
+}
+function startChores() {
+  chore.run++; chore.stop = false; chore.dadHome = false;
+  for (const o of dressing) { if (o.parent) o.parent.remove(o); } dressing.length = 0;
+  for (let i = W.colliders.length - 1; i >= 0; i--) if (W.colliders[i].dressing) W.colliders.splice(i, 1);
+  for (const p of [mom, dad]) { p.busy = false; p.pose = null; }
+  dadChores(); momChores();
+}
+function endChores() {
+  chore.run++;
+  for (const p of [mom, dad]) { p.busy = false; p.pose = null; }
+}
+
 async function dayScript() {
   F.stage = 'day'; setPhase('day');
   P.pos.set(2.2, 0, -9.0); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
@@ -598,21 +791,25 @@ async function dayScript() {
   F.birds = true;
   await wait(2.6);
   speak('dad/welcome');
+  startChores();
   UI.objective('Carry your boxes to your room <span>0 / 3</span>');
   UI.hint(`<b>${L('move')}</b> move &nbsp;·&nbsp; <b>${L('sprint')}</b> sprint &nbsp;·&nbsp; <b>${L('interact')}</b> interact`, 8);
   await waitFor(() => F.boxes >= 3);
+  chore.stop = true;   // Dad finishes the box he is carrying, then walks to the kitchen on his own
   await wait(0.8);
   UI.subtitle("<i>That's the last one.</i>", 3);
   UI.objective('Find Mom in the kitchen');
-  dad.group.position.set(-0.9, 0, -1.4); dad.group.rotation.y = -Math.PI / 2;
   F.momReady = true;
   await waitFor(() => F.talkedMom);
+  if (!chore.dadHome) UI.hint('Dad is still carrying his box in', 4);
+  await waitFor(() => chore.dadHome);
+  endChores();
   F.cutscene = true; P.vel.set(0, 0, 0);
   faceParent(mom);
   UI.objective(null);
   await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('mom/teeth');
   UI.fade(1, 2.5); await wait(3);
-  F.birds = false; F.cutscene = false;
+  F.birds = false; F.cutscene = false; endChores();
 }
 function faceParent(who) {
   who.head.getWorldPosition(tmp);
@@ -745,7 +942,7 @@ async function breakfast(n) {
   E.visible = false; F.chase = false;
   P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.yaw = HIDE_YAW + 0.15; P.pitch = -0.12; P.roll = 0;
   mom.group.visible = dad.group.visible = true;
-  mom.group.position.set(-0.5, 0, 2.35); mom.group.rotation.y = 0;        // at the stove
+  mom.group.position.set(1.95, 0, 1.33); mom.group.rotation.y = Math.PI / 2;        // at the stove
   dad.group.position.set(-1.45, 0, 1.4); dad.group.rotation.y = Math.PI / 2;   // by the table
   F.birds = true;
   UI.card('6:58 AM', 'Morning', 3.5);
@@ -787,7 +984,7 @@ async function pushScene() {
   await tween(1.6, (k) => { P.yaw = lerpAngle(y0, Math.PI, k); P.pitch = lerp(p0, 0.02, k); });
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.35; E.smileScale = 1; E.lookTarget = camera.position;
   E.root.position.set(7.5, -2.6, 3.3); E.root.rotation.y = Math.PI;
-  sfx.drone(0.07, 2); sfx.tension(0.025, 2);
+  sfx.drone(0.15, 2); sfx.tension(0.025, 2);
   await wait(0.3);
   await tween(2.8, (k) => { E.root.position.y = -2.6 + 2.6 * k; P.pitch = lerp(0.02, 0.1, k); }, ease.out);
   await tween(1.5, (k) => { E.smileScale = 1 + k * 0.35; E.tilt = 0.35 - k * 0.35; });
@@ -803,7 +1000,7 @@ async function pushScene() {
     E.lean = 0.62 * k;
   }, ease.lin);
   sfx.thud(); sfx.ring(); shake = 1.4; UI.flash('rgba(120,0,0,0.6)', 1.6); UI.blur(6, 0.05);
-  sfx.tension(0, 0.2); sfx.drone(0.03, 2);
+  sfx.tension(0, 0.2); sfx.drone(0.07, 2);
   await wait(0.2); UI.blur(1.5, 2.5);
   await tween(2.4, (k) => { E.tilt = Math.sin(k * Math.PI) * 0.5; E.smileScale = 1.35 + k * 0.1; });
   sfx.whoosh(0); E.visible = false;
@@ -877,7 +1074,7 @@ function update(dt) {
     for (const p of [mom, dad]) {
       const g = p.group.position, near = Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5;
       p.lookAt = near ? camera.position : null;
-      if (near) {
+      if (near && !p.busy) {
         const want = Math.atan2(P.pos.x - g.x, P.pos.z - g.z);
         p.group.rotation.y = lerpAngle(p.group.rotation.y, want, Math.min(1, dt * 3));
       }

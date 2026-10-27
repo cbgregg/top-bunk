@@ -42,19 +42,51 @@ function makeLowPoly({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair
   };
 }
 
+const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0);
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
 export function makePerson({ model, height = 1.75, ...look } = {}) {
   const lp = makeLowPoly({ height, ...look });
-  const g = new THREE.Group(); g.add(lp.group);
+  const g = new THREE.Group(); g.add(lp.group); g.userData.h = height;
   const head = new THREE.Object3D(); head.position.y = 1.64 * height / 1.75; g.add(head);   // the interaction target, always there
   const person = {
     group: g, head, arms: lp.arms, rig: null, lookAt: null,
+    pose: null,   // what the body is doing on top of the clip: { lean: 0..1 (bend at the waist), hold: a box mesh (both hands on its sides), reach: Vector3 (both hands to a world point) }
     update(t, dt = 0.016) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
       r.update(dt);
+      if (this.pose) this.applyPose(r, this.pose);
       r.lookAt(this.lookAt, dt);
       r.updateJaw(dt);
+    },
+    // Two-bone arm IK: the hand lands on the target and the elbow bends toward the pole, so hands rest ON things instead of passing through them.
+    ik(r, side, T, pole) {
+      const up = r.bones[side + '_UpperArm'], fo = r.bones[side + '_Forearm'], hand = r.bones[side + '_Hand'];
+      for (const b of [up, fo, hand]) b.updateWorldMatrix(true, false);
+      up.getWorldPosition(RS); fo.getWorldPosition(RE); hand.getWorldPosition(RH);
+      const l1 = RS.distanceTo(RE), l2 = RE.distanceTo(RH);
+      RD.copy(T).sub(RS); const d = Math.min(Math.max(RD.length(), 0.05), (l1 + l2) * 0.995); RD.normalize();
+      const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+      RP.copy(pole).addScaledVector(RD, -pole.dot(RD)).normalize();
+      RT.copy(RS).addScaledVector(RD, a).addScaledVector(RP, h);              // the elbow
+      r.aim(up, fo, RB.copy(RT).sub(RS).normalize(), 1);
+      fo.updateWorldMatrix(true, false); fo.getWorldPosition(RE);
+      RT.copy(RS).addScaledVector(RD, d);                                      // the reachable hand position
+      r.aim(fo, hand, RB.copy(RT).sub(RE).normalize(), 1);
+    },
+    applyPose(r, p) {
+      if (p.lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], p.lean);
+      const y = this.group.rotation.y, left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));
+      for (const [s, sg] of [['L', 1], ['R', -1]]) {
+        let T = null;
+        if (p.hold) {   // both hands flat on the sides of the box
+          p.hold.updateWorldMatrix(true, false); p.hold.getWorldPosition(RC);
+          const hw = p.hold.geometry.parameters.width / 2 * p.hold.getWorldScale(RS).x;
+          T = RC.clone().addScaledVector(left, sg * (hw + 0.035)); T.y -= 0.03; T.addScaledVector(fwd, -0.04);
+        } else if (p.reach) T = p.reach.clone().addScaledVector(left, sg * 0.08);
+        if (!T) continue;
+        this.ik(r, s, T, RPole.copy(left).multiplyScalar(sg * 0.7).addScaledVector(fwd, -0.3).add(RDown));
+      }
     },
     talk(env) { if (this.rig) this.rig.talk(env); },
   };
