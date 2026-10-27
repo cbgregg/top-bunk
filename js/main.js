@@ -8,6 +8,7 @@ import { Gfx } from './gfx.js';
 import { WindowFace } from './windowface.js';
 import { Dust } from './dust.js';
 import * as UI from './ui.js';
+import { input, label as L, initInput, controlsTable } from './input.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -109,18 +110,38 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+document.addEventListener('visibilitychange', () => { if (document.hidden && uiMode === 'playing') setPause(true); });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== canvas || paused || F.cutscene) return;
   if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide')) return;
   P.yaw -= e.movementX * 0.0022; P.pitch = clamp(P.pitch - e.movementY * 0.0022, -1.45, 1.45);
 });
+// pause / resume without the mouse (controller Start, the touch pause button)
+function setPause(on) {
+  if (on && uiMode === 'playing') { uiMode = 'pause'; paused = true; UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; if (document.pointerLockElement) document.exitPointerLock(); }
+  else if (!on && uiMode === 'pause') { uiMode = 'playing'; paused = false; UI.hide('pause'); sfx.resume(); if (input.scheme === 'kb') lock(); }
+}
+// the A button on a menu screen is a click on its button
+function confirmPress() {
+  if (uiMode === 'title' && !started) startGame(); else if (uiMode === 'pause') setPause(false); else if (uiMode === 'death') retry(); else if (uiMode === 'end') location.reload();
+}
+const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide');
+function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw; P.pitch = clamp(P.pitch + dpitch, -1.45, 1.45); }
+initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy });
+// the controls table and the "begin" line follow whichever device you last used
+function renderControls() {
+  $('controls').innerHTML = controlsTable().map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  $('begin').textContent = input.scheme === 'touch' ? 'Tap to begin' : input.scheme === 'pad' ? 'Press A to begin' : 'Click to begin';
+  $('resume').textContent = input.scheme === 'touch' ? 'Tap to resume' : input.scheme === 'pad' ? 'Press A to resume' : 'Click to resume';
+}
+input.onScheme = renderControls; renderControls();
 function lock() { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* noop */ } }
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
   if (locked && uiMode === 'pause') { uiMode = 'playing'; paused = false; UI.hide('pause'); sfx.resume(); }
   else if (!locked && uiMode === 'playing') { uiMode = 'pause'; paused = true; UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; }
 });
-$('pause').addEventListener('click', lock);
+$('pause').addEventListener('click', () => { lock(); setTimeout(() => { if (uiMode === 'pause' && document.pointerLockElement !== canvas) setPause(false); }, 200); });
 $('title').addEventListener('click', startGame);
 $('retry').addEventListener('click', retry);
 $('again').addEventListener('click', () => location.reload());
@@ -221,7 +242,7 @@ function updateInteract() {
       }
     }
   }
-  UI.prompt(label ? `<b>E</b> ${label}` : null);
+  UI.prompt(label ? `<b>${L('interact')}</b> ${label}` : null); input.setUse(!!label);
   if (pressE && act) act();
   pressE = false;
 }
@@ -352,12 +373,12 @@ function collide() {
 }
 function movePlayer(dt) {
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
-  const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
-  const s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-  let wx = fx * f + rx * s, wz = fz * f + rz * s; const wl = Math.hypot(wx, wz);
+  const f = clamp((keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + input.fy, -1, 1);
+  const s = clamp((keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + input.fx, -1, 1);
+  let wx = fx * f + rx * s, wz = fz * f + rz * s; const wl = Math.hypot(wx, wz), mag = Math.min(1, wl);   // (a gentle stick push walks slowly)
   if (wl > 0) { wx /= wl; wz /= wl; }
-  const sprint = (keys.ShiftLeft || keys.ShiftRight) && wl > 0 && f > 0 && !P.carrying && !P.exhausted && P.stamina > 0.01;
-  const speed = P.carrying ? 1.9 : sprint ? 4.7 : 2.5;
+  const sprint = (keys.ShiftLeft || keys.ShiftRight || input.run) && wl > 0 && f > 0 && !P.carrying && !P.exhausted && P.stamina > 0.01;
+  const speed = (P.carrying ? 1.9 : sprint ? 4.7 : 2.5) * (0.35 + 0.65 * mag);
   if (sprint) P.stamina -= dt / 5.5; else P.stamina = Math.min(1, P.stamina + dt / 4);
   if (P.stamina <= 0.01 && !P.exhausted) { P.exhausted = true; sfx.gasp(); }
   if (P.exhausted && P.stamina > 0.4) P.exhausted = false;
@@ -382,7 +403,7 @@ function updateCamera(dt) {
   } else camera.position.copy(P.cam);
   if (P.mode === 'hide') {
     P.yaw = HIDE_YAW + clamp(angDiff(HIDE_YAW, P.yaw), F.scare ? -1.5 : -0.55, F.scare ? 0.55 : 0.55); P.pitch = clamp(P.pitch, -0.35, 0.4);
-    camera.position.y += Math.sin(gameTime * (keys.Space ? 0.6 : 2.4)) * 0.006;
+    camera.position.y += Math.sin(gameTime * (keys.Space || input.breath ? 0.6 : 2.4)) * 0.006;
   }
   if (P.mode === 'bunk') P.pitch = clamp(P.pitch, -1.2, 0.9);
   camera.rotation.set(P.pitch, P.yaw, P.roll);
@@ -421,7 +442,7 @@ function startChase() {
   F.chase = true; E.mode = 'run';
   sfx.drone(0.09, 0.5);
   sfx.bed('music/chase', 0.6, 0.6); sfx.bed('music/night', 0, 1.5); sfx.bed('sfx/music_box', 0, 1);
-  UI.hint('Hold <b>Shift</b> to sprint', 3);
+  UI.hint(`Hold <b>${L('sprint')}</b> to sprint`, 3);
 }
 function updateChase(dt) {
   if (!F.chase || !chase) return;
@@ -454,7 +475,7 @@ function updateChase(dt) {
 
 // It stands over the bunk while you lie under the blanket holding your breath. level 1..3: how long, and how close it gets.
 async function loomOverBed(level, walkIn = true) {
-  UI.hint('Hold <b>SPACE</b> to hold your breath', 7);
+  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath`, 7);
   F.breathUI = true; sfx.violins(1, 0.4);
   if (walkIn) {   // heavy, slow steps from wherever it is to the side of the bunk
     E.mode = 'walk'; E.speed = 0.7; const from = E.root.position.clone(); let st = 0;
@@ -488,7 +509,7 @@ async function loomOverBed(level, walkIn = true) {
   F.breathUI = false; UI.blanket(false); UI.breath(1, false);
 }
 async function hideScript() {   // after the chase: wait until it has followed you to the bunk
-  UI.hint('Hold <b>SPACE</b> to hold your breath', 7);
+  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath`, 7);
   F.breathUI = true;
   await waitFor(() => chase.arrived);
   await loomOverBed(3, false);
@@ -554,6 +575,7 @@ async function startGame() {
   if (started) return;
   sfx.init(); started = true; uiMode = 'playing';
   UI.hide('title'); lock();
+  if (input.scheme === 'touch') { try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* not available */ } }
   E.visible = false; E.lookTarget = null;
   UI.fade(1, 0.01);
   await warmShaders();
@@ -577,7 +599,7 @@ async function dayScript() {
   await wait(2.6);
   speak('dad/welcome');
   UI.objective('Carry your boxes to your room <span>0 / 3</span>');
-  UI.hint('<b>WASD</b> move &nbsp;·&nbsp; <b>Shift</b> sprint &nbsp;·&nbsp; <b>E</b> interact', 8);
+  UI.hint(`<b>${L('move')}</b> move &nbsp;·&nbsp; <b>${L('sprint')}</b> sprint &nbsp;·&nbsp; <b>${L('interact')}</b> interact`, 8);
   await waitFor(() => F.boxes >= 3);
   await wait(0.8);
   UI.subtitle("<i>That's the last one.</i>", 3);
@@ -617,7 +639,7 @@ async function night1() {
   later(3.5, carPass); later(10.5, faceAtWindow);
   await wait(1.2);
   UI.objective('Go to the bathroom');
-  UI.hint('<b>E</b> climb down', 6);
+  UI.hint(`<b>${L('interact')}</b> climb down`, 6);
   await waitFor(() => P.mode === 'walk' && roomAt(P.pos.x, P.pos.z) === 'hall');
   await waitFor(() => P.pos.x > 5.0 && P.pos.x < 6.2 && P.pos.z < -0.4);
   sfx.whisper(panFor(W.drawingMesh.getWorldPosition(tmp)), 0.08);
@@ -633,7 +655,7 @@ async function night1() {
   }
   await waitFor(() => P.mode === 'hide');
   E.visible = true; E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z); E.mode = 'idle';
-  UI.hint('Hold <b>SPACE</b> to hold your breath', 7);
+  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath`, 7);
   F.breathUI = true; sfx.violins(1, 0.3); sfx.tension(0.05, 1);
   await wait(1.6);
   F.breathCheck = true; F.grace = 1.3;
@@ -681,7 +703,7 @@ async function night3(resume = false) {
     later(1.5, carPass); later(8.5, faceAtWindow);
     await say('mom/n3_a', { muffle: true }); await say('dad/n3_a', { muffle: true });
     UI.objective('Go to the bathroom at the end of the hall');
-    UI.hint('<b>E</b> climb down', 6);
+    UI.hint(`<b>${L('interact')}</b> climb down`, 6);
     await waitFor(() => P.mode === 'walk' && roomAt(P.pos.x, P.pos.z) === 'hall');
     later(2.5, () => { if (!F.splashed) sfx.knock(panFor(new V3(4.5, 1.5, -1.5)), 0.25); });
     await waitFor(() => P.pos.x > 5.0 && P.pos.x < 6.2 && P.pos.z < -0.4);
@@ -805,6 +827,9 @@ function update(dt) {
   gameTime += dt;
   runTimers();
 
+  if (input.lookX || input.lookY) lookBy(-input.lookX * 2.7 * dt, -input.lookY * 2.0 * dt);
+  input.setBreathVisible(F.breathUI && !F.dead);
+  if (shake > 0.25) input.rumble(shake * 0.55, shake * 0.4, 140);
   if (P.mode === 'walk' && !F.cutscene && !F.dead) movePlayer(dt);
   else { P.vel.set(0, 0, 0); P.speed = 0; UI.stamina(1, false); }
   updateCamera(dt);
@@ -818,7 +843,7 @@ function update(dt) {
 
   // breath / hiding
   if (P.mode === 'hide' && !F.dead) {
-    const holding = !!keys.Space;
+    const holding = !!keys.Space || input.breath;
     if (holding) P.breath -= dt / 8.5; else P.breath = Math.min(1, P.breath + dt / 3);
     if (F.breathCheck) {
       if (holding) F.grace = Math.max(F.grace, 0.45); else { F.grace -= dt; if (F.grace <= 0) { sfx.gasp(); caught(); } }
@@ -866,6 +891,7 @@ function update(dt) {
 let last = performance.now(), titleT = 0, frameN = 0;
 function loop(now) {
   requestAnimationFrame(loop);
+  input.poll();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (started) { if (!paused && !window.__freeze) update(dt); }
   else {

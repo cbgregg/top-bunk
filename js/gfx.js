@@ -52,7 +52,7 @@ export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
     let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* private window */ }
-    this.quality = QUALITY[q] ? q : 'high'; this.auto = !(QUALITY[saved] || quality);
+    this.quality = QUALITY[q] ? q : (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high');   // phones start lighter this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
     this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0;   // res: dynamic resolution scale
     this.pmrem = new THREE.PMREMGenerator(renderer);

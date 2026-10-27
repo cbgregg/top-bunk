@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Top Bunk</title>
   <meta name="description" content="A first-person horror game. Your family just moved into an old rented farmhouse. Something tall lives in the hallway.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,26 +36,19 @@
     <div class="panel">
       <h1>TOP BUNK</h1>
       <p class="tag">The rent on the old farmhouse was cheap.<br>Now we know why.</p>
-      <table class="controls">
-        <tr><td>WASD</td><td>Move</td></tr>
-        <tr><td>Mouse</td><td>Look</td></tr>
-        <tr><td>Shift</td><td>Sprint</td></tr>
-        <tr><td>E</td><td>Interact</td></tr>
-        <tr><td>Space</td><td>Hold your breath</td></tr>
-        <tr><td>Esc</td><td>Pause</td></tr>
-      </table>
+      <table class="controls" id="controls"></table>
       <p class="note gfx">Graphics <select id="quality"><option value="auto">Auto</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></p>
-      <p class="begin">Click to begin</p>
+      <p class="begin" id="begin">Click to begin</p>
       <p class="note">Headphones recommended. Contains jump scares.</p>
-      <p id="mobile" class="note warn">Needs a keyboard and mouse.</p>
+      <p id="mobile" class="note">Keyboard and mouse, a game controller, or touch. Landscape works best on a phone.</p>
     </div>
   </div>
-  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><p class="begin">Click to resume</p></div></div>
+  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><p class="begin" id="resume">Click to resume</p></div></div>
   <div id="death" class="screen hidden"><div class="panel"><h2 class="red">It found you.</h2><button id="retry">Try again</button></div></div>
   <div id="end" class="screen hidden">
     <div class="panel">
       <h1>TOP BUNK</h1>
-      <p class="tag">Night one survived.<br>Mostly.</p>
+      <p class="tag">Three nights.<br>Nobody believed you.</p>
       <p class="note">To be continued…</p>
       <button id="again">Play again</button>
     </div>

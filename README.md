@@ -17,16 +17,16 @@ A short first-person horror game built with [Three.js](https://threejs.org), run
 
 ## Controls
 
-| Key | Action |
-|---|---|
-| WASD / arrows | Move |
-| Mouse | Look |
-| Shift | Sprint (limited stamina) |
-| E | Interact |
-| Space | Hold your breath (while hiding) |
-| Esc | Pause |
+| Action | Keyboard + mouse | Game controller | Touch |
+|---|---|---|---|
+| Move | WASD / arrows | Left stick or d-pad | Drag on the left half (floating stick) |
+| Look | Mouse | Right stick | Drag on the right half |
+| Sprint (limited stamina) | Shift | RT / RB / L3 / B | RUN button |
+| Interact | E | A or X | USE button (glows when something is in reach) |
+| Hold your breath (while hiding) | Space | LT / LB / A | HOLD BREATH button |
+| Pause | Esc | Start | II button |
 
-Desktop with keyboard and mouse. Headphones recommended.
+The game switches prompts and the title screen's control list to whichever input you last used. Controllers rumble when things get scary. On phones the game goes fullscreen in landscape and defaults to the medium graphics preset. Headphones recommended.
 
 ## Run locally
 
