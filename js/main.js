@@ -847,18 +847,21 @@ async function night1() {
   // run back; it does not follow. When the lights stutter it is simply standing in your doorway.
   await waitFor(() => roomAt(P.pos.x, P.pos.z) === 'bed' || P.mode === 'hide');
   if (P.mode !== 'hide') {
+    UI.objective('Climb the ladder at the foot of the bunk');
+    UI.hint(`Go to the ladder and press <b>${L('interact')}</b> to climb up`, 8);
     await tween(0.5, () => { nlMult(Math.random() < 0.5 ? 0 : 1, false); W.bathSpot.intensity = Math.random() < 0.5 ? BATH_I : 0; }, ease.lin);
     W.bathSpot.intensity = 0; sfx.slamFar(0.5);
     E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);
   }
   await waitFor(() => P.mode === 'hide');
   E.visible = true; E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z); E.mode = 'idle';
-  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath`, 7);
+  UI.objective(`Hold your breath: keep <b>${L('breath')}</b> held until the violins stop`);
+  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath, and don't let go`, 10);
   F.breathUI = true; sfx.violins(1, 0.3); sfx.tension(0.05, 1);
   await wait(1.6);
   F.breathCheck = true; F.grace = 1.3;
   await tween(6.2, (k) => { E.tilt = 0.2 + Math.sin(k * Math.PI * 2) * 0.35; E.smileScale = 1 + k * 0.35; });
-  F.breathCheck = false; UI.hint(null);
+  F.breathCheck = false; UI.hint(null); UI.objective(null);
   sfx.violins(0, 0.04); sfx.ceilingThump();        // the violins stop dead
   E.visible = false; F.flicker = false; F.scare = false; W.bathSpot.intensity = 0; nlMult(1, false);
   sfx.tension(0, 2);
