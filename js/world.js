@@ -107,7 +107,7 @@ export function buildWorld(scene) {
     cabW: std({ color: 0xe9e6dc, roughness: 0.42 }), cabLine: std({ color: 0xc9c5b8, roughness: 0.6 }), appW: std({ color: 0xf1efe9, roughness: 0.28 }),
     brass: std({ color: 0xc9a14a, roughness: 0.28, metalness: 0.9 }), oak: std({ color: 0x9c6b3c, roughness: 0.55 }), heater: std({ color: 0xe6e2d6, roughness: 0.5 }),
     steelSink: std({ color: 0xc9cccf, roughness: 0.25, metalness: 1 }), carpetLid: std({ color: 0x8e4a5c, roughness: 1 }),
-    showerCurtain: std({ map: T.floralB, roughness: 0.85, side: THREE.DoubleSide }), valance: std({ map: T.floralA, roughness: 0.95, side: THREE.DoubleSide }),
+    showerCurtain: std({ map: T.floralB, roughness: 0.85, side: THREE.DoubleSide, transparent: true, opacity: 1 }), valance: std({ map: T.floralA, roughness: 0.95, side: THREE.DoubleSide }),
   };
   M.curtain.map = T.floralC; M.curtain.color.set(0xffffff);
   for (const k of ['pinkTile', 'carpet', 'lino', 'slate', 'bathFloor', 'brick', 'panel', 'butter', 'oak', 'cabW', 'borderRose', 'borderTeal', 'borderBlue']) M[k].userData.worldUV = true;
@@ -391,12 +391,23 @@ export function buildWorld(scene) {
     for (const s of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 8), M.brass); k.position.set(0.8, 1.0, s * 0.05); g.add(k); }
     house.add(g); return g;
   }
-  // closed doors: the two front bedrooms (off the hall)
-  door(3.45, -1.5, 1, 0); solid(3.45, 4.35, -1.54, -1.46);
-  door(7.05, -1.5, 1, 0); solid(7.05, 7.95, -1.54, -1.46);
-  // open doors: the bathroom (swings into it) and YOURS (swings into your room)
-  door(3.7, -0.3, 0, 1); solid(3.68, 3.72, -0.3, 0.6);
-  door(6.6, -0.3, 0, 1);   // (no collider: with the bunk's corner it left no room to squeeze into your own room)
+  // The four interior doors open and close (E), and the thing opens them too. closed/open = the leaf's direction from its hinge.
+  const doors = {};
+  const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+  function mkDoor(name, hx, hz, closed, open, col, mid, startOpen) {
+    const g = door(hx, hz, closed[0], closed[1]);
+    const rotC = Math.atan2(-closed[1], closed[0]), rotO = Math.atan2(-open[1], open[0]), c = solid(col[0], col[1], col[2], col[3], { door: name, on: !startOpen });
+    const d = { name, g, a: startOpen ? 1 : 0, target: startOpen ? 1 : 0, rotC, rotO, col: c, mid: new THREE.Vector3(mid[0], 1.0, mid[1]) };
+    const apply = () => { g.rotation.y = rotC + angDiff(rotC, rotO) * d.a; c.on = d.a < 0.35; };
+    d.apply = apply; apply(); doors[name] = d;
+  }
+  mkDoor('room2', 3.45, -1.5, [1, 0], [0, -1], [3.45, 4.35, -1.54, -1.46], [3.9, -1.5], false);
+  mkDoor('parents', 7.05, -1.5, [1, 0], [0, -1], [7.05, 7.95, -1.54, -1.46], [7.5, -1.5], false);
+  mkDoor('bath', 3.7, -0.3, [1, 0], [0, 1], [3.7, 4.6, -0.34, -0.26], [4.15, -0.3], true);
+  mkDoor('kid', 6.6, -0.3, [1, 0], [0, 1], [6.6, 7.5, -0.34, -0.26], [7.05, -0.3], true);
+  let doorHook = null;
+  const setDoor = (name, open, silent = false) => { const d = doors[name]; if (!d || d.target === (open ? 1 : 0)) return; d.target = open ? 1 : 0; if (doorHook && !silent) doorHook(name, open); };
+  const updateDoors = (dt) => { for (const k in doors) { const d = doors[k]; if (d.a === d.target) continue; d.a += Math.sign(d.target - d.a) * Math.min(Math.abs(d.target - d.a), dt * 1.5); d.apply(); } };
   // the barn door into the utility room (at the dining end): a whitewashed Z-brace leaf on a black rail, slid open along the dining-room wall
   {
     const x = -3.3 + WT / 2 + 0.04;
@@ -513,7 +524,7 @@ export function buildWorld(scene) {
     rbox(x0 + 0.04, 5.71, 1.35, 2.15, z1, z1 + 0.02, M.cabLine, 0.006);
     solid(x0 - 0.05, x1 + 0.05, z0 - 0.1, z1 + 0.05);
   }
-  let teddy = null;
+  let teddy = null, parentsBed = null, hallFrame = null; const chairs = [];
   {
     const bear = new THREE.Group(); const fur = std({ color: 0x7a5232, roughness: 1 });
     const s = (r, x, y, z) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), fur); m.position.set(x, y, z); m.castShadow = true; bear.add(m); };
@@ -536,7 +547,16 @@ export function buildWorld(scene) {
   // ---------- hallway (narrow, along the bedroom end; a gallery of family photos) ----------
   {
     // real photographs (assets/photos: public-domain family pictures and Pacific Northwest landscapes)
-    frameX(4.75, 1.55, -1.5, 0.44, 0.34, 'family2', 1); frameX(5.4, 1.5, -1.5, 0.34, 0.26, 'rainier', 1); frameX(6.0, 1.55, -1.5, 0.3, 0.24, 'sunset', 1); frameX(6.6, 1.5, -1.5, 0.26, 0.22, 'family1', 1);
+    {   // this one is a loose group (it is not merged into the walls) so it can tilt and fall
+      const g = new THREE.Group(); const xc = 4.75, y = 1.55, w = 0.44, h = 0.34, zf = -1.5 + WT / 2;
+      g.position.set(xc, y + h / 2 + 0.05, zf + 0.03);   // pivots at its top edge
+      const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.03), M.darkWood); fr.position.set(0, -h / 2 - 0.05, -0.0); g.add(fr);
+      const p = picture(w, h, 'family2'); p.position.set(0, -h / 2 - 0.05, 0.017); g.add(p); house.add(g);
+      hallFrame = { g, y0: g.position.y, tilt(r) { g.rotation.z = r; }, fallen: false,
+        fall() { hallFrame.fallen = true; g.position.set(xc + 0.25, 0.06, zf + 0.35); g.rotation.set(-Math.PI / 2 + 0.1, 0.4, 0.2); },
+        reset() { hallFrame.fallen = false; g.position.set(xc, hallFrame.y0, zf + 0.03); g.rotation.set(0, 0, 0); } };
+    }
+    frameX(5.4, 1.5, -1.5, 0.34, 0.26, 'rainier', 1); frameX(6.0, 1.55, -1.5, 0.3, 0.24, 'sunset', 1); frameX(6.6, 1.5, -1.5, 0.26, 0.22, 'family1', 1);
     frameX(4.95, 1.55, -0.3, 0.3, 0.24, 'family1', -1); frameX(6.25, 1.5, -0.3, 0.3, 0.24, 'moraine', -1); frameX(7.85, 1.55, -0.3, 0.2, 0.26, 'family2', -1);
     wreath(8.01, 1.55, -0.9, -Math.PI / 2);
     shelf(7.6, 8.0, 1.95, -1.3, -0.5); knick(7.8, 1.975, -0.9, 4, 0.7, 'z');
@@ -622,8 +642,8 @@ export function buildWorld(scene) {
   box(-3.0, -2.75, 0.45, 0.95, -3.3, -1.5, M.couch, { uv: false });
   tagEnd();
   const cCouch = solid(-3.05, -2.15, -3.35, -1.45);
-  tagStart('coffee'); box(-1.5, -0.7, 0, 0.42, -3.0, -1.8, M.oak, { uv: false }); tagEnd();
-  const cCoffee = solid(-1.55, -0.65, -3.05, -1.75);
+  tagStart('coffee'); box(-1.5, -0.7, 0, 0.42, -3.6, -2.4, M.oak, { uv: false }); tagEnd();
+  const cCoffee = solid(-1.55, -0.65, -3.65, -2.35);
   tagStart('tv');
   box(2.7, 3.22, 0, 0.55, -3.9, -2.5, M.oak, { uv: false });
   box(2.75, 3.2, 0.55, 1.2, -3.85, -2.55, M.crt, { uv: false });
@@ -710,12 +730,23 @@ export function buildWorld(scene) {
     rbox(6.1, 6.85, 0, 2.1, -2.15, -1.58, M.oak, 0.01); box(6.46, 6.49, 0.05, 2.05, -2.17, -2.15, M.black, { uv: false });
     rbox(6.1, 6.85, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
     solid(6.05, 6.9, -2.2, -1.5);
-    rbox(7.05, 8.0, 0, 0.5, -3.8, -1.8, M.oak, 0.02); rbox(7.08, 7.97, 0.4, 0.6, -3.75, -1.85, M.mattress, 0.04); rbox(7.08, 7.97, 0.55, 0.64, -3.0, -1.85, M.plaid, 0.02); solid(7.0, 8.02, -3.85, -1.75);
+    // the parents' double bed: head on the west wall, a nightstand with a lamp, a floral quilt (the passage in front of the door and the closet stays clear)
+    rbox(5.9, 7.9, 0.12, 0.4, -4.38, -2.98, M.oak, 0.02); rbox(5.93, 7.87, 0.4, 0.58, -4.35, -3.01, M.mattress, 0.05);
+    rbox(5.9, 5.98, 0.4, 1.15, -4.38, -2.98, M.oak, 0.02); rbox(7.86, 7.9, 0.4, 0.62, -4.38, -2.98, M.oak, 0.02);
+    rbox(6.55, 7.88, 0.58, 0.9, -4.34, -3.02, M.floralB, 0.05);   // a thick quilt over the sleepers
+    for (const z of [-3.9, -3.4]) rbox(6.0, 6.5, 0.58, 0.68, z - 0.22, z + 0.22, M.pillow, 0.05);
+    solid(5.85, 7.95, -4.42, -2.94);
+    rbox(5.9, 6.3, 0, 0.55, -2.92, -2.55, M.oak, 0.015);
+    { const lampM = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0.0, roughness: 0.7 });
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.1, 0.65, -2.74); house.add(base);
+      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.1, 0.87, -2.74); house.add(shade); }
+    solid(5.85, 6.35, -2.96, -2.5);
+    parentsBed = { mom: { x: 7.65, y: 0.7, z: -3.4 }, dad: { x: 7.8, y: 0.7, z: -3.95 } };
     // the other bedroom: vertical-plank wood closet doors
     rbox(4.45, 5.5, 0, 2.1, -2.15, -1.58, M.oak, 0.01); for (let i = 1; i < 6; i++) box(4.45 + i * 0.175 - 0.006, 4.45 + i * 0.175 + 0.006, 0.05, 2.05, -2.165, -2.15, M.black, { uv: false });
     rbox(4.45, 5.5, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
     solid(4.4, 5.55, -2.2, -1.5);
-    rbox(3.4, 4.35, 0, 0.5, -4.4, -2.4, M.oak, 0.02); rbox(3.43, 4.32, 0.4, 0.6, -4.35, -2.45, M.mattress, 0.04); rbox(3.43, 4.32, 0.55, 0.64, -3.6, -2.45, M.floralB, 0.02); solid(3.35, 4.4, -4.45, -2.35);
+    rbox(3.4, 5.35, 0, 0.5, -4.4, -3.45, M.oak, 0.02); rbox(3.43, 5.32, 0.4, 0.6, -4.37, -3.48, M.mattress, 0.04); rbox(3.95, 5.32, 0.55, 0.64, -4.35, -3.5, M.floralB, 0.02); rbox(3.46, 3.95, 0.58, 0.7, -4.25, -3.62, M.pillow, 0.05); solid(3.35, 5.4, -4.45, -3.4);   // the spare room's bed runs along the front wall so the door and closet stay reachable
   }
 
   // moving boxes around the house
@@ -724,8 +755,14 @@ export function buildWorld(scene) {
   const cardboardBox = (x, y, z, w = 0.5, h = 0.44, d = 0.5, mi = 0, rot = 0, parent = house) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), boxMats[mi]); m.position.set(x, y + h / 2, z); m.rotation.y = rot; m.castShadow = m.receiveShadow = true; parent.add(m); return m;
   };
-  cardboardBox(-2.95, 0, -4.1, 0.55, 0.45, 0.55, 0, 0.4); solid(-3.22, -2.65, -4.4, -3.8);   // front-left corner of the living room
+  cardboardBox(-4.4, 0, -3.2, 0.55, 0.45, 0.5, 3, 0.2); cardboardBox(-4.4, 0.45, -3.2, 0.5, 0.4, 0.45, 1, -0.15); cardboardBox(-5.1, 0, -3.3, 0.5, 0.44, 0.5, 2, 0.1); solid(-5.45, -4.05, -3.65, -2.9);   // more boxes in the utility room
   cardboardBox(-5.0, 0, 2.8, 0.6, 0.5, 0.5, 2, 0.2); cardboardBox(-4.95, 0.5, 2.8, 0.5, 0.4, 0.45, 1, -0.1); solid(-5.35, -4.65, 2.45, 3.15);   // in the utility room
+
+  // the breaker box on the utility room's front wall
+  { const steel = std({ color: 0x8f969c, roughness: 0.5, metalness: 0.4 });
+    rbox(-5.75, -5.25, 1.15, 1.75, -3.84, -3.73, steel, 0.01);
+    for (let i = 0; i < 6; i++) rbox(-5.68 + (i % 2) * 0.25, -5.6 + (i % 2) * 0.25, 1.28 + Math.floor(i / 2) * 0.15, 1.34 + Math.floor(i / 2) * 0.15, -3.73, -3.715, M.black, 0.004);
+    solid(-5.85, -5.15, -3.95, -3.55); }
 
   // ---------- real furniture: each model replaces its stand-in (and collider) as it loads ----------
   const PI = Math.PI;
@@ -737,8 +774,8 @@ export function buildWorld(scene) {
   prop('table', { x: 2.9, z: -3.2, rot: -PI / 2 }, { tag: 'tv', old: [cTv], box: [2.45, 3.25, -3.95, -2.45] });
   prop('tv', { x: 2.95, y: 0.55, z: -3.2, rot: -PI / 2 });
   prop('sofa', { x: -2.6, z: -2.4, rot: PI / 2 }, { tag: 'couch', old: [cCouch], box: [-3.05, -2.15, -3.3, -1.5] });
-  prop('table', { x: -1.2, z: -2.4, rot: PI / 2 }, { tag: 'coffee', old: [cCoffee], box: [-1.6, -0.8, -3.3, -1.5] });
-  prop('armchair', { x: -1.9, z: -0.95, rot: PI }, { box: [-2.4, -1.4, -1.45, -0.45] });   // by the arch wall, out of the way of the front door and the boxes
+  prop('table', { x: -1.2, z: -3.0, rot: PI / 2 }, { tag: 'coffee', old: [cCoffee], box: [-1.6, -0.8, -3.9, -2.1] });   // (pushed toward the front wall so there is a lane behind it through the living room)
+  prop('armchair', { x: -2.55, z: -4.05, rot: 0 }, { box: [-2.98, -2.12, -4.42, -3.66] });   // front-left corner, clear of the picture window and of the lane through the living room
   prop('cabinet', { x: -0.2, z: -0.7, rot: PI, s: 0.9 }, { box: [-1.14, 0.74, -1.02, -0.38] });   // the china hutch: against the arch wall, to the right of the archway as you face it from the living room
   prop('plant2', { x: 2.85, z: -1.85 }, { box: [2.55, 3.15, -2.15, -1.55] });
   prop('clock_wall', { x: 3.21, y: 1.74, z: -3.05, rot: -PI / 2 });
@@ -746,11 +783,77 @@ export function buildWorld(scene) {
   {
     const cx = -2.1, cz = 2.3;
     prop('table_round', { x: cx, z: cz, s: 0.77 }, { tag: 'dining', old: [cDining], box: [cx - 0.55, cx + 0.55, cz - 0.55, cz + 0.55] });
-    for (const [dx, dz, r] of [[-0.83, 0, PI / 2], [0.83, 0, -PI / 2], [0, -0.9, 0], [0, 0.9, PI]]) prop('chair', { x: cx + dx, z: cz + dz, rot: r }, { tag: 'dining' });
+    for (const [dx, dz, r] of [[-0.83, 0, PI / 2], [0.83, 0, -PI / 2], [0, -0.9, 0], [0, 0.9, PI]]) chairs.push({ holder: prop('chair', { x: cx + dx, z: cz + dz, rot: r }, { tag: 'dining' }), x: cx + dx, z: cz + dz, rot: r });
     prop('kettle', { x: 2.82, y: 0.96, z: 1.17, rot: 0 });
     prop('pot', { x: 3.02, y: 0.96, z: 1.49, rot: 0 });
     prop('plant1', { x: -2.9, z: 3.2 }, { box: [-3.15, -2.65, 2.9, 3.45] });
   }
+
+  // ---------- set pieces for the nights: the TV, the wall phone, the bathroom mirror ----------
+  const tvFx = (() => {
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 48; const g = cv.getContext('2d'), img = g.createImageData(64, 48);
+    const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.26), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
+    plane.rotation.y = -Math.PI / 2; plane.position.set(2.713, 0.8, -3.2); plane.visible = false; house.add(plane);
+    const light = new THREE.PointLight(0x9db6ff, 0, 7, 1.6); light.position.set(2.2, 1.0, -3.2); scene.add(light);
+    const fx = { on: false, figure: 0, t: 0, base: 4, light, plane,
+      set(on) { fx.on = on; plane.visible = on; if (!on) light.intensity = 0; },
+      tick(dt) {
+        if (!fx.on) return;
+        fx.t += dt; light.intensity = fx.base * (0.75 + Math.random() * 0.5) * (fx.figure > 0.5 && Math.random() < 0.2 ? 0.2 : 1);
+        if (fx.t < 0.05) return; fx.t = 0;
+        const d = img.data, band = (Math.random() * 48) | 0;
+        for (let y = 0; y < 48; y++) for (let x = 0; x < 64; x++) {
+          const i = (y * 64 + x) * 4, v = Math.random() * 215 + (Math.abs(y - band) < 2 ? 40 : 0);
+          d[i] = v * 0.86; d[i + 1] = v * 0.93; d[i + 2] = v; d[i + 3] = 255;
+        }
+        g.putImageData(img, 0, 0);
+        if (fx.figure > 0) {   // something tall standing in the static
+          g.globalAlpha = Math.min(1, fx.figure); g.fillStyle = '#050506'; g.fillRect(27, 14, 10, 34); g.beginPath(); g.ellipse(32, 14, 6, 8, 0, 0, 7); g.fill();
+          g.fillStyle = '#fff'; g.fillRect(29, 12, 2, 4); g.fillRect(33, 12, 2, 4); g.fillRect(28, 17, 8, 1); g.globalAlpha = 1;
+        }
+        tex.needsUpdate = true;
+      } };
+    return fx;
+  })();
+  const phone = (() => {
+    const g = new THREE.Group(); g.position.set(-1.48, 1.4, 0.9); g.rotation.y = -Math.PI / 2; house.add(g);   // local +z points out into the dining room
+    const beige = std({ color: 0xd9d0b4, roughness: 0.45 }), dark = std({ color: 0x1b1a18, roughness: 0.6 });
+    const add = (geo, m, x, y, z, parent = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; parent.add(o); return o; };
+    add(new THREE.BoxGeometry(0.15, 0.24, 0.06), beige, 0, 0, 0.03); add(new THREE.BoxGeometry(0.1, 0.1, 0.012), dark, 0, -0.03, 0.066);
+    const hand = new THREE.Group(); hand.position.set(0, 0.04, 0.075); g.add(hand);
+    add(new THREE.BoxGeometry(0.045, 0.21, 0.04), beige, -0.04, 0, 0, hand); add(new THREE.BoxGeometry(0.06, 0.05, 0.04), beige, -0.04, 0.1, 0, hand); add(new THREE.BoxGeometry(0.06, 0.05, 0.04), beige, -0.04, -0.1, 0, hand);
+    const led = new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff1a10, emissiveIntensity: 0 }); add(new THREE.BoxGeometry(0.02, 0.012, 0.01), led, 0.045, 0.1, 0.064);
+    const cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-0.04, -0.07, 0.07), new THREE.Vector3(-0.07, -0.25, 0.1), new THREE.Vector3(0.0, -0.33, 0.1), new THREE.Vector3(0.02, -0.14, 0.06)]), 18, 0.004, 5), dark); g.add(cord);
+    const ph = { pos: new THREE.Vector3(-1.56, 1.3, 0.9), ringing: false, off: false,
+      setRinging(on) { ph.ringing = on; led.emissiveIntensity = on ? 1.5 : 0; },
+      pickUp() { ph.off = true; hand.position.set(-0.02, -0.28, 0.14); hand.rotation.set(0.5, 0, 0.3); },
+      hangUp() { ph.off = false; hand.position.set(0, 0.04, 0.075); hand.rotation.set(0, 0, 0); },
+      tick(t) { if (ph.ringing) { const on = (t % 1.6) < 0.8; led.emissiveIntensity = on ? 2 : 0; hand.rotation.z = on ? Math.sin(t * 90) * 0.04 : 0; } } };
+    return ph;
+  })();
+  const mirrorFx = (() => {
+    const cv = document.createElement('canvas'); cv.width = 156; cv.height = 136; const g = cv.getContext('2d');
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.68), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, fog: false }));
+    plane.rotation.y = -Math.PI / 2; plane.position.set(4.844, 1.6, 0.9); plane.visible = false; house.add(plane);
+    const base = () => { const gr = g.createLinearGradient(0, 0, 156, 136); gr.addColorStop(0, '#2b3036'); gr.addColorStop(1, '#14171b'); g.fillStyle = gr; g.fillRect(0, 0, 156, 136); g.fillStyle = 'rgba(190,120,135,0.18)'; for (let i = 0; i < 6; i++) g.fillRect(i * 28, 0, 14, 136); };
+    return {
+      plane,
+      show(kind) {
+        base();
+        if (kind === 'figure') {   // behind your reflected shoulder
+          g.fillStyle = '#040405'; g.fillRect(96, 40, 26, 100); g.beginPath(); g.ellipse(109, 38, 15, 20, 0, 0, 7); g.fill();
+          g.fillStyle = '#fff'; g.beginPath(); g.ellipse(102, 34, 4, 7, 0.3, 0, 7); g.ellipse(116, 34, 4, 7, -0.3, 0, 7); g.fill();
+          g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(109, 42, 11, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+        } else {   // writing in the steam
+          g.fillStyle = 'rgba(230,235,240,0.5)'; g.fillRect(0, 0, 156, 136); g.fillStyle = 'rgba(20,24,28,0.75)'; g.font = 'bold 30px "Special Elite", monospace'; g.textAlign = 'center'; g.fillText(kind === 'behind' ? 'BEHIND' : 'GET OUT', 78, 74);
+        }
+        tex.needsUpdate = true; plane.visible = true;
+      },
+      hide() { plane.visible = false; },
+    };
+  })();
 
   // ---------- light fixtures ----------
   const bulbs = {};
@@ -765,7 +868,7 @@ export function buildWorld(scene) {
     bulbs[name] = { light: L, dome, base: intensity };
   };
   fixture('bed', 6.5, 1.4); fixture('hall1', 4.8, -0.9); fixture('hall2', 7.0, -0.9); fixture('bath', 4.15, 1.0, 7);
-  fixture('living', 0, -2.4, 10); fixture('kitchen', 0.3, 1.5, 10);
+  fixture('living', 0, -2.4, 10); fixture('kitchen', 0.3, 1.5, 10); fixture('parents', 7.0, -3.1, 8); fixture('room2', 4.55, -3.1, 8);
 
   // ---------- outlets, and a few green plug-in night lights (the only light you get at night) ----------
   const outletMat = std({ color: 0xe4ded0, roughness: 0.5 }), holeMat = std({ color: 0x14140f, roughness: 0.9 }), nlBody = std({ color: 0xe9e4d4, roughness: 0.45 });
@@ -857,23 +960,45 @@ export function buildWorld(scene) {
   ];
   const dropSpots = [new THREE.Vector3(5.45, 0.55, 3.0), new THREE.Vector3(6.05, 0.55, 3.0), new THREE.Vector3(6.65, 0.55, 3.0)];   // on the bottom bunk
 
-  // the detached two-car garage (brown siding, gray shingles), and an arborvitae hedge along the left side
+  // the detached two-car garage (brown siding, gray shingles), behind the house on the left like the aerial photo (its doors face the house, a side door
+  // toward the concrete apron), and an arborvitae hedge along the east side. The group is built where the old garage stood and moved into place.
+  const GAR = { x: -4, z: 20 };
   {
-    box(-15.6, -9, 0, 3.0, -10, -3.6, M.siding, { parent: yard });
+    const GG = new THREE.Group(); GG.position.set(GAR.x, 0, GAR.z); yard.add(GG);
+    box(-15.6, -9, 0, 3.0, -10, -3.6, M.siding, { parent: GG });
     const half = 3.5, rise = 1.3, L = Math.hypot(half, rise), a = Math.atan2(rise, half);
     for (const s2 of [-1, 1]) {
       const geo = new THREE.BoxGeometry(7.4, 0.14, L); worldUV(geo);
-      const m = new THREE.Mesh(geo, M.roof); m.castShadow = m.receiveShadow = true; m.position.set(-12.3, 3.0 + rise / 2, -6.8 + s2 * half / 2); m.rotation.x = s2 * a; yard.add(m);
+      const m = new THREE.Mesh(geo, M.roof); m.castShadow = m.receiveShadow = true; m.position.set(-12.3, 3.0 + rise / 2, -6.8 + s2 * half / 2); m.rotation.x = s2 * a; GG.add(m);
     }
     const gshape = new THREE.Shape([new THREE.Vector2(10, 3.0), new THREE.Vector2(-3.6, 3.0), new THREE.Vector2(6.8, 3.0 + rise * 0.93)]);
-    for (const x of [-8.99, -15.61]) { const g = new THREE.ShapeGeometry(gshape); g.rotateY(Math.PI / 2); const m = new THREE.Mesh(g, M.gable); m.position.x = x; yard.add(m); }
-    box(-15.0, -9.6, 0.1, 2.5, -10.03, -10.0, M.garageDoor, { uv: false, parent: yard });
-    for (let y = 0.7; y < 2.5; y += 0.6) box(-15.0, -9.6, y, y + 0.03, -10.06, -10.03, M.black, { uv: false, parent: yard });
-    { const d = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.04, 0.05), M.doorW); d.rotation.y = Math.PI / 2; d.position.set(-8.97, 1.02, -9.0); yard.add(d); }
-    solid(-15.7, -8.9, -10.1, -3.5);
+    for (const x of [-8.99, -15.61]) { const g = new THREE.ShapeGeometry(gshape); g.rotateY(Math.PI / 2); const m = new THREE.Mesh(g, M.gable); m.position.x = x; GG.add(m); }
+    box(-15.0, -9.6, 0.1, 2.5, -10.03, -10.0, M.garageDoor, { uv: false, parent: GG });
+    for (let y = 0.7; y < 2.5; y += 0.6) box(-15.0, -9.6, y, y + 0.03, -10.06, -10.03, M.black, { uv: false, parent: GG });
+    { const d = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.04, 0.05), M.doorW); d.rotation.y = Math.PI / 2; d.position.set(-8.97, 1.02, -9.0); GG.add(d); }
+    solid(-15.7 + GAR.x, -8.9 + GAR.x, -10.1 + GAR.z, -3.5 + GAR.z);
+    // the concrete apron between the house and the garage
+    box(-13 + GAR.x + 6.6, -6.4, -0.02, 0.012, 3.4, 12, M.concrete, { parent: yard, cast: false });
     const hedge = new THREE.InstancedMesh(new THREE.ConeGeometry(0.55, 3.6, 10), M.leaves, 12), m4 = new THREE.Matrix4();
     for (let i = 0; i < 12; i++) { m4.makeTranslation(9.8, 1.8, -5.5 + i * 1.0); hedge.setMatrixAt(i, m4); }
     hedge.castShadow = true; yard.add(hedge); solid(9.2, 10.4, -6, 5.6);
+  }
+  // utility poles along the road, like the aerial photo (they also give the road something to rush past when you are in a car)
+  {
+    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.18, 8, 8), M.darkWood, 28), arms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, 2.4), M.darkWood, 28), mm = new THREE.Matrix4(); let n = 0;
+    for (let x = -240; x <= 240 && n < 28; x += 40) { mm.makeTranslation(x, 4, -26.2); poles.setMatrixAt(n, mm); mm.makeTranslation(x, 7.6, -26.2); arms.setMatrixAt(n, mm); n++; }
+    poles.count = arms.count = n; poles.castShadow = true; yard.add(poles, arms);
+    const wire = new THREE.Mesh(new THREE.BoxGeometry(480, 0.02, 0.02), M.black); wire.position.set(0, 7.5, -26.2); yard.add(wire);
+  }
+  // the property lines: a weathered wood fence along the west, back and east edges (the front is the road). Past it the fog takes over.
+  {
+    const FX0 = -27, FX1 = 27, FZ0 = -26, FZ1 = 28, mat = M.fence;
+    box(FX0, FX0 + 0.06, 0, 1.8, FZ0, FZ1, mat, { parent: yard, uv: true }); box(FX1 - 0.06, FX1, 0, 1.8, FZ0, FZ1, mat, { parent: yard, uv: true });
+    box(FX0, FX1, 0, 1.8, FZ1 - 0.06, FZ1, mat, { parent: yard, uv: true });
+    solid(FX0 - 0.3, FX0 + 0.3, FZ0, FZ1); solid(FX1 - 0.3, FX1 + 0.3, FZ0, FZ1); solid(FX0, FX1, FZ1 - 0.3, FZ1 + 0.3);
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 2.0, 0.14), M.darkWood, 60), mm = new THREE.Matrix4(); let n = 0;
+    for (let z = FZ0; z <= FZ1 && n < 60; z += 3) { mm.makeTranslation(FX0 + 0.03, 1.0, z); posts.setMatrixAt(n++, mm); mm.makeTranslation(FX1 - 0.03, 1.0, z); posts.setMatrixAt(n++, mm); }
+    posts.count = n; posts.castShadow = true; yard.add(posts);
   }
 
   // barn + silo
@@ -942,7 +1067,7 @@ export function buildWorld(scene) {
   // real trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -17 - pad && x < -8 + pad && z > -11 - pad && z < -3);   // not on the house, porch path or truck
+    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -21 - pad && x < -12 + pad && z > 8 - pad && z < 18 + pad);   // not on the house, porch path or truck
     const trees = [[-14, 7], [-19, -4], [-13, -16], [29, 9], [33, -6], [27, -24], [-12, -22], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2], [6, -8]];   // the last is the cherry tree by the front
     const tm = trees.map(([x, z]) => { const k = 1.5 + r() * 1.1; q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k, k)); });
     const near = tm.filter((m) => Math.hypot(m.elements[12], m.elements[14]) < 32);   // only the trees by the house cast shadows (the rest are too far to matter)
@@ -1028,5 +1153,9 @@ export function buildWorld(scene) {
   return {
     colliders, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, winMat, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
+    doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, tvFx, phone, mirrorFx,
+    get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
+    get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
+    curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
   };
 }

@@ -52,3 +52,6 @@ export function makeGrain() {
   g.putImageData(d, 0, 0);
   $('grain').style.backgroundImage = `url(${c.toDataURL()})`;
 }
+
+export function clock(text, label = '') { const el = $('clock'); if (!text) { el.classList.remove('show'); return; } el.querySelector('b').textContent = text; el.querySelector('small').textContent = label; el.classList.add('show'); }
+export function pod(kind) { const el = $('pod'); el.className = kind ? kind + ' show' : ''; }

@@ -92,5 +92,17 @@ button:hover { background: rgba(233,226,208,0.08); }
 #t-breath { display: none; right: max(24px, env(safe-area-inset-right)); bottom: 134px; width: 92px; height: 92px; font-size: 13px; }
 #t-breath.show { display: block; }
 #touch button.down { background: rgba(233,226,208,0.35); }
+#t-light { right: max(24px, env(safe-area-inset-right)); bottom: 240px; width: 64px; height: 64px; font-size: 11px; }
 #t-pause { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 44px; height: 44px; font-size: 16px; }
 body[data-scheme="touch"] #crosshair { opacity: 0.35 !important; }
+
+/* the night clock, and the places you hide */
+#clock { position: absolute; top: 20px; right: 26px; text-align: right; font-family: 'Courier Prime', monospace; opacity: 0; transition: opacity 1.5s; }
+#clock.show { opacity: 0.9; }
+#clock small { display: block; font-size: 10px; letter-spacing: 3px; color: var(--dim); text-transform: uppercase; margin-bottom: 2px; }
+#clock b { font-size: 22px; letter-spacing: 3px; color: #d8392b; text-shadow: 0 0 9px rgba(255,40,30,0.55); font-weight: 400; }
+#pod { position: fixed; inset: 0; pointer-events: none; z-index: 7; opacity: 0; transition: opacity 0.5s; }
+#pod.show { opacity: 1; }
+#pod.louvers { background: repeating-linear-gradient(180deg, rgba(7,7,9,0.985) 0 30px, rgba(7,7,9,0) 30px 40px); box-shadow: inset 0 0 220px 90px #000; }
+#pod.curtain { background: radial-gradient(ellipse at center, rgba(120,150,120,0.10) 0%, rgba(10,16,12,0.72) 100%); backdrop-filter: blur(1.4px); }
+#runinfo { letter-spacing: 2px; }

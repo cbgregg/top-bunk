@@ -214,7 +214,7 @@ export class Sound {
   }
   scream() {
     if (!this.ctx) return;
-    if (this.play('sfx/scare_strings', { gain: 1, wet: 0.1 })) { this.play('sfx/scare_synth', { gain: 0.5, delay: 0.04 }); return; }
+    if (this.play('sfx/scare_strings', { gain: 2.0, wet: 0.1 })) { this.play('sfx/scare_synth', { gain: 1.0, delay: 0.04 }); return; }
     const ctx = this.ctx, t = this.now;
     const vib = ctx.createOscillator(); vib.frequency.value = 28; const vg = ctx.createGain(); vg.gain.value = 60; vib.connect(vg); vib.start(t); vib.stop(t + 1.5);
     for (const f of [520, 610, 880, 1310, 1720]) {
@@ -242,12 +242,12 @@ export class Sound {
     }
     this.set(this.strings.g.gain, have ? 0 : v * 0.05, t);
   }
-  stab() { if (!this.play('sfx/violin_stab', { gain: 1.15, wet: 0.1 })) this.scream(); }
+  stab() { if (!this.play('sfx/violin_stab', { gain: 2.3, wet: 0.1 })) this.scream(); }
   swell() { if (!this.play('sfx/violin_swell', { gain: 1, wet: 0.1 })) this.tone({ type: 'sawtooth', f: 900, f2: 2400, dur: 6, gain: 0.06, attack: 5, wet: 0.5 }); }
   dread(v, t = 3) { if (!this.ctx) return; this.bed('sfx/low_drone', v, t); this.bed('sfx/whispers', v * 0.8, t); }
   scratch(pan = 0) { if (!this.play('sfx/closet_scratch', { gain: 0.9, pan, wet: 0.3 })) for (let i = 0; i < 7; i++) this.noiseHit({ dur: 0.25, type: 'highpass', f: 2500, gain: 0.18, pan, wet: 0.3, delay: i * 0.35 }); }
-  ceilingThump() { if (!this.play('sfx/ceiling_thump', { gain: 0.9, wet: 0.35 })) this.tone({ f: 70, f2: 30, dur: 0.5, gain: 0.8, wet: 0.5 }); }
-  slamFar(pan = 0) { if (!this.play('sfx/door_slam_far', { gain: 0.8, pan, wet: 0.4 })) { this.tone({ f: 90, f2: 40, dur: 0.4, gain: 0.7, pan, wet: 0.6 }); this.noiseHit({ dur: 0.2, f: 500, gain: 0.5, pan, wet: 0.6 }); } }
+  ceilingThump() { if (!this.play('sfx/ceiling_thump', { gain: 1.8, wet: 0.35 })) this.tone({ f: 70, f2: 30, dur: 0.5, gain: 0.8, wet: 0.5 }); }
+  slamFar(pan = 0) { if (!this.play('sfx/door_slam_far', { gain: 1.7, pan, wet: 0.4 })) { this.tone({ f: 90, f2: 40, dur: 0.4, gain: 0.7, pan, wet: 0.6 }); this.noiseHit({ dur: 0.2, f: 500, gain: 0.5, pan, wet: 0.6 }); } }
   pop() {
     this.noiseHit({ dur: 0.05, type: 'highpass', f: 2500, gain: 0.7, wet: 0.4 });
     this.tone({ f: 1400, f2: 200, dur: 0.06, gain: 0.25, wet: 0.4 });
@@ -277,5 +277,100 @@ export class Sound {
     for (let i = 0; i < n; i++) this.tone({ f: base, f2: base * (1.2 + Math.random() * 0.4), dur: 0.06, gain: 0.04, attack: 0.005, pan, wet: 0.05, delay: i * 0.11 });
   }
   thump() { this.tone({ f: 90, f2: 40, dur: 0.15, gain: 0.5, wet: 0.2 }); this.noiseHit({ dur: 0.08, f: 600, gain: 0.35 }); }
+  // doors: a long hinge creak and a latch click when one opens, a thud when it shuts
+  doorOpen(pan = 0, gain = 0.4) { this.creak(gain, pan, 0); this.noiseHit({ dur: 0.03, type: 'highpass', f: 2500, gain: gain * 0.5, pan, wet: 0.1 }); }
+  doorClose(pan = 0, gain = 0.6) { this.tone({ f: 100, f2: 45, dur: 0.18, gain: gain * 0.9, pan, wet: 0.3 }); this.noiseHit({ dur: 0.1, f: 800, gain: gain * 0.5, pan, wet: 0.3 }); this.noiseHit({ dur: 0.02, type: 'highpass', f: 3500, gain: gain * 0.4, pan, wet: 0.05, delay: 0.12 }); }
+  // ---- more of the house ----
+  // a person muttering: voiced syllables through two formants. Stands in for the recorded lines until a line has its own file; returns the mouth envelope.
+  mumble(voice = 'mom', dur = 2, { muffle = false, gain = 0.55, pan = 0 } = {}) {
+    if (!this.ctx) return null;
+    const ctx = this.ctx, t0 = this.now, f0 = voice === 'dad' ? 104 : voice === 'you' ? 250 : 198, n = Math.max(2, Math.round(dur * 4.4));
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    const out = ctx.createGain(); out.gain.value = 0;
+    const mk = (f, q) => { const b = ctx.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q; return b; };
+    const a = mk(650, 5), b = mk(1250, 7), g1 = ctx.createGain(), g2 = ctx.createGain(); g1.gain.value = 1; g2.gain.value = 0.6;
+    o.connect(a).connect(g1).connect(out); o.connect(b).connect(g2).connect(out);
+    let dest = out; if (muffle) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; out.connect(lp); dest = lp; }
+    dest.connect(this.bus(gain * (muffle ? 0.7 : 1), pan, muffle ? 0.2 : 0.12, dur));
+    const env = new Float32Array(Math.ceil(dur * 30) + 2);
+    for (let i = 0; i < n; i++) {
+      const ts = t0 + (i / n) * dur, te = ts + (dur / n) * 0.8, fall = 1 - (i / n) * 0.18, pitch = f0 * fall * (0.92 + Math.random() * 0.18), peak = 0.45 + Math.random() * 0.45;
+      o.frequency.setValueAtTime(pitch, ts); o.frequency.linearRampToValueAtTime(pitch * 0.94, te);
+      a.frequency.setValueAtTime(420 + Math.random() * 480, ts); b.frequency.setValueAtTime(1000 + Math.random() * 900, ts);
+      out.gain.setValueAtTime(0.0001, ts); out.gain.linearRampToValueAtTime(peak, ts + 0.05); out.gain.linearRampToValueAtTime(0.0001, te);
+      for (let k = Math.floor((i / n) * dur * 30); k < Math.min(env.length, Math.floor(((i + 0.8) / n) * dur * 30)); k++) env[k] = peak * Math.sin(Math.PI * (k / 30 - (i / n) * dur) / ((dur / n) * 0.8));
+    }
+    o.start(t0); o.stop(t0 + dur + 0.1);
+    return env;
+  }
+  faucet(dur = 3, pan = 0) {
+    if (!this.ctx) return; const t = this.now;
+    this.noiseHit({ dur, type: 'bandpass', f: 2400, q: 0.7, gain: 0.28, pan, wet: 0.2, attack: 0.3 });
+    this.noiseHit({ dur, type: 'lowpass', f: 600, gain: 0.2, pan, wet: 0.3, attack: 0.3 });
+    for (let i = 0; i < 6; i++) this.tone({ f: 900 + Math.random() * 700, f2: 500, dur: 0.05, gain: 0.05, pan, wet: 0.3, delay: dur * 0.2 + i * dur * 0.12 });
+    void t;
+  }
+  phoneRing(pan = 0) {   // a 2002 bell: a high tone chopped at 20 Hz, twice
+    if (!this.ctx) return;
+    for (const d of [0, 0.5]) {
+      const ctx = this.ctx, t = this.now + d, o = ctx.createOscillator(), o2 = ctx.createOscillator(), am = ctx.createOscillator(), amg = ctx.createGain(), g = ctx.createGain();
+      o.frequency.value = 1980; o2.frequency.value = 2310; am.type = 'square'; am.frequency.value = 22; amg.gain.value = 0.5; am.connect(amg).connect(g.gain);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.55, t + 0.01); g.gain.setValueAtTime(0.5, t + 0.38); g.gain.linearRampToValueAtTime(0.0001, t + 0.42);
+      o.connect(g); o2.connect(g); g.connect(this.bus(0.5, pan, 0.45, 1));
+      o.start(t); o2.start(t); am.start(t); o.stop(t + 0.45); o2.stop(t + 0.45); am.stop(t + 0.45);
+    }
+  }
+  staticBurst(pan = 0, dur = 2) {
+    if (!this.ctx) return;
+    this.noiseHit({ dur, type: 'bandpass', f: 3200, q: 0.5, gain: 0.34, pan, wet: 0.15, attack: 0.02 });
+    this.noiseHit({ dur, type: 'highpass', f: 6000, gain: 0.18, pan, wet: 0.1, attack: 0.02 });
+    for (let i = 0; i < dur * 8; i++) this.noiseHit({ dur: 0.03, type: 'highpass', f: 2000, gain: 0.25, pan, wet: 0.1, delay: Math.random() * dur });
+  }
+  scrape(pan = 0) {   // a chair dragged across lino
+    if (!this.ctx) return; this.noiseHit({ dur: 0.7, type: 'bandpass', f: 700, f2: 450, q: 2, gain: 0.35, pan, wet: 0.35, attack: 0.05 }); this.tone({ type: 'sawtooth', f: 160, f2: 110, dur: 0.6, gain: 0.07, pan, wet: 0.3 });
+  }
+  flush(pan = 0) { if (!this.ctx) return; this.noiseHit({ dur: 2.6, type: 'bandpass', f: 800, f2: 2200, q: 0.6, gain: 0.3, pan, wet: 0.3, attack: 0.4 }); }
+
+  // Silence before a scare makes it land: the whole mix ducks, and a jolt then hits well above everything else (the compressor keeps it from clipping).
+  hush(sec = 3) {
+    if (!this.ctx) return; const g = this.master.gain, t = this.now;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0.14, t + 0.5); g.setValueAtTime(0.14, t + sec - 0.1); g.linearRampToValueAtTime(0.85, t + sec + 0.4);
+  }
+  jolt(strength = 1) {
+    if (!this.ctx) return; const g = this.master.gain, t = this.now;
+    g.cancelScheduledValues(t); g.setValueAtTime(1.45, t); g.linearRampToValueAtTime(0.85, t + 1.6);
+    this.tone({ f: 52, f2: 24, dur: 1.1, gain: 1.7 * strength, wet: 0.4 }); this.tone({ f: 118, f2: 40, dur: 0.5, gain: 1.1 * strength, wet: 0.3 });
+    this.noiseHit({ dur: 0.6, type: 'highpass', f: 2400, gain: 1.1 * strength, wet: 0.35, attack: 0.002 }); this.noiseHit({ dur: 0.35, type: 'lowpass', f: 400, gain: 1.4 * strength, wet: 0.3, attack: 0.002 });
+    this.stab(); this.play('sfx/scare_bang', { gain: 1.6 * strength });
+  }
+  // ---- the car: an engine you can feel, road noise, and a radio ----
+  engine(v = 0, speed01 = 0.5) {
+    if (!this.ctx) return;
+    if (!this.eng) {
+      const ctx = this.ctx, o = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(), nz = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+      o.type = 'sawtooth'; o2.type = 'square'; o.frequency.value = 52; o2.frequency.value = 26; lp.type = 'lowpass'; lp.frequency.value = 240; g.gain.value = 0;
+      o.connect(lp); o2.connect(lp); lp.connect(g).connect(this.master);
+      nz.buffer = this.noise; nz.loop = true; bp.type = 'lowpass'; bp.frequency.value = 500; ng.gain.value = 0; nz.connect(bp).connect(ng).connect(this.master);
+      o.start(); o2.start(); nz.start(); this.eng = { o, o2, g, ng, bp };
+    }
+    const e = this.eng, t = this.now; e.o.frequency.setTargetAtTime(46 + speed01 * 55, t, 0.3); e.o2.frequency.setTargetAtTime(23 + speed01 * 27, t, 0.3);
+    e.g.gain.setTargetAtTime(v * 0.12, t, 0.5); e.ng.gain.setTargetAtTime(v * (0.05 + speed01 * 0.16), t, 0.5); e.bp.frequency.setTargetAtTime(380 + speed01 * 900, t, 0.5);
+  }
+  radio(v = 0, stat = 0) {   // a soft pad of a tune, and static when something is wrong
+    if (!this.ctx) return;
+    if (!this.rad) {
+      const ctx = this.ctx, g = ctx.createGain(), lp = ctx.createBiquadFilter(), trem = ctx.createOscillator(), tg = ctx.createGain(), sn = ctx.createBufferSource(), sbp = ctx.createBiquadFilter(), sg = ctx.createGain();
+      g.gain.value = 0; lp.type = 'lowpass'; lp.frequency.value = 1500; trem.frequency.value = 5; tg.gain.value = 0.25; trem.connect(tg).connect(g.gain);
+      const oscs = [220, 277.2, 329.6, 440].map((f) => { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 14; o.connect(lp); o.start(); return o; });
+      lp.connect(g).connect(this.master); trem.start();
+      sn.buffer = this.noise; sn.loop = true; sbp.type = 'bandpass'; sbp.frequency.value = 2800; sbp.Q.value = 0.4; sg.gain.value = 0; sn.connect(sbp).connect(sg).connect(this.master); sn.start();
+      this.rad = { g, sg, oscs, lp };
+      // the tune: a slow wandering melody on the chord tones
+      const notes = [0, 3, 7, 5, 3, 10, 7, 3]; let i = 0; this.radTimer = setInterval(() => { if (!this.rad) return; const base = 220 * Math.pow(2, notes[i++ % notes.length] / 12); this.rad.oscs[3].frequency.setTargetAtTime(base * 2, this.now, 0.05); }, 900);
+    }
+    const t = this.now; this.rad.g.gain.setTargetAtTime(v * 0.06, t, 0.4); this.rad.sg.gain.setTargetAtTime(stat * 0.22, t, 0.2);
+  }
+  honk(pan = 0) { if (!this.ctx) return; this.tone({ type: 'square', f: 420, dur: 0.35, gain: 0.12, pan, wet: 0.3 }); this.tone({ type: 'square', f: 520, dur: 0.35, gain: 0.1, pan, wet: 0.3 }); }
+
   click() { this.noiseHit({ dur: 0.02, type: 'highpass', f: 3000, gain: 0.3, wet: 0.02 }); }
 }

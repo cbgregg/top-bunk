@@ -42,6 +42,7 @@ function makeLowPoly({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair
   };
 }
 
+const RQ = new THREE.Quaternion();
 const GA = new THREE.Vector3(), GB = new THREE.Vector3(), GC = new THREE.Vector3(), GD = new THREE.Vector3(), GE = new THREE.Vector3(), GF = new THREE.Vector3();
 const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0), RG = new THREE.Vector3();
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
@@ -99,7 +100,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     },
     applyPose(r, p) {
       if (p.lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], p.lean);
-      const y = this.group.rotation.y, left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));
+      this.group.getWorldQuaternion(RQ); RF.set(0, 0, 1).applyQuaternion(RQ); const y = Math.atan2(RF.x, RF.z), left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));   // (world facing: the people can sit in a car that is turned)
       for (const [s, sg] of [['L', 1], ['R', -1]]) {
         let T = null;
         if (p.hold) {   // both hands flat on the sides of the box
