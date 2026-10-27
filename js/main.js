@@ -322,7 +322,7 @@ async function climbUp() {
   if (F.cutscene) return;
   F.cutscene = true; P.mode = 'cine';
   P.cam.copy(camera.position);
-  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, hiding = F.chase || F.scare;
+  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, hiding = F.chase;   // (during a scare you climb up first, then pull the covers over your head yourself)
   sfx.creak(0.25, 0);
   await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.3, k); });
   sfx.footstep(0.2, 0, 0.1);
@@ -842,7 +842,7 @@ async function night1() {
   await waitFor(() => P.pos.x > 5.0 && P.pos.x < 6.2 && P.pos.z < -0.4);
   sfx.whisper(panFor(W.drawingMesh.getWorldPosition(tmp)), 0.08);
   await waitFor(() => P.mode === 'walk' && P.pos.x < 5.0 && roomAt(P.pos.x, P.pos.z) === 'hall');
-  F.scare = true;
+  F.scare = true; F.coverPrompt = true;
   await reveal(false);
   // run back; it does not follow. When the lights stutter it is simply standing in your doorway.
   await waitFor(() => roomAt(P.pos.x, P.pos.z) === 'bed' || P.mode === 'hide');
@@ -853,6 +853,8 @@ async function night1() {
     W.bathSpot.intensity = 0; sfx.slamFar(0.5);
     E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);
   }
+  await waitFor(() => P.mode === 'bunk' || P.mode === 'hide');
+  if (P.mode === 'bunk') { UI.objective('<b class="red">Hide.</b> Pull the covers over your head'); UI.hint(`Press <b>${L('interact')}</b> to pull the covers over your head`, 8); }
   await waitFor(() => P.mode === 'hide');
   E.visible = true; E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z); E.mode = 'idle';
   UI.objective(`Hold your breath: keep <b>${L('breath')}</b> held until the violins stop`);
