@@ -471,7 +471,7 @@ export function buildWorld(scene) {
   // The bunk is built in its own local frame and turned into place: its long side is flush with the end wall (the window wall), the head toward the hall, the ladder at the foot.
   const BUNK = { x0: -5.65, x1: -3.55, z0: 3.95, z1: 4.9 };
   {
-    const bunkG = new THREE.Group(); bunkG.position.set(3.1, 0, 6.15); bunkG.rotation.y = Math.PI / 2; bunkG.scale.x = -1; house.add(bunkG); defParent = bunkG;   // world x = 3.1 + local z, world z = 6.15 + local x
+    const bunkG = new THREE.Group(); bunkG.position.set(10.68, 0, -1.38); house.add(bunkG); defParent = bunkG;   // along the back wall, head against the bathroom wall: world x = local x + 10.68, world z = local z - 1.38
     const { x0, x1, z0, z1 } = BUNK, zc = (z0 + z1) / 2;
     for (const px of [x0 + 0.035, x1 - 0.035]) for (const pz of [z0 + 0.035, z1 - 0.035]) box(px - 0.035, px + 0.035, 0, 2.0, pz - 0.035, pz + 0.035, M.furn, { uv: false });
     for (const y of [0.25, 1.42]) {
@@ -494,7 +494,7 @@ export function buildWorld(scene) {
     for (const zz of [zc - 0.245, zc + 0.245]) box(x1 + 0.01, x1 + 0.06, 0, 1.92, zz - 0.025, zz + 0.025, M.furn, { uv: false });
     for (let y = 0.3; y < 1.8; y += 0.3) box(x1 + 0.015, x1 + 0.055, y, y + 0.04, zc - 0.245, zc + 0.245, M.furn, { uv: false });
     defParent = null;
-    solid(7.08, 8.05, 0.5, 2.72);
+    solid(5.0, 7.22, 2.55, 3.55);
   }
   // the white built-in closet and drawers on the hall wall beside the door, like the photo: louvered bifold doors, drawers, a cubby above
   {
@@ -520,7 +520,7 @@ export function buildWorld(scene) {
     s(0.11, 0, 0.11, 0); s(0.08, 0, 0.27, 0.01); s(0.03, -0.06, 0.34, 0); s(0.03, 0.06, 0.34, 0); s(0.035, -0.1, 0.06, 0.06); s(0.035, 0.1, 0.06, 0.06);
     const eye = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });
     for (const x of [-0.025, 0.025]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), eye); e.position.set(x, 0.29, 0.08); bear.add(e); }
-    bear.position.set(7.5, 0.55, 2.3); bear.rotation.y = 2.7; house.add(bear); teddy = bear;
+    bear.position.set(6.83, 0.55, 3.0); bear.rotation.y = 2.7; house.add(bear); teddy = bear;
   }
   {
     // box TV on an oak stand against the bathroom wall, a braided rug, a heater
@@ -528,8 +528,8 @@ export function buildWorld(scene) {
     rbox(5.1, 5.55, 0.55, 1.2, 0.55, 1.35, M.crt, 0.03);
     const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.52), M.crtScreen); scr.rotation.y = Math.PI / 2; scr.position.set(5.605, 0.9, 0.95); house.add(scr);
     solid(5.05, 5.65, 0.45, 1.45);
-    const rugM = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.012, 48), M.rug); rugM.scale.set(1.2, 1, 1); rugM.position.set(6.2, 0.006, 1.7); rugM.receiveShadow = true; house.add(rugM);
-    heater(5.08, 5.16, 0.1, 1.9, 2.7);
+    const rugM = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.012, 48), M.rug); rugM.scale.set(1.2, 1, 1); rugM.position.set(6.2, 0.006, 1.5); rugM.receiveShadow = true; house.add(rugM);
+    heater(5.08, 5.16, 0.1, 1.55, 2.4);
     frameZ(0.95, 1.55, 5.0, 0.44, 0.34, 'reflection', 1);
   }
 
@@ -855,7 +855,7 @@ export function buildWorld(scene) {
     cardboardBox(3.45, 0, -12.7, 0.5, 0.44, 0.5, 3, -0.3, yard),
     cardboardBox(3.3, 0, -11.7, 0.5, 0.44, 0.5, 3, 0.4, yard),
   ];
-  const dropSpots = [new THREE.Vector3(7.5, 0.55, 0.9), new THREE.Vector3(7.5, 0.55, 1.5), new THREE.Vector3(7.5, 0.55, 2.1)];   // on the bottom bunk
+  const dropSpots = [new THREE.Vector3(5.45, 0.55, 3.0), new THREE.Vector3(6.05, 0.55, 3.0), new THREE.Vector3(6.65, 0.55, 3.0)];   // on the bottom bunk
 
   // the detached two-car garage (brown siding, gray shingles), and an arborvitae hedge along the left side
   {

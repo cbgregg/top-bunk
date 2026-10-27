@@ -42,7 +42,8 @@ function makeLowPoly({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair
   };
 }
 
-const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0);
+const GA = new THREE.Vector3(), GB = new THREE.Vector3(), GC = new THREE.Vector3(), GD = new THREE.Vector3(), GE = new THREE.Vector3(), GF = new THREE.Vector3();
+const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0), RG = new THREE.Vector3();
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
 export function makePerson({ model, height = 1.75, ...look } = {}) {
   const lp = makeLowPoly({ height, ...look });
@@ -74,6 +75,28 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       RT.copy(RS).addScaledVector(RD, d);                                      // the reachable hand position
       r.aim(fo, hand, RB.copy(RT).sub(RE).normalize(), 1);
     },
+    // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), then curl every finger toward it.
+    grip(r, side, c, amount) {
+      const B = r.bones, hand = B[side + '_Hand'], fo = B[side + '_Forearm'], i1 = B[side + '_Finger1'], i2 = B[side + '_Finger2'], i4 = B[side + '_Finger4'];
+      if (!hand || !fo || !i1 || !i2 || !i4) return;
+      for (const b of [fo, hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
+      fo.getWorldPosition(RE); hand.getWorldPosition(RH);
+      const fa = GA.copy(RH).sub(RE).normalize();
+      const cp = GB.copy(c).addScaledVector(fa, -c.dot(fa)).normalize();
+      i1.getWorldPosition(RS); i4.getWorldPosition(RT); const lat = GC.copy(RT).sub(RS).normalize();
+      const latT = GD.crossVectors(fa, cp); if (latT.dot(lat) < 0) latT.negate();
+      const lp = GE.copy(lat).addScaledVector(fa, -lat.dot(fa)).normalize(), tp = latT.addScaledVector(fa, -latT.dot(fa)).normalize();
+      const roll = Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp));
+      r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll));
+      for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
+      i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
+      const d = GA.copy(RA).sub(RH).normalize(), ax = GC.copy(RT).sub(RS).normalize();
+      if (GF.crossVectors(ax, d).dot(cp) < 0) ax.negate();
+      const total = amount * 1.7;
+      for (const [chain, k] of [[['Finger1', 'Finger11', 'Finger12'], 1], [['Finger2', 'Finger21', 'Finger22'], 1], [['Finger3', 'Finger31', 'Finger32'], 1], [['Finger4', 'Finger41', 'Finger42'], 1], [['Finger0', 'Finger01', 'Finger02'], 0.45]]) {
+        chain.forEach((n, i) => { const b = B[side + '_' + n]; if (b) r.rotateWorld(b, new THREE.Quaternion().setFromAxisAngle(ax, total * k * [0.35, 0.4, 0.25][i])); });
+      }
+    },
     applyPose(r, p) {
       if (p.lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], p.lean);
       const y = this.group.rotation.y, left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));
@@ -86,6 +109,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         } else if (p.reach) T = p.reach.clone().addScaledVector(left, sg * 0.08);
         if (!T) continue;
         this.ik(r, s, T, RPole.copy(left).multiplyScalar(sg * 0.7).addScaledVector(fwd, -0.3).add(RDown));
+        this.grip(r, s, RG.copy(left).multiplyScalar(-sg), p.hold ? 0.3 : 0.75);   // flat on the box, or closed around what is being picked up
       }
     },
     talk(env) { if (this.rig) this.rig.talk(env); },

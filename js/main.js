@@ -56,12 +56,13 @@ const BATH_I = 95;
 
 // ---------- constants ----------
 const EYE = 1.32, R = 0.28;
-const BUNK_SEAT = new V3(7.5, 2.24, 1.5);
-const BUNK_LIE = new V3(7.5, 1.9, 1.6);
-const LADDER_MID = new V3(7.5, 1.55, 2.95);
-const LADDER_FLOOR = new V3(7.5, 0, 3.15);
-const BUNK_SIDE = new V3(6.6, 0, 1.5);
-const HIDE_YAW = Math.PI / 2;               // lying on the top bunk you face the room (west)
+const BUNK_SEAT = new V3(6.03, 2.24, 3.02);
+const BUNK_LIE = new V3(6.13, 1.9, 3.02);
+const LADDER_MID = new V3(7.48, 1.55, 3.02);
+const LADDER_FLOOR = new V3(7.68, 0, 3.02);
+const BUNK_SIDE = new V3(6.03, 0, 2.12);
+const HIDE_YAW = 0;                         // lying on the top bunk you face the room (toward the front of the house, -z)
+const LADDER_YAW = Math.PI / 2;             // on the ladder you face the bunk (west)
 const HALL_DOOR = new V3(7.05, 0, -0.9);    // the hall in front of your door
 const HALL_MOUTH = new V3(1.6, 0, -0.9);    // just inside the living room, where the hall opens into it
 
@@ -217,7 +218,7 @@ W.pickups.forEach((b) => addI({ obj: b, r: 2.2, label: 'Pick up the box', when: 
 addI({ obj: W.drawingMesh, r: 2.3, label: 'Look at the drawing', when: () => F.phase !== 'morning', act: lookDrawing });
 addI({ obj: mom.head, r: 2.6, label: 'Talk to Mom', when: () => F.phase === 'day' && mom.group.visible, act: talkMom });
 addI({ obj: dad.head, r: 2.6, label: 'Talk to Dad', when: () => F.phase === 'day' && dad.group.visible, act: talkDad });
-addI({ p: new V3(7.5, 1.3, 2.8), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
+addI({ p: new V3(7.33, 1.3, 3.02), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
 addI({ p: W.bathSink, r: 1.9, label: 'Splash water on your face', when: () => F.phase === 'night' && !F.splashed, act: splash });
 
 function updateInteract() {
@@ -323,11 +324,11 @@ async function climbUp() {
   P.cam.copy(camera.position);
   const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, hiding = F.chase || F.scare;
   sfx.creak(0.25, 0);
-  await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, 0, k); P.pitch = lerp(p0, 0.3, k); });
+  await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.3, k); });
   sfx.footstep(0.2, 0, 0.1);
-  if (hiding && F.chase && chase) { chase.approach = [new V3(6.5, 0, 2.9), BUNK_SIDE.clone()]; }
+  if (hiding && F.chase && chase) { chase.approach = [new V3(6.6, 0, 1.2), BUNK_SIDE.clone()]; }
   const dest = hiding ? BUNK_LIE : BUNK_SEAT;
-  await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(0, HIDE_YAW, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
+  await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
   F.cutscene = false;
   if (hiding || F.chase) {
     P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); UI.objective('Stay quiet.');
@@ -344,9 +345,9 @@ async function climbDown() {
   F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
   const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
   sfx.creak(0.25, 0);
-  await tween(0.4, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, 0, k); P.pitch = lerp(p0, 0.1, k); });
+  await tween(0.4, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.1, k); });
   const end = new V3(LADDER_FLOOR.x, 1.32, LADDER_FLOOR.z);
-  await tween(0.35, (k) => { P.cam.lerpVectors(LADDER_MID, end, k); P.yaw = lerpAngle(0, Math.PI / 2, k); P.pitch = lerp(0.1, 0, k); });
+  await tween(0.35, (k) => { P.cam.lerpVectors(LADDER_MID, end, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.1, 0, k); });
   sfx.footstep(0.3);
   P.pos.set(LADDER_FLOOR.x, 0, LADDER_FLOOR.z); P.vel.set(0, 0, 0);
   P.mode = 'walk'; F.cutscene = false;
@@ -486,7 +487,7 @@ async function loomOverBed(level, walkIn = true) {
   F.breathCheck = true; F.grace = 1.3;
   sfx.tension(0.045, 1); sfx.bed('music/chase', 0, 2);
   const y0 = E.root.rotation.y;
-  await tween(1.6, (k) => { E.root.rotation.y = lerpAngle(y0, Math.PI / 2, Math.min(1, k * 2)); E.lean = k * 0.35; E.tilt = 0.55 - k * 0.95; });
+  await tween(1.6, (k) => { E.root.rotation.y = lerpAngle(y0, 0, Math.min(1, k * 2)); E.lean = k * 0.35; E.tilt = 0.55 - k * 0.95; });
   sfx.whisper(panFor(E.root.position), 0.16);
   await tween(2.2 + level * 0.3, (k) => { E.tilt = -0.4 + Math.sin(k * Math.PI * (1 + level * 0.5)) * 0.8; E.smileScale = 1 + k * 0.18; });   // (the whole breath-holding stretch stays under 8 s)
   sfx.giggle(0);
@@ -495,7 +496,7 @@ async function loomOverBed(level, walkIn = true) {
   UI.hint(null);
   sfx.violins(0, 0.05);    // the violins stop dead
   sfx.ceilingThump();
-  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(Math.PI / 2, Math.PI, k); E.smileScale = 1.18 - 0.18 * k; });
+  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(0, Math.PI, k); E.smileScale = 1.18 - 0.18 * k; });
   E.mode = 'walk'; E.speed = 0.6;
   const from = E.root.position.clone(), to = HALL_DOOR.clone();
   await tween(3.2, (k) => { E.root.position.lerpVectors(from, to, k); }, ease.lin);
@@ -715,7 +716,7 @@ async function dadChores() {
     if (chore.stop) break;
     // open it and take a few things out
     const kinds = [['books', 'lamp'], ['plates', 'books'], ['lamp', 'mug']][i % 3];
-    if (!(await unpackFloor(dad, box, kinds, new V3(spot.x + 0.1, 0, spot.z + 0.85)))) return;
+    if (!(await unpackFloor(dad, box, kinds, new V3(spot.x + 0.1, 0, spot.z + 0.66)))) return;
     if (chore.stop) break;
   }
   if (!stillOn(run)) return;
@@ -731,7 +732,7 @@ async function momChores() {
   W.colliders.push({ minX: KITCHEN_BOX.x - 0.3, maxX: KITCHEN_BOX.x + 0.3, minZ: KITCHEN_BOX.z - 0.3, maxZ: KITCHEN_BOX.z + 0.3, on: true, dressing: true });
   const open = openable(box); box.userData.open = open;
   const things = ['plates', 'mug', 'pot', 'mug', 'plates', 'mug'];
-  const stand = new V3(KITCHEN_BOX.x - 0.75, 0, KITCHEN_BOX.z);
+  const stand = new V3(KITCHEN_BOX.x - 0.62, 0, KITCHEN_BOX.z);
   if (!(await walkTo(mom, [stand]))) return;
   await turnToward(mom, box.position.x, box.position.z);
   const top = new V3(box.position.x, 0.44, box.position.z);
@@ -848,7 +849,7 @@ async function night1() {
   if (P.mode !== 'hide') {
     await tween(0.5, () => { nlMult(Math.random() < 0.5 ? 0 : 1, false); W.bathSpot.intensity = Math.random() < 0.5 ? BATH_I : 0; }, ease.lin);
     W.bathSpot.intensity = 0; sfx.slamFar(0.5);
-    E.root.position.set(7.05, 0, -0.35); E.faceTowards(7.5, 1.5);
+    E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);
   }
   await waitFor(() => P.mode === 'hide');
   E.visible = true; E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z); E.mode = 'idle';
@@ -981,9 +982,9 @@ async function pushScene() {
   sfx.creak(0.35, 0.3);
   UI.subtitle('<i>Something cold brushes the back of your neck.</i>', 3);
   const y0 = P.yaw, p0 = P.pitch;
-  await tween(1.6, (k) => { P.yaw = lerpAngle(y0, Math.PI, k); P.pitch = lerp(p0, 0.02, k); });
+  await tween(1.6, (k) => { P.yaw = lerpAngle(y0, -Math.PI / 2, k); P.pitch = lerp(p0, 0.02, k); });
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.35; E.smileScale = 1; E.lookTarget = camera.position;
-  E.root.position.set(7.5, -2.6, 3.3); E.root.rotation.y = Math.PI;
+  E.root.position.set(7.83, -2.6, 3.02); E.root.rotation.y = -Math.PI / 2;
   sfx.drone(0.15, 2); sfx.tension(0.025, 2);
   await wait(0.3);
   await tween(2.8, (k) => { E.root.position.y = -2.6 + 2.6 * k; P.pitch = lerp(0.02, 0.1, k); }, ease.out);
@@ -993,9 +994,9 @@ async function pushScene() {
   sfx.whoosh(0);
   await tween(0.16, (k) => { E.reach = k; }, ease.lin);
   sfx.shove(); shake = 0.6;
-  const start = BUNK_SEAT.clone(), end = new V3(6.3, 0.26, 1.5), pitch0 = P.pitch;
+  const start = BUNK_SEAT.clone(), end = new V3(6.03, 0.26, 1.82), pitch0 = P.pitch;
   await tween(0.62, (k) => {
-    P.cam.set(lerp(start.x, end.x, Math.min(1, k * 1.4)), lerp(start.y, end.y, k * k), start.z);
+    P.cam.set(start.x, lerp(start.y, end.y, k * k), lerp(start.z, end.z, Math.min(1, k * 1.4)));
     P.pitch = lerp(pitch0, 1.02, k); P.roll = lerp(0, 0.42, k);
     E.lean = 0.62 * k;
   }, ease.lin);
