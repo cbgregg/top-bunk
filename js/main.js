@@ -519,6 +519,7 @@ async function hideScript() {   // after the chase: wait until it has followed y
 async function caught() {
   if (F.dead) return;
   F.dead = true;
+  setTimeout(() => { if (F.dead && uiMode !== 'death') { uiMode = 'death'; document.exitPointerLock(); UI.fade(1, 0.05); UI.show('death'); } }, 6000);   // whatever happens in the scene, never leave the screen frozen
   killAll(); F.chase = false; F.breathCheck = false; F.echo = false; F.cutscene = true; F.breathUI = false;
   UI.blanket(false); UI.prompt(null); UI.breath(0, false); UI.objective(null); UI.hint(null); UI.stamina(1, false);
   P.mode = 'cine'; P.cam.copy(camera.position);
@@ -857,8 +858,8 @@ async function night1() {
   if (P.mode === 'bunk') { UI.objective('<b class="red">Hide.</b> Pull the covers over your head'); UI.hint(`Press <b>${L('interact')}</b> to pull the covers over your head`, 8); }
   await waitFor(() => P.mode === 'hide');
   E.visible = true; E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z); E.mode = 'idle';
-  UI.objective(`Hold your breath: keep <b>${L('breath')}</b> held until the violins stop`);
-  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath, and don't let go`, 10);
+  UI.objective(`Hold your breath: keep <b>${L('breath')}</b> held (or tapped on) until the violins stop`);
+  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath (or tap it once to keep holding)`, 10);
   F.breathUI = true; sfx.violins(1, 0.3); sfx.tension(0.05, 1);
   await wait(1.6);
   F.breathCheck = true; F.grace = 1.3;
@@ -1045,8 +1046,14 @@ function update(dt) {
   }
 
   // breath / hiding
+  if (P.mode !== 'hide' || F.dead) { breathLatch = false; breathPrev = false; }
   if (P.mode === 'hide' && !F.dead) {
-    const holding = !!keys.Space || input.breath;
+    // hold the key to hold your breath, or tap it once to keep holding (tap again to let go)
+    const down = !!keys.Space || input.breath, now = performance.now();
+    if (down && !breathPrev) breathDownAt = now;
+    if (!down && breathPrev && now - breathDownAt < 300) breathLatch = !breathLatch;
+    breathPrev = down;
+    const holding = down || breathLatch;
     if (holding) P.breath -= dt / 8.5; else P.breath = Math.min(1, P.breath + dt / 3);
     if (F.breathCheck) {
       if (holding) F.grace = Math.max(F.grace, 0.45); else { F.grace -= dt; if (F.grace <= 0) { sfx.gasp(); caught(); } }
@@ -1091,6 +1098,7 @@ function update(dt) {
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
 }
 
+let breathLatch = false, breathPrev = false, breathDownAt = 0;
 let last = performance.now(), titleT = 0, frameN = 0;
 function loop(now) {
   requestAnimationFrame(loop);
