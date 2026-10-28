@@ -153,7 +153,7 @@ function confirmPress() {
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw; P.pitch = clamp(P.pitch + dpitch, -1.45, 1.45); }
-initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight() });
+initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (P.mode === 'bunk' && !F.cutscene && !F.dead) hideUnderCovers(); } });
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
   $('controls').innerHTML = controlsTable().map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
@@ -169,6 +169,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 $('pause').addEventListener('click', () => { lock(); setTimeout(() => { if (uiMode === 'pause' && document.pointerLockElement !== canvas) setPause(false); }, 200); });
 $('title').addEventListener('click', startGame);
+$('start').addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
 $('retry').addEventListener('click', retry);
 $('again').addEventListener('click', () => location.reload());
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); gfx.resize(); });
@@ -264,6 +265,13 @@ function toggleDoor(d) {
 }
 addI({ p: W.bathSink, r: 1.9, label: 'Splash water on your face', when: () => F.phase === 'night' && !F.splashed, act: splash });
 
+const REACH = 0.7;   // interact range as a share of each thing's radius: you have to be right up close
+// a wall (or a shut door) between you and the thing; the thing's own wall or door is not counted
+function sightBlocked(x, z, tx, tz) {
+  const dx = tx - x, dz = tz - z, d = Math.hypot(dx, dz);
+  if (d < 1e-3) return false;
+  return wallAhead(x, z, dx / d, dz / d, d, tx, tz) < d - 0.05;
+}
 function updateInteract() {
   let label = null, act = null, extra = '';
   if (!F.cutscene && !F.dead) {
@@ -283,10 +291,11 @@ function updateInteract() {
         for (const it of interacts) {
           if (!it.when()) continue;
           if (it.obj) it.obj.getWorldPosition(tmp); else tmp.copy(it.p);
-          tmp.sub(camera.position); const d = tmp.length(); if (d > it.r) continue;
+          const tx = tmp.x, tz = tmp.z;
+          tmp.sub(camera.position); const d = tmp.length(); if (d > it.r * REACH) continue;
           const dot = tmp.divideScalar(d).dot(fwd);
           const score = dot - d * 0.12;   // (near things win over far ones in the same direction)
-          if (dot > (d < 1.1 ? 0.55 : 0.82) && score > best) { best = score; label = typeof it.label === 'function' ? it.label() : it.label; act = it.act; }
+          if (dot > (d < 1.1 ? 0.55 : 0.82) && score > best && !sightBlocked(camera.position.x, camera.position.z, tx, tz)) { best = score; label = typeof it.label === 'function' ? it.label() : it.label; act = it.act; }
         }
       }
     }
@@ -298,10 +307,11 @@ function updateInteract() {
 
 // The held box is pulled back and down as a wall gets close, so it never pokes through (the player's circle is smaller than the box's reach).
 const BOX_HALF = 0.23, BOX_Z = 0.62;
-function wallAhead(ox, oz, dx, dz, max) {
+function wallAhead(ox, oz, dx, dz, max, skipX, skipZ) {
   let best = max;
   for (const c of W.colliders) {
     if (!c.on) continue;
+    if (skipX !== undefined && skipX >= c.minX - 0.12 && skipX <= c.maxX + 0.12 && skipZ >= c.minZ - 0.12 && skipZ <= c.maxZ + 0.12) continue;
     let t0 = 0, t1 = best;
     for (const [o, d, lo, hi] of [[ox, dx, c.minX, c.maxX], [oz, dz, c.minZ, c.maxZ]]) {
       if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) { t1 = -1; break; } continue; }
@@ -1246,6 +1256,7 @@ function update(dt) {
 
   if (input.lookX || input.lookY) lookBy(-input.lookX * 2.7 * dt, -input.lookY * 2.0 * dt);
   input.setBreathVisible(F.breathUI && !F.dead);
+  input.setCoverVisible(P.mode === 'bunk' && !F.cutscene && !F.dead && !F.breathUI && (F.coverPrompt || F.live));
   if (shake > 0.25) input.rumble(shake * 0.55, shake * 0.4, 140);
   if (P.mode === 'walk' && !F.cutscene && !F.dead) movePlayer(dt);
   else { P.vel.set(0, 0, 0); P.speed = 0; P.sprinting = false; UI.stamina(1, false); }
@@ -1361,4 +1372,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { nights, RUN, toggleLight, sleepers, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { nights, RUN, toggleLight, sleepers, sightBlocked, startGame, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

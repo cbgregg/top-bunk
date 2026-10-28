@@ -22,7 +22,7 @@ export const controlsTable = () => ['move', 'look', 'sprint', 'interact', 'breat
 
 function setScheme(s) { if (input.scheme !== s) { input.scheme = s; document.body.dataset.scheme = s; if (input.onScheme) input.onScheme(s); } }
 
-export function initInput({ interact, pause, confirm, lookBy, light }) {
+export function initInput({ interact, pause, confirm, lookBy, light, cover }) {
   input.touchDevice = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
   addEventListener('keydown', () => setScheme('kb'));
   addEventListener('mousemove', () => { if (input.scheme !== 'kb' && !input.touchDevice) setScheme('kb'); });
@@ -30,7 +30,7 @@ export function initInput({ interact, pause, confirm, lookBy, light }) {
   // ---------- touch ----------
   const root = document.createElement('div'); root.id = 'touch';
   root.innerHTML = '<div id="t-look"></div><div id="t-move"><i id="t-base"></i><i id="t-knob"></i></div>'
-    + '<button id="t-breath" type="button">HOLD<br>BREATH</button><button id="t-run" type="button">RUN</button><button id="t-act" type="button">USE</button><button id="t-light" type="button">LIGHT</button><button id="t-pause" type="button">II</button>';
+    + '<button id="t-breath" type="button">HOLD<br>BREATH</button><button id="t-run" type="button">RUN</button><button id="t-act" type="button">USE</button><button id="t-light" type="button">LIGHT</button><button id="t-cover" type="button">COVER<br>UP</button><button id="t-pause" type="button">II</button>';
   document.body.appendChild(root);
   const $ = (id) => document.getElementById(id), tch = { fx: 0, fy: 0, run: false, breath: false };
   const show = () => { root.classList.add('on'); setScheme('touch'); };
@@ -66,6 +66,8 @@ export function initInput({ interact, pause, confirm, lookBy, light }) {
   $('t-light').addEventListener('pointerdown', (e) => { if (light) light(); e.preventDefault(); });
   input.setUse = (on) => $('t-act').classList.toggle('ready', !!on);
   input.setBreathVisible = (on) => $('t-breath').classList.toggle('show', !!on);
+  input.setCoverVisible = (on) => $('t-cover').classList.toggle('show', !!on);
+  $('t-cover').addEventListener('pointerdown', (e) => { cover(); show(); e.preventDefault(); });
   document.addEventListener('contextmenu', (e) => { if (input.scheme === 'touch') e.preventDefault(); });
 
   // ---------- game controller ----------

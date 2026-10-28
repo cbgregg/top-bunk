@@ -91,6 +91,8 @@ button:hover { background: rgba(233,226,208,0.08); }
 #t-run { right: max(132px, calc(env(safe-area-inset-right) + 108px)); bottom: max(34px, env(safe-area-inset-bottom)); width: 72px; height: 72px; }
 #t-breath { display: none; right: max(24px, env(safe-area-inset-right)); bottom: 134px; width: 92px; height: 92px; font-size: 13px; }
 #t-breath.show { display: block; }
+#t-cover { display: none; right: max(24px, env(safe-area-inset-right)); bottom: 134px; width: 92px; height: 92px; font-size: 13px; }
+#t-cover.show { display: block; }
 #touch button.down { background: rgba(233,226,208,0.35); }
 #t-light { right: max(24px, env(safe-area-inset-right)); bottom: 240px; width: 64px; height: 64px; font-size: 11px; }
 #t-pause { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 44px; height: 44px; font-size: 16px; }
