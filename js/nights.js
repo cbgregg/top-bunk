@@ -288,6 +288,8 @@ export function createNights(env) {
     // NIGHT ONE: the house wakes up. Nothing is ever seen; things creep and move, and at the end everything stops and something walks around your bunk.
     async poltergeist(plan, t) {
       const c0 = plan.clock0, at = (m) => atClock(t, c0 + m), room = () => env.roomAt(P.pos.x, P.pos.z);
+      if (W.hallFrame) W.hallFrame.reset();
+      const ramp = async (dur, fn) => { const n = Math.max(2, Math.round(dur * 60)); for (let i = 1; i <= n; i++) { fn(i / n); await wait(dur / n); if (!alive(t)) return; } };
       let seen = 0;
       const when = (cond, fn, minM = 0) => (async () => {
         await until(t, () => F.clock >= c0 + minM && !F.script && cond()); if (!alive(t)) return;
@@ -305,9 +307,23 @@ export function createNights(env) {
       when(() => true, async () => {
         sfx.staticBurst && sfx.staticBurst(0.5, 1.2); await wait(0.9); sfx.whisper(-0.6, 0.28); sub('<i>(a whisper, almost words) "…not… yours…"</i>', 4.5); F.fear = Math.max(F.fear, 0.5);
       }, 33);
-      when(() => room() === 'hall', async () => {
-        D.flicker(1.6); await wait(1.0); const hf = W.hallFrame; if (hf) { hf.tilt(0.08); sfx.creak(0.25, D.pan(4.75, -1.5)); await wait(1.6); hf.tilt(-0.12); await wait(1.2); hf.fall(); }
-        sfx.thump(); sfx.tone && sfx.tone({ f: 2300, f2: 1100, dur: 0.25, gain: 0.2, wet: 0.5 }); sub('<i>A photo just fell off the wall behind you.</i>', 3.5); F.fear = Math.max(F.fear, 0.6);
+      // the photo in the hall comes down only while you are looking at it, close by: a held silence, a tilt, a held breath, then the drop
+      const frameSeen = () => {
+        const hf = W.hallFrame; if (!hf || hf.fallen || room() !== 'hall') return false;
+        const dx = hf.g.position.x - P.pos.x, dz = hf.g.position.z - P.pos.z, d = Math.hypot(dx, dz);
+        if (d < 1.0 || d > 3.0) return false;
+        return (dx * -Math.sin(P.yaw) + dz * -Math.cos(P.yaw)) / d > 0.82;
+      };
+      when(frameSeen, async () => {
+        const hf = W.hallFrame; F.script = true; F.fear = Math.max(F.fear, 0.6);
+        sfx.hush && sfx.hush(1.4); sfx.drone(0, 1.2);
+        await wait(1.4); if (!alive(t)) return;                              // the silence: it is just hanging there
+        await ramp(0.35, (k) => hf.tilt(0.1 * k)); sfx.creak(0.3, D.pan(4.75, -1.4));
+        await wait(0.7); if (!alive(t)) return;                              // the held breath before it goes
+        await ramp(0.26, (k) => hf.pose(k)); hf.fall();
+        sfx.stab(); sfx.thump(); sfx.noiseHit({ dur: 0.3, type: 'highpass', f: 3500, gain: 0.5, wet: 0.2 }); env.addShake(1.5); D.flicker(2.2);
+        sub('<i>The photo came off the wall. The glass is still sliding across the floor.</i>', 3.5); F.fear = 1;
+        await wait(1.0); F.script = false;
       }, 14);
       when(() => room() === 'bath', async () => {
         sfx.faucet(6, D.pan(4.7, 0.9)); sub('<i>The tap turns itself on.</i>', 3.5); await wait(3.2); W.mirrorFx.show('writing'); sfx.whisper(0.6, 0.18); await wait(4); W.mirrorFx.hide(); F.fear = Math.max(F.fear, 0.6);
@@ -319,9 +335,11 @@ export function createNights(env) {
       when(() => room() === 'living' || room() === 'dining', async () => {
         sfx.scrape && sfx.scrape(D.pan(-2.1, 2.3)); W.moveChair(1, -1.55, 2.3 + 0.35, Math.PI / 2 + 0.5); await wait(1.4); W.moveChair(0, -3.1, 2.0, Math.PI / 2 - 0.4); sfx.scrape && sfx.scrape(D.pan(-2.9, 2.0)); sub('<i>Chairs are moving in the dining room.</i>', 3.5);
       }, 50);
-      when(() => room() === 'kitchen', async () => {
-        for (let i = 0; i < 5; i++) { sfx.knock(D.pan(0.5 + i * 0.6, 3.3), 0.35); await wait(0.28); }
-        sub('<i>Every cabinet in the kitchen bangs at once.</i>', 3.5); F.fear = Math.max(F.fear, 0.7); env.addShake(0.3);
+      // every cabinet door in the kitchen at once, heard from anywhere in the house
+      when(() => true, async () => {
+        for (let i = 0; i < 5; i++) sfx.cabinet(D.pan(0.6 + i * 0.7, 3.2), 1);
+        await wait(0.1); sfx.cabinet(D.pan(1.2, 3.0), 0.8);
+        sub('<i>Every cabinet in the kitchen bangs at once.</i>', 3.5); F.fear = Math.max(F.fear, 0.7); env.addShake(0.6);
       }, 45);
       when(() => room() === 'hall' && Math.hypot(P.pos.x - 7.3, P.pos.z + 0.9) < 2.8, async () => {
         W.setDoor('parents', true); await wait(1.2); env.say('mom/mutter_b', { muffle: true }); F.fear = Math.max(F.fear, 0.6);

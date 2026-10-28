@@ -224,6 +224,12 @@ export class Sound {
     this.noiseHit({ dur: 1.2, type: 'bandpass', f: 2200, q: 0.5, gain: 0.9, attack: 0.01, wet: 0.3 });
     this.tone({ f: 60, f2: 25, dur: 1.0, gain: 1, wet: 0.2 });
   }
+  // a kitchen cabinet door thrown shut: a hollow wood clap, then a rattle of dishes
+  cabinet(pan = 0, gain = 1) {
+    this.noiseHit({ dur: 0.05, type: 'bandpass', f: 1800, q: 1.2, gain: 1.1 * gain, pan, attack: 0.001, wet: 0.2 });
+    this.tone({ type: 'triangle', f: 210, f2: 120, dur: 0.14, gain: 0.7 * gain, pan, wet: 0.15 });
+    this.noiseHit({ dur: 0.5, type: 'highpass', f: 3000, gain: 0.25 * gain, pan, wet: 0.3 });
+  }
   // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it
   pianoSlam() {
     if (!this.ctx) return;

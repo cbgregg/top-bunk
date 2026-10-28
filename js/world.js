@@ -553,7 +553,9 @@ export function buildWorld(scene) {
       const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.03), M.darkWood); fr.position.set(0, -h / 2 - 0.05, -0.0); g.add(fr);
       const p = picture(w, h, 'family2'); p.position.set(0, -h / 2 - 0.05, 0.017); g.add(p); house.add(g);
       hallFrame = { g, y0: g.position.y, tilt(r) { g.rotation.z = r; }, fallen: false,
-        fall() { hallFrame.fallen = true; g.position.set(xc + 0.25, 0.06, zf + 0.35); g.rotation.set(-Math.PI / 2 + 0.1, 0.4, 0.2); },
+        // k: 0 hanging on the wall, 1 face-down on the floor. It speeds up as it goes (gravity)
+        pose(k) { const e = k * k; g.position.set(xc + 0.25 * e, hallFrame.y0 + (0.06 - hallFrame.y0) * e, zf + 0.03 + 0.32 * e); g.rotation.set((-Math.PI / 2 + 0.1) * e, 0.4 * e, 0.2 * e); },
+        fall() { hallFrame.fallen = true; hallFrame.pose(1); },
         reset() { hallFrame.fallen = false; g.position.set(xc, hallFrame.y0, zf + 0.03); g.rotation.set(0, 0, 0); } };
     }
     frameX(5.4, 1.5, -1.5, 0.34, 0.26, 'rainier', 1); frameX(6.0, 1.55, -1.5, 0.3, 0.24, 'sunset', 1); frameX(6.6, 1.5, -1.5, 0.26, 0.22, 'family1', 1);
@@ -626,7 +628,6 @@ export function buildWorld(scene) {
     }
     solid(4.55, 4.95, 0.45, 1.35);
     const mat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.02, 0.5), std({ color: 0x8e4a5c, roughness: 1 })); mat.position.set(4.1, 0.01, 1.1); mat.receiveShadow = true; house.add(mat);
-    cyl(0.01, 0.6, chrome, 3.95, 1.1, 0.0, 0, Math.PI / 2);
     // old-school pink tile: a wainscot around the room with a darker cap, and the tub wall tiled to the ceiling line
     const cap = std({ color: 0xb4707e, roughness: 0.3 });
     const wains = (x0, x1, z0, z1, y0 = 0.11) => { const tx = x1 - x0 < 0.1 ? 0.012 : 0, tz = z1 - z0 < 0.1 ? 0.012 : 0; box(x0, x1, y0, 1.2, z0, z1, M.pinkTile, { uv: true }); box(x0 - tx, x1 + tx, 1.2, 1.24, z0 - tz, z1 + tz, cap, { uv: false }); };
@@ -793,8 +794,9 @@ export function buildWorld(scene) {
   const tvFx = (() => {
     const cv = document.createElement('canvas'); cv.width = 64; cv.height = 48; const g = cv.getContext('2d'), img = g.createImageData(64, 48);
     const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.26), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
-    plane.rotation.y = -Math.PI / 2; plane.position.set(2.713, 0.8, -3.2); plane.visible = false; house.add(plane);
+    // the screen: the set's front is at x 2.75 and faces the living room (-x); the picture sits just in front of the glass, 4:3 like the canvas
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.54), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
+    plane.rotation.y = -Math.PI / 2; plane.position.set(2.742, 0.875, -3.2); plane.visible = false; house.add(plane);
     const light = new THREE.PointLight(0x9db6ff, 0, 7, 1.6); light.position.set(2.2, 1.0, -3.2); scene.add(light);
     const fx = { on: false, figure: 0, t: 0, base: 4, light, plane,
       set(on) { fx.on = on; plane.visible = on; if (!on) light.intensity = 0; },
