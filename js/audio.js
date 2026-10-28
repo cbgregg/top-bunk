@@ -224,6 +224,13 @@ export class Sound {
     this.noiseHit({ dur: 1.2, type: 'bandpass', f: 2200, q: 0.5, gain: 0.9, attack: 0.01, wet: 0.3 });
     this.tone({ f: 60, f2: 25, dur: 1.0, gain: 1, wet: 0.2 });
   }
+  // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it
+  pianoSlam() {
+    if (!this.ctx) return;
+    for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16, attack: 0.002, wet: 0.45 });
+    for (const f of [40, 46]) this.tone({ type: 'sawtooth', f, f2: f * 0.5, dur: 1.4, gain: 0.22, wet: 0.3 });
+    this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1, attack: 0.001, wet: 0.35 });
+  }
   // ---- the horror layer: screaming violins (Insidious), a low dread bed, and the small paranormal knocks ----
   // violins(v): 0 silences them, 1 is the full storm. A looping recording, or a synthesized stand-in: detuned sawtooth "violins" with frantic vibrato.
   violins(v, t = 1.5) {

@@ -180,7 +180,7 @@ export function createNights(env) {
 
   async function dawn(n) {
     F.live = false; F.script = true; director.stop(); tok++;
-    hunter.dismiss(); sfx.violins(0, 3); sfx.tension(0, 2); sfx.drone(0.04, 4); UI.objective(null); UI.hint(null); W.tvFx.set(false); W.phone.setRinging(false);
+    env.vigil.stop(); hunter.dismiss(); sfx.violins(0, 3); sfx.tension(0, 2); sfx.drone(0.04, 4); UI.objective(null); UI.hint(null); W.tvFx.set(false); W.phone.setRinging(false);
     F.breathCheck = false; F.chase = false; F.echo = false; W.nightLights.forEach((x) => { x.dead = false; }); F.blackout = false; env.nlMult(1, false);
     if (P.mode === 'hide' && P.pod) { UI.pod(null); P.pod = null; }
     await wait(1.0);
@@ -346,7 +346,7 @@ export function createNights(env) {
       for (let i = 0; i < 7; i++) { sfx.heavyStep(0.8, Math.sin(i * 0.9) * 0.8); if (i % 2) sfx.knock(Math.sin(i) * 0.7, 0.3); if (i === 3) sfx.scratch(0); if (i === 4) { env.addShake(0.5); sfx.creak(0.4, 0); } F.fear = 1; await wait(0.95); }
       F.breathCheck = false; UI.hint(null); obj(null);
       sfx.violins(0, 0.05); sfx.ceilingThump(); await wait(0.4); sfx.whisper(0, 0.3); F.flicker = false; env.nlMult(1, false); F.fear = 0.4; F.script = false;
-      await wait(4); sub('<i>You stay under the blanket until the window turns grey.</i>', 4.5); F.clock = Math.max(F.clock, 350);
+      await wait(4); F.clock = Math.max(F.clock, 350);
     },
     // the end: it comes down the hall, and they see it too
     async finale(plan, t) {
@@ -354,8 +354,11 @@ export function createNights(env) {
       director.stop(); const t0 = env.time();   // no more tricks: whatever is hunting you gets a little while to finish, then the end begins
       await until(t, () => (!hunter.busy && !F.script && !F.cutscene) || env.time() - t0 > 40);
       if (!alive(t)) return; if (hunter.busy && hunter.state !== 'loom') hunter.dismiss(); await until(t, () => !F.script && !F.cutscene); if (!alive(t)) return;
-      await env.finaleScene(); if (!alive(t)) return; F.holdDawn = false; F.clock = DAWN;
+      if (await env.finaleScene()) return;   // the game is over: the end screen takes it from here
+      if (!alive(t)) return; F.holdDawn = false; F.clock = DAWN;
     },
+    // the power is out, one candle in the hall, and grandpa in a chair at the far end of it
+    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)); },
     // you fall asleep and dream a drive to the store
     async car(plan, t) {
       await atClock(t, plan.clock0 + 10); if (!alive(t)) return;

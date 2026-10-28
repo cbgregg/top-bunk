@@ -24,13 +24,15 @@ def el(voice_id, speed=1.0):
 # account voices (the same ones Breachpoint uses): Sarah for Mom, Chris for Dad
 MOM = el('EXAVITQu4vr4xnSDxMaL', 1.0)
 DAD = el('iP95p4xoKVk53GoZ742B', 1.0)
+# Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).
+GRAMPS = el(os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)
 
 # The lines live in assets/audio/lines.json, which the game reads too (subtitles and voice stay in sync): {id: {voice, say, html}}.
 # id -> (voice, line). Lines without a voice (what the kid says, shown as subtitles only) are skipped.
 LINES = {}
 for _id, _l in json.load(open(os.path.join(OUT, 'lines.json'))).items():
     if _l.get('voice'):
-        LINES['vo/' + _id] = (MOM if _l['voice'] == 'mom' else DAD, _l['say'])
+        LINES['vo/' + _id] = ({'mom': MOM, 'gramps': GRAMPS}.get(_l['voice'], DAD), _l['say'])
 
 
 def ssml_safe(s):

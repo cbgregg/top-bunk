@@ -450,5 +450,15 @@
   "voice": "mom",
   "say": "[far away, from outside, sweet] Honey? We're home.",
   "html": "<b>Mom:</b> <i>(from outside)</i> Honey? We're home."
+ },
+ "gramps/v_a": {
+  "voice": "gramps",
+  "say": "[old, soft, slow] Hey there, kiddo. Come sit with me a minute. The light's better over here.",
+  "html": "<b>Grandpa:</b> Hey there, kiddo. Come sit with me a minute. The light's better over here."
+ },
+ "gramps/v_b": {
+  "voice": "gramps",
+  "say": "[low, wet, not quite his voice] Look at me, Bud. Look at me. Don't you know who I am?",
+  "html": "<b>Grandpa:</b> Look at me, Bud. Look at me. Don't you know who I am?"
  }
 }

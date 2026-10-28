@@ -8,23 +8,24 @@
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
 import { NODES, nearestNode, dist as navDist } from './nav.js';
 
-export const TYPES = ['thirst', 'ring', 'static', 'mimic', 'blackout', 'hunted', 'paralysis', 'teddy', 'parents', 'quiet', 'car'];
+export const TYPES = ['thirst', 'ring', 'static', 'mimic', 'blackout', 'hunted', 'paralysis', 'teddy', 'parents', 'quiet', 'car', 'vigil'];
 export const TYPE_NAMES = {
   thirst: 'The Thirst', ring: 'The Phone', static: 'Static', mimic: 'Mom', blackout: 'Blackout', hunted: 'Hunted', paralysis: 'Paralysis',
-  teddy: 'The Bear', parents: 'The Parents', quiet: 'The Quiet', car: 'The Drive', finale: 'Ten', poltergeist: 'Night one',
+  teddy: 'The Bear', parents: 'The Parents', quiet: 'The Quiet', car: 'The Drive', vigil: 'The Vigil', finale: 'Ten', poltergeist: 'Night one',
 };
 
 // nights 2..9 get a type each; night 10 is the end. The order is different for every seed.
 export function nightTypes(seed) {
   const r = rng('types:' + seed);
   for (let tries = 0; tries < 400; tries++) {
-    const rest = shuffle(r, TYPES.filter((t) => t !== 'static' && t !== 'car'));
-    const pool = shuffle(r, ['static', 'car', ...rest.slice(0, 6)]);   // eight of the eleven, and the TV and the drive are always in
+    const rest = shuffle(r, TYPES.filter((t) => t !== 'static' && t !== 'car' && t !== 'vigil'));
+    const pool = shuffle(r, ['static', 'car', 'vigil', ...rest.slice(0, 5)]);   // eight of the twelve, and the TV, the drive and the vigil are always in
     const ok = pool.every((t, i) => {
       const n = i + 2;
       if (t === 'quiet' && n < 4) return false;
       if (t === 'blackout' && n < 3) return false;
       if (t === 'car' && (n < 5 || n > 8)) return false;
+      if (t === 'vigil' && (n < 4 || n > 8)) return false;
       if (t === 'paralysis' && n < 3) return false;
       if (t === 'parents' && n < 3) return false;
       if (i > 0 && t === pool[i - 1]) return false;

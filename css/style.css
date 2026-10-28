@@ -108,3 +108,11 @@ body[data-scheme="touch"] #crosshair { opacity: 0.35 !important; }
 #pod.louvers { background: repeating-linear-gradient(180deg, rgba(7,7,9,0.985) 0 30px, rgba(7,7,9,0) 30px 40px); box-shadow: inset 0 0 220px 90px #000; }
 #pod.curtain { background: radial-gradient(ellipse at center, rgba(120,150,120,0.10) 0%, rgba(10,16,12,0.72) 100%); backdrop-filter: blur(1.4px); }
 #runinfo { letter-spacing: 2px; }
+
+/* the nightmare: the picture turns over, the colours go wrong (the vigil) */
+body.nightmare #game { animation: dream 0.9s steps(5) infinite; }
+@keyframes dream {
+  0% { filter: hue-rotate(0deg) contrast(1.6) saturate(1.8); transform: scale(1.02) rotate(-0.6deg); }
+  50% { filter: hue-rotate(200deg) contrast(2.4) saturate(2.6) brightness(0.8); transform: scale(0.99) rotate(0.8deg); }
+  100% { filter: hue-rotate(340deg) contrast(1.4) saturate(1.2); transform: scale(1.03) rotate(-0.2deg); }
+}
