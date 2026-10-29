@@ -147,7 +147,7 @@ export function attach(game, opts = {}) {
     fadeInOut(delay, fin, fout) { const st = this.st, dur = this.shot.dur; return this.ramp(st, delay, delay + fin, dur - fout, dur); },
     rnd: rng(7),
   };
-  let cur = null, began = false, frameN = 0, pending = false, finished = false;
+  let cur = null, began = false, frameN = 0, pending = false, finished = false, lastT = null;
   const origRender = game.gfx.render.bind(game.gfx);
 
   // the shots are sequential, so the one that starts last before t is current (a start/end test would miss a frame where a rounded start
@@ -181,8 +181,8 @@ export function attach(game, opts = {}) {
     if (shot.fadeIn && st < shot.fadeIn) blk = Math.max(blk, 1 - st / shot.fadeIn);
     if (shot.fadeOut && st > dur - shot.fadeOut) blk = Math.max(blk, (st - (dur - shot.fadeOut)) / shot.fadeOut);
     ui.black(blk); ui.hideFade();
-    ui.grain((c.rnd() * 14 - 7).toFixed(1), (c.rnd() * 14 - 7).toFixed(1), portrait ? 0.7 : 0.55);
-    if (portrait) ui.camcorder(shot.camcorder === false || shot.black ? null : { stamp: shot.stamp || '', blink: Math.floor(c.t * 2) % 2 === 0, rec: true });
+    if (!c.subframe) ui.grain((c.rnd() * 14 - 7).toFixed(1), (c.rnd() * 14 - 7).toFixed(1), portrait ? 0.7 : 0.55);   // (grain is per frame, not per exposure)
+    if (portrait) ui.camcorder(shot.camcorder === false ? null : shot.osd ? shot.osd(c) : shot.black ? null : { stamp: shot.stamp || '', blink: Math.floor(c.t * 2) % 2 === 0 });
   }
   game.gfx.render = (dt) => { if (pending) { apply(); pending = false; } origRender(dt); };
 
@@ -203,7 +203,7 @@ export function attach(game, opts = {}) {
       if (quality) game.gfx.setQuality(quality, { save: false });
       if (shadow) for (const l of game.scene.userData.shadowLights) { const sz = l.sun ? shadow : shadow / 2; l.light.shadow.mapSize.set(sz, sz); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.needsUpdate = true; }
       if (res && res !== 1) game.gfx.setRes(res);
-      if (game.gfx.pass && game.gfx.pass.grade) game.gfx.pass.grade.uniforms.ca.value = ca ?? (portrait ? 0.0045 : 0.0011);
+      if (game.gfx.pass && game.gfx.pass.grade) game.gfx.pass.grade.uniforms.ca.value = ca ?? (portrait ? 0.002 : 0.0011);
       ui.letterbox(!!letterbox && !portrait);
       // the bottom bunk is for boxes (the story's own dressing)
       for (const [i, s] of game.W.dropSpots.entries()) if (i < 2) game.W.cardboardBox(s.x, s.y, s.z, 0.5, 0.44, 0.5, 3, i ? -0.3 : 0.2);
@@ -217,10 +217,11 @@ export function attach(game, opts = {}) {
     // headless: step to frame i. Pumps the game's clock in sub-steps (dt never over the game's 50 ms cap) and, when the frame is going to be
     // captured, renders on the last one. A frame that is not captured still runs the game and the shot (so doors close and walks happen on time)
     // but never touches the GPU: SwiftShader executes every queued draw whether or not a screenshot follows, and that is what costs seconds.
+    // i can be fractional: the extra exposures of a frame for motion blur (render.js --shutter); the clock then advances by the real gap
     frame(i, capture = true) {
-      frameN = i; Math.random = rng(1000003 + i * 7919);
-      const t = i / fps; tick(t);
-      const shot = c.shot, stepMs = 1000 / fps, n = Math.max(1, Math.ceil(stepMs / 45)), sub = stepMs / n, draw = capture && !shot.noRender;
+      frameN = i; Math.random = rng(1000003 + i * 7919); c.subframe = i % 1 !== 0;
+      const t = i / fps, gap = lastT !== null && t > lastT && t - lastT <= 1 / fps + 1e-9 ? t - lastT : 1 / fps; lastT = t; tick(t);
+      const shot = c.shot, stepMs = gap * 1000, n = Math.max(1, Math.ceil(stepMs / 45)), sub = stepMs / n, draw = capture && !shot.noRender;
       for (let s = 0; s < n; s++) { window.__norender = !draw || s < n - 1; window.__pump(sub); }
       window.__norender = false;
       if (pending) { apply(); pending = false; }   // (nothing was drawn: a black card, or a frame nobody will look at)

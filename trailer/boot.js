@@ -1,13 +1,14 @@
 // Live preview of the trailer in a browser, without the headless harness: serve the repo with `node trailer/render.js --serve` and open
 //   index.html?trailer=1            the landscape cut        index.html?trailer=1&aspect=portrait   the portrait cut (use a tall window)
 //   &music=/path/to/track.wav       a licensed recording     &lb=1   2.39:1 letterbox bars           &bio=1  the "link in bio" end card
+//   &cta=web                        the portrait end card offers the browser build instead of the Steam page
 // The server adds this script to index.html; the game itself is untouched, and without ?trailer=1 this does nothing.
 const q = new URLSearchParams(location.search);
 if (q.get('trailer')) {
   const ready = () => (window.__game && window.__game.E && window.__game.E.rig && window.__game.mom.rig && window.__game.dad.rig ? Promise.resolve() : new Promise((r) => setTimeout(r, 120)).then(ready));
   ready().then(() => import('./trailer.js')).then(async (m) => {
     const game = window.__game, aspect = q.get('aspect') || (innerHeight > innerWidth ? 'portrait' : 'landscape');
-    const player = m.attach(game, { aspect, fps: 60, linkInBio: q.get('bio') === '1' });
+    const player = m.attach(game, { aspect, fps: 60, linkInBio: q.get('bio') === '1', cta: q.get('cta') || '' });
     const go = document.createElement('div');
     go.style.cssText = 'position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:#000;color:#e9e2d0;font:24px "Special Elite",monospace;letter-spacing:3px;cursor:pointer';
     go.textContent = `click to play the ${aspect} trailer`; document.body.appendChild(go);

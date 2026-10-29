@@ -16,6 +16,8 @@
 //   --no-audio          video only   --no-warp   lay the song under straight (no low-pass, no slowing)   --letterbox   2.39:1 bars (landscape)
 //   --bio               the portrait end card says "link in bio"   --keep-frames   do not delete the PNGs   --gpu   use the machine's GPU (needs one)
 //   --frames jpg        write quality-95 JPEG frames instead of PNG (about a quarter of the disk; use it for the full-resolution presets)
+//   --shutter N         motion blur: N exposures per frame, averaged (N times the render time; 2-3 is plenty at 30 fps)
+//   --cta web           the portrait end card says "play it free in your browser" instead of the Steam line
 //   --headed            a visible browser window (needs a display; with --gpu this is the fast path on a real machine)
 //   --serve [--port N]  only serve the repo for the live preview (index.html?trailer=1) and keep running
 'use strict';
@@ -61,7 +63,7 @@ const INIT = `(() => {
 })();`;
 
 function ensureMusic(file) {
-  if (fs.existsSync(file)) return file;
+  if (fs.existsSync(file) && fs.existsSync(path.join(__dirname, 'music', 'door_latch.wav'))) return file;   // (the last file gen_music.js writes)
   log('no placeholder music yet: generating it (trailer/gen_music.js)');
   execFileSync(process.execPath, [path.join(__dirname, 'gen_music.js')], { stdio: 'inherit' });
   return file;
@@ -110,7 +112,24 @@ function buildMix({ music, cues, plan, duration, warp, outWav, scratch }) {
   const cmd = ['-y', '-hide_banner', '-loglevel', 'error', ...inputs.flatMap((f) => ['-i', f]), '-filter_complex_script', script, '-map', '[out]', '-ar', String(SR), '-ac', '2', '-c:a', 'pcm_s16le', outWav];
   log('mixing audio:', labels.length, 'tracks ->', path.relative(ROOT, outWav));
   const r = spawnSync('ffmpeg', cmd, { stdio: 'inherit' }); if (r.status !== 0) throw new Error('ffmpeg audio mix failed');
+  if (plan.loudness !== undefined) master(outWav, plan.loudness, plan.truePeak ?? -1, scratch);
   return outWav;
+}
+// integrated loudness (LUFS) and true peak (dBTP) of a file, from ffmpeg's EBU R128 meter
+function loudness(file) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' });
+  const s = r.stderr.slice(r.stderr.lastIndexOf('Summary:')), num = (re) => { const m = re.exec(s); return m ? parseFloat(m[1]) : NaN; };
+  return { I: num(/I:\s+(-?[\d.]+) LUFS/), LRA: num(/LRA:\s+(-?[\d.]+) LU/), TP: num(/Peak:\s+(-?[\d.]+) dBFS/) };
+}
+// one gain to the target loudness, then a limiter for the peaks: the mix keeps its dynamics (the quiet bed stays quiet, the scare still jumps),
+// and the platforms' own normalisation has nothing left to turn down or clip
+function master(wav, target, ceiling, scratch) {
+  const before = loudness(wav), gain = target - before.I, tmp = path.join(scratch, 'mix-master.wav');
+  const r = spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', wav, '-af', `volume=${gain.toFixed(2)}dB,alimiter=limit=${Math.pow(10, (ceiling - 0.6) / 20).toFixed(4)}:attack=2:release=60:level=false`, '-c:a', 'pcm_s16le', tmp], { stdio: 'inherit' });
+  if (r.status !== 0) throw new Error('ffmpeg mastering failed');
+  fs.renameSync(tmp, wav);
+  const after = loudness(wav);
+  log(`loudness ${before.I} LUFS -> ${after.I} LUFS (target ${target}), range ${after.LRA} LU, true peak ${after.TP} dBTP (ceiling ${ceiling})`);
 }
 
 // ---------- main ----------
@@ -152,21 +171,28 @@ async function main() {
     const m = await import('/trailer/trailer.js');
     window.__trailer = m.attach(window.__game, o);
     await window.__trailer.begin(b);
-    return { duration: window.__trailer.duration, shots: window.__trailer.SHOTS.map((s) => ({ id: s.id, t: s.t, dur: s.dur })) };
-  }, [{ aspect, fps, linkInBio: has('--bio') }, { quality, shadow, res, letterbox: has('--letterbox') }]);
+    return { duration: window.__trailer.duration, shots: window.__trailer.SHOTS.map((s) => ({ id: s.id, t: s.t, dur: s.dur, teaser: s.teaser })) };
+  }, [{ aspect, fps, linkInBio: has('--bio'), cta: opt('--cta', '') }, { quality, shadow, res, letterbox: has('--letterbox') }]);
   const duration = info.duration, total = Math.ceil(duration * fps);
   log(`${info.shots.length} shots, ${duration} s, ${total} frames`);
   // which frames to capture
   const wanted = new Set();
   if (contact) for (const s of info.shots) wanted.add(Math.min(total - 1, Math.floor((s.t + s.dur / 2) * fps)));
   else for (let i = 0; i < total; i++) if (i % every === 0 && (!range[0] && range[0] !== 0 || (i >= (range[0] || 0) && i <= (range[1] ?? total)))) wanted.add(i);
+  // --shutter N: N exposures per frame spread over the first half of the frame time (a 180-degree shutter), averaged when encoding (full renders only)
+  const xs = !contact && wanted.size === total ? Math.max(1, Math.min(8, Math.round(+opt('--shutter', 1) || 1))) : 1;
+  if (xs > 1) log(`motion blur: ${xs} exposures per frame`);
   let lastShot = '', captured = 0, tStart = Date.now(), times = [];
   for (let i = 0; i < total; i++) {
-    const file = path.join(framesDir, String(i).padStart(6, '0') + '.' + FX), take = wanted.has(i) && !(resume && fs.existsSync(file));
+    const file = (s) => path.join(framesDir, String(i * xs + s).padStart(6, '0') + '.' + FX), take = wanted.has(i) && !(resume && fs.existsSync(file(xs - 1)));
     const fa = Date.now();
-    const r = await page.evaluate(([n, cap]) => window.__trailer.frame(n, cap), [i, take]);
+    let r;
+    for (let s = 0; s < xs; s++) {
+      r = await page.evaluate(([n, cap]) => window.__trailer.frame(n, cap), [i + s * 0.5 / xs, take]);
+      if (take) await page.screenshot({ path: file(s), ...(FX === 'jpg' ? { type: 'jpeg', quality: 95 } : { type: 'png' }), animations: 'disabled', caret: 'hide', timeout: 900000 });
+    }
     if (r.shot !== lastShot) { lastShot = r.shot; log(`shot ${r.shot} at ${r.t.toFixed(2)} s (frame ${i})`); }
-    if (take) { await page.screenshot({ path: file, ...(FX === 'jpg' ? { type: 'jpeg', quality: 95 } : { type: 'png' }), animations: 'disabled', caret: 'hide', timeout: 900000 }); captured++; }
+    if (take) captured++;
     const dt = (Date.now() - fa) / 1000; if (take) times.push(dt); if (times.length > 30) times.shift();
     if (take && (captured % 10 === 0 || captured === 1)) {
       const avg = times.reduce((a, b) => a + b, 0) / times.length, left = [...wanted].filter((n) => n > i).length;
@@ -188,11 +214,13 @@ async function main() {
   let mix = null;
   if (!has('--no-audio')) mix = buildMix({ music, cues, plan, duration, warp: !has('--no-warp'), outWav: path.join(scratch, 'mix.wav'), scratch });
   log('encoding', path.relative(ROOT, outFile));
-  const enc = ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-pattern_type', 'glob', '-i', path.join(framesDir, '*.' + FX), ...(mix ? ['-i', mix] : []),
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(fps), ...(mix ? ['-c:a', 'aac', '-b:a', '256k', '-ar', '44100', '-shortest'] : ['-an']), '-movflags', '+faststart', outFile];
+  const blur = xs > 1 ? ['-vf', `tmix=frames=${xs},select='eq(mod(n\\,${xs})\\,${xs - 1})',setpts=N/(${fps}*TB)`] : [];
+  const enc = ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(fps * xs), '-pattern_type', 'glob', '-i', path.join(framesDir, '*.' + FX), ...(mix ? ['-i', mix] : []),
+    ...blur, '-frames:v', String(total), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(fps), ...(mix ? ['-c:a', 'aac', '-b:a', '256k', '-ar', '44100', '-shortest'] : ['-an']), '-movflags', '+faststart', outFile];
   const r = spawnSync('ffmpeg', enc, { stdio: 'inherit' }); if (r.status !== 0) throw new Error('ffmpeg encode failed');
-  // a ten-second teaser (the run, the cut, the scare) at gif size
-  const teaser = path.join(outDir, preset.name + '-teaser10s.mp4'), ts = portrait ? Math.max(0, duration - 11.5) : 100;
+  // a ten-second teaser (the run, the cut, the scare) at gif size; a shot with `teaser: s` starts it s seconds into that shot
+  const tShot = info.shots.find((s) => s.teaser !== undefined && s.teaser !== null);
+  const teaser = path.join(outDir, preset.name + '-teaser10s.mp4'), ts = tShot ? tShot.t + tShot.teaser : portrait ? Math.max(0, duration - 11.5) : 100;
   spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-ss', String(ts), '-t', '10', '-i', outFile, '-vf', portrait ? 'scale=270:-2' : 'scale=480:-2', '-c:v', 'libx264', '-crf', '24', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', teaser], { stdio: 'inherit' });
   if (!has('--keep-frames')) fs.rmSync(framesDir, { recursive: true, force: true });
   log('done:', path.relative(ROOT, outFile), fs.existsSync(teaser) ? 'and ' + path.relative(ROOT, teaser) : '');

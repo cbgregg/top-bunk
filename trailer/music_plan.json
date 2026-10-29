@@ -12,12 +12,16 @@
     "mute": [[108, 110]]
   },
   "portrait": {
+    "_comment": "The song comes in on the first daylight shot, sits under the voices, warps through the TV and the door, and stops dead when the door opens again. From there it is room tone, breath, the heartbeat and the run, then true silence before the scare. loudness/truePeak: the finished mix is set to this integrated loudness (LUFS) under this ceiling (dBTP), where Shorts, Reels and TikTok play it.",
     "segments": [
-      { "out": [2.92, 19.58], "src": 8, "rate": 1, "gain": 1, "fadeIn": 0.05 },
-      { "out": [19.58, 29.58], "src": 24.66, "rate": 0.97, "lp": 3000, "vib": 0.12, "gain": 0.95 },
-      { "out": [29.58, 38.75], "src": 34.36, "rate": 0.9, "lp": 1200, "vib": 0.28, "gain": 0.9 },
-      { "out": [40, 44], "src": 113, "rate": 1, "lp": 500, "gain": 0.16, "fadeIn": 0.5, "fadeOut": 2.5 }
+      { "out": [2.45, 6.95], "src": 8, "rate": 1, "gain": 0.24, "fadeIn": 0.02 },
+      { "out": [6.95, 10.25], "src": 12.5, "rate": 0.98, "lp": 3500, "vib": 0.08, "gain": 0.22 },
+      { "out": [10.25, 12.65], "src": 15.73, "rate": 0.95, "lp": 2200, "vib": 0.15, "gain": 0.26 },
+      { "out": [12.65, 14.85], "src": 18.01, "rate": 0.88, "lp": 1200, "vib": 0.3, "gain": 0.32, "fadeOut": 0.03 },
+      { "out": [26.05, 27.75], "src": 113, "rate": 1, "lp": 900, "gain": 0.22, "fadeIn": 0.08, "fadeOut": 0.5 }
     ],
-    "mute": [[38.75, 39.17]]
+    "mute": [[24.15, 24.75]],
+    "loudness": -14,
+    "truePeak": -1
   }
 }

@@ -53,20 +53,26 @@ const CSS = `
 #tr-cap { z-index: 60; display: flex; align-items: flex-end; justify-content: center; opacity: 0; }
 #tr-cap div { font-family: 'Special Elite', 'Courier Prime', monospace; color: #f3eee2; text-align: center; text-shadow: 0 2px 6px #000, 0 0 2px #000, 0 0 18px rgba(0,0,0,0.9); line-height: 1.3; max-width: 84%; background: rgba(0,0,0,0.28); padding: 0.35em 0.6em; border-radius: 0.12em; }
 #tr-cam { z-index: 57; display: none; }
-#tr-cam .scan { position: absolute; inset: 0; background: repeating-linear-gradient(180deg, rgba(0,0,0,0.16) 0 1px, rgba(0,0,0,0) 1px 3px); mix-blend-mode: multiply; }
-#tr-cam .edge { position: absolute; inset: 0; box-shadow: inset 0 0 12vw 2vw rgba(0,0,0,0.55); }
-#tr-cam .rec { position: absolute; font-family: 'Courier Prime', ui-monospace, monospace; color: #f2f2ee; text-shadow: 0 0 4px #000, 0 1px 2px #000; letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.5em; }
-#tr-cam .rec i { display: inline-block; width: 0.55em; height: 0.55em; border-radius: 50%; background: #e2261b; box-shadow: 0 0 6px #ff3a2a; }
-#tr-cam .stamp { position: absolute; font-family: 'Courier Prime', ui-monospace, monospace; color: #f2f2ee; text-shadow: 0 0 4px #000, 0 1px 2px #000; letter-spacing: 0.1em; white-space: pre; }
-#tr-cam .corner { position: absolute; width: 5vw; height: 5vw; border: 2px solid rgba(255,255,255,0.75); }
-#tr-cam .bat { position: absolute; font-family: 'Courier Prime', ui-monospace, monospace; color: #f2f2ee; text-shadow: 0 0 4px #000; letter-spacing: 0.1em; }
+#tr-cam .osd { position: absolute; left: 8%; font-family: 'Courier Prime', ui-monospace, monospace; font-weight: 700; color: #f1f1e6; letter-spacing: 0; line-height: 1.2; white-space: pre;
+  text-shadow: 0.07em 0 rgba(255,48,40,0.5), -0.07em 0 rgba(60,200,255,0.45), 0 0 0.18em rgba(0,0,0,0.9); }
+#tr-cam .rec { display: flex; align-items: center; gap: 0.45em; }
+#tr-cam .rec i { display: inline-block; width: 0.62em; height: 0.62em; border-radius: 50%; background: #e2261b; box-shadow: 0 0 0.3em rgba(255,58,42,0.8); }
+/* the portrait cut: the camcorder's own text sits under the grain like the picture; captions and the end card stay crisp on top */
+.tr-portrait #grain { z-index: 58 !important; }
+.tr-portrait #tr-black { z-index: 5; }
+.tr-portrait #tr-cap div { position: absolute; left: 8%; width: 70%; top: 58%; transform: translateY(-50%); max-width: none; box-sizing: border-box; padding: 0; background: none; border-radius: 0;
+  font-family: 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif; font-weight: 700; color: #fff; line-height: 1.2; white-space: pre-line; text-wrap: balance; letter-spacing: 0;
+  -webkit-text-stroke: 0.1em #000; paint-order: stroke fill; text-shadow: 0 0.05em 0.25em rgba(0,0,0,0.75); }
+.tr-portrait #tr-cards .line { font-family: 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif; font-weight: 700; color: #fff; letter-spacing: 0; line-height: 1.25; margin-top: 2.2vh;
+  -webkit-text-stroke: 0.08em #000; paint-order: stroke fill; }
 `;
 export function makeOverlays(portrait) {
   if (document.getElementById('tr-black')) return overlayApi(portrait);
   const st = document.createElement('style'); st.id = 'tr-style'; st.textContent = CSS; document.head.appendChild(st);
   const mk = (id, html = '') => { const d = document.createElement('div'); d.id = id; d.className = 'tr'; d.innerHTML = html; document.body.appendChild(d); return d; };
   mk('tr-lb', '<i style="top:0"></i><i style="bottom:0"></i>');
-  mk('tr-cam', '<div class="scan"></div><div class="edge"></div><div class="rec"><i></i>REC</div><div class="stamp"></div><div class="bat">▮▮▮▯</div><div class="corner" style="left:4vw;top:7vh;border-right:0;border-bottom:0"></div><div class="corner" style="right:4vw;top:7vh;border-left:0;border-bottom:0"></div><div class="corner" style="left:4vw;bottom:9vh;border-right:0;border-top:0"></div><div class="corner" style="right:4vw;bottom:9vh;border-left:0;border-top:0"></div>');
+  mk('tr-cam', '<div class="osd rec"><i></i><span>REC</span><span class="ctr"></span></div><div class="osd zoom"></div><div class="osd stamp"></div>');
+  if (portrait) document.body.classList.add('tr-portrait');
   mk('tr-black'); mk('tr-flash');
   mk('tr-cards', '<div class="big"></div><div class="small"></div><div class="line"></div>');
   mk('tr-cap', '<div></div>');
@@ -76,14 +82,14 @@ function overlayApi(portrait) {
   const $ = (id) => document.getElementById(id), W = () => innerWidth, H = () => innerHeight;
   const black = $('tr-black'), flash = $('tr-flash'), cards = $('tr-cards'), cap = $('tr-cap'), cam = $('tr-cam'), lb = $('tr-lb'), grain = $('grain');
   const big = cards.querySelector('.big'), small = cards.querySelector('.small'), line = cards.querySelector('.line'), capText = cap.firstElementChild;
-  const rec = cam.querySelector('.rec'), stamp = cam.querySelector('.stamp'), bat = cam.querySelector('.bat');
+  const rec = cam.querySelector('.rec'), ctr = cam.querySelector('.ctr'), zoom = cam.querySelector('.zoom'), stamp = cam.querySelector('.stamp');
   // sizes in px from the viewport (so a 360-wide preview and a 1080-wide render look the same)
   const px = (f) => Math.round((portrait ? W() : H()) * f) + 'px';
-  big.style.fontSize = px(portrait ? 0.13 : 0.19); big.style.letterSpacing = px(0.012); small.style.fontSize = px(portrait ? 0.028 : 0.032); line.style.fontSize = px(portrait ? 0.05 : 0.07);
-  capText.style.fontSize = px(0.047); cap.style.paddingBottom = Math.round(H() * (portrait ? 0.30 : 0.12)) + 'px';
-  rec.style.fontSize = px(0.034); rec.style.left = '6vw'; rec.style.top = '8vh';
-  stamp.style.fontSize = px(0.03); stamp.style.right = '6vw'; stamp.style.bottom = '10vh';
-  bat.style.fontSize = px(0.028); bat.style.right = '6vw'; bat.style.top = '8vh';
+  big.style.fontSize = px(portrait ? 0.13 : 0.19); big.style.letterSpacing = px(0.012); small.style.fontSize = px(portrait ? 0.028 : 0.032); line.style.fontSize = px(portrait ? 0.058 : 0.07);
+  capText.style.fontSize = px(portrait ? 0.064 : 0.047); if (!portrait) cap.style.paddingBottom = Math.round(H() * 0.12) + 'px';
+  // (kept clear of the platform's own buttons and text: nothing above 11% or below 75% of the height, nothing right of 80% of the width)
+  for (const e of [rec, zoom, stamp]) { e.style.fontSize = px(0.036); e.style.filter = `blur(${(W() / 900).toFixed(2)}px)`; }
+  rec.style.top = '11.5%'; zoom.style.top = '15.5%'; stamp.style.top = '68.5%';
   const api = {
     black: (o) => { black.style.opacity = clamp(o, 0, 1); },
     flash: (o) => { flash.style.opacity = clamp(o, 0, 1); },
@@ -95,10 +101,11 @@ function overlayApi(portrait) {
       cards.style.opacity = clamp(o.alpha ?? 1, 0, 1);
     },
     caption: (text, alpha = 1) => { if (!text) { cap.style.opacity = 0; return; } capText.textContent = text; cap.style.opacity = clamp(alpha, 0, 1); },
+    // the camcorder's on-screen text: {blink, counter: '0:31:12', stamp: 'OCT 20 2004\n3:12:40 AM', zoom: 'x2.0'}
     camcorder: (o) => {
       if (!o) { cam.style.display = 'none'; return; }
-      cam.style.display = 'block'; rec.style.visibility = o.rec === false ? 'hidden' : 'visible'; rec.firstElementChild.style.opacity = o.blink ? 1 : 0.15;
-      stamp.textContent = o.stamp || ''; bat.style.visibility = o.stamp ? 'visible' : 'hidden';
+      cam.style.display = 'block'; rec.firstElementChild.style.opacity = o.blink === false ? 0.12 : 1;
+      ctr.textContent = o.counter ? '  ' + o.counter : ''; stamp.textContent = o.stamp || ''; zoom.textContent = o.zoom || '';
     },
     letterbox: (on) => { lb.style.display = on ? 'block' : 'none'; const h = Math.round(H() * (1 - (W() / H()) / 2.39) / 2); for (const i of lb.children) i.style.height = h + 'px'; },
     grain: (x, y, alpha = 0.55) => { if (grain) { grain.style.transform = `translate(${x}%, ${y}%)`; grain.style.opacity = alpha; } },

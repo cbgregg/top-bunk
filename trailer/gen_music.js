@@ -246,8 +246,22 @@ function tvSnow(sec) {
   return normalize(L, Rr, 0.7);
 }
 
+function heartbeat(sec, period) {   // lub-dub, fast: a scared kid's, felt more than heard
+  const b = new Buf(sec + 1);
+  for (let t = 0; t < sec; t += period) { b.add(onePoleLP(thump(58, 34, 0.14, 0.9), 180), t, 1, 0); b.add(onePoleLP(thump(52, 30, 0.12, 0.6), 160), t + 0.17, 1, 0); }
+  return normalize(b.L, b.R, 0.8);
+}
+function latch() {   // a door pulled shut close by: the leaf hitting the stop, the bolt clicking into the strike
+  const b = new Buf(1.5);
+  b.add(room(thump(110, 55, 0.22, 0.9), 0.2, 0.9), 0, 1, 0);
+  b.add(onePoleHP(thump(3200, 1800, 0.018, 0.5), 1400), 0.012, 1, 0); b.add(onePoleHP(thump(2600, 1500, 0.02, 0.35), 1200), 0.06, 1, 0);
+  return normalize(b.L, b.R, 0.85);
+}
+
 const [L, Rr] = render(); writeWav(path.join(OUT, 'placeholder.wav'), L, Rr);
 writeWav(path.join(OUT, 'heavy_steps.wav'), ...steps(7, 1.05, true));
 writeWav(path.join(OUT, 'run_steps.wav'), ...steps(16, 0.42, false));
 writeWav(path.join(OUT, 'breath_slow.wav'), ...breathing(9));
 writeWav(path.join(OUT, 'tv_snow.wav'), ...tvSnow(8));
+writeWav(path.join(OUT, 'heartbeat.wav'), ...heartbeat(4, 0.56));
+writeWav(path.join(OUT, 'door_latch.wav'), ...latch());
