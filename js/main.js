@@ -1272,9 +1272,10 @@ async function carLeaving() {
 }
 
 // ---------- night ten: the thing stands at the end of the hall, and this time they see it too ----------
+// what you found decides the end: under 3 nobody comes, 3 to 6 they come and it takes them, 7 or more they believe you and you leave
+const finaleFor = (proof) => (proof < 3 ? 'ENDING_ALONE' : proof < 7 ? 'ENDING_TAKEN' : 'ENDING_BELIEVED');
 async function finaleScene() {
-  // what you found decides the end: under 3 nobody comes, 3 to 6 they come and it takes them, 7 or more they believe you and you leave
-  const proof = proofCount();
+  const end = finaleFor(proofCount());
   F.script = true; F.cutscene = true; UI.objective(null); UI.hint(null); UI.prompt(null);
   if (nights) nights.hunter.dismiss();
   UI.pod(null); UI.blanket(false); P.pod = null; flash.intensity = 0; F.flashOn = false; F.breathCheck = false; F.breathUI = false;
@@ -1295,7 +1296,7 @@ async function finaleScene() {
   E.mode = 'walk'; E.speed = 0.55; { const x0 = 3.95; let st = 0; await tween(7, (k) => { E.root.position.x = lerp(x0, 5.2, k); st += 0.03; if (st > 1.1) { st = 0; sfx.heavyStep(0.9, panFor(E.root.position)); } shake = Math.max(shake, 0.12 + k * 0.3); }, ease.lin); }
   E.mode = 'idle'; sfx.giggle(panFor(E.root.position)); await wait(1.6);
   await say('you/f_a'); sfx.scream(); UI.flash('rgba(255,255,255,0.55)', 0.4); shake = 1;
-  if (proof < 3) { await finaleNeverBelieved(); return true; }
+  if (end === 'ENDING_ALONE') { await finaleNeverBelieved(); return true; }
   // their door bangs open and they are standing there
   W.setDoor('parents', true); sfx.slamFar(0.5); sleepers(false);
   mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = true; mom.lookAt = dad.lookAt = null;
@@ -1303,7 +1304,7 @@ async function finaleScene() {
   await wait(0.4);
   await Promise.all([lookAtPerson(dad, 0.9), say('dad/f_a')]);
   sfx.scream(); await say('mom/f_a');
-  if (proof >= 7) return finaleBelieved();
+  if (end === 'ENDING_BELIEVED') return finaleBelieved();
   return finaleGruesome();
 }
 // how much proof the run has (#proof=N stands in for it, to reach each ending)
@@ -1351,7 +1352,7 @@ async function finaleNeverBelieved() {
 }
 // the game is over: the ending's line goes on the end screen, and the run is cleared
 async function endGame(line) {
-  F.cutscene = true; F.script = true; UI.objective(null); UI.hint(null); UI.prompt(null); UI.clock(null);
+  F.cutscene = true; F.script = true; F.live = false; UI.objective(null); UI.hint(null); UI.prompt(null); UI.clock(null);
   UI.fade(1, 2.5); await wait(3);
   $('endtag').innerHTML = line;
   uiMode = 'end'; document.exitPointerLock(); UI.show('end');
@@ -1510,7 +1511,7 @@ function newRun() {   // New game over a saved run: a fresh seed from the first 
   nights.proof.sync();
   startGame();
 }
-achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter });   // (before menu.init: it adds its panel to the title and pause menus)
+achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter, test: () => uiMode === 'test' });   // (before menu.init: it adds its panel to the title and pause menus)
 menu.init({
   startGame, newGame: newRun, hasSave: () => RUN.night >= 2, night: () => Math.min(RUN.night, 10),
   resume: () => setPause(false), pause: () => setPause(true), canPause: () => uiMode === 'playing',
@@ -1520,4 +1521,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

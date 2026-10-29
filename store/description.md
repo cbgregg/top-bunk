@@ -5,17 +5,15 @@ Content). Steam's description fields take a BBCode subset (`[h2]`, `[b]`, `[list
 written in that subset so it can be pasted as-is. Nothing here claims a feature the game does not have; when the game changes, change
 this file in the same commit.
 
-Re-check before the page goes live (these depend on work that was in flight when this was written):
+Re-check before the page goes live:
 
-- **Endings.** The copy says only that the ending depends on where you are and whether anyone sees it. Today the finale has two
-  outcomes ("They never believed you" if you are in bed when it comes; "They saw it. Then it had them." if you are not). The third,
-  driving away at dawn ("They believed you"), exists in the code but is not reachable from the finale until the evidence work wires
-  it up. Once it is, "Three endings" can go into the About text, the features list and `press-kit.md`.
-- **In flight alongside this copy**, named in the features list (here and in `press-kit.md`) without specifics so the lines stay
-  true whatever shape they land in: an options menu and pause menu with settings that are remembered, usable from keyboard, mouse or
-  controller; Steam Achievements; and evidence objectives on the nights between the first and the last that feed the breakfast
-  dialogue and the finale. Before pasting, confirm each is in the build and drop the bullet for any that is not. *Steam
-  Achievements* stays unticked in Supported Features until the achievements work lands.
+- **Endings.** There are three, chosen by how much proof the run has found when it comes down the hall on night ten (`finaleFor` in
+  `js/main.js`): fewer than three pieces, "They never believed you"; three to six, "They saw it. Then it had them."; seven or more,
+  the drive away at dawn, "They believed you". If those thresholds change, change the About text and `press-kit.md` with them.
+- **Proof** turns up on most nights from two to nine. Night one, night ten and most car-dream nights leave none, so the copy says
+  "most nights".
+- **Steam Achievements** are in the build. Tick them in Supported Features once the 64x64 achieved and unachieved icons exist; none
+  have been made yet.
 - **System requirements** are estimates from the render pipeline, not measurements; see that section.
 
 ## Short description
@@ -47,16 +45,16 @@ You have a flashlight, two legs that get tired, doors you can shut behind you, a
 A single-storey farmhouse from the early 2000s, built room by room: the brown carpet, the floral wallpaper, the white kitchen, the narrow hall of family photos, the box TV, the dining-room wall phone, the utility room with the breaker panel, the yard with the moving truck still parked on the gravel. Every night the house does a little more.
 
 [h2]Nobody believes you[/h2]
-Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Every night the house leaves something behind; find it, and you have something to show them in the morning. Your parents notice the evidence, and still they would rather believe it was you.
+Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Most nights the house leaves something behind; find it, and you have something to show them in the morning. Show them enough and they start to listen.
 
-How it ends depends on where you are when it finally comes down the hall on the tenth night, and on whether anyone else is awake to see it.
+There are three endings. Which one you get depends on how much proof you have found by the tenth night, when it finally comes down the hall.
 
 [h2]Features[/h2]
 [list]
 [*] A short, focused horror story: ten nights, one house, one thing in the hallway
 [*] Seeded runs: the same seed replays the same ten nights; a new seed shuffles what each night is about
 [*] Hiding spots, a breath meter, a flashlight, stamina, and doors you can close
-[*] Evidence objectives: the house leaves something behind every night, and what you find shapes breakfast and the ending
+[*] Evidence objectives: most nights leave something behind, and what you find shapes breakfast and decides which of three endings you get
 [*] A house that changes every night: night lights that die, a drawing that changes, a clock that lies
 [*] Mom and Dad are voiced, with subtitles
 [*] Keyboard and mouse or a game controller, with rumble; the pause and options menus work from any of them
@@ -139,8 +137,8 @@ fixed audio files. No content is generated at runtime."
 | Steam Deck | Untested | Expect *Playable* at best until the Linux build has been tried on a Deck |
 
 Store Page → Basic Info → Supported Features: tick *Single-player* and *Full Controller Support* (once the title, pause, death and
-end screens are all confirmed usable from a pad; until then *Partial Controller Support*). Tick *Steam Achievements* only when the
-achievements work lands.
+end screens are all confirmed usable from a pad; until then *Partial Controller Support*). The achievements are in the build
+(`steam/achievements.json`); tick *Steam Achievements* once their icons exist.
 
 ## Languages
 

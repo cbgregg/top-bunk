@@ -7,8 +7,8 @@ rented farmhouse, you have the top bunk in the back corner room, and something t
 end of the hallway. It only comes at night. Over ten nights the house does a little more each time (doors shut, the phone rings, the
 TV turns itself on, Mom calls you from a kitchen she is not in) and the thing hunts you through the dark, while you run, shut doors,
 hide under the covers or in the closet, and hold your breath until it goes. Every morning you tell your parents. Every morning they
-explain it away. How it ends depends on where you are when it comes down the hall on the last night, and on whether anyone else is
-awake to see it.
+explain it away, unless you have found something they cannot. How it ends on the last night depends on how much proof you have
+shown them.
 
 ## Fact sheet
 
@@ -42,9 +42,8 @@ awake to see it.
   comes off the wall while you are looking at it.
 - **Breakfast every morning.** Voiced, subtitled dialogue with Mom and Dad, who notice what the house leaves behind (the tap left
   running, the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
-- **Evidence.** The house leaves something behind every night; what you find shapes breakfast and the ending.
-- **More than one ending.** Where you are when it comes on the tenth night, and whether anyone else is awake to see it, decides how it
-  goes.
+- **Evidence.** Most nights the house leaves something behind; what you find shapes breakfast and the ending.
+- **Three endings.** How much proof you have found by the tenth night decides which one you get.
 - **Runs on ordinary hardware.** Graphics presets from Low to Ultra; the Auto preset keeps the frame rate up on integrated graphics.
 - **Keyboard and mouse or controller**, with the prompts and the title screen following whichever you picked up last, and pause and
   options menus that work from either.
@@ -55,7 +54,7 @@ awake to see it.
 Moving day: carry your boxes from the truck to the back-corner room. Top bunk is yours, the bottom one is for boxes. The landlord said
 the last family left in a hurry. Night one, you get up for the bathroom and something is just standing at the far end of the hall
 while the violins scream. Breakfast: nobody believes you. From then on every night is different and worse, and every morning is the
-same. On the tenth night it comes down the hall, and whether anyone else sees it depends on where you are.
+same. On the tenth night it comes down the hall, and whether anyone believes you depends on what you found.
 
 ## Assets
 

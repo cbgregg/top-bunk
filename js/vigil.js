@@ -2,6 +2,7 @@
 // Walk up to him and he turns over his shoulder with the thing's eyes and smile, screams, and you fall into a nightmare.
 import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
+import { flicker as lightFlicker } from './settings.js';
 
 const SEAT = { x: 3.5, z: -0.6 };      // the chair: against the north side of the hall, facing west (its back to the bedroom end)
 const CANDLE = { x: 5.2, z: -0.95 };   // the tea light, on the floor in the middle of the hall
@@ -144,7 +145,7 @@ export function createVigil(env) {
     t += dt;
     const f = 1.3 + Math.sin(t * 17) * 0.1 + Math.sin(t * 41) * 0.05 + (Math.random() - 0.5) * 0.12;
     rig.candleLight.intensity = f; rig.flame.scale.setScalar(0.9 + Math.random() * 0.25);
-    if (flicker) rig.spot.intensity = Math.random() < 0.12 ? 2 : 26;
+    if (flicker) rig.spot.intensity = lightFlicker('vigil', Math.random() < 0.12 ? 2 : 26, 26);
   }
 
   return { run, stop, update, isOn: () => on };

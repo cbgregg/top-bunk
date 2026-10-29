@@ -53,7 +53,7 @@ fallback face rather than silently fetching.
 
 ## Not in this folder
 
-- The trailer (its own stream; Steam wants 1920×1080 H.264 MP4 with a 1920×1080 thumbnail).
-- Achievement icons (64×64 JPG pairs, from the achievements work).
+- The trailer (`trailer/`; Steam wants 1920×1080 H.264 MP4 with a 1920×1080 thumbnail).
+- Achievement icons: a 64×64 JPG pair (achieved and unachieved) for each entry in `steam/achievements.json`. None are made yet.
 - A real developer name, website and press contact: `press-kit.md` and `description.md` carry placeholders where those go.
 - Localised copy: the page is English only, which `description.md` says.

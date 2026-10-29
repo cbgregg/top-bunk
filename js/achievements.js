@@ -9,8 +9,8 @@ export const ACHIEVEMENTS = [
   { id: 'MOVING_DAY', name: 'Moving day', desc: 'Carry all three of your boxes to your room.', hidden: false },
   ...NUM.map((w, i) => ({ id: `NIGHT_${i + 1}`, name: `Night ${w}`, desc: `Survive night ${w}.`, hidden: false })),
   { id: 'NIGHT_10', name: 'Ten', desc: 'See night ten through to the end.', hidden: false },
-  { id: 'ENDING_TAKEN', name: 'They saw it', desc: 'Be out of bed when it comes on night ten.', hidden: true },
-  { id: 'ENDING_ALONE', name: 'They never believed you', desc: 'Be in bed when it comes on night ten.', hidden: true },
+  { id: 'ENDING_TAKEN', name: 'They saw it', desc: 'Reach night ten with three to six pieces of proof.', hidden: true },
+  { id: 'ENDING_ALONE', name: 'They never believed you', desc: 'Reach night ten with fewer than three pieces of proof.', hidden: true },
   { id: 'ENDING_BELIEVED', name: 'They believed you', desc: 'Leave the house with Mom and Dad in the morning.', hidden: true },
   { id: 'THE_DRAWING', name: 'He watches', desc: 'Look at the drawing the last kid left in the hall.', hidden: false },
   { id: 'UNDER_THE_COVERS', name: 'Top bunk', desc: 'Pull the covers over your head.', hidden: false },
@@ -30,12 +30,13 @@ const BY_ID = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 const read = (k) => { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } };
 const got = read(KEY), stats = read(STATS);
-const G = {};   // from main.js (bind): F, P, W, RUN, sfx, menu, hunter()
+const G = {};   // from main.js (bind): F, P, W, RUN, sfx, menu, hunter(), test()
+const off = () => !!(G.test && G.test());   // the test mode (window.__game.start(), used by the trailer and the store shots) earns nothing
 const steam = () => (typeof window !== 'undefined' && window.desktop && window.desktop.achieve ? window.desktop : null);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function unlock(id) {
-  if (!BY_ID[id] || got[id]) return false;
+  if (!BY_ID[id] || got[id] || off()) return false;
   got[id] = Date.now(); write(KEY, got);
   queue.push(BY_ID[id]); pump();
   return true;
@@ -53,6 +54,7 @@ function run() {
 }
 // dawn of night n (nights.js)
 export function survived(n) {
+  if (off()) return;
   const r = run(); if (!r.survived.includes(n)) r.survived.push(n);
   write(STATS, stats);
   unlock(`NIGHT_${n}`); if (!r.died.includes(n)) unlock('FIRST_TRY');
@@ -73,7 +75,7 @@ function caught() {
 // ---------- what can be read straight off the game's state, every frame ----------
 const last = { dead: false, state: 'away' };
 export function tick() {
-  const { F, P, W } = G; if (!F) return;
+  const { F, P, W } = G; if (!F || off()) return;
   if (F.boxes >= 3) unlock('MOVING_DAY');
   if (P.mode === 'hide' && !F.dead) { unlock(P.pod ? 'HIDING_PLACE' : 'UNDER_THE_COVERS'); if (P.breath < 0.3) unlock('HOLD_BREATH'); }
   if (W.hallFrame && W.hallFrame.fallen) unlock('PHOTO_FELL');

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as TX from './textures.js';
 import { applyPBR } from './pbr.js';
 import { place, scatter } from './props.js';
+import { flicker } from './settings.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -841,7 +842,7 @@ export function buildWorld(scene) {
       set(on) { fx.on = on; plane.visible = on; if (!on) light.intensity = 0; },
       tick(dt) {
         if (!fx.on) return;
-        fx.t += dt; light.intensity = fx.base * (0.75 + Math.random() * 0.5) * (fx.figure > 0.5 && Math.random() < 0.2 ? 0.2 : 1);
+        fx.t += dt; light.intensity = flicker('tv', fx.base * (0.75 + Math.random() * 0.5) * (fx.figure > 0.5 && Math.random() < 0.2 ? 0.2 : 1), fx.base);
         if (fx.t < 1 / 20) return; fx.t = 0;
         const img = g.createImageData(W, H), d = img.data, bar = Math.random() * H;
         for (let y = 0; y < H; y++) {

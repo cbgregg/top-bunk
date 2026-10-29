@@ -27,9 +27,9 @@ Players' unlocks are stored under the API name, so keep each name fixed once the
 | `MOVING_DAY` | The third box is put down in your room on moving day. |
 | `NIGHT_1` to `NIGHT_9` | Dawn of that night, at the "You made it" card. |
 | `NIGHT_10` | Any ending, once its end screen is up. |
-| `ENDING_TAKEN` | The finale starts while you are out of bed. End screen: "They saw it." |
-| `ENDING_ALONE` | The finale starts while you are on the bunk or under the covers. End screen: "They never believed you." |
-| `ENDING_BELIEVED` | The end screen after the morning drive away from the house (`endingScript` in `js/main.js`). No night leads there in the current build: enter it once one does. |
+| `ENDING_TAKEN` | Night ten ends with three to six pieces of proof found. End screen: "They saw it." |
+| `ENDING_ALONE` | Night ten ends with fewer than three pieces of proof. End screen: "They never believed you." |
+| `ENDING_BELIEVED` | Night ten ends with seven or more pieces of proof and the morning drive away from the house. End screen: "They believed you." |
 | `THE_DRAWING` | "Look at the drawing" in the hall. |
 | `UNDER_THE_COVERS` | You hide under the covers on the top bunk. |
 | `HIDING_PLACE` | You hide in one of the three closets or behind the shower curtain. |
