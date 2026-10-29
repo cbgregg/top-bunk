@@ -15,6 +15,7 @@
 //   --every N           capture every Nth frame   --range A-B   capture frames A..B only   --resume   skip frames whose PNG already exists
 //   --no-audio          video only   --no-warp   lay the song under straight (no low-pass, no slowing)   --letterbox   2.39:1 bars (landscape)
 //   --bio               the portrait end card says "link in bio"   --keep-frames   do not delete the PNGs   --gpu   use the machine's GPU (needs one)
+//   --frames jpg        write quality-95 JPEG frames instead of PNG (about a quarter of the disk; use it for the full-resolution presets)
 //   --headed            a visible browser window (needs a display; with --gpu this is the fast path on a real machine)
 //   --serve [--port N]  only serve the repo for the live preview (index.html?trailer=1) and keep running
 'use strict';
@@ -23,6 +24,8 @@ const http = require('http'), fs = require('fs'), path = require('path'), os = r
 const ROOT = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const has = (k) => args.includes(k), opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; };
+// frame files: PNG by default; --frames jpg writes quality-95 JPEGs (the film grain makes 1080p PNGs ~3.5 MB each, ~15 GB for the Steam cut)
+const FX = opt('--frames', 'png') === 'jpg' ? 'jpg' : 'png';
 const PRESETS = {
   preview: { w: 640, h: 360, fps: 12, aspect: 'landscape', quality: 'medium', name: 'topbunk-trailer-preview-360p12' },
   steam: { w: 1920, h: 1080, fps: 30, aspect: 'landscape', quality: 'high', name: 'topbunk-trailer-1080p30' },
@@ -159,11 +162,11 @@ async function main() {
   else for (let i = 0; i < total; i++) if (i % every === 0 && (!range[0] && range[0] !== 0 || (i >= (range[0] || 0) && i <= (range[1] ?? total)))) wanted.add(i);
   let lastShot = '', captured = 0, tStart = Date.now(), times = [];
   for (let i = 0; i < total; i++) {
-    const file = path.join(framesDir, String(i).padStart(6, '0') + '.png'), take = wanted.has(i) && !(resume && fs.existsSync(file));
+    const file = path.join(framesDir, String(i).padStart(6, '0') + '.' + FX), take = wanted.has(i) && !(resume && fs.existsSync(file));
     const fa = Date.now();
     const r = await page.evaluate(([n, cap]) => window.__trailer.frame(n, cap), [i, take]);
     if (r.shot !== lastShot) { lastShot = r.shot; log(`shot ${r.shot} at ${r.t.toFixed(2)} s (frame ${i})`); }
-    if (take) { await page.screenshot({ path: file, type: 'png', animations: 'disabled', caret: 'hide', timeout: 900000 }); captured++; }
+    if (take) { await page.screenshot({ path: file, ...(FX === 'jpg' ? { type: 'jpeg', quality: 95 } : { type: 'png' }), animations: 'disabled', caret: 'hide', timeout: 900000 }); captured++; }
     const dt = (Date.now() - fa) / 1000; if (take) times.push(dt); if (times.length > 30) times.shift();
     if (take && (captured % 10 === 0 || captured === 1)) {
       const avg = times.reduce((a, b) => a + b, 0) / times.length, left = [...wanted].filter((n) => n > i).length;
@@ -176,7 +179,7 @@ async function main() {
   if (contact) {
     // the contact sheet: every shot's middle frame, named by shot
     const dir = path.join(outDir, preset.name + '-contact'); fs.mkdirSync(dir, { recursive: true });
-    for (const s of info.shots) { const n = Math.min(total - 1, Math.floor((s.t + s.dur / 2) * fps)), src = path.join(framesDir, String(n).padStart(6, '0') + '.png'); if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, `${String(s.t).padStart(6, '0')}-${s.id}.png`)); }
+    for (const s of info.shots) { const n = Math.min(total - 1, Math.floor((s.t + s.dur / 2) * fps)), src = path.join(framesDir, String(n).padStart(6, '0') + '.' + FX); if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, `${String(s.t).padStart(6, '0')}-${s.id}.${FX}`)); }
     log('contact frames in', path.relative(ROOT, dir)); return;
   }
   if (wanted.size !== total) { log('partial render (frames kept in ' + framesDir + '); no video encoded'); return; }
@@ -185,7 +188,7 @@ async function main() {
   let mix = null;
   if (!has('--no-audio')) mix = buildMix({ music, cues, plan, duration, warp: !has('--no-warp'), outWav: path.join(scratch, 'mix.wav'), scratch });
   log('encoding', path.relative(ROOT, outFile));
-  const enc = ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-pattern_type', 'glob', '-i', path.join(framesDir, '*.png'), ...(mix ? ['-i', mix] : []),
+  const enc = ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-pattern_type', 'glob', '-i', path.join(framesDir, '*.' + FX), ...(mix ? ['-i', mix] : []),
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(fps), ...(mix ? ['-c:a', 'aac', '-b:a', '256k', '-ar', '44100', '-shortest'] : ['-an']), '-movflags', '+faststart', outFile];
   const r = spawnSync('ffmpeg', enc, { stdio: 'inherit' }); if (r.status !== 0) throw new Error('ffmpeg encode failed');
   // a ten-second teaser (the run, the cut, the scare) at gif size
