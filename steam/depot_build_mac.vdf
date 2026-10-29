@@ -1,0 +1,27 @@
+// macOS depot: the x64 electron-builder "dir" output (npm run dist:mac -> dist/mac/Top Bunk.app).
+// The x64 app runs natively on Intel Macs and under Rosetta on Apple silicon, which is what the Steam
+// client and its overlay expect. The arm64 build (dist/mac-arm64/) ships as a zip outside Steam; to put
+// one bundle on Steam that is native everywhere, build with "arch": ["universal"] in package.json and point
+// ContentRoot at "../dist/mac-universal/".
+// Upload this depot from macOS or Linux so executable bits inside the bundle survive (Windows drops them).
+// Launch option in Steamworks: executable "Top Bunk.app/Contents/MacOS/Top Bunk", OS macOS.
+"DepotBuild"
+{
+	"DepotID" "YOUR_DEPOT_ID_MAC"
+
+	// Overrides AppBuild/ContentRoot; relative to this file. Contains "Top Bunk.app".
+	"ContentRoot" "../dist/mac/"
+
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+
+	"FileExclusion" "*.DS_Store"
+	"FileExclusion" "*.map"
+	"FileExclusion" "*.log"
+	"FileExclusion" "*/steamworks.js/dist/win64/*"
+	"FileExclusion" "*/steamworks.js/dist/linux64/*"
+}

@@ -1,0 +1,22 @@
+// Linux depot: the electron-builder "dir" output (npm run dist:linux -> dist/linux-unpacked/).
+// Upload from Linux or macOS so the executable bit on "top-bunk" and "chrome-sandbox" survives.
+// Launch option in Steamworks: executable "top-bunk", OS Linux + SteamOS, 64-bit.
+"DepotBuild"
+{
+	"DepotID" "YOUR_DEPOT_ID_LINUX"
+
+	// Overrides AppBuild/ContentRoot; relative to this file.
+	"ContentRoot" "../dist/linux-unpacked/"
+
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+
+	"FileExclusion" "*.map"
+	"FileExclusion" "*.log"
+	"FileExclusion" "*/steamworks.js/dist/win64/*"
+	"FileExclusion" "*/steamworks.js/dist/osx/*"
+}

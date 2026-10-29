@@ -1,0 +1,15 @@
+# desktop build (Electron + electron-builder)
+node_modules/
+dist/
+steam/build/
+steam/app_build.generated.vdf
+steam/*.log
+*.log
+.DS_Store
+Thumbs.db
+
+# python tooling
+__pycache__/
+*.pyc
+
+# desktop/steam_appid.txt is deliberately tracked: it carries the Steam App ID the shell starts with.

@@ -1,0 +1,25 @@
+// Windows depot: the electron-builder "dir" output (npm run dist:win -> dist/win-unpacked/).
+// Launch option in Steamworks: executable "Top Bunk.exe", OS Windows, 64-bit.
+"DepotBuild"
+{
+	"DepotID" "YOUR_DEPOT_ID_WINDOWS"
+
+	// Overrides AppBuild/ContentRoot; relative to this file.
+	"ContentRoot" "../dist/win-unpacked/"
+
+	// Everything in the unpacked folder lands at the root of the install directory.
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+
+	// Build leftovers and the other platforms' Steamworks binaries.
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "*.map"
+	"FileExclusion" "*.log"
+	"FileExclusion" "*.lib"
+	"FileExclusion" "*/steamworks.js/dist/osx/*"
+	"FileExclusion" "*/steamworks.js/dist/linux64/*"
+}
