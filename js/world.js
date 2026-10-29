@@ -792,28 +792,37 @@ export function buildWorld(scene) {
 
   // ---------- set pieces for the nights: the TV, the wall phone, the bathroom mirror ----------
   const tvFx = (() => {
-    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 48; const g = cv.getContext('2d'), img = g.createImageData(64, 48);
-    const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
-    // the screen: the set's front is at x 2.75 and faces the living room (-x); the picture sits just in front of the glass, 4:3 like the canvas
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.54), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
-    plane.rotation.y = -Math.PI / 2; plane.position.set(2.742, 0.875, -3.2); plane.visible = false; house.add(plane);
+    // the glass: a 4:3 canvas of snow with a rolling bar, scanlines, and a dark vignette at the edges (the CRT look)
+    const W = 160, H = 120;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    const vig = document.createElement('canvas'); vig.width = W; vig.height = H;
+    { const vg = vig.getContext('2d'), r = vg.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.6); r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, 'rgba(0,0,0,0.8)'); vg.fillStyle = r; vg.fillRect(0, 0, W, H); }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    // the glass of the set (assets/props/tv.glb at 2.95, 0.55, -3.2, facing -x): measured from a head-on render, it is the 4:3 window
+    // left of the control strip, z -3.475..-3.057 and y 0.655..0.975 on the front face at x 2.715. The picture sits just inside that, a hair in front.
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.40, 0.30), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
+    plane.rotation.y = -Math.PI / 2; plane.position.set(2.711, 0.815, -3.266); plane.visible = false; house.add(plane);
     const light = new THREE.PointLight(0x9db6ff, 0, 7, 1.6); light.position.set(2.2, 1.0, -3.2); scene.add(light);
     const fx = { on: false, figure: 0, t: 0, base: 4, light, plane,
       set(on) { fx.on = on; plane.visible = on; if (!on) light.intensity = 0; },
       tick(dt) {
         if (!fx.on) return;
         fx.t += dt; light.intensity = fx.base * (0.75 + Math.random() * 0.5) * (fx.figure > 0.5 && Math.random() < 0.2 ? 0.2 : 1);
-        if (fx.t < 0.05) return; fx.t = 0;
-        const d = img.data, band = (Math.random() * 48) | 0;
-        for (let y = 0; y < 48; y++) for (let x = 0; x < 64; x++) {
-          const i = (y * 64 + x) * 4, v = Math.random() * 215 + (Math.abs(y - band) < 2 ? 40 : 0);
-          d[i] = v * 0.86; d[i + 1] = v * 0.93; d[i + 2] = v; d[i + 3] = 255;
+        if (fx.t < 1 / 20) return; fx.t = 0;
+        const img = g.createImageData(W, H), d = img.data, bar = Math.random() * H;
+        for (let y = 0; y < H; y++) {
+          const scan = y % 2 ? 0.78 : 1, rolling = Math.abs(y - bar) < 5 ? 55 : 0;   // every other line is dimmer; the bar rolls up the screen
+          for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4, v = (60 + Math.random() * 150) * scan + rolling;
+            d[i] = v * 0.82; d[i + 1] = v * 0.88; d[i + 2] = v; d[i + 3] = 255;
+          }
         }
         g.putImageData(img, 0, 0);
-        if (fx.figure > 0) {   // something tall standing in the static
-          g.globalAlpha = Math.min(1, fx.figure); g.fillStyle = '#050506'; g.fillRect(27, 14, 10, 34); g.beginPath(); g.ellipse(32, 14, 6, 8, 0, 0, 7); g.fill();
-          g.fillStyle = '#fff'; g.fillRect(29, 12, 2, 4); g.fillRect(33, 12, 2, 4); g.fillRect(28, 17, 8, 1); g.globalAlpha = 1;
+        if (fx.figure > 0) {   // something tall, standing in the snow: a soft dark shape, the head a little dimmer
+          g.save(); g.filter = 'blur(2px)'; g.globalAlpha = 0.6 * Math.min(1, fx.figure); g.fillStyle = '#060608';
+          g.beginPath(); g.ellipse(80, 30, 8, 10, 0, 0, Math.PI * 2); g.fill(); g.fillRect(70, 40, 20, 62); g.restore();
         }
+        g.drawImage(vig, 0, 0);
         tex.needsUpdate = true;
       } };
     return fx;
