@@ -93,6 +93,8 @@ const EVENT_LIST = [
   { id: 'bunkShake', safe: true, w: 2, minN: 2, ok: (D) => D.onBunk(), run: (D) => { D.shake(0.5); D.sfx.creak(0.35, 0); D.F.fear = Math.max(D.F.fear, 0.5); } },
   { id: 'steps', safe: true, w: 2, minN: 2, ok: (D) => !D.onBunk() && !D.hunter.busy, run: (D) => { D.F.echo = true; D.later(9, () => { D.F.echo = false; }); } },
   { id: 'flush', safe: true, w: 1, run: (D) => D.sfx.flush && D.sfx.flush(D.pan(4.2, 1.5)) },
+  // everything that happens before a hunt, and then nothing comes: the warning is never a promise
+  { id: 'falseAlarm', w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0, run: (D) => { D.flicker(1.5); D.sfx.violins(0.3, 0.6); D.sfx.heavyStep(0.5, D.randPan()); D.later(0.85, () => D.sfx.heavyStep(0.4, D.randPan())); D.later(2.6, () => D.sfx.violins(0, 2.5)); D.F.fear = Math.max(D.F.fear, 0.8); } },
 ];
 export const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
 

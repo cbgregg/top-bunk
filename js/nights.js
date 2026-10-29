@@ -56,7 +56,7 @@ export function createNights(env) {
 
   // ---------- the thing ----------
   const hunter = createHunter({
-    E, W, sfx, P, F, camera, pods: PODS, hidden, holding: env.holding, caught: env.caught, panFor: env.panFor, now: env.time,
+    E, W, sfx, P, F, camera, pods: PODS, hidden, holding: env.holding, caught: env.caught, panFor: env.panFor, now: env.time, addShake: env.addShake,
     flicker: (s) => D.flicker(s),
     onVanish: () => { UI.hint(null); },
     onHunt: () => { UI.hint(`Hold <b>${L('sprint')}</b> to run. Break its line of sight. Hide.`, 5); },
@@ -135,8 +135,11 @@ export function createNights(env) {
   }
   // the lights go wrong first, then it is there
   async function startHunt(node) {
-    F.script = true; D.flicker(1.8); sfx.tension(0.05, 1.5); sfx.violins(0.35, 1); sfx.whisper(D.pan(NODES[node][0], NODES[node][1]), 0.18); F.fear = Math.max(F.fear, 0.6);
-    await wait(1.7); F.script = false;
+    // usually the lights go wrong first, for a moment you cannot predict; sometimes there is no warning at all (and the director's false alarms look just like this)
+    if (rnd() < 0.62) {
+      F.script = true; D.flicker(1.8); sfx.tension(0.05, 1.5); sfx.violins(0.35, 1); sfx.whisper(D.pan(NODES[node][0], NODES[node][1]), 0.18); F.fear = Math.max(F.fear, 0.6);
+      await wait(0.9 + rnd() * 1.8); F.script = false;
+    }
     if (F.dead || !F.live) return;
     if (hidden()) hunter.searchFrom(node); else hunter.hunt(node);
   }
@@ -237,7 +240,7 @@ export function createNights(env) {
       // "Dad" stands in front of the TV with his back to you
       mom.group.visible = true;
       dad.sleeping = false; dad.busy = true; dad.group.rotation.order = 'XYZ'; dad.group.rotation.set(0, 0, 0); dad.group.position.set(2.0, 0, -2.6); dad.group.rotation.y = Math.atan2(2.9 - 2.0, -3.2 + 2.6);   // standing in front of the TV, his back to you
-      dad.group.visible = true; dad.lookAt = null; dad.fake = true; if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });
+      dad.group.visible = true; dad.lookAt = null; dad.fake = true; W.bedSleepers.one('dad', false); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });   // (and his side of the bed is empty)
       let revealed = false, saidB = false; const t0 = env.time();
       while (alive(t) && !revealed && env.time() - t0 < 95) {
         const d = Math.hypot(P.pos.x - 2.0, P.pos.z + 2.6);
@@ -255,6 +258,7 @@ export function createNights(env) {
         W.tvFx.set(false); D.holdTv(false); obj(null);
       }
       if (dad.fake) { dad.fake = false; dad.busy = false; env.sleepers(true); }
+      W.bedSleepers.one('dad', true);
     },
     // Mom calls you from the kitchen
     async mimic(plan, t) {
@@ -292,7 +296,8 @@ export function createNights(env) {
       const ramp = async (dur, fn) => { const n = Math.max(2, Math.round(dur * 60)); for (let i = 1; i <= n; i++) { fn(i / n); await wait(dur / n); if (!alive(t)) return; } };
       let seen = 0;
       const when = (cond, fn, minM = 0) => (async () => {
-        await until(t, () => F.clock >= c0 + minM && !F.script && cond()); if (!alive(t)) return;
+        const m0 = minM + (minM > 0 ? rnd() * 9 : 0);   // the beats never land on the same minute twice (the seed decides)
+        await until(t, () => F.clock >= c0 + m0 && !F.script && cond()); if (!alive(t)) return;
         seen++; await fn();
       })();
       (async () => {   // from the bunk

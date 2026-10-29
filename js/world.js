@@ -524,7 +524,7 @@ export function buildWorld(scene) {
     rbox(x0 + 0.04, 5.71, 1.35, 2.15, z1, z1 + 0.02, M.cabLine, 0.006);
     solid(x0 - 0.05, x1 + 0.05, z0 - 0.1, z1 + 0.05);
   }
-  let teddy = null, parentsBed = null, hallFrame = null; const chairs = [];
+  let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null; const chairs = [];
   {
     const bear = new THREE.Group(); const fur = std({ color: 0x7a5232, roughness: 1 });
     const s = (r, x, y, z) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), fur); m.position.set(x, y, z); m.castShadow = true; bear.add(m); };
@@ -734,8 +734,54 @@ export function buildWorld(scene) {
     // the parents' double bed: head on the west wall, a nightstand with a lamp, a floral quilt (the passage in front of the door and the closet stays clear)
     rbox(5.9, 7.9, 0.12, 0.4, -4.38, -2.98, M.oak, 0.02); rbox(5.93, 7.87, 0.4, 0.58, -4.35, -3.01, M.mattress, 0.05);
     rbox(5.9, 5.98, 0.4, 1.15, -4.38, -2.98, M.oak, 0.02); rbox(7.86, 7.9, 0.4, 0.62, -4.38, -2.98, M.oak, 0.02);
-    rbox(6.55, 7.88, 0.58, 0.9, -4.34, -3.02, M.floralB, 0.05);   // a thick quilt over the sleepers
     for (const z of [-3.9, -3.4]) rbox(6.0, 6.5, 0.58, 0.68, z - 0.22, z + 0.22, M.pillow, 0.05);
+    for (const [z0, z1] of [[-4.36, -4.34], [-3.02, -3.0]]) rbox(6.55, 7.88, 0.46, 0.6, z0, z1, M.floralB, 0.005);   // the quilt hangs over the sides
+    rbox(7.86, 7.88, 0.46, 0.6, -4.36, -3.0, M.floralB, 0.005);
+    // the sleepers: two bodies under a draped quilt that rises and falls with their breathing, heads on the pillows.
+    // (The walking rigs are hidden while they sleep; laid flat they looked like mannequins.) set(false) flattens the quilt and hides the heads: the bed looks slept in.
+    bedSleepers = (() => {
+      const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+      const g = new THREE.Group(); house.add(g);
+      const X0 = 6.55, X1 = 7.88, Z0 = -4.34, Z1 = -3.02, TOP = 0.6;
+      const geo = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, 34, 34); geo.rotateX(-Math.PI / 2); geo.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
+      const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z);
+        // each body: full height at the shoulders (the west end, by the pillows), tapering to the feet; a soft gaussian across
+        const along = cl((x - X0) / (X1 - X0), 0, 1), h = 0.21 - along * 0.1;
+        const dm = (z + 3.4) / 0.2, dd = (z + 3.95) / 0.24;
+        bm[i] = h * Math.exp(-dm * dm * 1.5); bd[i] = h * 1.08 * Math.exp(-dd * dd * 1.5);
+      }
+      const quilt = new THREE.Mesh(geo, M.floralB); quilt.castShadow = quilt.receiveShadow = true; g.add(quilt);
+      // a head on a pillow: the face up and turned a little toward the room, hair behind, the eyes shut
+      const skin = std({ color: 0xd6a882, roughness: 0.75 }), shut = std({ color: 0x3a2a22, roughness: 1 });
+      const mkHead = (z, hairColor, long) => {
+        // lying on the back: the outer group lays the head flat with the crown toward the headboard (west), the inner one tilts the face a little toward the room
+        const h = new THREE.Group(); h.position.set(6.27, 0.75, z); h.rotation.set(-Math.PI / 2, 0, Math.PI / 2); g.add(h);
+        const f = new THREE.Group(); f.rotation.x = 0.4; h.add(f);   // (local: +z is the face, +y the crown)
+        const hair = std({ color: hairColor, roughness: 0.95 });
+        const skull = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 14), skin); skull.scale.set(0.92, 1.12, 0.98); skull.castShadow = true; f.add(skull);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.114, 18, 12), hair); cap.position.set(0, 0.035, -0.04); cap.scale.set(1, 1.05, 0.95); f.add(cap);   // over the crown and the back
+        for (const x of [-0.036, 0.036]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.004, 0.004), shut); e.position.set(x, 0.012, 0.104); f.add(e); }
+        if (long) { const spread = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 8), hair); spread.position.set(0, 0.06, -0.085); spread.scale.set(1.9, 1.5, 0.3); f.add(spread); }   // hair spread on the pillow
+        return h;
+      };
+      const heads = { mom: mkHead(-3.4, 0x5b3a22, true), dad: mkHead(-3.95, 0x2a221c, false) };
+      // Dad's arm over the covers
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.038, 0.42, 10), std({ color: 0x6d7a8c, roughness: 0.9 })); arm.rotation.z = Math.PI / 2; arm.position.set(6.95, 0.78, -3.68); arm.castShadow = true; g.add(arm);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), skin); hand.scale.set(1.3, 0.6, 1); hand.position.set(7.18, 0.77, -3.68); g.add(hand);
+      const fx = { group: g, quilt, amount: 1, target: 1, t: 0,
+        set(on) { fx.target = on ? 1 : 0; for (const k in heads) heads[k].visible = on; arm.visible = hand.visible = on; },
+        one(name, on) { if (heads[name]) heads[name].visible = on; if (name === 'dad') arm.visible = hand.visible = on; },
+        update(dt) {
+          fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5);
+          const fm = fx.amount * (1 + Math.sin(fx.t * 1.05) * 0.05), fd = fx.amount * (1 + Math.sin(fx.t * 0.86 + 1.9) * 0.06), flat = 0.05 * (1 - fx.amount);
+          for (let i = 0; i < n; i++) pos.setY(i, TOP + 0.01 + bm[i] * fm + bd[i] * fd + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9));   // (rumpled when empty)
+          pos.needsUpdate = true; geo.computeVertexNormals();
+        } };
+      fx.update(0);
+      return fx;
+    })();
     solid(5.85, 7.95, -4.42, -2.94);
     rbox(5.9, 6.3, 0, 0.55, -2.92, -2.55, M.oak, 0.015);
     { const lampM = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0.0, roughness: 0.7 });
@@ -1164,7 +1210,7 @@ export function buildWorld(scene) {
   return {
     colliders, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, winMat, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
-    doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, tvFx, phone, mirrorFx,
+    doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
     get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },

@@ -197,9 +197,10 @@ function nlMult(m, flick = true) {
 function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
     p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
-    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.4 }); }
-    else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
+    // asleep, the walking rig is hidden: the bed has its own sleepers (heads on the pillows, bodies under a breathing quilt)
+    if (on) { p.group.visible = false; p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); p.group.position.set(spot.x, 0, spot.z); p.lookAt = null; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.4 }); }
   }
+  W.bedSleepers.set(on);
 }
 
 // ---------- phases (lighting) ----------
@@ -609,11 +610,14 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
   P.mode = 'cine'; P.cam.copy(camera.position);
   camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
   const cp = P.cam.clone();
+  // it lunges from where it actually is (if it is in front of you), not from a spot re-centred 1.7 m away: no backward pop at the moment it gets you
+  let dx = fwd.x, dz = fwd.z, d0 = 1.7;
+  if (!opts.unseen && E.visible) { const ex = E.root.position.x - cp.x, ez = E.root.position.z - cp.z, d = Math.hypot(ex, ez); if (d > 0.3 && (ex * fwd.x + ez * fwd.z) / d > 0.25) { dx = ex / d; dz = ez / d; d0 = clamp(d, 0.8, 1.7); } }
   if (!opts.unseen) { E.visible = true; E.mode = 'idle'; E.reach = 1; E.lean = 0.12; E.smileScale = 1.3; E.tilt = 0.3; E.lookTarget = camera.position; }
-  const place = (d) => { if (opts.unseen) return; E.root.position.set(cp.x + fwd.x * d, cp.y - 2.2, cp.z + fwd.z * d); E.faceTowards(cp.x, cp.z); };
-  place(1.7);
+  const place = (d) => { if (opts.unseen) return; E.root.position.set(cp.x + dx * d, cp.y - 2.2, cp.z + dz * d); E.faceTowards(cp.x, cp.z); };
+  place(d0);
   sfx.scream(); sfx.jolt(1); shake = 1.4; UI.flash('rgba(255,255,255,0.5)', 0.25);
-  await tween(0.3, (k) => place(1.7 - k * 1.25), ease.in);
+  await tween(0.3, (k) => place(d0 - k * (d0 - 0.45)), ease.in);
   await wait(0.4);
   UI.fade(1, 0.05);
   E.visible = false; sfx.drone(0, 1); sfx.tension(0, 0.3); sfx.bed('music/chase', 0, 0.3);
@@ -1389,7 +1393,7 @@ function update(dt) {
       }
     }
   }
-  W.updateDoors(dt); W.tvFx.tick(dt); W.phone.tick(gameTime);
+  W.updateDoors(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt);
   if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
   WF.update(dt); dust.update(dt);
   E.update(dt);

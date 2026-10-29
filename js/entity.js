@@ -109,12 +109,14 @@ export class Entity {
 
   updateRig(dt) {
     const r = this.rig, t = this.t, run = this.mode === 'run', walk = this.mode === 'walk';
-    if (run) r.play('run', { fade: 0.2, speed: 1.1 });
-    else if (walk) r.play('walk', { fade: 0.35, speed: 0.55 });
-    else r.play('idle', { fade: 0.4, speed: 0.3 });
+    // the clip keeps pace with how fast it is actually moving (this.speed is metres per second over 3)
+    if (run) r.play('run', { fade: 0.25, speed: 0.8 + this.speed * 0.3 });
+    else if (walk) r.play('walk', { fade: 0.45, speed: 0.4 + this.speed * 0.45 });
+    else r.play('idle', { fade: 0.5, speed: 0.3 });
     r.update(dt);
-    // posture on top of the clip: stooped when moving, plus the story's lean and head tilt
+    // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0));
+    r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
     r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt + Math.sin(t * 0.7) * 0.05);
     // arms out toward you
     if (this.reach > 0.01) {
