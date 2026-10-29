@@ -42,10 +42,13 @@ awake to see it.
   comes off the wall while you are looking at it.
 - **Breakfast every morning.** Voiced, subtitled dialogue with Mom and Dad, who notice what the house leaves behind (the tap left
   running, the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
+- **Evidence.** The house leaves something behind every night; what you find shapes breakfast and the ending.
 - **More than one ending.** Where you are when it comes on the tenth night, and whether anyone else is awake to see it, decides how it
   goes.
 - **Runs on ordinary hardware.** Graphics presets from Low to Ultra; the Auto preset keeps the frame rate up on integrated graphics.
-- **Keyboard and mouse or controller**, with the prompts and the title screen following whichever you picked up last.
+- **Keyboard and mouse or controller**, with the prompts and the title screen following whichever you picked up last, and pause and
+  options menus that work from either.
+- **Steam Achievements.**
 
 ## Story in one paragraph (spoiler-light)
 

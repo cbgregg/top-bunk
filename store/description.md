@@ -11,7 +11,11 @@ Re-check before the page goes live (these depend on work that was in flight when
   outcomes ("They never believed you" if you are in bed when it comes; "They saw it. Then it had them." if you are not). The third,
   driving away at dawn ("They believed you"), exists in the code but is not reachable from the finale until the evidence work wires
   it up. Once it is, "Three endings" can go into the About text, the features list and `press-kit.md`.
-- **Steam Achievements** is left unticked in Supported Features until the achievements work lands.
+- **In flight alongside this copy**, named in the features list (here and in `press-kit.md`) without specifics so the lines stay
+  true whatever shape they land in: an options menu and pause menu with settings that are remembered, usable from keyboard, mouse or
+  controller; Steam Achievements; and evidence objectives on the nights between the first and the last that feed the breakfast
+  dialogue and the finale. Before pasting, confirm each is in the build and drop the bullet for any that is not. *Steam
+  Achievements* stays unticked in Supported Features until the achievements work lands.
 - **System requirements** are estimates from the render pipeline, not measurements; see that section.
 
 ## Short description
@@ -43,7 +47,7 @@ You have a flashlight, two legs that get tired, doors you can shut behind you, a
 A single-storey farmhouse from the early 2000s, built room by room: the brown carpet, the floral wallpaper, the white kitchen, the narrow hall of family photos, the box TV, the dining-room wall phone, the utility room with the breaker panel, the yard with the moving truck still parked on the gravel. Every night the house does a little more.
 
 [h2]Nobody believes you[/h2]
-Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Your parents notice the evidence the house leaves behind, and still they would rather believe it was you.
+Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Every night the house leaves something behind; find it, and you have something to show them in the morning. Your parents notice the evidence, and still they would rather believe it was you.
 
 How it ends depends on where you are when it finally comes down the hall on the tenth night, and on whether anyone else is awake to see it.
 
@@ -52,10 +56,12 @@ How it ends depends on where you are when it finally comes down the hall on the 
 [*] A short, focused horror story: ten nights, one house, one thing in the hallway
 [*] Seeded runs: the same seed replays the same ten nights; a new seed shuffles what each night is about
 [*] Hiding spots, a breath meter, a flashlight, stamina, and doors you can close
+[*] Evidence objectives: the house leaves something behind every night, and what you find shapes breakfast and the ending
 [*] A house that changes every night: night lights that die, a drawing that changes, a clock that lies
-[*] Mom and Dad are voiced, with subtitles always on
-[*] Keyboard and mouse or a game controller, with rumble
+[*] Mom and Dad are voiced, with subtitles
+[*] Keyboard and mouse or a game controller, with rumble; the pause and options menus work from any of them
 [*] Graphics presets from Low to Ultra, with an Auto mode that keeps the frame rate up on ordinary laptops
+[*] Steam Achievements
 [/list]
 
 [b]Headphones recommended. Contains jump scares, loud sudden sounds and flashing lights.[/b]
@@ -142,7 +148,7 @@ achievements work lands.
 | --- | --- | --- | --- |
 | English | yes | yes | yes |
 
-No other languages. The voice lines are English only; subtitles are always on.
+No other languages. The voice lines are English only; every voice line is subtitled.
 
 ## Tags
 

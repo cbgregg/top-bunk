@@ -37,11 +37,19 @@ time with the same cue sheet through WebAudio. It needs a click to start (browse
 
 The render is CPU-only (Chromium's SwiftShader). Measured on a 4-core build box, per captured frame: a lit night interior costs about
 2-7 s at 640x360 (the dusk exterior with the sky is the dearest shot, ~6.5 s), daylight interiors 1-2 s, black cards nothing; at 1920x1080
-a lit interior costs about 50-60 s. Frames that are simulated but not captured cost about 20 ms. Measured end to end:
+(quality high) the night hallway long lens, the dearest interior, costs 21 s per frame steady state and 37 s for the first frame while
+shaders compile (measured with `--preset steam --range 1290-1291`), so full-size frames cost roughly 3x their 640x360 cost, not 9x.
+Frames that are simulated but not captured cost about 20 ms. Measured end to end:
 
 - `social-preview`: 528 frames in 24 minutes (2.7 s per frame, while another render shared the CPU).
-- `preview`: 1668 frames, LANDSCAPE_TIME_PLACEHOLDER.
-- `steam`: 4170 frames at ~60 s each is on the order of **two to three days** on SwiftShader. Run it on a machine with a GPU instead:
+- `preview`: 1668 frames in 77 minutes (2.8 s per frame overall; the ~310 black-card frames cost 0.03 s, the dusk porch ~6.6 s after a
+  one-off ~60 s first frame while shaders compile, the lit night hallway shots 4.5-7.2 s, daylight interiors 1.2-3.1 s), while another
+  render shared the CPU.
+- `steam`: 4170 frames, ~3240 of them lit at roughly 2-21 s each (3x the 640x360 per-shot costs) and ~930 black-card frames at
+  nothing: on the order of **10-15 hours** on SwiftShader, more while the CPU is shared. Run it on a machine with a GPU instead:
+- `social`: 1320 frames; the portrait hallway measured 8 s per frame at 1080x1920 (24 s for the first frame; `--preset social
+  --range 330-331`), so about **2-3 hours** on SwiftShader.
+  The same GPU and quality knobs below apply.
   `--gpu --headed` (needs a display, or `xvfb-run`) renders at interactive speed, so the whole thing takes minutes. Or trade quality for time:
   `--res 0.5` renders at 960x540 internally and upscales (about 4x faster), `--quality medium` drops ambient occlusion and MSAA (~25% faster).
   `--resume` lets an interrupted render continue (every frame is still simulated, only the screenshots are skipped).
