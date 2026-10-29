@@ -735,10 +735,10 @@ export function buildWorld(scene) {
     rbox(5.9, 7.9, 0.12, 0.4, -4.38, -2.98, M.oak, 0.02); rbox(5.93, 7.87, 0.4, 0.58, -4.35, -3.01, M.mattress, 0.05);
     rbox(5.9, 5.98, 0.4, 1.15, -4.38, -2.98, M.oak, 0.02); rbox(7.86, 7.9, 0.4, 0.62, -4.38, -2.98, M.oak, 0.02);
     for (const z of [-3.9, -3.4]) rbox(6.0, 6.5, 0.58, 0.68, z - 0.22, z + 0.22, M.pillow, 0.05);
-    for (const [z0, z1] of [[-4.36, -4.34], [-3.02, -3.0]]) rbox(6.55, 7.88, 0.46, 0.6, z0, z1, M.floralB, 0.005);   // the quilt hangs over the sides
-    rbox(7.86, 7.88, 0.46, 0.6, -4.36, -3.0, M.floralB, 0.005);
-    // the sleepers: two bodies under a draped quilt that rises and falls with their breathing, heads on the pillows.
-    // (The walking rigs are hidden while they sleep; laid flat they looked like mannequins.) set(false) flattens the quilt and hides the heads: the bed looks slept in.
+    for (const [z0, z1] of [[-4.36, -4.34], [-3.02, -3.0]]) rbox(6.55, 7.88, 0.46, 0.66, z0, z1, M.floralB, 0.005);   // the quilt hangs over the sides
+    rbox(7.86, 7.88, 0.46, 0.66, -4.36, -3.0, M.floralB, 0.005);
+    // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's real rigs lie under it, see sleepers() in main.js)
+    // and breathes. set(false) flattens it: the bed looks slept in. one('dad', false) empties his side.
     bedSleepers = (() => {
       const cl = (v, a, b) => Math.max(a, Math.min(b, v));
       const g = new THREE.Group(); house.add(g);
@@ -748,35 +748,23 @@ export function buildWorld(scene) {
       for (let i = 0; i < n; i++) {
         const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z);
         // each body: full height at the shoulders (the west end, by the pillows), tapering to the feet; a soft gaussian across
-        const along = cl((x - X0) / (X1 - X0), 0, 1), h = 0.21 - along * 0.1;
-        const dm = (z + 3.4) / 0.2, dd = (z + 3.95) / 0.24;
-        bm[i] = h * Math.exp(-dm * dm * 1.5); bd[i] = h * 1.08 * Math.exp(-dd * dd * 1.5);
+        // the rise peaks just past the shoulders over the chest (a hand's breadth above it) and tapers to the feet; at the top edge it dips to meet the shoulders,
+        // so the heads on the pillows show over it (measured: Mom's chest tops at 0.86, Dad's at 0.95, their feet at ~0.77)
+        const along = cl((x - X0) / (X1 - X0), 0, 1), h = Math.min(0.31 - along * 0.08, 0.25 + along * 0.6);
+        // a flat-topped rise the width of a body (so a leg off the centre line is still under it), falling away at the sides
+        // (Dad is broader: his side is a wider, flatter plateau that stays high out to the wall edge, so his far elbow is under it)
+        const dm = (z + 3.4) / 0.34, dd = (z + 3.95) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
+        bm[i] = h * 1.10 * Math.exp(-dm * dm * dm * dm * 2); bd[i] = h * 1.22 * Math.exp(-dd6 * 2);
       }
       const quilt = new THREE.Mesh(geo, M.floralB); quilt.castShadow = quilt.receiveShadow = true; g.add(quilt);
-      // a head on a pillow: the face up and turned a little toward the room, hair behind, the eyes shut
-      const skin = std({ color: 0xd6a882, roughness: 0.75 }), shut = std({ color: 0x3a2a22, roughness: 1 });
-      const mkHead = (z, hairColor, long) => {
-        // lying on the back: the outer group lays the head flat with the crown toward the headboard (west), the inner one tilts the face a little toward the room
-        const h = new THREE.Group(); h.position.set(6.27, 0.75, z); h.rotation.set(-Math.PI / 2, 0, Math.PI / 2); g.add(h);
-        const f = new THREE.Group(); f.rotation.x = 0.4; h.add(f);   // (local: +z is the face, +y the crown)
-        const hair = std({ color: hairColor, roughness: 0.95 });
-        const skull = new THREE.Mesh(new THREE.SphereGeometry(0.105, 18, 14), skin); skull.scale.set(0.92, 1.12, 0.98); skull.castShadow = true; f.add(skull);
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.114, 18, 12), hair); cap.position.set(0, 0.035, -0.04); cap.scale.set(1, 1.05, 0.95); f.add(cap);   // over the crown and the back
-        for (const x of [-0.036, 0.036]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.004, 0.004), shut); e.position.set(x, 0.012, 0.104); f.add(e); }
-        if (long) { const spread = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 8), hair); spread.position.set(0, 0.06, -0.085); spread.scale.set(1.9, 1.5, 0.3); f.add(spread); }   // hair spread on the pillow
-        return h;
-      };
-      const heads = { mom: mkHead(-3.4, 0x5b3a22, true), dad: mkHead(-3.95, 0x2a221c, false) };
-      // Dad's arm over the covers
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.038, 0.42, 10), std({ color: 0x6d7a8c, roughness: 0.9 })); arm.rotation.z = Math.PI / 2; arm.position.set(6.95, 0.78, -3.68); arm.castShadow = true; g.add(arm);
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), skin); hand.scale.set(1.3, 0.6, 1); hand.position.set(7.18, 0.77, -3.68); g.add(hand);
-      const fx = { group: g, quilt, amount: 1, target: 1, t: 0,
-        set(on) { fx.target = on ? 1 : 0; for (const k in heads) heads[k].visible = on; arm.visible = hand.visible = on; },
-        one(name, on) { if (heads[name]) heads[name].visible = on; if (name === 'dad') arm.visible = hand.visible = on; },
+      const fx = { group: g, quilt, amount: 1, target: 1, t: 0, side: { mom: 1, dad: 1 },
+        set(on) { fx.target = on ? 1 : 0; fx.side.mom = fx.side.dad = 1; },
+        one(name, on) { fx.side[name] = on ? 1 : 0; },
         update(dt) {
           fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5);
-          const fm = fx.amount * (1 + Math.sin(fx.t * 1.05) * 0.05), fd = fx.amount * (1 + Math.sin(fx.t * 0.86 + 1.9) * 0.06), flat = 0.05 * (1 - fx.amount);
-          for (let i = 0; i < n; i++) pos.setY(i, TOP + 0.01 + bm[i] * fm + bd[i] * fd + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9));   // (rumpled when empty)
+          // breathing only ever lifts the quilt above its resting shape (the resting shape is what clears the bodies)
+          const fm = fx.amount * fx.side.mom * (1 + (0.5 - 0.5 * Math.cos(fx.t * 1.05)) * 0.06), fd = fx.amount * fx.side.dad * (1 + (0.5 - 0.5 * Math.cos(fx.t * 0.86)) * 0.07), flat = 0.05 * (1 - fx.amount);
+          for (let i = 0; i < n; i++) pos.setY(i, TOP + 0.04 + bm[i] * fm + bd[i] * fd + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9));   // (rumpled when empty)
           pos.needsUpdate = true; geo.computeVertexNormals();
         } };
       fx.update(0);
@@ -788,7 +776,7 @@ export function buildWorld(scene) {
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.1, 0.65, -2.74); house.add(base);
       const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.1, 0.87, -2.74); house.add(shade); }
     solid(5.85, 6.35, -2.96, -2.5);
-    parentsBed = { mom: { x: 7.65, y: 0.7, z: -3.4 }, dad: { x: 7.8, y: 0.7, z: -3.95 } };
+    parentsBed = { mom: { x: 7.65, y: 0.74, z: -3.4 }, dad: { x: 7.8, y: 0.74, z: -3.95 } };
     // the other bedroom: vertical-plank wood closet doors
     rbox(4.45, 5.5, 0, 2.1, -2.15, -1.58, M.oak, 0.01); for (let i = 1; i < 6; i++) box(4.45 + i * 0.175 - 0.006, 4.45 + i * 0.175 + 0.006, 0.05, 2.05, -2.165, -2.15, M.black, { uv: false });
     rbox(4.45, 5.5, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);

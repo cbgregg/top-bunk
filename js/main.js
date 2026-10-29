@@ -197,8 +197,9 @@ function nlMult(m, flick = true) {
 function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
     p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
-    // asleep, the walking rig is hidden: the bed has its own sleepers (heads on the pillows, bodies under a breathing quilt)
-    if (on) { p.group.visible = false; p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); p.group.position.set(spot.x, 0, spot.z); p.lookAt = null; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.4 }); }
+    // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
+    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
+    else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
   }
   W.bedSleepers.set(on);
 }

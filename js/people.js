@@ -99,6 +99,12 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       }
     },
     applyPose(r, p) {
+      if (p.sleep) {   // asleep on the back: the head turned toward the room, the feet flat, a slow breath in the chest
+        r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * p.sleep);
+        r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.25);   // toes pointed along the bed, so they stay under the quilt
+        r.bend(['Spine1', 'Spine2'], [0.5, 0.5], [1, 0, 0], 0.03 + Math.sin(performance.now() * 0.0011) * 0.025);
+        return;
+      }
       if (p.lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], p.lean);
       this.group.getWorldQuaternion(RQ); RF.set(0, 0, 1).applyQuaternion(RQ); const y = Math.atan2(RF.x, RF.z), left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));   // (world facing: the people can sit in a car that is turned)
       for (const [s, sg] of [['L', 1], ['R', -1]]) {
