@@ -13,6 +13,8 @@ import { createNights } from './nights.js';
 import { newSeed } from './rng.js';
 import { createCar } from './cars.js';
 import { createVigil } from './vigil.js';
+import { settings, flicker } from './settings.js';
+import { menu } from './menu.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -49,6 +51,7 @@ const W = buildWorld(scene);
 const E = new Entity(scene);
 const car = createCar(scene);
 const sfx = new Sound();
+for (const b of ['master', 'music', 'sfx', 'voice']) { sfx.setVolume(b, settings.get(b)); settings.on(b, (v) => sfx.setVolume(b, v)); }
 const WF = new WindowFace(scene, W.faceLight, W.carLight);
 const mom = makePerson({ model: 'mom', height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
 const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
@@ -57,14 +60,13 @@ scene.add(mom.group, dad.group);
 
 const gfx = new Gfx(renderer, scene, camera);
 const dust = new Dust(scene, camera);
+settings.delegate('quality', { get: () => gfx.mode, set: (v) => gfx.setMode(v), def: 'auto' });   // (the options menu's Graphics row; gfx keeps it)
 {   // graphics setting on the title screen
   const sel = $('quality');
   if (sel) {
-    sel.value = gfx.auto ? 'auto' : gfx.quality;
-    sel.addEventListener('change', () => {
-      if (sel.value === 'auto') { try { localStorage.removeItem('topbunk.quality'); } catch (e) { /* ignore */ } gfx.auto = true; gfx.setQuality('high', { save: false }); }
-      else gfx.setQuality(sel.value);
-    });
+    sel.value = gfx.mode;
+    sel.addEventListener('change', () => settings.set('quality', sel.value));
+    settings.on('quality', (v) => { sel.value = v; });
     sel.addEventListener('click', (e) => e.stopPropagation()); sel.addEventListener('mousedown', (e) => e.stopPropagation());
   }
 }
@@ -138,10 +140,13 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 document.addEventListener('visibilitychange', () => { if (document.hidden && uiMode === 'playing') setPause(true); });
+// look sensitivity and invert-Y (options menu) scale the mouse, the right stick and the touch look pad alike
+const look = { s: settings.get('sensitivity'), y: settings.get('invertY') ? -1 : 1 };
+settings.on('sensitivity', (v) => { look.s = v; }); settings.on('invertY', (v) => { look.y = v ? -1 : 1; });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== canvas || paused || F.cutscene) return;
   if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car')) return;
-  P.yaw -= e.movementX * 0.0022; P.pitch = clamp(P.pitch - e.movementY * 0.0022, -1.45, 1.45);
+  P.yaw -= e.movementX * 0.0022 * look.s; P.pitch = clamp(P.pitch - e.movementY * 0.0022 * look.s * look.y, -1.45, 1.45);
 });
 // pause / resume without the mouse (controller Start, the touch pause button)
 function setPause(on) {
@@ -153,7 +158,7 @@ function confirmPress() {
   if (uiMode === 'title' && !started) startGame(); else if (uiMode === 'pause') setPause(false); else if (uiMode === 'death') retry(); else if (uiMode === 'end') location.reload();
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car');
-function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw; P.pitch = clamp(P.pitch + dpitch, -1.45, 1.45); }
+function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
 initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (P.mode === 'bunk' && !F.cutscene && !F.dead) hideUnderCovers(); } });
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
@@ -169,6 +174,7 @@ document.addEventListener('pointerlockchange', () => {
   else if (!locked && uiMode === 'playing') { uiMode = 'pause'; paused = true; UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; }
 });
 $('pause').addEventListener('click', () => { lock(); setTimeout(() => { if (uiMode === 'pause' && document.pointerLockElement !== canvas) setPause(false); }, 200); });
+canvas.addEventListener('click', () => { if (uiMode === 'playing' && input.scheme === 'kb' && document.pointerLockElement !== canvas) lock(); });   // (a resume the browser refused to lock: click to take the mouse back)
 $('title').addEventListener('click', startGame);
 $('start').addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
 $('retry').addEventListener('click', retry);
@@ -188,7 +194,7 @@ function nlMult(m, flick = true) {
   if (F.blackout) m = 0;
   for (const n of W.nightLights) {
     let k = n.dead ? 0 : m;
-    if (flick && E.visible && m > 0) { const d = Math.hypot(n.pos.x - E.root.position.x, n.pos.z - E.root.position.z); if (d < 7) k *= Math.random() < 0.09 * (1 - d / 7) * 3 ? 0.08 : 1 - 0.35 * (1 - d / 7); }
+    if (flick && E.visible && m > 0) { const d = Math.hypot(n.pos.x - E.root.position.x, n.pos.z - E.root.position.z), dim = k * (1 - 0.35 * (1 - d / 7)); if (d < 7) k = flicker(n, Math.random() < 0.09 * (1 - d / 7) * 3 ? k * 0.08 : dim, dim); }
     n.light.intensity = n.base * k; n.mat.emissiveIntensity = 2.4 * k;
   }
 }
@@ -363,16 +369,16 @@ try { LINES = await (await fetch('assets/audio/lines.json')).json(); } catch (e)
 // subtitle + recorded voice (what the kid says is subtitle-only); returns how long the line is held
 function speak(id, { muffle = false, hold = 0.45 } = {}) {
   const l = LINES[id] || { html: id, voice: null };
-  let d = 0;
+  let d = 0, rec = false;
   const text = l.html.replace(/<[^>]+>/g, ''), len = Math.max(2.2, 1.0 + text.length / 15);
   if (l.voice) {
-    d = sfx.say(id, { muffle });
+    d = sfx.say(id, { muffle }); rec = d > 0;   // (only a recorded line counts as speech for the subtitles setting: a murmur needs its words shown)
     let envl = muffle ? null : sfx.envelope('vo/' + id);
     if (!d) { d = len; envl = sfx.mumble(l.voice, len, { muffle }); if (muffle) envl = null; }   // no recording yet: a murmur with the same rhythm
     (l.voice === 'mom' ? mom : dad).talk(envl);
   }
   const t = Math.max(d + hold, 2.4 + text.length / 24);
-  UI.subtitle(l.html, t); return t;
+  UI.subtitle(l.html, t, rec ? 'speech' : null); return t;
 }
 const say = async (id, o) => { await wait(speak(id, o)); };
 function talkMom() {
@@ -469,7 +475,7 @@ function playerStep(sprint) {
 }
 function updateCamera(dt) {
   if (P.mode === 'walk') {
-    const bobY = Math.sin(P.bob) * 0.035 * Math.min(1, P.speed / 2.5);
+    const bobY = Math.sin(P.bob) * 0.035 * Math.min(1, P.speed / 2.5) * bobK;
     camera.position.set(P.pos.x, EYE + bobY, P.pos.z);
   } else if (P.mode === 'car') { car.cameraWorld(camera.position); P.yaw = clamp(P.yaw, -2.75, 2.75); P.pitch = clamp(P.pitch, -0.85, 0.65); }
   else camera.position.copy(P.cam);
@@ -491,15 +497,18 @@ function updateCamera(dt) {
 }
 
 // the camera is never perfectly still: breathing, a rolling gait, and a tremor that grows with fear (F.fear, 0..1)
-let fovNow = 74, fovOff = 0;   // fovOff: the nightmare swings the lens
+// baseFov and bobK follow the options menu (field of view; head bob scales the walking gait, not the breathing or the fear tremor)
+let baseFov = settings.get('fov'), fovNow = baseFov, fovOff = 0, bobK = settings.get('headBob') ? 1 : 0;   // fovOff: the nightmare swings the lens
+settings.on('fov', (v) => { fovNow += v - baseFov; baseFov = v; if (started) { camera.fov = fovNow; camera.updateProjectionMatrix(); } });
+settings.on('headBob', (v) => { bobK = v ? 1 : 0; });
 function handheld(dt) {
-  const t = gameTime, fear = F.fear, walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0, k = P.mode === 'cine' ? 0.5 : 1;
+  const t = gameTime, fear = F.fear, walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0, gait = walk * bobK, k = P.mode === 'cine' ? 0.5 : 1;
   const tr = 1 + fear * 3.2;
-  camera.rotation.x += (Math.sin(t * 1.05) * 0.0035 + Math.sin(t * 0.37) * 0.002 + Math.sin(P.bob) * 0.006 * walk + (Math.sin(t * 7.3) * Math.sin(t * 3.1)) * 0.0025 * fear) * k;
-  camera.rotation.z += (Math.sin(t * 0.71) * 0.004 + Math.sin(t * 0.29 + 1.3) * 0.003 + Math.sin(P.bob * 0.5) * 0.009 * walk + Math.sin(t * 9.1) * 0.003 * fear) * tr * k * 0.6;
-  camera.rotation.y += (Math.sin(t * 0.6) * 0.0022 + Math.sin(t * 0.23 + 2.1) * 0.0026 + Math.sin(P.bob * 0.5) * 0.004 * walk) * tr * k * 0.6;
+  camera.rotation.x += (Math.sin(t * 1.05) * 0.0035 + Math.sin(t * 0.37) * 0.002 + Math.sin(P.bob) * 0.006 * gait + (Math.sin(t * 7.3) * Math.sin(t * 3.1)) * 0.0025 * fear) * k;
+  camera.rotation.z += (Math.sin(t * 0.71) * 0.004 + Math.sin(t * 0.29 + 1.3) * 0.003 + Math.sin(P.bob * 0.5) * 0.009 * gait + Math.sin(t * 9.1) * 0.003 * fear) * tr * k * 0.6;
+  camera.rotation.y += (Math.sin(t * 0.6) * 0.0022 + Math.sin(t * 0.23 + 2.1) * 0.0026 + Math.sin(P.bob * 0.5) * 0.004 * gait) * tr * k * 0.6;
   F.fear = Math.max(0, F.fear - dt * 0.12);
-  const want = 74 + (P.sprinting && walk > 0.5 ? 6 : 0) - F.fear * 5 + (P.mode === 'hide' ? -6 : 0) + fovOff;
+  const want = baseFov + (P.sprinting && walk > 0.5 ? 6 : 0) - F.fear * 5 + (P.mode === 'hide' ? -6 : 0) + fovOff;
   fovNow += (want - fovNow) * Math.min(1, dt * 4);
   if (Math.abs(camera.fov - fovNow) > 0.05) { camera.fov = fovNow; camera.updateProjectionMatrix(); }
 }
@@ -514,7 +523,7 @@ async function reveal(chasing = true) {
   E.root.position.copy(HALL_MOUTH); E.root.rotation.y = Math.PI / 2; E.lookTarget = camera.position;
   sfx.stab(); sfx.violins(chasing ? 0.55 : 1, 0.3); shake = 0.35;
   F.flicker = true;
-  await tween(0.55, (k) => { W.bathSpot.intensity = Math.random() < k ? BATH_I : BATH_I * 0.05; nlMult(Math.random() < k ? 0 : 1, false); }, ease.lin);
+  await tween(0.55, (k) => { W.bathSpot.intensity = flicker('bath', Math.random() < k ? BATH_I : BATH_I * 0.05, BATH_I * (0.05 + 0.95 * k)); nlMult(flicker('nl', Math.random() < k ? 0 : 1, 1 - k), false); }, ease.lin);
   W.bathSpot.intensity = BATH_I; nlMult(0.2, false);
   UI.objective(chasing ? '<b class="red">RUN.</b> Get back to bed' : 'Get back to bed. <b class="red">Don\'t look at it.</b>');
   sfx.tension(0.03, 0.4);
@@ -956,7 +965,7 @@ async function night1() {
   if (P.mode !== 'hide') {
     UI.objective('Climb the ladder at the foot of the bunk');
     UI.hint(`Go to the ladder and press <b>${L('interact')}</b> to climb up`, 8);
-    await tween(0.5, () => { nlMult(Math.random() < 0.5 ? 0 : 1, false); W.bathSpot.intensity = Math.random() < 0.5 ? BATH_I : 0; }, ease.lin);
+    await tween(0.5, () => { nlMult(flicker('nl', Math.random() < 0.5 ? 0 : 1, 0.5), false); W.bathSpot.intensity = flicker('bath', Math.random() < 0.5 ? BATH_I : 0, BATH_I * 0.5); }, ease.lin);
     W.bathSpot.intensity = 0; sfx.slamFar(0.5);
     E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);
   }
@@ -994,7 +1003,7 @@ async function night2() {
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.5; E.smileScale = 1.1; E.lookTarget = camera.position;
   E.root.position.set(6.7, 0, 0.5); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);   // standing beside the closet, looking at you
   sfx.stab(); sfx.violins(1, 0.3); shake = 0.5; sfx.tension(0.05, 1);
-  await tween(0.5, () => { nlMult(Math.random() < 0.5 ? 0 : 1, false); }, ease.lin);
+  await tween(0.5, () => { nlMult(flicker('nl', Math.random() < 0.5 ? 0 : 1, 0.5), false); }, ease.lin);
   nlMult(0.25, false);
   UI.objective('<b class="red">Hide.</b> Pull the covers over your head');
   await waitFor(() => P.mode === 'hide');
@@ -1019,7 +1028,7 @@ async function night3(resume = false) {
     sfx.whisper(panFor(W.drawingMesh.getWorldPosition(tmp)), 0.08);
     await waitFor(() => roomAt(P.pos.x, P.pos.z) === 'bath');
     const bb = W.bulbs.bath; sfx.click();
-    await tween(0.4, () => { bb.light.intensity = Math.random() < 0.5 ? bb.base : 0; }, ease.lin);
+    await tween(0.4, () => { bb.light.intensity = flicker(bb, Math.random() < 0.5 ? bb.base : 0, bb.base); }, ease.lin);
     bb.light.intensity = bb.base; bb.dome.material.emissiveIntensity = 2;
     await waitFor(() => F.splashed);
     await wait(1.8);
@@ -1367,8 +1376,8 @@ function update(dt) {
   if (nlBase > 0 && !F.flicker) nlMult(nlBase * (0.93 + 0.07 * Math.sin(gameTime * 0.9)));
   // light flicker
   if (F.flicker) {
-    if (W.bathSpot.intensity > 0) W.bathSpot.intensity = BATH_I * (0.82 + Math.sin(gameTime * 23) * 0.08 + (Math.random() < 0.03 ? -0.7 : 0));
-    nlMult(Math.random() < 0.15 ? 0 : 0.25, false);
+    if (W.bathSpot.intensity > 0) W.bathSpot.intensity = flicker('bath', BATH_I * (0.82 + Math.sin(gameTime * 23) * 0.08 + (Math.random() < 0.03 ? -0.7 : 0)), BATH_I * 0.82);
+    nlMult(flicker('nl', Math.random() < 0.15 ? 0 : 0.25, 0.25), false);
   }
 
   // ambience
@@ -1448,8 +1457,19 @@ UI.makeGrain();
   $('newrun').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); try { localStorage.removeItem('topbunk.run'); } catch (err) { /* ignore */ } location.hash = ''; location.reload(); });
   $('newrun').addEventListener('pointerdown', (e) => e.stopPropagation());
 }
+// the title, pause and options menus (js/menu.js opens them when the #title / #pause screens show)
+function newRun() {   // New game over a saved run: a fresh seed from the first day
+  try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
+  Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0 }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  startGame();
+}
+menu.init({
+  startGame, newGame: newRun, hasSave: () => RUN.night >= 2, night: () => Math.min(RUN.night, 10),
+  resume: () => setPause(false), pause: () => setPause(true), canPause: () => uiMode === 'playing',
+  restartNight: () => location.reload(), quitToTitle: () => location.reload(),   // (the run is saved at each dawn, so a reload starts this night again)
+});
 titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { nights, RUN, toggleLight, sleepers, sightBlocked, startGame, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { settings, menu, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

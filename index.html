@@ -36,17 +36,21 @@
     <div class="panel">
       <h1>TOP BUNK</h1>
       <p class="tag">The rent on the old farmhouse was cheap.<br>Now we know why.</p>
-      <table class="controls" id="controls"></table>
-      <p class="note gfx">Graphics <select id="quality"><option value="auto">Auto</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></p>
-      <p id="runinfo" class="note"></p>
-      <button id="start" type="button">Start game</button>
+      <nav id="title-menu" class="menu" aria-label="Main menu"><button id="start" type="button">Start game</button></nav>
       <p class="begin" id="begin">Click to begin</p>
-      <p class="note"><a id="newrun" href="#" style="color:inherit">Start a new run</a></p>
+      <p id="runinfo" class="note"></p>
       <p class="note">Headphones recommended. Contains jump scares.</p>
       <p id="mobile" class="note">Keyboard and mouse, a game controller, or touch. Landscape works best on a phone.</p>
     </div>
   </div>
-  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><p class="begin" id="resume">Click to resume</p></div></div>
+  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><nav id="pause-menu" class="menu" aria-label="Pause menu"></nav><p class="begin" id="resume">Click to resume</p></div></div>
+  <div id="menu" class="screen hidden"></div>
+  <!-- js/menu.js shows these in its panels (Controls; Options sets the same graphics quality; New game replaces the link) -->
+  <div id="menu-keep" hidden>
+    <table class="controls" id="controls"></table>
+    <p class="note gfx">Graphics <select id="quality"><option value="auto">Auto</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></p>
+    <p class="note"><a id="newrun" href="#" style="color:inherit">Start a new run</a></p>
+  </div>
   <div id="death" class="screen hidden"><div class="panel"><h2 class="red">It found you.</h2><button id="retry">Try again</button></div></div>
   <div id="end" class="screen hidden">
     <div class="panel">

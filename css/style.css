@@ -116,3 +116,68 @@ body.nightmare #game { animation: dream 0.9s steps(5) infinite; }
   50% { filter: hue-rotate(200deg) contrast(2.4) saturate(2.6) brightness(0.8); transform: scale(0.99) rotate(0.8deg); }
   100% { filter: hue-rotate(340deg) contrast(1.4) saturate(1.2); transform: scale(1.03) rotate(-0.2deg); }
 }
+
+/* ---------- menus (js/menu.js): the title and pause lists, and the Options / Credits / Controls panels over them ---------- */
+.menu { display: flex; flex-direction: column; align-items: center; gap: 3px; width: min(380px, 88vw); margin: 0 auto 16px; }
+.menu .mi { position: relative; display: flex; align-items: center; justify-content: center; gap: 16px; width: 100%; min-height: 42px; margin: 0; padding: 6px 26px;
+  font-family: 'Special Elite', monospace; font-size: 20px; letter-spacing: 3px; line-height: 1.2; text-align: center; color: var(--dim);
+  background: transparent; border: 1px solid transparent; border-radius: 0; outline: none; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+  text-shadow: 0 1px 3px #000, 0 0 10px rgba(0,0,0,0.9); }
+.menu .mi:hover { background: transparent; }
+.menu .mi.focus { color: var(--ink); border-color: rgba(233,226,208,0.55); background: rgba(10,9,8,0.55); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); }
+.menu .mi.focus::before { content: '\203A'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); line-height: 1; color: var(--red); font-size: 22px; }
+.menu .mi:focus, .menu .mi:focus-visible { outline: none; }   /* (the .focus ring above is the focus ring, for every input device) */
+body:has(.screen:not(.hidden)) #touch { visibility: hidden; }   /* the touch buttons stay out of the menus */
+#pause { background: radial-gradient(ellipse at center, rgba(0,0,0,0.55), rgba(0,0,0,0.9)); }
+.menu .mh { align-self: stretch; margin: 14px 0 3px; padding: 0 4px 4px; font-size: 10px; letter-spacing: 4px; text-transform: uppercase; text-align: left; color: var(--dim); border-bottom: 1px solid rgba(233,226,208,0.14); }
+.menu .mh:first-child { margin-top: 2px; }
+#menu { z-index: 45; cursor: default; background: rgba(0,0,0,0.5); }
+.screen.menu-sub > .panel { visibility: hidden; }
+.menu-panel { display: flex; flex-direction: column; align-items: center; width: min(620px, 94vw); max-height: 100%; padding: max(20px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+.menu-panel h2 { flex: none; font-size: 40px; margin: 0 0 10px; }
+.menu-panel .menu { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 560px; margin: 0; padding: 4px 6px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233,226,208,0.3) transparent; }
+.menu-panel.has-body .menu { flex: none; overflow: visible; }
+.menu-panel .menu .mi { justify-content: space-between; min-height: 40px; padding: 4px 14px 4px 30px; font-size: 17px; letter-spacing: 1.5px; text-align: left; }
+.menu-panel .menu .mi-action { justify-content: center; padding-left: 26px; }
+.menu-body { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 560px; overflow-y: auto; margin: 0 0 12px; padding: 0 6px; text-align: left; font-size: 14px; line-height: 1.5; color: var(--dim); scrollbar-width: thin; scrollbar-color: rgba(233,226,208,0.3) transparent; }
+.menu-body .controls { margin: 4px auto; font-size: 15px; }
+.menu-ask { text-align: center; font-size: 16px; color: var(--ink); margin: 6px 0; }
+.menu-hint { flex: none; min-height: 1.5em; margin: 10px 0 0; font-size: 12px; letter-spacing: 1px; color: var(--dim); text-align: center; }
+.mi .ml { pointer-events: none; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mi .mv { display: inline-flex; align-items: center; gap: 8px; flex: none; font-family: 'Courier Prime', monospace; font-size: 15px; letter-spacing: 1px; color: var(--ink); }
+.mi output { min-width: 4.4em; text-align: center; }
+.mi-toggle output { color: var(--dim); }
+.mi-toggle.on output { color: var(--ink); }
+.mi .ma { width: 28px; height: 28px; padding: 0; font-family: 'Courier Prime', monospace; font-size: 18px; line-height: 1; letter-spacing: 0; color: var(--ink); background: transparent; border: 1px solid rgba(233,226,208,0.28); }
+.mi .ma:hover { background: rgba(233,226,208,0.12); }
+.mi input[type=range] { -webkit-appearance: none; appearance: none; width: clamp(80px, 14vw, 150px); height: 22px; margin: 0; background: transparent; cursor: pointer; touch-action: none; }
+.mi input[type=range]:focus { outline: none; }
+.mi input[type=range]::-webkit-slider-runnable-track { height: 2px; background: rgba(233,226,208,0.35); }
+.mi input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 20px; margin-top: -9px; background: var(--ink); border: 0; border-radius: 1px; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
+.mi input[type=range]::-moz-range-track { height: 2px; background: rgba(233,226,208,0.35); }
+.mi input[type=range]::-moz-range-thumb { width: 11px; height: 20px; background: var(--ink); border: 0; border-radius: 1px; }
+.credits { margin: 0; }
+.credits dt { margin-top: 10px; font-family: 'Special Elite', monospace; letter-spacing: 2px; color: var(--ink); }
+.credits dt:first-child { margin-top: 0; }
+.credits dd { margin: 2px 0 0; }
+.menu-body .note { margin-top: 14px; }
+#pause .menu { margin-top: 4px; }
+#pause .begin { font-size: 13px; letter-spacing: 2px; color: var(--dim); margin: 6px 0 0; }
+/* reduced flashing: the nightmare's colour strobe becomes a slow swell */
+body.reduce-flashing.nightmare #game { animation: dream 4.5s ease-in-out infinite alternate; }
+/* a phone held sideways (844 x 390 and the like): everything tighter, and the panels scroll */
+@media (max-height: 520px) {
+  .screen > .panel { max-height: 100%; overflow-y: auto; overflow-x: hidden; padding: 10px 16px; }
+  .panel h1 { font-size: clamp(34px, 12vh, 72px); letter-spacing: 6px; }
+  .panel h2 { font-size: 28px; margin-bottom: 6px; }
+  .tag { font-size: 13px; margin: 2px 0 8px; }
+  .begin { font-size: 15px; margin: 4px 0; }
+  #title .note { margin: 3px 0; }
+  .menu { gap: 1px; margin-bottom: 6px; }
+  .menu .mi { min-height: 34px; padding: 3px 22px; font-size: 16px; }
+  .menu-panel { padding: max(8px, env(safe-area-inset-top)) 12px max(6px, env(safe-area-inset-bottom)); }
+  .menu-panel h2 { font-size: 24px; margin-bottom: 4px; }
+  .menu-panel .menu .mi { min-height: 36px; font-size: 15px; }
+  .menu .mh { margin-top: 8px; }
+  .menu-hint { margin-top: 4px; }
+}

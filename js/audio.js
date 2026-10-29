@@ -1,17 +1,22 @@
 // Sound is synthesized with WebAudio. Recorded files (voices, music, jump scares, ambience — made by tools/gen_*.py)
 // layer on top when they load; every call falls back to the synth if a file is missing.
+// Every source goes through one of three buses (music, sfx, voice) on its way to the master, each with its own reverb send so its
+// volume covers its share of the reverb too. Synthesized sounds are sfx; a file's bus comes from its id (vo/ and music/) or its sfx.json kind.
+export const BUSES = ['music', 'sfx', 'voice'];
 export class Sound {
-  constructor() { this.ctx = null; }
+  constructor() { this.ctx = null; this.level = 0.85; this.vol = { music: 1, sfx: 1, voice: 1 }; }
 
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -14; this.comp.ratio.value = 6;
-    this.master = ctx.createGain(); this.master.gain.value = 0.85;
+    this.master = ctx.createGain(); this.master.gain.value = this.level;
     this.master.connect(this.comp).connect(ctx.destination);
     this.reverb = ctx.createConvolver(); this.reverb.buffer = this.impulse(2.4, 2.6);
     this.reverb.connect(this.master);
+    this.buses = {}; this.sends = {};
+    for (const k of BUSES) { (this.buses[k] = ctx.createGain()).connect(this.master); (this.sends[k] = ctx.createGain()).connect(this.reverb); this.buses[k].gain.value = this.sends[k].gain.value = this.vol[k]; }
     const len = ctx.sampleRate * 2; this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startBeds();
@@ -20,18 +25,27 @@ export class Sound {
   suspend() { this.ctx && this.ctx.suspend(); }
   resume() { this.ctx && this.ctx.resume(); }
   get now() { return this.ctx.currentTime; }
+  // the player's volume for 'master' | 'music' | 'sfx' | 'voice', 0..1 (kept until init when there is no context yet)
+  setVolume(bus, v) {
+    v = Math.max(0, Math.min(1, +v || 0));
+    const to = (p) => { p.cancelScheduledValues(this.now); p.value = v; };
+    if (bus === 'master') { this.level = v; if (this.ctx) to(this.master.gain); return; }
+    if (!(bus in this.vol)) return;
+    this.vol[bus] = v; if (this.ctx) { to(this.buses[bus].gain); to(this.sends[bus].gain); }
+  }
+  kindOf(id) { return id.startsWith('vo/') ? 'voice' : id.startsWith('music/') || (this.kinds && this.kinds[id] === 'music') ? 'music' : 'sfx'; }
 
   impulse(sec, decay) {
     const ctx = this.ctx, n = ctx.sampleRate * sec, b = ctx.createBuffer(2, n, ctx.sampleRate);
     for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); }
     return b;
   }
-  // output bus: gain -> panner -> master, plus reverb send. Auto-disconnects.
-  bus(gain = 1, pan = 0, wet = 0.25, life = 3) {
+  // output bus: gain -> panner -> the kind's bus, plus reverb send. Auto-disconnects.
+  bus(gain = 1, pan = 0, wet = 0.25, life = 3, kind = 'sfx') {
     const ctx = this.ctx, g = ctx.createGain(); g.gain.value = gain;
     const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
     const s = ctx.createGain(); s.gain.value = wet;
-    g.connect(p).connect(this.master); p.connect(s).connect(this.reverb);
+    g.connect(p).connect(this.buses[kind] || this.buses.sfx); p.connect(s).connect(this.sends[kind] || this.sends.sfx);
     setTimeout(() => { try { g.disconnect(); p.disconnect(); s.disconnect(); } catch (e) { /* noop */ } }, (life + 3) * 1000);
     return g;
   }
@@ -67,22 +81,22 @@ export class Sound {
     const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 380; wf.Q.value = 0.6;
     this.windGain = ctx.createGain(); this.windGain.gain.value = 0;
     const lfo = ctx.createOscillator(); lfo.frequency.value = 0.08; const lg = ctx.createGain(); lg.gain.value = 180; lfo.connect(lg).connect(wf.frequency); lfo.start();
-    w.connect(wf).connect(this.windGain).connect(this.master); w.start();
+    w.connect(wf).connect(this.windGain).connect(this.buses.sfx); w.start();
     // drone
     this.droneGain = ctx.createGain(); this.droneGain.gain.value = 0;
     const df = ctx.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 240;
     for (const [f, ty] of [[46.25, 'sawtooth'], [46.9, 'sawtooth'], [69.3, 'sine'], [92.5, 'triangle']]) { const o = ctx.createOscillator(); o.type = ty; o.frequency.value = f; o.connect(df); o.start(); }
     const dl = ctx.createOscillator(); dl.frequency.value = 0.05; const dg = ctx.createGain(); dg.gain.value = 90; dl.connect(dg).connect(df.frequency); dl.start();
-    df.connect(this.droneGain).connect(this.master);
+    df.connect(this.droneGain).connect(this.buses.sfx);
     // high tension whine
     this.tensionGain = ctx.createGain(); this.tensionGain.gain.value = 0;
     const tw = ctx.createOscillator(); tw.type = 'sine'; tw.frequency.value = 1760; const tw2 = ctx.createOscillator(); tw2.type = 'sine'; tw2.frequency.value = 1767;
     tw.connect(this.tensionGain); tw2.connect(this.tensionGain); tw.start(); tw2.start();
-    this.tensionGain.connect(this.master);
+    this.tensionGain.connect(this.buses.sfx);
     // fridge/house hum
     this.humGain = ctx.createGain(); this.humGain.gain.value = 0;
     const hm = ctx.createOscillator(); hm.type = 'sine'; hm.frequency.value = 60; hm.connect(this.humGain); hm.start();
-    this.humGain.connect(this.master);
+    this.humGain.connect(this.buses.sfx);
   }
   set(param, v, time = 1.5) { if (!this.ctx) return; const p = param; p.cancelScheduledValues(this.now); p.setTargetAtTime(v, this.now, time / 3); }
   wind(v, t) { this.ctx && this.set(this.windGain.gain, v, t); }
@@ -102,6 +116,7 @@ export class Sound {
       } catch (e) { /* the synth covers it */ }
     };
     const [vo, sfx, music] = await Promise.all([json('assets/audio/manifest.json'), json('assets/sfx/sfx.json'), json('assets/music/tracks.json')]);
+    this.kinds = {}; for (const [k, m] of Object.entries(sfx || {})) this.kinds['sfx/' + k] = m.kind;   // (which bus each file plays on)
     const first = [];
     for (const f of (vo && vo.files) || []) first.push(load(f, `assets/audio/${f}.mp3`));
     for (const [k, m] of Object.entries(sfx || {})) first.push(load('sfx/' + k, m.file));
@@ -111,11 +126,11 @@ export class Sound {
   // plays a loaded file once; returns its length in seconds (0 if it isn't loaded, so callers can fall back)
   play(id, { gain = 1, pan = 0, wet = 0.15, delay = 0, muffle = false } = {}) {
     const b = this.buf && this.buf[id]; if (!this.ctx || !b) return 0;
-    const src = this.ctx.createBufferSource(); src.buffer = b;
+    const src = this.ctx.createBufferSource(); src.buffer = b; const kind = this.kindOf(id);
     if (muffle) {   // heard through a wall: low-passed and quiet
       const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; lp.Q.value = 0.5;
-      src.connect(lp).connect(this.bus(gain * 0.7, pan, wet + 0.1, b.duration));
-    } else src.connect(this.bus(gain, pan, wet, b.duration));
+      src.connect(lp).connect(this.bus(gain * 0.7, pan, wet + 0.1, b.duration, kind));
+    } else src.connect(this.bus(gain, pan, wet, b.duration, kind));
     src.start(this.now + delay);
     return b.duration;
   }
@@ -128,7 +143,7 @@ export class Sound {
     const g = ctx.createGain(); g.gain.value = gain; const p = ctx.createStereoPanner(), t = this.now, len = dur || b.duration;
     p.pan.setValueAtTime(from, t); p.pan.linearRampToValueAtTime(to, t + len);
     const wet = ctx.createGain(); wet.gain.value = 0.35;
-    src.connect(g).connect(p).connect(this.master); p.connect(wet).connect(this.reverb); src.start(t);
+    const kind = this.kindOf(id); src.connect(g).connect(p).connect(this.buses[kind]); p.connect(wet).connect(this.sends[kind]); src.start(t);
     return b.duration;
   }
   movingSynth(id, from, to, dur) {
@@ -139,7 +154,7 @@ export class Sound {
     const vib = ctx.createOscillator(); vib.frequency.value = 5; const vg = ctx.createGain(); vg.gain.value = car ? 2 : 14; vib.connect(vg).connect(o.frequency);
     const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(car ? 0.12 : 0.05, t + dur * 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     const p = ctx.createStereoPanner(); p.pan.setValueAtTime(from, t); p.pan.linearRampToValueAtTime(to, t + dur);
-    o.connect(bp).connect(g).connect(p).connect(this.master); o.start(t); vib.start(t); o.stop(t + dur + 0.1); vib.stop(t + dur + 0.1);
+    o.connect(bp).connect(g).connect(p).connect(this.buses.sfx); o.start(t); vib.start(t); o.stop(t + dur + 0.1); vib.stop(t + dur + 0.1);
     return dur;
   }
   say(id, { gain = 1.3, muffle = false } = {}) { return this.play('vo/' + id, { gain, wet: 0.12, muffle }); }
@@ -163,7 +178,7 @@ export class Sound {
     if (!l) {
       if (w.v <= 0) return;
       const src = this.ctx.createBufferSource(); src.buffer = b; src.loop = true;
-      const g = this.ctx.createGain(); g.gain.value = 0; src.connect(g).connect(this.master); src.start();
+      const g = this.ctx.createGain(); g.gain.value = 0; src.connect(g).connect(this.buses[this.kindOf(id)]); src.start();
       l = this.live[id] = { src, g };
     }
     this.set(l.g.gain, w.v, w.time);
@@ -251,7 +266,7 @@ export class Sound {
       for (const f of [740, 784, 1109, 1480, 1865, 2217, 2960]) {
         const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; vg.connect(o.frequency); sg.connect(o.frequency); o.connect(bp); o.start();
       }
-      bp.connect(g).connect(this.master); this.strings = { g };
+      bp.connect(g).connect(this.buses.sfx); this.strings = { g };
     }
     this.set(this.strings.g.gain, have ? 0 : v * 0.05, t);
   }
@@ -304,7 +319,7 @@ export class Sound {
     const a = mk(650, 5), b = mk(1250, 7), g1 = ctx.createGain(), g2 = ctx.createGain(); g1.gain.value = 1; g2.gain.value = 0.6;
     o.connect(a).connect(g1).connect(out); o.connect(b).connect(g2).connect(out);
     let dest = out; if (muffle) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; out.connect(lp); dest = lp; }
-    dest.connect(this.bus(gain * (muffle ? 0.7 : 1), pan, muffle ? 0.2 : 0.12, dur));
+    dest.connect(this.bus(gain * (muffle ? 0.7 : 1), pan, muffle ? 0.2 : 0.12, dur, 'voice'));   // (it stands in for a voice line, so the voice volume covers it)
     const env = new Float32Array(Math.ceil(dur * 30) + 2);
     for (let i = 0; i < n; i++) {
       const ts = t0 + (i / n) * dur, te = ts + (dur / n) * 0.8, fall = 1 - (i / n) * 0.18, pitch = f0 * fall * (0.92 + Math.random() * 0.18), peak = 0.45 + Math.random() * 0.45;
@@ -345,13 +360,14 @@ export class Sound {
   flush(pan = 0) { if (!this.ctx) return; this.noiseHit({ dur: 2.6, type: 'bandpass', f: 800, f2: 2200, q: 0.6, gain: 0.3, pan, wet: 0.3, attack: 0.4 }); }
 
   // Silence before a scare makes it land: the whole mix ducks, and a jolt then hits well above everything else (the compressor keeps it from clipping).
+  // (both move the master relative to the player's master volume, this.level: 0.85 is the mix they were tuned at)
   hush(sec = 3) {
-    if (!this.ctx) return; const g = this.master.gain, t = this.now;
-    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0.14, t + 0.5); g.setValueAtTime(0.14, t + sec - 0.1); g.linearRampToValueAtTime(0.85, t + sec + 0.4);
+    if (!this.ctx) return; const g = this.master.gain, t = this.now, L = this.level;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(L * 0.165, t + 0.5); g.setValueAtTime(L * 0.165, t + sec - 0.1); g.linearRampToValueAtTime(L, t + sec + 0.4);
   }
   jolt(strength = 1) {
     if (!this.ctx) return; const g = this.master.gain, t = this.now;
-    g.cancelScheduledValues(t); g.setValueAtTime(1.45, t); g.linearRampToValueAtTime(0.85, t + 1.6);
+    g.cancelScheduledValues(t); g.setValueAtTime(this.level * 1.7, t); g.linearRampToValueAtTime(this.level, t + 1.6);
     this.tone({ f: 52, f2: 24, dur: 1.1, gain: 1.7 * strength, wet: 0.4 }); this.tone({ f: 118, f2: 40, dur: 0.5, gain: 1.1 * strength, wet: 0.3 });
     this.noiseHit({ dur: 0.6, type: 'highpass', f: 2400, gain: 1.1 * strength, wet: 0.35, attack: 0.002 }); this.noiseHit({ dur: 0.35, type: 'lowpass', f: 400, gain: 1.4 * strength, wet: 0.3, attack: 0.002 });
     this.stab(); this.play('sfx/scare_bang', { gain: 1.6 * strength });
@@ -362,8 +378,8 @@ export class Sound {
     if (!this.eng) {
       const ctx = this.ctx, o = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(), nz = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
       o.type = 'sawtooth'; o2.type = 'square'; o.frequency.value = 52; o2.frequency.value = 26; lp.type = 'lowpass'; lp.frequency.value = 240; g.gain.value = 0;
-      o.connect(lp); o2.connect(lp); lp.connect(g).connect(this.master);
-      nz.buffer = this.noise; nz.loop = true; bp.type = 'lowpass'; bp.frequency.value = 500; ng.gain.value = 0; nz.connect(bp).connect(ng).connect(this.master);
+      o.connect(lp); o2.connect(lp); lp.connect(g).connect(this.buses.sfx);
+      nz.buffer = this.noise; nz.loop = true; bp.type = 'lowpass'; bp.frequency.value = 500; ng.gain.value = 0; nz.connect(bp).connect(ng).connect(this.buses.sfx);
       o.start(); o2.start(); nz.start(); this.eng = { o, o2, g, ng, bp };
     }
     const e = this.eng, t = this.now; e.o.frequency.setTargetAtTime(46 + speed01 * 55, t, 0.3); e.o2.frequency.setTargetAtTime(23 + speed01 * 27, t, 0.3);
@@ -375,8 +391,8 @@ export class Sound {
       const ctx = this.ctx, g = ctx.createGain(), lp = ctx.createBiquadFilter(), trem = ctx.createOscillator(), tg = ctx.createGain(), sn = ctx.createBufferSource(), sbp = ctx.createBiquadFilter(), sg = ctx.createGain();
       g.gain.value = 0; lp.type = 'lowpass'; lp.frequency.value = 1500; trem.frequency.value = 5; tg.gain.value = 0.25; trem.connect(tg).connect(g.gain);
       const oscs = [220, 277.2, 329.6, 440].map((f) => { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 14; o.connect(lp); o.start(); return o; });
-      lp.connect(g).connect(this.master); trem.start();
-      sn.buffer = this.noise; sn.loop = true; sbp.type = 'bandpass'; sbp.frequency.value = 2800; sbp.Q.value = 0.4; sg.gain.value = 0; sn.connect(sbp).connect(sg).connect(this.master); sn.start();
+      lp.connect(g).connect(this.buses.sfx); trem.start();
+      sn.buffer = this.noise; sn.loop = true; sbp.type = 'bandpass'; sbp.frequency.value = 2800; sbp.Q.value = 0.4; sg.gain.value = 0; sn.connect(sbp).connect(sg).connect(this.buses.sfx); sn.start();
       this.rad = { g, sg, oscs, lp };
       // the tune: a slow wandering melody on the chord tones
       const notes = [0, 3, 7, 5, 3, 10, 7, 3]; let i = 0; this.radTimer = setInterval(() => { if (!this.rad) return; const base = 220 * Math.pow(2, notes[i++ % notes.length] / 12); this.rad.oscs[3].frequency.setTargetAtTime(base * 2, this.now, 0.05); }, 900);

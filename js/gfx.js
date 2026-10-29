@@ -52,7 +52,8 @@ export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
     let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* private window */ }
-    this.quality = QUALITY[q] ? q : (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high');   // phones start lighter this.auto = !(QUALITY[saved] || quality);
+    this.autoQuality = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high';   // phones start lighter
+    this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
     this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0;   // res: dynamic resolution scale
     this.pmrem = new THREE.PMREMGenerator(renderer);
@@ -135,6 +136,12 @@ export class Gfx {
     this.quality = q; this.build();
     if (save) try { localStorage.setItem(KEY, q); this.auto = false; } catch (e) { /* ignore */ }
     this.slow = 0; if (this.onChange) this.onChange(q);
+  }
+  // the options menu's setting: 'auto' (a preset picked for the device, stepped down when frames are slow) or a preset kept as chosen
+  get mode() { return this.auto ? 'auto' : this.quality; }
+  setMode(m) {
+    if (m === 'auto') { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } this.auto = true; this.age = 0; this.setQuality(this.autoQuality, { save: false }); }
+    else if (QUALITY[m]) { this.setQuality(m, { save: false }); this.auto = false; try { localStorage.setItem(KEY, m); } catch (e) { /* ignore */ } }
   }
 
   // dynamic resolution: render at a lower pixel ratio when frames are slow, and creep back up when there is headroom
