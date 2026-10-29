@@ -199,3 +199,12 @@ body.reduce-flashing.nightmare #game { animation: dream 4.5s ease-in-out infinit
 .achv-list li.locked { opacity: 0.45; }
 @media (max-height: 520px) { #achv { width: min(290px, 60vw); padding: 7px 12px 9px; } #achv b { font-size: 16px; } #achv span { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { #achv { transform: none; transition: opacity 0.4s; } }
+
+/* ---------- proof (js/nights.js): the night's find-proof line under the objective, and the count on the morning card ---------- */
+#proof { position: absolute; top: 22px; left: 26px; max-width: 46vw; font-family: 'Special Elite', monospace; font-size: 15px; letter-spacing: 0.5px; color: var(--ink); text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity 0.6s, top 0.4s; }
+#proof.show { opacity: 1; }
+#proof.alone::before { content: 'OBJECTIVE'; display: block; font-size: 10px; letter-spacing: 3px; color: var(--dim); margin-bottom: 4px; }
+#proof span { color: var(--dim); margin-left: 8px; }
+#card .proof { margin-top: 12px; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--dim); }
+#card .proof:empty { display: none; }
+@media (max-height: 520px) { #proof { font-size: 13px; } }

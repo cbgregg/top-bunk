@@ -5,6 +5,7 @@
 //   D.r()  seeded random 0..1        D.P / D.F / D.W / D.E / D.sfx / D.UI / D.camera / D.hunter
 //   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)     D.sub(html, dur)
 //   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerNode()  D.playerRoom()
+//   D.fired(id)                      told after each event has run (some events leave proof behind, see nights.js)
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
 import { NODES, nearestNode, dist as navDist } from './nav.js';
 
@@ -122,6 +123,7 @@ export function createDirector(D) {
         const def = EVENTS[ev.id];
         if (def.ok && !def.ok(D)) { if (c > ev.t + 40) ev.done = true; continue; }
         ev.done = true; try { def.run(D); } catch (e) { console.warn('event failed', ev.id, e); }
+        if (D.fired) D.fired(ev.id);
       }
     },
   };

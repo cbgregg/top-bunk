@@ -418,6 +418,58 @@ export function smile() {
   return t;
 }
 
+// what the nights leave on the house, one quarter each on a transparent sheet: claw marks gouged through white paint (top left), a long wet
+// bare footprint (top right), a sooty handprint with fingers far too long (bottom left), black crayon on a wall (bottom right).
+// world.js maps each decal's uvs to its quarter, so everything stays inside its own 512 px with a margin.
+export function marks() {
+  const S = 1024, Q = 512, [c, g] = mk(S), r = rng(1313);
+  // claws: four ragged furrows, pale wood in the middle and dirty at the edges
+  for (let i = 0; i < 4; i++) {
+    const x0 = 96 + i * 78 + r() * 14, y0 = 30 + i * 10 + r() * 20, len = 330 + r() * 50, bend = 30 + r() * 20;
+    const at = (t) => [x0 + bend * Math.sin(t * 1.4) + t * 70, y0 + t * len];
+    for (const [w, col] of [[15, 'rgba(46,34,24,0.85)'], [8, 'rgba(206,182,140,0.95)'], [3, 'rgba(120,92,62,0.8)']]) {
+      g.beginPath();
+      for (let k = 0; k <= 40; k++) { const t = k / 40, [x, y] = at(t), ww = w * Math.sin(Math.min(1, t * 1.3) * Math.PI) * (0.75 + r() * 0.5); g.lineTo(x - ww, y); }
+      for (let k = 40; k >= 0; k--) { const t = k / 40, [x, y] = at(t), ww = w * Math.sin(Math.min(1, t * 1.3) * Math.PI) * (0.75 + r() * 0.5); g.lineTo(x + ww, y); }
+      g.closePath(); g.fillStyle = col; g.fill();
+    }
+    g.fillStyle = 'rgba(206,182,140,0.8)';
+    for (let k = 0; k < 6; k++) { const [x, y] = at(0.2 + r() * 0.6); g.fillRect(x + (r() - 0.5) * 30, y, 2 + r() * 3, 1.5); }   // flakes of paint
+  }
+  // a bare foot: heel, a narrow arch, the ball, and five long toes
+  g.save(); g.translate(Q, 0); g.shadowColor = 'rgba(8,6,5,0.9)'; g.shadowBlur = 10; g.fillStyle = 'rgba(8,6,5,0.78)';
+  g.beginPath(); g.ellipse(256, 400, 52, 70, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(214, 380); g.quadraticCurveTo(196, 260, 222, 170); g.lineTo(312, 170); g.quadraticCurveTo(296, 270, 300, 380); g.closePath(); g.fill();
+  g.beginPath(); g.ellipse(262, 168, 66, 46, 0.1, 0, Math.PI * 2); g.fill();
+  for (const [x, y, l, a] of [[214, 104, 70, -0.25], [242, 92, 76, -0.1], [268, 92, 72, 0.02], [292, 100, 62, 0.15], [314, 114, 50, 0.3]]) {
+    g.beginPath(); g.ellipse(x + Math.sin(a) * l * 0.5, y - l * 0.5, 11, l * 0.55, a, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+  // a hand: the palm, then fingers half again too long, smudged
+  g.save(); g.translate(0, Q); g.shadowColor = 'rgba(14,11,9,0.9)'; g.shadowBlur = 14; g.fillStyle = 'rgba(14,11,9,0.82)';
+  g.beginPath(); g.ellipse(256, 380, 70, 84, 0, 0, Math.PI * 2); g.fill();
+  for (const [x, a, l] of [[196, -0.3, 190], [232, -0.1, 230], [268, 0.04, 236], [302, 0.18, 206]]) {
+    g.beginPath(); g.moveTo(x - 13, 330); g.quadraticCurveTo(x + Math.sin(a) * l * 0.5 - 14, 330 - l * 0.5, x + Math.sin(a) * l, 330 - l); g.quadraticCurveTo(x + Math.sin(a) * l * 0.5 + 14, 330 - l * 0.5, x + 13, 330); g.fill();
+  }
+  g.beginPath(); g.moveTo(320, 400); g.quadraticCurveTo(390, 360, 430, 290); g.lineTo(444, 300); g.quadraticCurveTo(410, 380, 330, 430); g.fill();   // the thumb
+  g.restore();
+  // crayon: a tall figure with long arms, white eyes and a wide smile, standing over a little bunk bed
+  g.save(); g.translate(Q, Q); g.lineCap = 'round'; g.lineJoin = 'round';
+  const wax = (pts, w = 7) => { for (let pass = 0; pass < 3; pass++) { g.strokeStyle = `rgba(12,12,14,${0.45 + pass * 0.15})`; g.lineWidth = w - pass * 2; g.beginPath(); pts.forEach(([x, y], k) => { const jx = x + (r() - 0.5) * 4, jy = y + (r() - 0.5) * 4; if (k) g.lineTo(jx, jy); else g.moveTo(jx, jy); }); g.stroke(); } };
+  g.fillStyle = 'rgba(12,12,14,0.85)'; g.beginPath(); g.ellipse(200, 110, 46, 56, 0, 0, Math.PI * 2); g.fill();
+  for (let k = 0; k < 30; k++) wax([[176 + r() * 48, 160], [172 + r() * 56, 330]], 6);   // the body, scribbled solid
+  wax([[180, 330], [160, 460]]); wax([[220, 330], [244, 460]]);
+  wax([[176, 190], [110, 300], [96, 420]]); wax([[224, 190], [300, 290], [330, 380]]);
+  g.fillStyle = '#fff'; g.globalCompositeOperation = 'destination-out';
+  for (const x of [184, 216]) { g.beginPath(); g.ellipse(x, 100, 9, 13, 0, 0, Math.PI * 2); g.fill(); }
+  g.lineWidth = 5; g.strokeStyle = '#fff'; g.beginPath(); g.arc(200, 118, 26, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  g.globalCompositeOperation = 'source-over';
+  wax([[330, 470], [330, 360], [460, 360], [460, 470]], 6); wax([[330, 420], [460, 420]], 6);   // the bunk
+  wax([[390, 360], [390, 330]], 5); g.beginPath(); g.arc(392, 320, 12, 0, Math.PI * 2); g.stroke();   // you, on top
+  g.restore();
+  return toTex(c, { wrap: false });
+}
+
 // dense fir needles: a tileable mat of short strokes in several greens
 export function needles() {
   const S = 256, [c, g] = mk(S), r = rng(91);

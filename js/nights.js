@@ -101,6 +101,7 @@ export function createNights(env) {
     encounter(kind, plan) { return encounter(kind, plan); },
     blackout(on) { F.blackout = on; env.nlMult(on ? 0 : 1, false); },
     startHunt, visibleNodes, objective: (t) => UI.objective(t),
+    fired: (id) => proofFire(id),
   };
   let tvHeld = false;
   D.holdTv = (v) => { tvHeld = v; };
@@ -154,12 +155,138 @@ export function createNights(env) {
   function tick(dt) {   // called every frame by the game while the night is live
     if (!(F.script && F.clock >= DAWN - 1) && !(F.holdDawn && F.clock >= DAWN - 3)) F.clock += dt * (F.clockRateNow || env.clockRate) * (window.__clockMul || 1);   // (a scene that is playing holds the dawn back)
     const m = Math.floor(F.clock); if (m !== lastMin || F.clockGlitch) { lastMin = m; UI.clock(clockText(F.clock), `night ${F.night}`); }
-    director.update(); hunter.update(dt);
+    director.update(); hunter.update(dt); proofTick();
     // the breath meter shows whenever something is near enough to hear you
     if (F.live) F.breathUI = F.breathUI || (P.mode === 'hide' && hunter.busy && hunter.gap() < 14 && hunter.state !== 'leave');
     if (F.live && P.mode === 'hide' && !(hunter.busy && hunter.gap() < 14)) F.breathUI = F.breathCheck;
   }
   const director = createDirector(D);
+
+  // ---------- proof: what a night leaves behind, to show Mom and Dad ----------
+  // Each kind comes from the night's own events (a director event id, or the night's type). It shows only after one of them has fired, at a
+  // moment you are not looking at the spot. RUN.evidence holds the kinds found in this run, RUN.evidenceAt the night each was found on.
+  const WP = W.proof || {};
+  const prop = (k) => (on) => { if (WP[k]) WP[k].show(on); };
+  const PROOF = {
+    SCRATCHES: { from: ['knock', 'bunkShake'], keep: true, at: [6.15, 1.45, 0.45], p: [6.15, 1.35, 0.55], show: prop('SCRATCHES'),
+      cue: () => { sfx.scratch(D.pan(6.15, 0.45)); sub('<i>Something is scratching at your closet door.</i>', 3.5); },
+      line: '<i>Claw marks, right through the paint. They start higher than Dad can reach.</i>',
+      tell: 'Come look at my closet door. Something clawed it.' },
+    FOOTPRINTS: { from: ['thirst', 'faucet', 'flush'], at: [5.5, 0, -0.88], show: prop('FOOTPRINTS'),
+      cue: () => { for (let i = 0; i < 3; i++) later(i * 0.5, () => sfx.footstep(0.16, D.pan(4.6 + i * 0.9, -0.9), 0.35, 'tile')); sub('<i>Wet bare feet slap down the hall.</i>', 3.5); },
+      line: "<i>Wet footprints. Bare feet, longer than Dad's. They go from the bathroom to my door.</i>",
+      tell: 'There were wet footprints in the hall last night. Bare feet. Bigger than yours, Dad.' },
+    CABINETS: { from: ['slam', 'mimic'], at: [2.88, 1.9, 2.6], p: [2.6, 1.85, 2.6], show: prop('CABINETS'),
+      cue: () => { sfx.cabinet(D.pan(2.7, 2.6), 0.8); sub('<i>A cabinet door bangs in the kitchen.</i>', 3.5); },
+      line: '<i>The cabinet is wide open. Every cup in it is turned upside down.</i>',
+      tell: 'A cabinet in the kitchen was open, and all the cups were upside down.' },
+    STATIC: { from: ['static', 'tvStatic'], at: [2.711, 0.815, -3.266], p: [2.7, 0.85, -3.27], show: (on) => W.tvFx.set(on), still: () => W.tvFx.on, took: () => { W.tvFx.set(false); sfx.click(); },
+      cue: () => sub('<i>Blue light flickers in the living room. The TV is on again.</i>', 3.5),
+      line: "<i>Nobody is watching it. The screen is warm, like it's been on for hours.</i>",
+      tell: 'The TV was on again last night. Nobody was watching it.' },
+    DRAWING: { from: ['drawing'], keep: true, at: [5.22, 0.45, -0.39], p: [5.28, 0.6, -0.48], show: prop('DRAWING'),
+      cue: () => sub('<i>Out in the hall, a crayon squeaks across the wall.</i>', 3.5),
+      line: "<i>Somebody kept drawing, right on the wall. And left the crayon. I don't have a black crayon.</i>",
+      tell: "Somebody drew on the wall under the drawing. In black crayon. I don't have a black one." },
+    CHAIR: { from: ['chairs'], at: [-1.95, 0.5, 0.6], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, -1.95, 0.6, Math.PI / 2); else if (c) W.moveChair(2, c.x, c.z, c.rot); },
+      cue: () => sub('<i>A chair scrapes across the dining room floor.</i>', 3.5),
+      line: '<i>Somebody turned this chair to face the wall, right up close. Like a kid sent to sit in the corner.</i>',
+      tell: 'Somebody turned a chair in the dining room to face the wall. Right up against it.' },
+    PHONE: { from: ['ring'], at: [-1.6, 1.15, 0.89], p: [-1.56, 1.3, 0.9], show: (on) => (on ? W.phone.pickUp() : W.phone.hangUp()), still: () => W.phone.off, took: () => { W.phone.hangUp(); sfx.click(); },
+      line: "<i>It's off the hook. If I hold my breath, there's still breathing on the line.</i>",
+      tell: 'The phone was off the hook. Somebody was still breathing on it.' },
+    HANDPRINT: { from: ['blackout'], keep: true, at: [-5.47, 1.47, -3.71], p: [-5.45, 1.45, -3.62], show: prop('HANDPRINT'),
+      line: "<i>A handprint on the breaker box, black, like it's burned on. The fingers are way too long.</i>",
+      tell: 'There is a handprint on the breaker box. Go look at the fingers.' },
+    TEDDY: { from: ['teddy'], at: [0, 0, 0], show: prop('TEDDY'), place: (s) => { PROOF.TEDDY.at = [s[0], s[1], s[2]]; if (WP.TEDDY) WP.TEDDY.at(s[0], s[1], s[2]); },
+      line: '<i>Stuffing. Somebody picked it out of my bear, a little at a time.</i>',
+      tell: 'Somebody pulled the stuffing out of my bear. Look at him.' },
+    CANDLE: { from: ['vigil'], at: [5.2, 0.03, -0.95], show: () => {},   // the vigil's own tea light, left on the floor until dawn
+      line: '<i>The candle from the hall. Burned all the way down. Nobody in this house lit it.</i>',
+      tell: 'There was a candle burning in the hall last night. None of us lit it.' },
+  };
+  const found = () => (env.RUN.evidence ||= []), foundAt = () => (env.RUN.evidenceAt ||= {});
+  const isFound = (k) => found().includes(k);
+  const pr = { n: 0, kinds: [], pending: new Map(), shown: new Set(), its: {}, hud: false };
+  // what a night can leave: its type's kinds and its events' (the vigil stops the events, and the drive ends the night soon after it starts)
+  function proofKinds(plan) {
+    if (!plan || plan.n < 2 || plan.n > 9) return [];
+    const src = new Set([plan.type]);
+    if (plan.type !== 'vigil') for (const e of plan.events) if (plan.type !== 'car' || e.t < plan.clock0 + 10) src.add(e.id);
+    return Object.keys(PROOF).filter((k) => PROOF[k].from.some((s) => src.has(s)) && (!isFound(k) || foundAt()[k] === plan.n));
+  }
+  // the house goes back to how it was, apart from what you found that stays (claw marks do not wash off)
+  function proofSync() {
+    for (const k of pr.shown) PROOF[k].show(false);
+    for (const k in PROOF) if (PROOF[k].keep) PROOF[k].show(isFound(k));
+    pr.shown.clear(); pr.pending.clear();
+    for (const k in pr.its) env.removeI(pr.its[k]);
+    pr.its = {};
+  }
+  function proofStart(plan) { proofSync(); pr.n = plan.n; pr.kinds = proofKinds(plan); proofLine(); }
+  function proofFire(src, at) {
+    if (!F.live) return;
+    for (const k of pr.kinds) {
+      const d = PROOF[k];
+      if (isFound(k) || pr.pending.has(k) || pr.shown.has(k) || !d.from.includes(src)) continue;
+      if (at && d.place) d.place(at);
+      pr.pending.set(k, env.time());
+    }
+  }
+  function proofTick() {
+    for (const [k, t0] of pr.pending) {
+      const d = PROOF[k], [x, y, z] = d.at;
+      if (env.time() - t0 < 2.5 || (Math.hypot(camera.position.x - x, camera.position.z - z) < 10 && hunter.looking(x, z, 0.3, y))) continue;
+      pr.pending.delete(k); pr.shown.add(k); d.show(true);
+      if (d.cue && !F.script && !F.cutscene && !hunter.busy) d.cue();
+      const p = d.p || [x, Math.max(y + 0.25, 0.7), z];
+      pr.its[k] = env.addI({ p: new V3(...p), r: 1.4, label: 'Look closer', act: () => proofLook(k),
+        when: () => F.live && P.mode === 'walk' && !F.cutscene && pr.shown.has(k) && !isFound(k) && hunter.state !== 'hunt' && hunter.state !== 'loom' });
+    }
+    // something else put it back (the TV switched off, the phone hung up): it turns up again later
+    for (const k of pr.shown) {
+      const d = PROOF[k]; if (!d.still || isFound(k) || d.still()) continue;
+      pr.shown.delete(k); env.removeI(pr.its[k]); delete pr.its[k]; pr.pending.set(k, env.time());
+    }
+  }
+  // look closer: the view leans in, the kid says what it is, and it is kept. Saved first, so getting caught right after still counts it.
+  async function proofLook(k) {
+    const d = PROOF[k]; if (F.cutscene || isFound(k)) return;
+    found().push(k); foundAt()[k] = pr.n; env.saveRun(); proofLine();
+    env.removeI(pr.its[k]); delete pr.its[k];
+    F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
+    const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, at = new V3(...d.at), dist = from.distanceTo(at);
+    const to = from.clone().lerp(at, clamp((dist - 0.45) / Math.max(dist, 0.01), 0, 0.6)); to.y = Math.max(to.y, 0.45);
+    const h = Math.hypot(at.x - to.x, at.z - to.z), yaw = h > 0.05 ? Math.atan2(-(at.x - to.x), -(at.z - to.z)) : y0, pitch = clamp(Math.atan2(at.y - to.y, h), -1.3, 1.3);
+    sub(d.line, 5.5); sfx.creak(0.1, 0, 0.3);
+    await tween(1.2, (q) => { P.cam.lerpVectors(from, to, q); P.yaw = lerpAngle(y0, yaw, q); P.pitch = lerp(p0, pitch, q); });
+    if (d.took) d.took();
+    await wait(1.1);
+    const back = new V3(P.pos.x, env.EYE, P.pos.z);
+    await tween(0.6, (q) => { P.cam.lerpVectors(to, back, q); P.pitch = lerp(pitch, clamp(pitch, -0.5, 0.5), q); });
+    if (P.mode === 'cine' && !F.dead) { P.mode = 'walk'; F.cutscene = false; }
+  }
+  // the line under the objective: how much of tonight's proof you have
+  const proofEl = (() => {
+    const o = typeof document !== 'undefined' && document.getElementById('objective'); if (!o) return null;
+    const el = document.createElement('div'); el.id = 'proof'; o.after(el);
+    // under the objective while there is one, in its place while there is none
+    const place = () => { const on = o.classList.contains('show'); el.classList.toggle('alone', !on); el.style.top = `${on ? o.offsetTop + o.offsetHeight + 10 : o.offsetTop}px`; };
+    new MutationObserver(place).observe(o, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
+    addEventListener('resize', place); place();
+    return el;
+  })();
+  function proofLine() { if (proofEl) proofEl.innerHTML = `Find proof <span>${pr.kinds.filter(isFound).length} / ${pr.kinds.length}</span>`; }
+  // main.js, every frame: shown while a night that can leave proof is being played
+  function proofHud(on) {
+    on = !!on && pr.kinds.length > 0 && F.stage === 'n' + pr.n;
+    if (on !== pr.hud && proofEl) { pr.hud = on; proofEl.classList.toggle('show', on); }
+  }
+  proofSync();
+  const proof = {
+    defs: PROOF, total: Object.keys(PROOF).length, count: () => found().length, on: (n) => found().filter((k) => foundAt()[k] === n), tell: (k) => PROOF[k] && PROOF[k].tell,
+    kinds: () => pr.kinds.slice(), pending: () => [...pr.pending.keys()], shown: () => [...pr.shown], kindsFor: proofKinds, start: proofStart, fire: proofFire, sync: proofSync, hud: proofHud, look: proofLook,
+  };
 
   async function freeNight(n) {
     const t = ++tok;
@@ -168,7 +295,7 @@ export function createNights(env) {
     const plan = makePlan(env.RUN.seed, n); if (env.HPARAM && env.HPARAM.type) plan.type = env.HPARAM.type;   // (#type=ring forces a night type for testing)
     rnd = plan.r; F.plan = plan; F.typeName = TYPE_NAMES[plan.type];
     F.clock = plan.clock0; lastMin = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
-    hunter.reset(); hunter.setLevel(n); W.tvFx.set(false); W.phone.setRinging(false);
+    hunter.reset(); hunter.setLevel(n); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
     env.toBunk();
     const dialClock = clockText(F.clock);
     UI.card(dialClock, `Night ${n}`, 4.5);
@@ -185,6 +312,7 @@ export function createNights(env) {
   async function dawn(n) {
     F.live = false; F.script = true; director.stop(); tok++;
     env.vigil.stop(); hunter.dismiss(); sfx.violins(0, 3); sfx.tension(0, 2); sfx.drone(0.04, 4); UI.objective(null); UI.hint(null); W.tvFx.set(false); W.phone.setRinging(false);
+    proofSync(); pr.kinds = [];
     F.breathCheck = false; F.chase = false; F.echo = false; W.nightLights.forEach((x) => { x.dead = false; }); F.blackout = false; env.nlMult(1, false);
     if (P.mode === 'hide' && P.pod) { UI.pod(null); P.pod = null; }
     await wait(1.0);
@@ -211,6 +339,7 @@ export function createNights(env) {
       const it = env.addI({ p: new V3(1.4, 1.1, 3.0), r: 1.7, label: 'Fill your cup', when: () => alive(t) && !done && P.mode === 'walk', act: async () => {
         F.script = true; sfx.faucet(3.2, D.pan(1.4, 3.3)); UI.hint('<i>The pipes shudder.</i>', 3); await wait(3.4); F.script = false; done = true; } });
       await until(t, () => done); env.removeI(it); if (!alive(t)) return;
+      proofFire('thirst');
       obj('Go back to bed'); sfx.tension(0.04, 2); F.fear = Math.max(F.fear, 0.5);
       if (!hunter.busy) { const node = spawnFar(); hunter.stalk(node); }
       await until(t, () => P.mode === 'bunk' || P.mode === 'hide'); obj(null);
@@ -226,11 +355,12 @@ export function createNights(env) {
         sfx.whisper(0, 0.24); sub('<i>"…I can see you."</i>', 3.5); await wait(2.4);
         sfx.staticBurst && sfx.staticBurst(0, 1.4); await wait(1.5); sub('<i>The line goes to a dial tone, a very long way off.</i>', 3.5); await wait(2);
         W.phone.hangUp(); sfx.click(); F.script = false;
+        if (alive(t)) proofFire('ring');
         if (!hunter.busy) hunter.stalk(hunter.pickSpawn(7) || 'archN');
       } });
       const ringer = (async () => { while (alive(t) && W.phone.ringing && rings < 11) { sfx.phoneRing && sfx.phoneRing(D.pan(-1.5, 0.9)); F.fear = Math.max(F.fear, 0.25); rings++; await wait(1.7); } })();
       await until(t, () => answered || rings >= 11); W.phone.setRinging(false); env.removeI(it);
-      if (!answered && alive(t)) { obj(null); W.setDoor('parents', true); sub("<i>Your parents' door opens by itself.</i>", 3.5); }
+      if (!answered && alive(t)) { obj(null); W.setDoor('parents', true); sub("<i>Your parents' door opens by itself.</i>", 3.5); proofFire('ring'); }
     },
     // the TV in the living room, and Dad's voice
     async static(plan, t) {
@@ -260,6 +390,7 @@ export function createNights(env) {
       }
       if (dad.fake) { dad.fake = false; dad.busy = false; env.sleepers(true); }
       W.bedSleepers.one('dad', true);
+      if (alive(t)) proofFire('static');
     },
     // Mom calls you from the kitchen
     async mimic(plan, t) {
@@ -275,6 +406,7 @@ export function createNights(env) {
         await wait(0.9); env.say('mom/mimic_c'); F.script = false;
         hunter.hunt('archN');
       } else if (!hunter.busy) hunter.stalk(spawnFar());
+      if (alive(t)) proofFire('mimic');
     },
     // the power fails: find the breaker in the utility room
     async blackout(plan, t) {
@@ -288,6 +420,7 @@ export function createNights(env) {
         hunter.hunt(hunter.pickSpawn(7) || 'livC');
       } });
       await until(t, () => fixed); env.removeI(it);
+      if (alive(t)) proofFire('blackout');
     },
 
     // NIGHT ONE: the house wakes up. Nothing is ever seen; things creep and move, and at the end everything stops and something walks around your bunk.
@@ -382,7 +515,7 @@ export function createNights(env) {
       if (!alive(t)) return; F.holdDawn = false; F.clock = DAWN;
     },
     // the power is out, one candle in the hall, and grandpa in a chair at the far end of it
-    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)).then(() => { if (alive(t)) achievements.unlock('GRANDPA'); }); },
+    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)).then(() => { if (alive(t)) { achievements.unlock('GRANDPA'); proofFire('vigil'); } }); },
     // you fall asleep and dream a drive to the store
     async car(plan, t) {
       await atClock(t, plan.clock0 + 10); if (!alive(t)) return;
@@ -416,8 +549,10 @@ export function createNights(env) {
       const spots = [[5.6, 0.02, -0.9, 'in the hall'], [0.05, 0.98, 3.2, 'on the kitchen counter'], [7.0, 0.02, -2.0, "in Mom and Dad's room"], [-2.6, 0.5, -2.4, 'on the couch'], [4.45, 0.02, 1.6, 'on the bathroom floor']];
       const s = pick(rnd, spots); W.moveTeddy(s[0], s[1], s[2]); let got = false;
       sub('<i>Your bear is not where you left it.</i>', 4); obj('Find your teddy bear');
-      const it = env.addI({ p: new V3(s[0], s[1] + 0.15, s[2]), r: 1.4, label: 'Pick up the bear', when: () => alive(t) && !got && P.mode === 'walk', act: () => { got = true; W.teddy.visible = false; sfx.thump(); } });
+      // (reach is measured from your eyes, so the prompt point stays at least 0.75 m up or a bear on the floor would be out of it)
+      const it = env.addI({ p: new V3(s[0], Math.max(s[1] + 0.15, 0.75), s[2]), r: 1.4, label: 'Pick up the bear', when: () => alive(t) && !got && P.mode === 'walk', act: () => { got = true; W.teddy.visible = false; sfx.thump(); } });
       await until(t, () => got); env.removeI(it); if (!alive(t)) return;
+      proofFire('teddy', s);
       obj('Put it back on your bunk'); sfx.tension(0.05, 2); sub('<i>It is warm.</i>', 3.5); await wait(3);
       if (!hunter.busy) hunter.stalk(spawnFar());
       await until(t, () => P.mode === 'bunk' || P.mode === 'hide'); W.moveTeddy(6.83, 0.55, 3.0); W.teddy.visible = true; obj(null);
@@ -436,5 +571,5 @@ export function createNights(env) {
     },
   };
 
-  return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, plan: (n) => makePlan(env.RUN.seed, n) };
+  return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: (n) => makePlan(env.RUN.seed, n) };
 }

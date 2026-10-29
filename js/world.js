@@ -900,6 +900,52 @@ export function buildWorld(scene) {
     };
   })();
 
+  // ---------- what the nights leave behind, hidden until nights.js shows it (the TV, the phone, a dining chair and the vigil's candle are already in the house) ----------
+  const proof = {};
+  {
+    const sheet = TX.marks();
+    const decalMat = (roughness) => std({ map: sheet, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, roughness });
+    // q: the quarter of the sheet (0 claws, 1 bare foot, 2 hand, 3 crayon)
+    const decal = (q, w, h, m) => {
+      const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, (q % 2) * 0.5 + uv.getX(i) * 0.5, (q < 2 ? 0.5 : 0) + uv.getY(i) * 0.5);
+      return new THREE.Mesh(geo, m);
+    };
+    const kit = (name, build) => { const g = new THREE.Group(); g.visible = false; house.add(g); build(g); proof[name] = { g, show(on) { g.visible = on; } }; return proof[name]; };
+    // claw marks down the louvred doors of your closet
+    kit('SCRATCHES', (g) => { const d = decal(0, 0.66, 1.2, decalMat(0.9)); d.position.set(6.15, 1.45, 0.453); g.add(d); });
+    // wet bare feet from the bathroom door, along the hall, to your door
+    kit('FOOTPRINTS', (g) => {
+      const m = decalMat(0.16);
+      [[4.12, -0.42, 0, -1], [4.3, -0.78, 0.6, -0.8], [4.68, -0.98, 1, 0], [5.1, -0.8, 1, 0], [5.52, -0.98, 1, 0], [5.94, -0.8, 1, 0], [6.36, -0.98, 1, 0], [6.74, -0.78, 0.6, 0.8], [6.98, -0.5, 0, 1]].forEach(([x, z, dx, dz], i) => {
+        const d = decal(1, 0.36, 0.36, m); d.rotation.set(-Math.PI / 2, Math.atan2(-dx, -dz), 0, 'YXZ'); d.position.set(x, 0.006, z); if (i % 2) d.scale.x = -1; g.add(d);
+      });
+    });
+    // a handprint on the breaker box door
+    kit('HANDPRINT', (g) => { const d = decal(2, 0.3, 0.3, decalMat(0.8)); d.position.set(-5.47, 1.47, -3.708); d.rotation.z = 0.12; g.add(d); });
+    // crayon on the hall wall under the drawing, and the crayon on the carpet
+    kit('DRAWING', (g) => {
+      const d = decal(3, 0.5, 0.5, decalMat(0.6)); d.position.set(5.22, 0.52, -0.3 - WT / 2 - 0.003); d.rotation.y = Math.PI; g.add(d);
+      const cr = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.07, 8), std({ color: 0x0c0c0e, roughness: 0.5 })); cr.rotation.set(0, 0.7, Math.PI / 2); cr.position.set(5.42, 0.0065, -0.56); g.add(cr);
+    });
+    // a kitchen cabinet left open: the dark inside, a shelf, the door swung out
+    kit('CABINETS', (g) => {
+      const inside = new THREE.Mesh(new THREE.PlaneGeometry(0.56, 0.72), std({ color: 0x17130f, roughness: 1 })); inside.rotation.y = -Math.PI / 2; inside.position.set(2.874, 1.9, 2.6); g.add(inside);
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.016, 0.56), M.cabW); shelf.position.set(2.872, 1.9, 2.6); g.add(shelf);
+      const hinge = new THREE.Group(); hinge.position.set(2.889, 1.9, 2.888); hinge.rotation.y = 1.75; g.add(hinge);
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.74, 0.576), M.cabW); leaf.position.set(0, 0, -0.288); leaf.castShadow = true; hinge.add(leaf);
+      const pull = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.25, 0.015), M.brass); pull.position.set(-0.02, -0.2, -0.52); hinge.add(pull);
+    });
+    // stuffing out of your bear, wherever it was left (nights.js moves the group there)
+    const tuft = kit('TEDDY', (g) => {
+      const fluff = std({ color: 0xdcd6c8, roughness: 1 });
+      for (const [x, z, s, sx, sz] of [[0, 0, 0.05, 1.5, 0.9], [0.09, 0.05, 0.035, 0.8, 1.6], [-0.07, 0.08, 0.04, 1.7, 0.7], [0.04, -0.1, 0.03, 1.2, 1.4], [-0.12, -0.04, 0.026, 1.9, 0.8], [0.16, -0.06, 0.02, 1, 1], [-0.03, 0.15, 0.018, 1.4, 0.9]]) {
+        const b = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), fluff); b.position.set(x, s * 0.35, z); b.scale.set(sx, 0.45, sz); b.rotation.set(0.2, x * 20, -0.15); g.add(b);
+      }
+    });
+    tuft.at = (x, y, z) => tuft.g.position.set(x, y, z);
+  }
+
   // ---------- light fixtures ----------
   const bulbs = {};
   const fixture = (name, x, z, intensity = 9) => {
@@ -1202,5 +1248,6 @@ export function buildWorld(scene) {
     get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
+    proof,
   };
 }

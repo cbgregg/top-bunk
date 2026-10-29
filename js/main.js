@@ -688,7 +688,7 @@ async function startGame() {
   if (DEBUG === 'night' || DEBUG === 'night1') { await playFrom('n1'); return; }
   if (DEBUG === 'breakfast') { await playFrom('b1'); return; }
   if (/^n\d+$/.test(DEBUG) || /^night\d+$/.test(DEBUG)) { await playFrom('n' + DEBUG.replace(/\D/g, '')); return; }
-  if (DEBUG === 'morning') { await finalMorning(); await endingScript(); return; }
+  if (DEBUG === 'morning') { await endingScript(); return; }
   if (!DEBUG && RUN.night >= 2) { await playFrom('n' + Math.min(RUN.night, 10)); return; }   // the run continues where you died or stopped
   await playFrom('day');
 }
@@ -1086,8 +1086,9 @@ async function wideShot(dur = 0.8) {
 }
 async function conversation(lines) {
   P.mode = 'cine'; P.cam.copy(camera.position);
-  for (const [who, key] of lines) {
-    const id = `${who}/${key}`;
+  for (const step of lines) {
+    if (typeof step === 'function') { await step(); continue; }   // a beat that runs its own shots
+    const [who, key] = step, id = `${who}/${key}`;
     if (who === 'you') { await wideShot(); await lookDown(); await say(id); await wait(0.25); }
     else { await closeOn(who === 'mom' ? mom : dad); await say(id); await wait(0.3); }
   }
@@ -1127,6 +1128,7 @@ async function breakfast(n) {
   dad.group.position.set(0.9, 0, 2.3); dad.group.rotation.y = Math.PI;               // at the sink
   F.birds = true;
   UI.card('6:58 AM', n === 1 ? 'Morning' : `Morning ${n}`, 3.5);
+  if (n >= 2 && nights) cardProof(`Night ${n} · proof ${nights.proof.count()} / ${nights.proof.total}`, 3.5);
   await wait(2.2); UI.fade(0, 3); await wait(2.4);
   UI.subtitle(n === 1 ? '<i>You hardly slept.</i>' : n < 6 ? '<i>You did not sleep at all.</i>' : '<i>You are so tired it feels like a fever.</i>', 3.5);
   UI.objective('Go to the kitchen');
@@ -1138,10 +1140,35 @@ async function breakfast(n) {
   await wait(0.5);
   const lines = [...(MORN[n] || MORN[3])];
   const tl = n >= 2 && nights && TYPE_LINE[nights.plan(n).type]; if (tl) lines.push(tl);
+  const fresh = nights ? nights.proof.on(n) : []; if (fresh.length) lines.push(() => proofBeat(fresh[fresh.length - 1]));
   await conversation(lines);
   UI.fade(1, 2.5); await wait(3);
   F.birds = false; F.cutscene = false; F.morningReady = false;
   mom.group.visible = dad.group.visible = false;
+}
+// a third line on the morning card (ui.js fills only two); it goes when the card does
+let cardProofT = 0;
+function cardProof(text, dur) {
+  const card = $('card'); let el = card.querySelector('.proof');
+  if (!el) { el = document.createElement('div'); el.className = 'proof'; card.appendChild(el); }
+  el.textContent = text; clearTimeout(cardProofT); cardProofT = setTimeout(() => { el.textContent = ''; }, (dur + 1.3) * 1000);
+}
+// you found something last night and try to show them. How they take it depends on how much there has been.
+async function proofBeat(id) {
+  const c = nights.proof.count();
+  await wideShot(); await lookDown(); await say(`<b>You:</b> ${nights.proof.tell(id)}`); await wait(0.25);
+  if (c < 3) {
+    await closeOn(mom); await say('<b>Mom:</b> Not at breakfast. Please. Not today.'); await wait(0.3);
+    await closeOn(dad); await say("<b>Dad:</b> You need sleep, bud. That's all this is.");
+  } else if (c < 7) {
+    await closeOn(dad); await say('<b>Dad:</b> ...Show me after breakfast.'); await wait(0.3);
+    await closeOn(mom); await say("<b>Mom:</b> ...We'll call the landlord.");
+  } else {
+    await closeOn(dad); dad.gaze = mom.head.getWorldPosition(new V3());
+    UI.subtitle("<i>Dad doesn't say anything. He looks at Mom for a long time.</i>", 4.5); await wait(4.2);
+    dad.gaze = null;
+  }
+  await wait(0.3);
 }
 
 // ---------- the car: the road-trip dream, and driving away at the end ----------
@@ -1246,7 +1273,8 @@ async function carLeaving() {
 
 // ---------- night ten: the thing stands at the end of the hall, and this time they see it too ----------
 async function finaleScene() {
-  const inBed = P.mode === 'bunk' || P.mode === 'hide';   // in bed when it comes: nobody comes out for you
+  // what you found decides the end: under 3 nobody comes, 3 to 6 they come and it takes them, 7 or more they believe you and you leave
+  const proof = proofCount();
   F.script = true; F.cutscene = true; UI.objective(null); UI.hint(null); UI.prompt(null);
   if (nights) nights.hunter.dismiss();
   UI.pod(null); UI.blanket(false); P.pod = null; flash.intensity = 0; F.flashOn = false; F.breathCheck = false; F.breathUI = false;
@@ -1267,7 +1295,7 @@ async function finaleScene() {
   E.mode = 'walk'; E.speed = 0.55; { const x0 = 3.95; let st = 0; await tween(7, (k) => { E.root.position.x = lerp(x0, 5.2, k); st += 0.03; if (st > 1.1) { st = 0; sfx.heavyStep(0.9, panFor(E.root.position)); } shake = Math.max(shake, 0.12 + k * 0.3); }, ease.lin); }
   E.mode = 'idle'; sfx.giggle(panFor(E.root.position)); await wait(1.6);
   await say('you/f_a'); sfx.scream(); UI.flash('rgba(255,255,255,0.55)', 0.4); shake = 1;
-  if (inBed) { await finaleNeverBelieved(); return true; }
+  if (proof < 3) { await finaleNeverBelieved(); return true; }
   // their door bangs open and they are standing there
   W.setDoor('parents', true); sfx.slamFar(0.5); sleepers(false);
   mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = true; mom.lookAt = dad.lookAt = null;
@@ -1275,7 +1303,21 @@ async function finaleScene() {
   await wait(0.4);
   await Promise.all([lookAtPerson(dad, 0.9), say('dad/f_a')]);
   sfx.scream(); await say('mom/f_a');
+  if (proof >= 7) return finaleBelieved();
   return finaleGruesome();
+}
+// how much proof the run has (#proof=N stands in for it, to reach each ending)
+const proofCount = () => (HPARAM.proof !== undefined ? +HPARAM.proof : (RUN.evidence || []).length);
+// they see it, and after everything you showed them they do not argue: they get you out. The night ends here, and the morning drive follows.
+async function finaleBelieved() {
+  UI.subtitle('<i>Dad pulls you behind him. Mom has your arm. Nobody lets go.</i>', 4.5); shake = 0.6;
+  await tween(2.5, (k) => { E.root.position.x = lerp(5.2, 4.6, k); E.tilt = 0.3 + k * 0.4; }, ease.inOut);
+  sfx.violins(0, 2.5); sfx.tension(0, 2); F.flicker = false; await wait(1.5);
+  E.visible = false; W.bathSpot.intensity = 0; nlMult(1, false);
+  UI.subtitle('<i>Then the hall is empty. Nobody goes back to bed.</i>', 4); await wait(3);
+  UI.fade(1, 2.5); await wait(3);
+  F.script = false; F.cutscene = false;
+  return false;
 }
 
 // the last night, the bad ways: it takes them (Dad, then Mom), or nobody ever believes you
@@ -1322,6 +1364,7 @@ async function endingScript() {
   await carLeaving();
   UI.card('7:12 AM', 'They believed you', 4.5);
   await wait(5);
+  $('endtag').innerHTML = 'They believed you.<br>Nobody went back for the rest of your things.';
   uiMode = 'end'; document.exitPointerLock(); UI.show('end'); achievements.ending('ENDING_BELIEVED');
   try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
 }
@@ -1397,7 +1440,7 @@ function update(dt) {
     for (const p of [mom, dad]) {
       if (p.sleeping || p.inCar) continue;
       const g = p.group.position, near = Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5;
-      p.lookAt = near ? camera.position : null;
+      p.lookAt = p.gaze || (near ? camera.position : null);
       if (near && (!p.busy || p.talking)) {
         const want = Math.atan2(P.pos.x - g.x, P.pos.z - g.z);
         p.group.rotation.y = lerpAngle(p.group.rotation.y, want, Math.min(1, dt * (p.talking ? 5 : 3)));
@@ -1410,6 +1453,7 @@ function update(dt) {
   E.update(dt);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
   achievements.tick();
+  if (nights) nights.proof.hud(F.live && !F.dead);
 }
 
 let breathLatch = false, breathPrev = false, breathDownAt = 0, coverPrev = false, nights = null;
@@ -1462,7 +1506,8 @@ UI.makeGrain();
 // the title, pause and options menus (js/menu.js opens them when the #title / #pause screens show)
 function newRun() {   // New game over a saved run: a fresh seed from the first day
   try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
-  Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0 }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {} }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  nights.proof.sync();
   startGame();
 }
 achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter });   // (before menu.init: it adds its panel to the title and pause menus)
