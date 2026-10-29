@@ -1,0 +1,22 @@
+/* Shared look for the Steam capsules: the game's palette and type (css/style.css), a screenshot as the ground, film grain and a vignette. */
+:root { --ink: #e9e2d0; --dim: #a59d8b; --red: #c0261e; --bg: #050506; }
+html, body { margin: 0; padding: 0; background: var(--bg); overflow: hidden; }
+.cap { position: relative; overflow: hidden; background: var(--bg); color: var(--ink); font-family: 'Courier Prime', ui-monospace, monospace; }
+.cap > * { position: absolute; }
+.cap .bg { inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.cap .shade { inset: 0; }
+.cap .vignette { inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.78) 100%); }
+.cap .grain { inset: -2%; opacity: 0.35; mix-blend-mode: overlay; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/></filter><rect width='256' height='256' filter='url(%23n)'/></svg>"); }
+.title { font-family: 'Special Elite', 'Courier Prime', monospace; font-weight: 400; letter-spacing: 0.12em; line-height: 0.95; color: var(--ink); white-space: nowrap;
+  text-shadow: 0 0 40px rgba(0,0,0,1), 0 0 12px rgba(0,0,0,0.9), 0 2px 2px #000; }
+.tag { font-family: 'Courier Prime', ui-monospace, monospace; color: var(--dim); letter-spacing: 0.04em; line-height: 1.35; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
+.rule { height: 1px; background: linear-gradient(90deg, rgba(192,38,30,0) 0%, var(--red) 30%, var(--red) 70%, rgba(192,38,30,0) 100%); opacity: 0.85; }
+/* the thing's face, for the icons: two glowing eyes and the smile, in CSS so it stays crisp at 32 px */
+.face { inset: 0; background: #060607; }
+.face .eye { position: absolute; width: 22%; height: 30%; top: 24%; border-radius: 50%; background: #fff; box-shadow: 0 0 6% 1% rgba(255,255,255,0.55); }
+.face .eye.l { left: 23%; transform: rotate(-12deg); } .face .eye.r { right: 23%; transform: rotate(12deg); }
+.face .eye::after { content: ''; position: absolute; left: 33%; top: 36%; width: 34%; height: 38%; border-radius: 50%; background: #000; }
+/* the grin is a white ellipse with a black one laid over its top: a crescent that scales with the face (border widths cannot take %) */
+.face .smile { position: absolute; left: 22%; width: 56%; top: 52%; height: 26%; border-radius: 50%; background: #fff; overflow: hidden; }
+.face .smile::after { content: ''; position: absolute; left: -6%; width: 112%; top: -70%; height: 122%; border-radius: 50%; background: #060607; }
