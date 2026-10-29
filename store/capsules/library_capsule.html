@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Top Bunk — library capsule 600×900</title>
+  <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/fonts.css">
+  <link rel="stylesheet" href="capsule.css">
+  <style>
+    /* the library grid: the thing fills the frame, the title sits low where the grid's own hover text would be */
+    .cap { width: 600px; height: 900px; }
+    .cap .bg { object-position: 50% 45%; }
+    .shade { background: linear-gradient(180deg, rgba(5,5,6,0.35) 0%, rgba(5,5,6,0) 25%, rgba(5,5,6,0) 60%, rgba(5,5,6,0.94) 100%); }
+    .title { left: 0; right: 0; bottom: 92px; text-align: center; font-size: 92px; letter-spacing: 0.14em; text-indent: 0.14em; }
+    .rule { left: 170px; width: 260px; bottom: 78px; }
+    .tag { left: 0; right: 0; bottom: 44px; text-align: center; font-size: 15px; letter-spacing: 0.32em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="cap">
+    <img class="bg" src="src/portrait_1000x1400.png" onerror="this.onerror=null;this.src='../screenshots/05_end_of_hall.png'" alt="">
+    <div class="shade"></div>
+    <div class="vignette"></div>
+    <div class="title">TOP BUNK</div>
+    <div class="rule"></div>
+    <div class="tag">A short horror game</div>
+    <div class="grain"></div>
+  </div>
+  <script src="capsule.js"></script>
+</body>
+</html>

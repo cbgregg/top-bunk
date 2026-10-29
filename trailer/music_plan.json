@@ -1,0 +1,23 @@
+{
+  "_comment": "How the song is laid under each cut. Times are seconds in the trailer (out) and in the song (src). rate < 1 slows the record and drops its pitch (asetrate), lp is a low-pass in Hz, vib is tape wow depth (0..1), gain is linear. mute windows silence EVERYTHING (the hard cut before the scare).",
+  "landscape": {
+    "segments": [
+      { "out": [0, 56], "src": 0, "rate": 1, "gain": 1, "fadeIn": 0.02 },
+      { "out": [56, 68], "src": 56, "rate": 1, "lp": 6000, "vib": 0.08, "gain": 1 },
+      { "out": [68, 80], "src": 68, "rate": 0.97, "lp": 2800, "vib": 0.15, "gain": 0.95 },
+      { "out": [80, 94], "src": 80, "rate": 0.93, "lp": 1500, "vib": 0.25, "gain": 0.9 },
+      { "out": [94, 108], "src": 94, "rate": 0.86, "lp": 800, "vib": 0.35, "gain": 0.85 },
+      { "out": [113, 139], "src": 113, "rate": 1, "lp": 500, "vib": 0.1, "gain": 0.16, "fadeIn": 1.5, "fadeOut": 9 }
+    ],
+    "mute": [[108, 110]]
+  },
+  "portrait": {
+    "segments": [
+      { "out": [2.92, 19.58], "src": 8, "rate": 1, "gain": 1, "fadeIn": 0.05 },
+      { "out": [19.58, 29.58], "src": 24.66, "rate": 0.97, "lp": 3000, "vib": 0.12, "gain": 0.95 },
+      { "out": [29.58, 38.75], "src": 34.36, "rate": 0.9, "lp": 1200, "vib": 0.28, "gain": 0.9 },
+      { "out": [40, 44], "src": 113, "rate": 1, "lp": 500, "gain": 0.16, "fadeIn": 0.5, "fadeOut": 2.5 }
+    ],
+    "mute": [[38.75, 39.17]]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "name": "top-bunk",
+  "productName": "Top Bunk",
+  "version": "1.0.0",
+  "description": "A first-person horror game. Your family just moved into an old rented farmhouse. Something tall lives in the hallway.",
+  "author": "Top Bunk",
+  "license": "SEE LICENSE IN CREDITS.md",
+  "private": true,
+  "main": "desktop/main.js",
+  "homepage": "https://github.com/cbgregg/top-bunk",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "smoke": "node desktop/smoke.js",
+    "check": "node desktop/check.js",
+    "dist": "electron-builder --win --mac --linux",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0"
+  },
+  "optionalDependencies": {
+    "steamworks.js": "0.4.0"
+  },
+  "build": {
+    "appId": "com.topbunk.game",
+    "productName": "Top Bunk",
+    "copyright": "Top Bunk. Third-party assets: see CREDITS.md",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/steamworks.js/**"
+    ],
+    "npmRebuild": false,
+    "compression": "normal",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "desktop/build"
+    },
+    "files": [
+      "index.html",
+      "js/**/*",
+      "css/**/*",
+      "assets/**/*",
+      "vendor/**/*",
+      "desktop/**/*",
+      "CREDITS.md",
+      "!desktop/build/**",
+      "!desktop/smoke.js",
+      "!desktop/check.js",
+      "!node_modules/@types/**",
+      "!node_modules/undici-types/**",
+      "!**/*.map",
+      "!**/*.md5"
+    ],
+    "win": {
+      "target": [
+        { "target": "dir", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "extraFiles": [
+        { "from": "node_modules/steamworks.js/dist/win64/steam_api64.dll", "to": "steam_api64.dll" }
+      ]
+    },
+    "mac": {
+      "target": [
+        { "target": "dir", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.games",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true
+    },
+    "linux": {
+      "target": [
+        { "target": "dir", "arch": ["x64"] },
+        { "target": "tar.gz", "arch": ["x64"] }
+      ],
+      "executableName": "top-bunk",
+      "category": "Game",
+      "synopsis": "A first-person horror game in an old rented farmhouse.",
+      "extraFiles": [
+        { "from": "node_modules/steamworks.js/dist/linux64/libsteam_api.so", "to": "libsteam_api.so" }
+      ]
+    }
+  }
+}

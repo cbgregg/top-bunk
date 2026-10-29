@@ -1,0 +1,23 @@
+// SteamPipe app build script for Top Bunk. Run from steam/ with upload.sh / upload.ps1, or by hand:
+//   steamcmd +login <account> +run_app_build "<repo>/steam/app_build.vdf" +quit
+// Replace every YOUR_* placeholder with the IDs Steamworks gave you (see ../STEAM.md). Steamworks
+// creates depot AppID+1 for you; create +2 and +3 under SteamPipe > Depots and give each one an OS.
+// Relative paths are resolved from the folder that holds this file.
+"AppBuild"
+{
+	"AppID"       "YOUR_APP_ID"                // the Steam App ID (also goes into ../desktop/steam_appid.txt)
+	"Desc"        "Top Bunk desktop build"     // shown in Steamworks > SteamPipe > Builds; the upload scripts put "Top Bunk <version> (<git sha>)" here
+	"BuildOutput" "./build/"                   // steamcmd logs and chunk cache (git-ignored)
+	"ContentRoot" "../dist/"                   // electron-builder output; each depot narrows this down
+	"SetLive"     ""                           // branch to set live after upload, e.g. "beta". Empty = upload only.
+	                                           // The "default" branch can only be set live from the Steamworks site.
+	"Preview"     "0"                          // "1" = dry run: build the depots locally, upload nothing
+	"Local"       ""                           // path for a local content server (unused)
+
+	"Depots"
+	{
+		"YOUR_DEPOT_ID_WINDOWS" "depot_build_windows.vdf"   // AppID+1, OS = Windows,        64-bit
+		"YOUR_DEPOT_ID_MAC"     "depot_build_mac.vdf"       // AppID+2, OS = macOS
+		"YOUR_DEPOT_ID_LINUX"   "depot_build_linux.vdf"     // AppID+3, OS = Linux + SteamOS, 64-bit
+	}
+}
