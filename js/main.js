@@ -15,6 +15,7 @@ import { createCar } from './cars.js';
 import { createVigil } from './vigil.js';
 import { settings, flicker } from './settings.js';
 import { menu } from './menu.js';
+import { achievements } from './achievements.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -361,7 +362,7 @@ function dropBox() {
 function lookDrawing() {
   if (F.phase === 'night') UI.subtitle("<i>It's different now. The figure is next to the bed... and the kid is falling.</i>", 5.5);
   else UI.subtitle("<i>The last kid drew this. A tall black shape with huge white eyes and a big smile. \"HE WATCHES.\"</i>", 6);
-  sfx.creak(0.12, 0.6, 0.4);
+  sfx.creak(0.12, 0.6, 0.4); achievements.unlock('THE_DRAWING');
 }
 // ---------- dialogue: assets/audio/lines.json holds each line's subtitle and the text the voice reads (tools/gen_voice.py makes the audio) ----------
 let LINES = {};
@@ -1296,7 +1297,7 @@ async function finaleGruesome() {
   await takeThem(dad); await wait(0.6); await takeThem(mom);
   UI.flash('rgba(120,0,0,0.9)', 1.2); shake = 1.2; E.visible = false; sfx.drone(0, 1); sfx.tension(0, 1);
   await wait(1.2);
-  await endGame('They saw it.<br>Then it had them.');
+  await endGame('They saw it.<br>Then it had them.'); achievements.ending('ENDING_TAKEN');
   return true;
 }
 async function finaleNeverBelieved() {
@@ -1304,7 +1305,7 @@ async function finaleNeverBelieved() {
   E.visible = true; E.mode = 'idle'; E.root.position.set(6.4, 0, 1.6); E.faceTowards(6.03, 3.02);
   E.reach = 0.5; E.smileScale = 1.6; E.tilt = 0.4; sfx.stab(); shake = 1; await wait(2);
   sfx.scream(); UI.flash('rgba(255,255,255,0.6)', 0.4); await wait(1.5);
-  await endGame('They never believed you.');
+  await endGame('They never believed you.'); achievements.ending('ENDING_ALONE');
 }
 // the game is over: the ending's line goes on the end screen, and the run is cleared
 async function endGame(line) {
@@ -1321,7 +1322,7 @@ async function endingScript() {
   await carLeaving();
   UI.card('7:12 AM', 'They believed you', 4.5);
   await wait(5);
-  uiMode = 'end'; document.exitPointerLock(); UI.show('end');
+  uiMode = 'end'; document.exitPointerLock(); UI.show('end'); achievements.ending('ENDING_BELIEVED');
   try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
 }
 
@@ -1408,6 +1409,7 @@ function update(dt) {
   WF.update(dt); dust.update(dt);
   E.update(dt);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
+  achievements.tick();
 }
 
 let breathLatch = false, breathPrev = false, breathDownAt = 0, coverPrev = false, nights = null;
@@ -1463,6 +1465,7 @@ function newRun() {   // New game over a saved run: a fresh seed from the first 
   Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0 }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   startGame();
 }
+achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter });   // (before menu.init: it adds its panel to the title and pause menus)
 menu.init({
   startGame, newGame: newRun, hasSave: () => RUN.night >= 2, night: () => Math.min(RUN.night, 10),
   resume: () => setPause(false), pause: () => setPause(true), canPause: () => uiMode === 'playing',
@@ -1472,4 +1475,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { settings, menu, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

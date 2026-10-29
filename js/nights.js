@@ -5,6 +5,7 @@ import { createHunter } from './hunter.js';
 import { createDirector, makePlan, TYPE_NAMES } from './director.js';
 import { NODES, nearestNode } from './nav.js';
 import { pick } from './rng.js';
+import { achievements } from './achievements.js';
 
 const DAWN = 360;   // minutes after midnight
 
@@ -188,7 +189,7 @@ export function createNights(env) {
     if (P.mode === 'hide' && P.pod) { UI.pod(null); P.pod = null; }
     await wait(1.0);
     UI.clock('6:00 AM', `night ${n}`); sfx.chirp && sfx.chirp(0.2);
-    UI.card('6:00 AM', 'You made it', 3.5);
+    UI.card('6:00 AM', 'You made it', 3.5); achievements.survived(n);
     await wait(3.2); UI.fade(1, 2.5); await wait(3);
     F.script = false; UI.clock(null);
     env.RUN.night = n + 1; env.saveRun();
@@ -249,7 +250,7 @@ export function createNights(env) {
         await wait(0.1);
       }
       if (alive(t) && revealed) {   // it was never Dad
-        F.script = true; obj(null); W.tvFx.figure = 1; sfx.staticBurst && sfx.staticBurst(0, 0.6);
+        achievements.unlock('NOT_DAD'); F.script = true; obj(null); W.tvFx.figure = 1; sfx.staticBurst && sfx.staticBurst(0, 0.6);
         env.nlMult(0, false); D.flicker(1.4); await wait(0.5);
         dad.group.visible = false; dad.fake = false; dad.busy = false; W.tvFx.set(false); D.holdTv(false); W.tvFx.figure = 0;
         F.script = false;
@@ -381,14 +382,14 @@ export function createNights(env) {
       if (!alive(t)) return; F.holdDawn = false; F.clock = DAWN;
     },
     // the power is out, one candle in the hall, and grandpa in a chair at the far end of it
-    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)); },
+    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)).then(() => { if (alive(t)) achievements.unlock('GRANDPA'); }); },
     // you fall asleep and dream a drive to the store
     async car(plan, t) {
       await atClock(t, plan.clock0 + 10); if (!alive(t)) return;
       if (P.mode === 'walk' && !hidden()) { sub('<i>You are so tired. You can barely stand.</i>', 4); obj('Go back to bed'); await until(t, () => P.mode === 'bunk' || P.mode === 'hide' || F.clock > plan.clock0 + 70); obj(null); if (!alive(t)) return; }
       await until(t, () => !F.script && !F.cutscene); if (!alive(t)) return;
       if (P.mode === 'walk') env.toBunk();
-      await env.carDream();
+      await env.carDream(); if (alive(t)) achievements.unlock('GLOVE_BOX');   // (opening it gets you caught)
     },
     async hunted() {}, async quiet(plan, t) {
       await atClock(t, plan.clock0 + 10); if (!alive(t)) return;
