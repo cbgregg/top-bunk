@@ -42,7 +42,7 @@ function makeLowPoly({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair
   };
 }
 
-const RQ = new THREE.Quaternion();
+const RQ = new THREE.Quaternion(), _qt = new THREE.Quaternion();
 const GA = new THREE.Vector3(), GB = new THREE.Vector3(), GC = new THREE.Vector3(), GD = new THREE.Vector3(), GE = new THREE.Vector3(), GF = new THREE.Vector3();
 const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0), RG = new THREE.Vector3();
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
@@ -53,16 +53,47 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
   const person = {
     group: g, head, arms: lp.arms, rig: null, lookAt: null,
     pose: null,   // what the body is doing on top of the clip: { lean: 0..1 (bend at the waist), hold: a box mesh (both hands on its sides), reach: Vector3 (both hands to a world point) }
+    ikW: 0, leanNow: 0, snap: new Map(),   // the hands and the waist ease in and out of a pose instead of snapping: letting go blends the last solved arm rotations back to the clip
     update(t, dt = 0.016) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
       r.update(dt);
-      if (this.pose) this.applyPose(r, this.pose);
+      const p = this.pose;
+      if (p && p.sleep) this.applyPose(r, p, 1, 0);
+      else {
+        const k = Math.min(1, dt * 7), want = p && (p.hold || p.reach) ? 1 : 0, leanWant = p ? p.lean || 0 : 0;
+        this.leanNow += (leanWant - this.leanNow) * k;
+        if (want) {
+          // solve the arms fully, then move only part of the way from last frame's solution: the hands settle onto a thing in a few frames and never flail
+          const prevW = this.ikW; this.ikW = 1; this.applyPose(r, p, 1, this.leanNow); this.smoothSnap(r, Math.min(1, dt * 12), prevW);
+        } else {
+          this.ikW += (0 - this.ikW) * k;
+          if (Math.abs(this.leanNow) > 1e-3) this.applyPose(r, {}, 0, this.leanNow);
+          if (this.ikW > 0.005) this.blendSnap(r, this.ikW); else this.snap.clear();
+        }
+      }
       r.lookAt(this.lookAt, dt);
       r.updateJaw(dt);
     },
+    // letting go: remember what the arm bones were doing with the thing, and ease from that back to the clip (no solver against a target that is walking away)
+    // (the bones keep their Bip01_ prefix; only the rig's lookup keys drop it)
+    // after a solve: each arm bone goes a fraction of the way from last frame's solved rotation to this frame's, and that becomes the new memory
+    smoothSnap(r, a, prevW = 1) {
+      for (const [b, clipQ] of r.saved) {
+        if (!/^(Bip01_?)?[LR]_(UpperArm|Forearm|Hand|Finger)/.test(b.name)) continue;
+        let s = this.snap.get(b);
+        if (!s) { s = clipQ.clone(); this.snap.set(b, s); }                       // the first frame of a reach starts from the clip's pose
+        else if (prevW < 0.999) s.copy(_qt.copy(clipQ).slerp(s, prevW));       // ...or, mid-way through letting go, from the pose that is actually on screen
+        s.slerp(b.quaternion, a); b.quaternion.copy(s); b.updateMatrix();
+      }
+      r.root.updateMatrixWorld(true);
+    },
+    blendSnap(r, w) {
+      for (const [b, q] of this.snap) { if (!r.saved.has(b)) r.saved.set(b, b.quaternion.clone()); b.quaternion.slerp(q, w); b.updateMatrix(); }
+      r.root.updateMatrixWorld(true);
+    },
     // Two-bone arm IK: the hand lands on the target and the elbow bends toward the pole, so hands rest ON things instead of passing through them.
-    ik(r, side, T, pole) {
+    ik(r, side, T, pole, w = 1) {
       const up = r.bones[side + '_UpperArm'], fo = r.bones[side + '_Forearm'], hand = r.bones[side + '_Hand'];
       for (const b of [up, fo, hand]) b.updateWorldMatrix(true, false);
       up.getWorldPosition(RS); fo.getWorldPosition(RE); hand.getWorldPosition(RH);
@@ -71,13 +102,13 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
       RP.copy(pole).addScaledVector(RD, -pole.dot(RD)).normalize();
       RT.copy(RS).addScaledVector(RD, a).addScaledVector(RP, h);              // the elbow
-      r.aim(up, fo, RB.copy(RT).sub(RS).normalize(), 1);
+      r.aim(up, fo, RB.copy(RT).sub(RS).normalize(), w);
       fo.updateWorldMatrix(true, false); fo.getWorldPosition(RE);
       RT.copy(RS).addScaledVector(RD, d);                                      // the reachable hand position
-      r.aim(fo, hand, RB.copy(RT).sub(RE).normalize(), 1);
+      r.aim(fo, hand, RB.copy(RT).sub(RE).normalize(), w);
     },
     // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), then curl every finger toward it.
-    grip(r, side, c, amount) {
+    grip(r, side, c, amount, w = 1) {
       const B = r.bones, hand = B[side + '_Hand'], fo = B[side + '_Forearm'], i1 = B[side + '_Finger1'], i2 = B[side + '_Finger2'], i4 = B[side + '_Finger4'];
       if (!hand || !fo || !i1 || !i2 || !i4) return;
       for (const b of [fo, hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
@@ -88,7 +119,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const latT = GD.crossVectors(fa, cp); if (latT.dot(lat) < 0) latT.negate();
       const lp = GE.copy(lat).addScaledVector(fa, -lat.dot(fa)).normalize(), tp = latT.addScaledVector(fa, -latT.dot(fa)).normalize();
       const roll = Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp));
-      r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll));
+      r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll * w));
       for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
       i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
       const d = GA.copy(RA).sub(RH).normalize(), ax = GC.copy(RT).sub(RS).normalize();
@@ -98,14 +129,14 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         chain.forEach((n, i) => { const b = B[side + '_' + n]; if (b) r.rotateWorld(b, new THREE.Quaternion().setFromAxisAngle(ax, total * k * [0.35, 0.4, 0.25][i])); });
       }
     },
-    applyPose(r, p) {
+    applyPose(r, p, w = 1, lean = p.lean || 0) {
       if (p.sleep) {   // asleep on the back: the head turned toward the room, the feet flat, a slow breath in the chest
         r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * p.sleep);
         r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.25);   // toes pointed along the bed, so they stay under the quilt
         r.bend(['Spine1', 'Spine2'], [0.5, 0.5], [1, 0, 0], 0.03 + Math.sin(performance.now() * 0.0011) * 0.025);
         return;
       }
-      if (p.lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], p.lean);
+      if (lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], lean);
       this.group.getWorldQuaternion(RQ); RF.set(0, 0, 1).applyQuaternion(RQ); const y = Math.atan2(RF.x, RF.z), left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));   // (world facing: the people can sit in a car that is turned)
       for (const [s, sg] of [['L', 1], ['R', -1]]) {
         let T = null;
@@ -114,9 +145,9 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
           const hw = p.hold.geometry.parameters.width / 2 * p.hold.getWorldScale(RS).x;
           T = RC.clone().addScaledVector(left, sg * (hw + 0.035)); T.y -= 0.03; T.addScaledVector(fwd, -0.04);
         } else if (p.reach) T = p.reach.clone().addScaledVector(left, sg * 0.08);
-        if (!T) continue;
-        this.ik(r, s, T, RPole.copy(left).multiplyScalar(sg * 0.7).addScaledVector(fwd, -0.3).add(RDown));
-        this.grip(r, s, RG.copy(left).multiplyScalar(-sg), p.hold ? 0.3 : 0.75);   // flat on the box, or closed around what is being picked up
+        if (!T || w <= 0.005) continue;
+        this.ik(r, s, T, RPole.copy(left).multiplyScalar(sg * 0.7).addScaledVector(fwd, -0.3).add(RDown), w);
+        this.grip(r, s, RG.copy(left).multiplyScalar(-sg), (p.hold ? 0.3 : 0.75) * w, w);   // flat on the box, or closed around what is being picked up
       }
     },
     talk(env) { if (this.rig) this.rig.talk(env); },

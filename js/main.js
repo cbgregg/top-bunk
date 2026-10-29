@@ -690,7 +690,7 @@ const TRUCK_PICK = new V3(2.3, 0.55, -15.2), RAMP_FOOT = new V3(2.3, 0, -11.3), 
 const LIVING_SPOTS = [new V3(0.85, 0, -3.75), new V3(-0.2, 0, -3.85), new V3(0.35, 0, -2.7)];
 const KITCHEN_BOX = new V3(1.2, 0, 1.4), DAD_HOME = new V3(0.2, 0, 0.6), ARCH = new V3(1.7, 0, -1.0), ARCH_IN = new V3(1.7, 0, 0.3);
 const COUNTER = [[2.8, 0.95, 1.95], [2.8, 0.95, 2.25], [2.8, 0.95, 2.55], [0.0, 0.95, 3.3], [-0.3, 0.95, 3.3], [2.2, 0.95, 3.3]];   // where Mom puts things (the east counter and the back counter)
-const rampY = (x, z) => (Math.abs(x - 2.3) < 0.9 ? clamp((-11.4 - z) * 0.18, 0, 0.55) : 0);
+const rampY = (x, z) => clamp((-11.4 - z) * 0.18, 0, 0.55) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // (fades out at the ramp's sides: no step up or down)
 const stillOn = (run) => run === chore.run;
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
@@ -717,13 +717,13 @@ async function walkTo(who, pts, speed = 1.25) {
     if (!stillOn(run)) return false;
     const x0 = g.x, z0 = g.z, d = Math.hypot(p.x - x0, p.z - z0);
     if (d < 0.03) continue;
-    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed; let stride = 0;
+    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed, turnT = Math.min(dur, 0.25 + Math.abs(angDiff(yaw0, want)) * 0.3); let stride = 0;   // a turn takes time in proportion to its angle
     if (who.rig) who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 }); who.walking = speed / 1.25;
     await htween(who, dur, (k) => {
       if (!stillOn(run)) return;
       g.x = x0 + (p.x - x0) * k; g.z = z0 + (p.z - z0) * k; g.y = rampY(g.x, g.z);
       if ((stride += speed * 0.0167) > 0.72) { stride = 0; stepSound(g); }
-      who.group.rotation.y = lerpAngle(yaw0, want, Math.min(1, k * dur / 0.35));
+      who.group.rotation.y = lerpAngle(yaw0, want, ease.inOut(Math.min(1, k * dur / turnT)));
     }, ease.lin);
   }
   who.walking = 0;
