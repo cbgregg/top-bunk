@@ -23,6 +23,14 @@ function grain(g, w, h, amt, r) {
   g.putImageData(d, 0, 0);
 }
 function wrapDraw(w, h, fn) { for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) fn(ox, oy); }
+// Web fonts used inside textures are often not ready when the world is built
+// (and iOS falls back to a swirly script for `cursive`). Draw now with the
+// fallback, then redraw the same canvas once the real font arrives.
+function redrawWhenFont(tex, fonts, paint) {
+  if (!document.fonts || !document.fonts.load) return;
+  if (fonts.every((f) => document.fonts.check(f))) return;
+  Promise.all(fonts.map((f) => document.fonts.load(f).catch(() => null))).then(() => { paint(); tex.needsUpdate = true; });
+}
 function stains(g, S, r, n, color, maxR) {
   for (let i = 0; i < n; i++) {
     const x = r() * S, y = r() * S, rad = maxR * (0.3 + r() * 0.7);
@@ -186,15 +194,21 @@ export function barnBoards() {
 }
 
 export function cardboard(label = 'KIDS ROOM', seed = 1) {
-  const S = 256, [c, g] = mk(S), r = rng(91 + seed);
-  g.fillStyle = '#ad8352'; g.fillRect(0, 0, S, S);
-  stains(g, S, r, 5, 'rgba(90,60,30,0.3)', 60);
-  g.fillStyle = 'rgba(205,175,120,0.75)'; g.fillRect(S / 2 - 22, 0, 44, S);
-  g.save(); g.translate(S / 2, S * 0.68); g.rotate((r() - 0.5) * 0.25);
-  g.fillStyle = '#1b1612'; g.font = 'bold 30px "Permanent Marker", "Comic Sans MS", cursive'; g.textAlign = 'center';
-  g.fillText(label, 0, 0); g.restore();
-  grain(g, S, S, 14, r);
-  return toTex(c, { wrap: false });
+  const S = 256, [c, g] = mk(S);
+  const paint = () => {
+    const r = rng(91 + seed);
+    g.globalAlpha = 1; g.fillStyle = '#ad8352'; g.fillRect(0, 0, S, S);
+    stains(g, S, r, 5, 'rgba(90,60,30,0.3)', 60);
+    g.fillStyle = 'rgba(205,175,120,0.75)'; g.fillRect(S / 2 - 22, 0, 44, S);
+    g.save(); g.translate(S / 2, S * 0.68); g.rotate((r() - 0.5) * 0.25);
+    g.fillStyle = '#1b1612'; g.font = 'bold 30px "Permanent Marker", "Comic Sans MS", "Marker Felt", sans-serif'; g.textAlign = 'center';
+    g.fillText(label, 0, 0); g.restore();
+    grain(g, S, S, 14, r);
+  };
+  paint();
+  const t = toTex(c, { wrap: false });
+  redrawWhenFont(t, ['bold 30px "Permanent Marker"'], paint);
+  return t;
 }
 
 export function plaid() {
@@ -236,72 +250,79 @@ export function runner() {
 
 // Crayon drawing left by the previous kid. v=0 day, v=1 night (it changed).
 export function drawing(v = 0) {
-  const W = 512, Hh = 384, [c, g] = mk(W, Hh), r = rng(v ? 99 : 42);
-  g.fillStyle = '#ece4cf'; g.fillRect(0, 0, W, Hh);
-  stains(g, W, r, 4, 'rgba(150,120,60,0.2)', 80);
-  const crayon = (pts, color, width = 6, passes = 3) => {
-    g.strokeStyle = color; g.lineCap = 'round'; g.lineJoin = 'round';
-    for (let p = 0; p < passes; p++) {
-      g.lineWidth = width * (0.6 + r() * 0.6); g.globalAlpha = 0.55 + r() * 0.35;
-      g.beginPath();
-      pts.forEach(([x, y], i) => { const jx = x + (r() - 0.5) * 4, jy = y + (r() - 0.5) * 4; i ? g.lineTo(jx, jy) : g.moveTo(jx, jy); });
-      g.stroke();
+  const W = 512, Hh = 384, [c, g] = mk(W, Hh);
+  const paint = () => {
+    const r = rng(v ? 99 : 42);
+    g.globalAlpha = 1;
+    g.fillStyle = '#ece4cf'; g.fillRect(0, 0, W, Hh);
+    stains(g, W, r, 4, 'rgba(150,120,60,0.2)', 80);
+    const crayon = (pts, color, width = 6, passes = 3) => {
+      g.strokeStyle = color; g.lineCap = 'round'; g.lineJoin = 'round';
+      for (let p = 0; p < passes; p++) {
+        g.lineWidth = width * (0.6 + r() * 0.6); g.globalAlpha = 0.55 + r() * 0.35;
+        g.beginPath();
+        pts.forEach(([x, y], i) => { const jx = x + (r() - 0.5) * 4, jy = y + (r() - 0.5) * 4; i ? g.lineTo(jx, jy) : g.moveTo(jx, jy); });
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    };
+    const fillRow = (x0, x1, y, color) => crayon([[x0, y], [x1, y + (r() - 0.5) * 5]], color, 6, 1);
+    // ground
+    crayon([[10, 345], [500, 340]], '#3f8a3a', 9);
+    // bunk bed (right)
+    const bx0 = 320, bx1 = 480;
+    crayon([[bx0, 345], [bx0, 150]], '#7a4a22', 8); crayon([[bx1, 345], [bx1, 150]], '#7a4a22', 8);
+    crayon([[bx0, 300], [bx1, 300]], '#7a4a22', 10); crayon([[bx0, 215], [bx1, 215]], '#7a4a22', 10);
+    crayon([[bx0 + 10, 290], [bx1 - 10, 290]], '#3a5aa0', 12); crayon([[bx0 + 10, 205], [bx1 - 10, 205]], '#3a5aa0', 12);
+    if (!v) {
+      // kid asleep on top bunk
+      g.fillStyle = '#e8b890'; g.beginPath(); g.arc(bx0 + 30, 188, 12, 0, 7); g.fill();
+      crayon([[bx0 + 42, 192], [bx1 - 30, 192]], '#c33', 7);
+    } else {
+      // kid falling off the top bunk
+      g.fillStyle = '#e8b890'; g.beginPath(); g.arc(275, 225, 12, 0, 7); g.fill();
+      crayon([[280, 236], [262, 280]], '#c33', 7);
+      crayon([[270, 260], [245, 250]], '#c33', 4); crayon([[270, 260], [290, 280]], '#c33', 4);
+      crayon([[262, 280], [240, 300]], '#c33', 4); crayon([[262, 280], [280, 305]], '#c33', 4);
+      crayon([[300, 200], [312, 192]], '#555', 3); crayon([[300, 215], [314, 210]], '#555', 3);
+    }
+    // the tall one
+    const fx = v ? 230 : 95, top = 40;
+    for (let y = top + 70; y < 260; y += 4) { const w = 28 + Math.sin((y - top) / 60) * 6; fillRow(fx - w, fx + w, y, '#111'); }
+    for (let y = 260; y < 342; y += 4) { fillRow(fx - 26, fx - 12, y, '#111'); fillRow(fx + 12, fx + 26, y, '#111'); }
+    if (v) {
+      crayon([[fx + 28, 130], [fx + 80, 180], [fx + 105, 205]], '#111', 9);
+      crayon([[fx - 28, 130], [fx + 30, 190], [fx + 95, 225]], '#111', 9);
+    } else {
+      crayon([[fx - 30, 125], [fx - 44, 220], [fx - 46, 300]], '#111', 8);
+      crayon([[fx + 30, 125], [fx + 44, 220], [fx + 46, 300]], '#111', 8);
+    }
+    for (let y = top; y < top + 78; y += 3) { const dy = y - (top + 39); const w = Math.sqrt(Math.max(0, 39 * 39 - dy * dy)) * 0.95; fillRow(fx - w, fx + w, y, '#111'); }
+    g.fillStyle = '#fff';
+    g.beginPath(); g.ellipse(fx - 14, top + 30, 11, 13, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(fx + 14, top + 30, 11, 13, 0, 0, 7); g.fill();
+    g.fillStyle = '#000';
+    g.beginPath(); g.arc(fx - 14 + (v ? 3 : 0), top + 32, 7, 0, 7); g.fill();
+    g.beginPath(); g.arc(fx + 14 + (v ? 3 : 0), top + 32, 7, 0, 7); g.fill();
+    g.fillStyle = '#fff';
+    g.beginPath(); g.moveTo(fx - 32, top + 46); g.quadraticCurveTo(fx, top + 82, fx + 32, top + 46); g.quadraticCurveTo(fx, top + 62, fx - 32, top + 46); g.fill();
+    g.strokeStyle = '#111'; g.lineWidth = 1.5;
+    for (let i = -24; i <= 24; i += 6) { g.beginPath(); g.moveTo(fx + i, top + 52); g.lineTo(fx + i, top + 66 - Math.abs(i) * 0.3); g.stroke(); }
+    // words
+    const words = v ? 'HE PUSHES' : 'HE WATCHES';
+    g.font = 'bold 40px "Gloria Hallelujah", "Comic Sans MS", "Marker Felt", sans-serif'; g.fillStyle = '#b3201c';
+    let x = v ? 30 : 190;
+    for (const ch of words) {
+      g.save(); g.translate(x, 375 - (v ? 0 : 0)); g.rotate((r() - 0.5) * 0.35);
+      g.globalAlpha = 0.85; g.fillText(ch, 0, -(r() * 6)); g.restore(); x += ch === ' ' ? 14 : 27;
     }
     g.globalAlpha = 1;
+    grain(g, W, Hh, 12, r);
   };
-  const fillRow = (x0, x1, y, color) => crayon([[x0, y], [x1, y + (r() - 0.5) * 5]], color, 6, 1);
-  // ground
-  crayon([[10, 345], [500, 340]], '#3f8a3a', 9);
-  // bunk bed (right)
-  const bx0 = 320, bx1 = 480;
-  crayon([[bx0, 345], [bx0, 150]], '#7a4a22', 8); crayon([[bx1, 345], [bx1, 150]], '#7a4a22', 8);
-  crayon([[bx0, 300], [bx1, 300]], '#7a4a22', 10); crayon([[bx0, 215], [bx1, 215]], '#7a4a22', 10);
-  crayon([[bx0 + 10, 290], [bx1 - 10, 290]], '#3a5aa0', 12); crayon([[bx0 + 10, 205], [bx1 - 10, 205]], '#3a5aa0', 12);
-  if (!v) {
-    // kid asleep on top bunk
-    g.fillStyle = '#e8b890'; g.beginPath(); g.arc(bx0 + 30, 188, 12, 0, 7); g.fill();
-    crayon([[bx0 + 42, 192], [bx1 - 30, 192]], '#c33', 7);
-  } else {
-    // kid falling off the top bunk
-    g.fillStyle = '#e8b890'; g.beginPath(); g.arc(275, 225, 12, 0, 7); g.fill();
-    crayon([[280, 236], [262, 280]], '#c33', 7);
-    crayon([[270, 260], [245, 250]], '#c33', 4); crayon([[270, 260], [290, 280]], '#c33', 4);
-    crayon([[262, 280], [240, 300]], '#c33', 4); crayon([[262, 280], [280, 305]], '#c33', 4);
-    crayon([[300, 200], [312, 192]], '#555', 3); crayon([[300, 215], [314, 210]], '#555', 3);
-  }
-  // the tall one
-  const fx = v ? 230 : 95, top = 40;
-  for (let y = top + 70; y < 260; y += 4) { const w = 28 + Math.sin((y - top) / 60) * 6; fillRow(fx - w, fx + w, y, '#111'); }
-  for (let y = 260; y < 342; y += 4) { fillRow(fx - 26, fx - 12, y, '#111'); fillRow(fx + 12, fx + 26, y, '#111'); }
-  if (v) {
-    crayon([[fx + 28, 130], [fx + 80, 180], [fx + 105, 205]], '#111', 9);
-    crayon([[fx - 28, 130], [fx + 30, 190], [fx + 95, 225]], '#111', 9);
-  } else {
-    crayon([[fx - 30, 125], [fx - 44, 220], [fx - 46, 300]], '#111', 8);
-    crayon([[fx + 30, 125], [fx + 44, 220], [fx + 46, 300]], '#111', 8);
-  }
-  for (let y = top; y < top + 78; y += 3) { const dy = y - (top + 39); const w = Math.sqrt(Math.max(0, 39 * 39 - dy * dy)) * 0.95; fillRow(fx - w, fx + w, y, '#111'); }
-  g.fillStyle = '#fff';
-  g.beginPath(); g.ellipse(fx - 14, top + 30, 11, 13, 0, 0, 7); g.fill();
-  g.beginPath(); g.ellipse(fx + 14, top + 30, 11, 13, 0, 0, 7); g.fill();
-  g.fillStyle = '#000';
-  g.beginPath(); g.arc(fx - 14 + (v ? 3 : 0), top + 32, 7, 0, 7); g.fill();
-  g.beginPath(); g.arc(fx + 14 + (v ? 3 : 0), top + 32, 7, 0, 7); g.fill();
-  g.fillStyle = '#fff';
-  g.beginPath(); g.moveTo(fx - 32, top + 46); g.quadraticCurveTo(fx, top + 82, fx + 32, top + 46); g.quadraticCurveTo(fx, top + 62, fx - 32, top + 46); g.fill();
-  g.strokeStyle = '#111'; g.lineWidth = 1.5;
-  for (let i = -24; i <= 24; i += 6) { g.beginPath(); g.moveTo(fx + i, top + 52); g.lineTo(fx + i, top + 66 - Math.abs(i) * 0.3); g.stroke(); }
-  // words
-  const words = v ? 'HE PUSHES' : 'HE WATCHES';
-  g.font = 'bold 40px "Comic Sans MS", cursive'; g.fillStyle = '#b3201c';
-  let x = v ? 30 : 190;
-  for (const ch of words) {
-    g.save(); g.translate(x, 375 - (v ? 0 : 0)); g.rotate((r() - 0.5) * 0.35);
-    g.globalAlpha = 0.85; g.fillText(ch, 0, -(r() * 6)); g.restore(); x += ch === ' ' ? 14 : 27;
-  }
-  g.globalAlpha = 1;
-  grain(g, W, Hh, 12, r);
-  const t = toTex(c, { wrap: false }); return t;
+  paint();
+  const t = toTex(c, { wrap: false });
+  redrawWhenFont(t, ['bold 40px "Gloria Hallelujah"'], paint);
+  return t;
 }
 
 export function painting(kind = 0) {

@@ -197,9 +197,11 @@ function nlMult(m, flick = true) {
 function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
     p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
-    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.4 }); }
+    // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
+    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
     else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
   }
+  W.bedSleepers.set(on);
 }
 
 // ---------- phases (lighting) ----------
@@ -609,11 +611,14 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
   P.mode = 'cine'; P.cam.copy(camera.position);
   camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
   const cp = P.cam.clone();
+  // it lunges from where it actually is (if it is in front of you), not from a spot re-centred 1.7 m away: no backward pop at the moment it gets you
+  let dx = fwd.x, dz = fwd.z, d0 = 1.7;
+  if (!opts.unseen && E.visible) { const ex = E.root.position.x - cp.x, ez = E.root.position.z - cp.z, d = Math.hypot(ex, ez); if (d > 0.3 && (ex * fwd.x + ez * fwd.z) / d > 0.25) { dx = ex / d; dz = ez / d; d0 = clamp(d, 0.8, 1.7); } }
   if (!opts.unseen) { E.visible = true; E.mode = 'idle'; E.reach = 1; E.lean = 0.12; E.smileScale = 1.3; E.tilt = 0.3; E.lookTarget = camera.position; }
-  const place = (d) => { if (opts.unseen) return; E.root.position.set(cp.x + fwd.x * d, cp.y - 2.2, cp.z + fwd.z * d); E.faceTowards(cp.x, cp.z); };
-  place(1.7);
+  const place = (d) => { if (opts.unseen) return; E.root.position.set(cp.x + dx * d, cp.y - 2.2, cp.z + dz * d); E.faceTowards(cp.x, cp.z); };
+  place(d0);
   sfx.scream(); sfx.jolt(1); shake = 1.4; UI.flash('rgba(255,255,255,0.5)', 0.25);
-  await tween(0.3, (k) => place(1.7 - k * 1.25), ease.in);
+  await tween(0.3, (k) => place(d0 - k * (d0 - 0.45)), ease.in);
   await wait(0.4);
   UI.fade(1, 0.05);
   E.visible = false; sfx.drone(0, 1); sfx.tension(0, 0.3); sfx.bed('music/chase', 0, 0.3);
@@ -685,7 +690,7 @@ const TRUCK_PICK = new V3(2.3, 0.55, -15.2), RAMP_FOOT = new V3(2.3, 0, -11.3), 
 const LIVING_SPOTS = [new V3(0.85, 0, -3.75), new V3(-0.2, 0, -3.85), new V3(0.35, 0, -2.7)];
 const KITCHEN_BOX = new V3(1.2, 0, 1.4), DAD_HOME = new V3(0.2, 0, 0.6), ARCH = new V3(1.7, 0, -1.0), ARCH_IN = new V3(1.7, 0, 0.3);
 const COUNTER = [[2.8, 0.95, 1.95], [2.8, 0.95, 2.25], [2.8, 0.95, 2.55], [0.0, 0.95, 3.3], [-0.3, 0.95, 3.3], [2.2, 0.95, 3.3]];   // where Mom puts things (the east counter and the back counter)
-const rampY = (x, z) => (Math.abs(x - 2.3) < 0.9 ? clamp((-11.4 - z) * 0.18, 0, 0.55) : 0);
+const rampY = (x, z) => clamp((-11.4 - z) * 0.18, 0, 0.55) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // (fades out at the ramp's sides: no step up or down)
 const stillOn = (run) => run === chore.run;
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
@@ -693,6 +698,18 @@ function stepSound(g) {   // somebody else's footstep, quieter with distance and
   if (room === 'out') sfx.grassStep(0.3 / (1 + d * 0.35), panFor(tmp2.set(g.x, 1, g.z))); else sfx.footstep(0.3 / (1 + d * 0.3), panFor(tmp2.set(g.x, 1, g.z)), 0.25, hard ? 'tile' : 'carpet');
 }
 const idle = (who) => { if (who.rig) who.rig.play('idle', { fade: 0.3, speed: 1 }); };
+// a chore tween: like tween, but it stands still while who.held (you are talking to them), and carries on after
+function htween(who, dur, fn, e = ease.inOut) {
+  return new Promise((res) => {
+    let k = 0, last = gameTime, held = false; fn(0);
+    waiters.push({ res, check: () => {
+      const now = gameTime, dt = now - last; last = now;
+      if (who.held) { if (!held) { held = true; idle(who); } return false; }
+      if (held) { held = false; if (who.walking && who.rig) who.rig.play('walk', { fade: 0.25, speed: who.walking }); }
+      k = Math.min(1, k + dt / dur); fn(e(k)); return k >= 1;
+    } });
+  });
+}
 
 async function walkTo(who, pts, speed = 1.25) {
   const run = chore.run, g = who.group.position;
@@ -700,21 +717,22 @@ async function walkTo(who, pts, speed = 1.25) {
     if (!stillOn(run)) return false;
     const x0 = g.x, z0 = g.z, d = Math.hypot(p.x - x0, p.z - z0);
     if (d < 0.03) continue;
-    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed; let stride = 0;
-    if (who.rig) who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 });
-    await tween(dur, (k) => {
+    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed, turnT = Math.min(dur, 0.25 + Math.abs(angDiff(yaw0, want)) * 0.3); let stride = 0;   // a turn takes time in proportion to its angle
+    if (who.rig) who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 }); who.walking = speed / 1.25;
+    await htween(who, dur, (k) => {
       if (!stillOn(run)) return;
       g.x = x0 + (p.x - x0) * k; g.z = z0 + (p.z - z0) * k; g.y = rampY(g.x, g.z);
       if ((stride += speed * 0.0167) > 0.72) { stride = 0; stepSound(g); }
-      who.group.rotation.y = lerpAngle(yaw0, want, Math.min(1, k * dur / 0.35));
+      who.group.rotation.y = lerpAngle(yaw0, want, ease.inOut(Math.min(1, k * dur / turnT)));
     }, ease.lin);
   }
+  who.walking = 0;
   if (!stillOn(run)) return false;
   idle(who); return true;
 }
 function turnToward(who, x, z, dur = 0.45) {
   const y0 = who.group.rotation.y, w = Math.atan2(x - who.group.position.x, z - who.group.position.z);
-  return tween(dur, (k) => { who.group.rotation.y = lerpAngle(y0, w, k); });
+  return htween(who, dur, (k) => { who.group.rotation.y = lerpAngle(y0, w, k); });
 }
 // a box with flaps that open, and a few things to take out of it
 function openable(b) {
@@ -750,12 +768,12 @@ function holdUp(who, box) {
 }
 async function setDown(who, box, spot) {
   const run = chore.run, h = bodyH(who), y0 = box.position.y, z0 = box.position.z;
-  await tween(0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k - 0.0; box.position.z = z0 + 0.16 * k; });
+  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k - 0.0; box.position.z = z0 + 0.16 * k; });
   if (!stillOn(run)) return false;
   scene.attach(box); box.position.set(spot.x, box.geometry.parameters.height / 2, spot.z); box.rotation.set(0, who.group.rotation.y + 0.15, 0); sfx.thump();
   W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
   who.pose = { lean: 0.75, reach: wpos(box).add(new V3(0, 0.25, 0)) };
-  await tween(0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.75 * (1 - k) }; });
+  await htween(who, 0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.75 * (1 - k) }; });
   who.pose = null; return stillOn(run);
 }
 // open a box on the floor and take things out of it; each thing ends up beside it
@@ -764,8 +782,8 @@ async function unpackFloor(who, box, kinds, stand) {
   if (!(await walkTo(who, [stand]))) return false;
   await turnToward(who, box.position.x, box.position.z);
   const top = new V3(box.position.x, box.geometry.parameters.height + 0.02, box.position.z);
-  await tween(0.7, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * k, reach: top }; });
-  await tween(0.6, (k) => { if (stillOn(run)) open(k); });
+  await htween(who, 0.7, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * k, reach: top }; });
+  await htween(who, 0.6, (k) => { if (stillOn(run)) open(k); });
   const side = new V3(Math.cos(who.group.rotation.y), 0, -Math.sin(who.group.rotation.y)), fwdv = new V3(Math.sin(who.group.rotation.y), 0, Math.cos(who.group.rotation.y));
   let i = 0;
   for (const kind of kinds) {
@@ -773,7 +791,7 @@ async function unpackFloor(who, box, kinds, stand) {
     const th = makeThing(kind); scene.add(th); dressing.push(th);
     const a = top.clone().add(new V3(0, 0.02, 0)), b = box.position.clone().addScaledVector(side, 0.55 + 0.2 * i).addScaledVector(fwdv, -0.1 * i); b.y = 0.0;
     const c = new V3(), lift = new V3();
-    await tween(0.9, (k) => {
+    await htween(who, 0.9, (k) => {
       if (!stillOn(run)) return;
       lift.lerpVectors(a, b, k); lift.y = a.y + Math.sin(Math.min(1, k * 1.15) * Math.PI) * 0.35 * (1 - k) + (b.y - a.y) * k + 0.1;
       th.position.copy(lift); c.copy(lift); c.y += 0.08; who.pose = { lean: 0.8, reach: c.clone() }; th.position.y = lift.y - 0.05;
@@ -781,7 +799,7 @@ async function unpackFloor(who, box, kinds, stand) {
     th.position.copy(b); sfx.thump(0.35);
     i++;
   }
-  await tween(0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * (1 - k) }; });
+  await htween(who, 0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * (1 - k) }; });
   who.pose = null; return stillOn(run);
 }
 
@@ -795,7 +813,7 @@ async function dadChores() {
     if (!(await walkTo(dad, i === 0 ? [RAMP_FOOT, TRUCK_PICK] : [DOOR_IN, DOOR_OUT, PORCH, RAMP_FOOT, TRUCK_PICK]))) return;   // back out through the front door, never through the wall
     await turnToward(dad, g.x, g.z - 1);
     const grab = new V3(g.x, 0.55 + 0.55, g.z - 0.7);
-    await tween(0.8, (k) => { if (stillOn(run)) dad.pose = { lean: 0.5 * Math.sin(k * Math.PI / 2), reach: grab }; });
+    await htween(dad, 0.8, (k) => { if (stillOn(run)) dad.pose = { lean: 0.5 * Math.sin(k * Math.PI / 2), reach: grab }; });
     if (!stillOn(run)) return;
     holdUp(dad, box); box.visible = true; sfx.thump(0.4);
     // down the ramp, along the path and in the front door, to the spot in the living room
@@ -825,13 +843,13 @@ async function momChores() {
   if (!(await walkTo(mom, [stand]))) return;
   await turnToward(mom, box.position.x, box.position.z);
   const top = new V3(box.position.x, 0.44, box.position.z);
-  await tween(0.8, (k) => { if (stillOn(run)) mom.pose = { lean: 0.75 * k, reach: top }; });
-  await tween(0.6, (k) => { if (stillOn(run)) open(k); });
+  await htween(mom, 0.8, (k) => { if (stillOn(run)) mom.pose = { lean: 0.75 * k, reach: top }; });
+  await htween(mom, 0.6, (k) => { if (stillOn(run)) open(k); });
   for (let i = 0; i < things.length && stillOn(run); i++) {
     const th = makeThing(things[i]); scene.add(th); dressing.push(th);
     const [cx, cy, cz] = COUNTER[i], hold = new V3();
     // lift it out of the box, then stand up with it
-    await tween(0.9, (k) => { if (!stillOn(run)) return; th.position.set(top.x, 0.44 + 0.3 * k, top.z); hold.copy(th.position).add(new V3(0, 0.08, 0)); mom.pose = { lean: 0.75 * (1 - 0.5 * k), reach: hold.clone() }; });
+    await htween(mom, 0.9, (k) => { if (!stillOn(run)) return; th.position.set(top.x, 0.44 + 0.3 * k, top.z); hold.copy(th.position).add(new V3(0, 0.08, 0)); mom.pose = { lean: 0.75 * (1 - 0.5 * k), reach: hold.clone() }; });
     // carry it to its place on the counter
     const east = cx > 2.5, sx = east ? cx - 0.65 : cx, sz = east ? cz : cz - 0.9;
     mom.pose = { reach: null };
@@ -847,7 +865,7 @@ async function momChores() {
     if (!okp) return;
     await turnToward(mom, cx, cz, 0.4);
     const c0 = th.position.clone(), c1 = new V3(cx, cy, cz);
-    await tween(0.7, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(c0, c1, k); mom.pose = { lean: 0.25 * Math.sin(k * Math.PI), reach: th.position.clone().add(new V3(0, 0.05, 0)) }; });
+    await htween(mom, 0.7, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(c0, c1, k); mom.pose = { lean: 0.25 * Math.sin(k * Math.PI), reach: th.position.clone().add(new V3(0, 0.05, 0)) }; });
     sfx.thump(0.3); mom.pose = null;
     if (i < things.length - 1) { if (!(await walkTo(mom, [stand]))) return; await turnToward(mom, box.position.x, box.position.z, 0.4); }
   }
@@ -1065,11 +1083,18 @@ async function conversation(lines) {
   }
   P.mode = 'walk';
 }
-// a day talk: the camera goes in close on whoever speaks, and comes back
+// a day talk: they stop whatever they are doing and turn to you; the camera stays where you stand and settles on their face
 async function talkTo(p, id) {
-  F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position); P.vel.set(0, 0, 0);
-  await closeOn(p); await say(id); await wideShot(0.6);
-  P.mode = 'walk'; F.cutscene = false;
+  if (p.talking) return;
+  F.cutscene = true; P.vel.set(0, 0, 0); p.held = true; p.talking = true;
+  const y0 = P.yaw, p0 = P.pitch;
+  await tween(0.5, (k) => {
+    p.head.getWorldPosition(tmp);
+    const want = Math.atan2(-(tmp.x - P.pos.x), -(tmp.z - P.pos.z)), up = Math.atan2(tmp.y - EYE, Math.hypot(tmp.x - P.pos.x, tmp.z - P.pos.z));
+    P.yaw = lerpAngle(y0, want, k); P.pitch = lerp(p0, clamp(up, -0.35, 0.4), k);
+  }, ease.out);
+  await say(id);
+  p.held = false; p.talking = false; F.cutscene = false;
 }
 const MORN = {
   1: [['you', 'm1_a'], ['mom', 'm1_a'], ['you', 'm1_b'], ['dad', 'm1_a'], ['mom', 'm1_b']],
@@ -1363,13 +1388,13 @@ function update(dt) {
       if (p.sleeping || p.inCar) continue;
       const g = p.group.position, near = Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5;
       p.lookAt = near ? camera.position : null;
-      if (near && !p.busy) {
+      if (near && (!p.busy || p.talking)) {
         const want = Math.atan2(P.pos.x - g.x, P.pos.z - g.z);
-        p.group.rotation.y = lerpAngle(p.group.rotation.y, want, Math.min(1, dt * 3));
+        p.group.rotation.y = lerpAngle(p.group.rotation.y, want, Math.min(1, dt * (p.talking ? 5 : 3)));
       }
     }
   }
-  W.updateDoors(dt); W.tvFx.tick(dt); W.phone.tick(gameTime);
+  W.updateDoors(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt);
   if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
   WF.update(dt); dust.update(dt);
   E.update(dt);

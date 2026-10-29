@@ -524,7 +524,7 @@ export function buildWorld(scene) {
     rbox(x0 + 0.04, 5.71, 1.35, 2.15, z1, z1 + 0.02, M.cabLine, 0.006);
     solid(x0 - 0.05, x1 + 0.05, z0 - 0.1, z1 + 0.05);
   }
-  let teddy = null, parentsBed = null, hallFrame = null; const chairs = [];
+  let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null; const chairs = [];
   {
     const bear = new THREE.Group(); const fur = std({ color: 0x7a5232, roughness: 1 });
     const s = (r, x, y, z) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), fur); m.position.set(x, y, z); m.castShadow = true; bear.add(m); };
@@ -734,15 +734,49 @@ export function buildWorld(scene) {
     // the parents' double bed: head on the west wall, a nightstand with a lamp, a floral quilt (the passage in front of the door and the closet stays clear)
     rbox(5.9, 7.9, 0.12, 0.4, -4.38, -2.98, M.oak, 0.02); rbox(5.93, 7.87, 0.4, 0.58, -4.35, -3.01, M.mattress, 0.05);
     rbox(5.9, 5.98, 0.4, 1.15, -4.38, -2.98, M.oak, 0.02); rbox(7.86, 7.9, 0.4, 0.62, -4.38, -2.98, M.oak, 0.02);
-    rbox(6.55, 7.88, 0.58, 0.9, -4.34, -3.02, M.floralB, 0.05);   // a thick quilt over the sleepers
     for (const z of [-3.9, -3.4]) rbox(6.0, 6.5, 0.58, 0.68, z - 0.22, z + 0.22, M.pillow, 0.05);
+    for (const [z0, z1] of [[-4.36, -4.34], [-3.02, -3.0]]) rbox(6.55, 7.88, 0.46, 0.66, z0, z1, M.floralB, 0.005);   // the quilt hangs over the sides
+    rbox(7.86, 7.88, 0.46, 0.66, -4.36, -3.0, M.floralB, 0.005);
+    // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's real rigs lie under it, see sleepers() in main.js)
+    // and breathes. set(false) flattens it: the bed looks slept in. one('dad', false) empties his side.
+    bedSleepers = (() => {
+      const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+      const g = new THREE.Group(); house.add(g);
+      const X0 = 6.55, X1 = 7.88, Z0 = -4.34, Z1 = -3.02, TOP = 0.6;
+      const geo = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, 34, 34); geo.rotateX(-Math.PI / 2); geo.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
+      const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z);
+        // each body: full height at the shoulders (the west end, by the pillows), tapering to the feet; a soft gaussian across
+        // the rise peaks just past the shoulders over the chest (a hand's breadth above it) and tapers to the feet; at the top edge it dips to meet the shoulders,
+        // so the heads on the pillows show over it (measured: Mom's chest tops at 0.86, Dad's at 0.95, their feet at ~0.77)
+        const along = cl((x - X0) / (X1 - X0), 0, 1), h = Math.min(0.31 - along * 0.08, 0.25 + along * 0.6);
+        // a flat-topped rise the width of a body (so a leg off the centre line is still under it), falling away at the sides
+        // (Dad is broader: his side is a wider, flatter plateau that stays high out to the wall edge, so his far elbow is under it)
+        const dm = (z + 3.4) / 0.34, dd = (z + 3.95) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
+        bm[i] = h * 1.10 * Math.exp(-dm * dm * dm * dm * 2); bd[i] = h * 1.22 * Math.exp(-dd6 * 2);
+      }
+      const quilt = new THREE.Mesh(geo, M.floralB); quilt.castShadow = quilt.receiveShadow = true; g.add(quilt);
+      const fx = { group: g, quilt, amount: 1, target: 1, t: 0, side: { mom: 1, dad: 1 },
+        set(on) { fx.target = on ? 1 : 0; fx.side.mom = fx.side.dad = 1; },
+        one(name, on) { fx.side[name] = on ? 1 : 0; },
+        update(dt) {
+          fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5);
+          // breathing only ever lifts the quilt above its resting shape (the resting shape is what clears the bodies)
+          const fm = fx.amount * fx.side.mom * (1 + (0.5 - 0.5 * Math.cos(fx.t * 1.05)) * 0.06), fd = fx.amount * fx.side.dad * (1 + (0.5 - 0.5 * Math.cos(fx.t * 0.86)) * 0.07), flat = 0.05 * (1 - fx.amount);
+          for (let i = 0; i < n; i++) pos.setY(i, TOP + 0.04 + bm[i] * fm + bd[i] * fd + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9));   // (rumpled when empty)
+          pos.needsUpdate = true; geo.computeVertexNormals();
+        } };
+      fx.update(0);
+      return fx;
+    })();
     solid(5.85, 7.95, -4.42, -2.94);
     rbox(5.9, 6.3, 0, 0.55, -2.92, -2.55, M.oak, 0.015);
     { const lampM = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0.0, roughness: 0.7 });
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.1, 0.65, -2.74); house.add(base);
       const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.1, 0.87, -2.74); house.add(shade); }
     solid(5.85, 6.35, -2.96, -2.5);
-    parentsBed = { mom: { x: 7.65, y: 0.7, z: -3.4 }, dad: { x: 7.8, y: 0.7, z: -3.95 } };
+    parentsBed = { mom: { x: 7.65, y: 0.74, z: -3.4 }, dad: { x: 7.8, y: 0.74, z: -3.95 } };
     // the other bedroom: vertical-plank wood closet doors
     rbox(4.45, 5.5, 0, 2.1, -2.15, -1.58, M.oak, 0.01); for (let i = 1; i < 6; i++) box(4.45 + i * 0.175 - 0.006, 4.45 + i * 0.175 + 0.006, 0.05, 2.05, -2.165, -2.15, M.black, { uv: false });
     rbox(4.45, 5.5, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
@@ -792,28 +826,37 @@ export function buildWorld(scene) {
 
   // ---------- set pieces for the nights: the TV, the wall phone, the bathroom mirror ----------
   const tvFx = (() => {
-    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 48; const g = cv.getContext('2d'), img = g.createImageData(64, 48);
-    const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
-    // the screen: the set's front is at x 2.75 and faces the living room (-x); the picture sits just in front of the glass, 4:3 like the canvas
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.54), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
-    plane.rotation.y = -Math.PI / 2; plane.position.set(2.742, 0.875, -3.2); plane.visible = false; house.add(plane);
+    // the glass: a 4:3 canvas of snow with a rolling bar, scanlines, and a dark vignette at the edges (the CRT look)
+    const W = 160, H = 120;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    const vig = document.createElement('canvas'); vig.width = W; vig.height = H;
+    { const vg = vig.getContext('2d'), r = vg.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.6); r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, 'rgba(0,0,0,0.8)'); vg.fillStyle = r; vg.fillRect(0, 0, W, H); }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    // the glass of the set (assets/props/tv.glb at 2.95, 0.55, -3.2, facing -x): measured from a head-on render, it is the 4:3 window
+    // left of the control strip, z -3.475..-3.057 and y 0.655..0.975 on the front face at x 2.715. The picture sits just inside that, a hair in front.
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.40, 0.30), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
+    plane.rotation.y = -Math.PI / 2; plane.position.set(2.711, 0.815, -3.266); plane.visible = false; house.add(plane);
     const light = new THREE.PointLight(0x9db6ff, 0, 7, 1.6); light.position.set(2.2, 1.0, -3.2); scene.add(light);
     const fx = { on: false, figure: 0, t: 0, base: 4, light, plane,
       set(on) { fx.on = on; plane.visible = on; if (!on) light.intensity = 0; },
       tick(dt) {
         if (!fx.on) return;
         fx.t += dt; light.intensity = fx.base * (0.75 + Math.random() * 0.5) * (fx.figure > 0.5 && Math.random() < 0.2 ? 0.2 : 1);
-        if (fx.t < 0.05) return; fx.t = 0;
-        const d = img.data, band = (Math.random() * 48) | 0;
-        for (let y = 0; y < 48; y++) for (let x = 0; x < 64; x++) {
-          const i = (y * 64 + x) * 4, v = Math.random() * 215 + (Math.abs(y - band) < 2 ? 40 : 0);
-          d[i] = v * 0.86; d[i + 1] = v * 0.93; d[i + 2] = v; d[i + 3] = 255;
+        if (fx.t < 1 / 20) return; fx.t = 0;
+        const img = g.createImageData(W, H), d = img.data, bar = Math.random() * H;
+        for (let y = 0; y < H; y++) {
+          const scan = y % 2 ? 0.78 : 1, rolling = Math.abs(y - bar) < 5 ? 55 : 0;   // every other line is dimmer; the bar rolls up the screen
+          for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4, v = (60 + Math.random() * 150) * scan + rolling;
+            d[i] = v * 0.82; d[i + 1] = v * 0.88; d[i + 2] = v; d[i + 3] = 255;
+          }
         }
         g.putImageData(img, 0, 0);
-        if (fx.figure > 0) {   // something tall standing in the static
-          g.globalAlpha = Math.min(1, fx.figure); g.fillStyle = '#050506'; g.fillRect(27, 14, 10, 34); g.beginPath(); g.ellipse(32, 14, 6, 8, 0, 0, 7); g.fill();
-          g.fillStyle = '#fff'; g.fillRect(29, 12, 2, 4); g.fillRect(33, 12, 2, 4); g.fillRect(28, 17, 8, 1); g.globalAlpha = 1;
+        if (fx.figure > 0) {   // something tall, standing in the snow: a soft dark shape, the head a little dimmer
+          g.save(); g.filter = 'blur(2px)'; g.globalAlpha = 0.6 * Math.min(1, fx.figure); g.fillStyle = '#060608';
+          g.beginPath(); g.ellipse(80, 30, 8, 10, 0, 0, Math.PI * 2); g.fill(); g.fillRect(70, 40, 20, 62); g.restore();
         }
+        g.drawImage(vig, 0, 0);
         tex.needsUpdate = true;
       } };
     return fx;
@@ -1155,7 +1198,7 @@ export function buildWorld(scene) {
   return {
     colliders, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, winMat, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
-    doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, tvFx, phone, mirrorFx,
+    doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
     get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },

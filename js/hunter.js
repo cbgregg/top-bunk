@@ -78,7 +78,8 @@ export function createHunter(ctx) {
         if (d && doorClosed(d)) { S.doorName = d; S.doorWait = 1.1; E.faceTowards(tx, tz, 1); sfx.knock(ctx.panFor(tmp.set(W.doors[d].mid.x, 1.2, W.doors[d].mid.z)), 0.12); return false; }
       }
       const dx = tx - ep().x, dz = tz - ep().z, d = Math.hypot(dx, dz);
-      if (d > 0.04) E.faceTowards(tx, tz, Math.min(1, dt * 9));
+      if (S.pi < S.path.length - 1 && d < 0.32) { S.node = id; S.pi++; continue; }   // cut the corner: head for the next node before reaching this one
+      if (d > 0.04) E.faceTowards(tx, tz, Math.min(1, dt * (spd > 2.6 ? 8 : 4.5)));
       if (d <= remaining) { ep().x = tx; ep().z = tz; remaining -= d; S.node = id; S.pi++; moved = true; }
       else { ep().x += dx / d * remaining; ep().z += dz / d * remaining; remaining = 0; moved = true; }
     }
@@ -102,11 +103,20 @@ export function createHunter(ctx) {
   // it is simply there, somewhere you can see (or soon will)
   function sight(node, opts = {}) {
     place(node); setState('sight');
-    S.sightT = 0; S.sightDur = opts.dur ?? 4; S.seenT = 0; S.sightOpts = opts; E.tilt = opts.tilt ?? 0.4; S.turned = false;
+    S.sightT = 0; S.sightDur = opts.dur ?? 4; S.seenT = 0; S.sightOpts = opts; E.tilt = opts.tilt ?? 0.4; S.turned = false; S.stung = false;
     if (opts.facing) { E.lookTarget = null; E.faceTowards(opts.facing[0], opts.facing[1], 1); }
-    if (opts.stab !== false) sfx.stab();
-    ctx.flicker && ctx.flicker(0.5);
-    F.fear = Math.max(F.fear, 0.7);
+    // the sting lands the instant it is in front of you, not when it appears somewhere behind a wall (see update); until then, a small wrongness
+    if (opts.stab !== false && inView(ep().x, ep().z, 0.7) && gap() < 18) sting(); else sfx.creak(0.12, ctx.panFor(ep()));
+    F.fear = Math.max(F.fear, 0.5);
+  }
+  function sting() {
+    if (S.stung) return; S.stung = true;
+    sfx.stab(); ctx.flicker && ctx.flicker(0.5); ctx.addShake && ctx.addShake(0.6); F.fear = Math.max(F.fear, 0.85);
+  }
+  // the jolt of a hunt: when it comes into view, not when it starts somewhere out of sight
+  function huntJolt() {
+    if (S.jolted) return; S.jolted = true;
+    sfx.jolt(0.85); ctx.flicker && ctx.flicker(0.6); ctx.addShake && ctx.addShake(0.9);
   }
   function stalk(node) {
     place(node); setState('stalk'); S.frozen = false; S.lookT = 0; S.replan = 0;
@@ -115,10 +125,11 @@ export function createHunter(ctx) {
   function hunt(node = null) {
     if (S.state === 'away' || node) place(node || pickSpawn(8) || 'hallW');
     setState('hunt'); S.lostT = 0; S.lastSeen = { x: P.pos.x, z: P.pos.z }; S.replan = 0;
-    E.tilt = 0.2; E.smileScale = 1.1;
-    sfx.jolt(0.85); sfx.violins(0.7, 0.3); sfx.bed('music/chase', 0.55, 0.6); sfx.bed('music/night', 0, 1.5); sfx.drone(0.17, 0.5);
+    E.tilt = 0.2; E.smileScale = 1.1; S.jolted = false;
+    sfx.violins(0.7, 0.3); sfx.bed('music/chase', 0.55, 0.6); sfx.bed('music/night', 0, 1.5); sfx.drone(0.17, 0.5);
     F.fear = 1; F.chase = true;
-    ctx.flicker && ctx.flicker(0.6); ctx.onHunt && ctx.onHunt();
+    if (inView(ep().x, ep().z, 0.6) && sees()) huntJolt();
+    ctx.onHunt && ctx.onHunt();
   }
   function startSearch(fromHunt = true) {
     setState('search'); S.searchT = 0; S.searchWait = 0; S.heard = 0; S.forcePod = null;
@@ -175,13 +186,14 @@ export function createHunter(ctx) {
       case 'sight': {
         S.sightT += dt;
         if (S.sightOpts.facing && !S.turned) {   // it has its back to you, watching something else, until you come close
+          if (S.sightOpts.stab !== false && inView(ep().x, ep().z, 0.7) && g < 18) sting();
           if (g < (S.sightOpts.turnDist ?? 3.4) && !podId) { S.turned = true; E.lookTarget = camera.position; sfx.giggle(ctx.panFor(ep())); ctx.onTurn && ctx.onTurn(); if (S.sightOpts.chase) { hunt(); break; } }
           else if (S.sightT > S.sightDur) { vanish(); break; }
           else break;
         }
         E.faceTowards(P.pos.x, P.pos.z, Math.min(1, dt * 4));
         const seen = inView(ep().x, ep().z, 0.7) && g < 18;
-        if (seen) S.seenT += dt;
+        if (seen) { if (S.sightOpts.stab !== false) sting(); S.seenT += dt; }
         if (S.sightOpts.chase && g < (S.sightOpts.chaseDist ?? 4)) { hunt(); break; }
         if ((S.sightOpts.vanishOnLook !== false && S.seenT > (S.sightOpts.lookTime ?? 0.9)) || S.sightT > S.sightDur) {
           if (S.sightOpts.then === 'hunt') hunt(); else vanish();
@@ -200,6 +212,7 @@ export function createHunter(ctx) {
         break;
       }
       case 'hunt': {
+        if (!S.jolted && inView(ep().x, ep().z, 0.6) && sees()) huntJolt();
         if (sees()) { S.lastSeen = { x: P.pos.x, z: P.pos.z }; S.lostT = 0; } else S.lostT += dt;
         S.replan -= dt;
         if (S.replan <= 0) { S.replan = 0.35; planTo(S.lostT < 0.6 ? playerNode() : nearestNode(S.lastSeen.x, S.lastSeen.z)); }
