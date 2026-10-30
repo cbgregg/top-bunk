@@ -2,7 +2,7 @@
 // something hunting you through the house, and places to hide.
 import * as THREE from 'three';
 import { createHunter } from './hunter.js';
-import { createDirector, makePlan, TYPE_NAMES } from './director.js';
+import { createDirector, makePlan, PLAN_VERSION, PROOF_FROM, proofSources, TYPE_NAMES } from './director.js';
 import { NODES, nearestNode } from './nav.js';
 import { pick } from './rng.js';
 import { achievements } from './achievements.js';
@@ -168,57 +168,55 @@ export function createNights(env) {
   const director = createDirector(D);
 
   // ---------- proof: what a night leaves behind, to show Mom and Dad ----------
-  // Each kind comes from the night's own events (a director event id, or the night's type). It shows only after one of them has fired, at a
-  // moment you are not looking at the spot. RUN.evidence holds the kinds found in this run, RUN.evidenceAt the night each was found on.
+  // Each kind comes from the night's own events or its type (PROOF_FROM in director.js says which). It shows only after one of them has fired,
+  // at a moment you are not looking at the spot. RUN.evidence holds the kinds found in this run, RUN.evidenceAt the night each was found on.
   const WP = W.proof || {};
   const prop = (k) => (on) => { if (WP[k]) WP[k].show(on); };
   const PROOF = {
-    SCRATCHES: { from: ['knock', 'bunkShake'], keep: true, at: [6.15, 1.45, 0.45], p: [6.15, 1.35, 0.55], show: prop('SCRATCHES'),
+    SCRATCHES: { from: PROOF_FROM.SCRATCHES, keep: true, at: [6.15, 1.45, 0.45], p: [6.15, 1.35, 0.55], show: prop('SCRATCHES'),
       cue: () => { sfx.scratch(D.pan(6.15, 0.45)); sub('<i>Something is scratching at your closet door.</i>', 3.5); },
       line: '<i>Claw marks, right through the paint. They start higher than Dad can reach.</i>',
       tell: 'Come look at my closet door. Something clawed it.' },
-    FOOTPRINTS: { from: ['thirst', 'faucet', 'flush'], at: [5.5, 0, -0.88], show: prop('FOOTPRINTS'),
+    FOOTPRINTS: { from: PROOF_FROM.FOOTPRINTS, at: [5.5, 0, -0.88], show: prop('FOOTPRINTS'),
       cue: () => { for (let i = 0; i < 3; i++) later(i * 0.5, () => sfx.footstep(0.16, D.pan(4.6 + i * 0.9, -0.9), 0.35, 'tile')); sub('<i>Wet bare feet slap down the hall.</i>', 3.5); },
       line: "<i>Wet footprints. Bare feet, longer than Dad's. They go from the bathroom to my door.</i>",
       tell: 'There were wet footprints in the hall last night. Bare feet. Bigger than yours, Dad.' },
-    CABINETS: { from: ['slam', 'mimic'], at: [2.88, 1.9, 2.6], p: [2.6, 1.85, 2.6], show: prop('CABINETS'),
+    CABINETS: { from: PROOF_FROM.CABINETS, at: [2.88, 1.9, 2.6], p: [2.6, 1.85, 2.6], show: prop('CABINETS'),
       cue: () => { sfx.cabinet(D.pan(2.7, 2.6), 0.8); sub('<i>A cabinet door bangs in the kitchen.</i>', 3.5); },
       line: '<i>The cabinet is wide open. Every cup in it is turned upside down.</i>',
       tell: 'A cabinet in the kitchen was open, and all the cups were upside down.' },
-    STATIC: { from: ['static', 'tvStatic'], at: [2.711, 0.815, -3.266], p: [2.7, 0.85, -3.27], show: (on) => W.tvFx.set(on), still: () => W.tvFx.on, took: () => { W.tvFx.set(false); sfx.click(); },
+    STATIC: { from: PROOF_FROM.STATIC, at: [2.711, 0.815, -3.266], p: [2.7, 0.85, -3.27], show: (on) => W.tvFx.set(on), still: () => W.tvFx.on, took: () => { W.tvFx.set(false); sfx.click(); },
       cue: () => sub('<i>Blue light flickers in the living room. The TV is on again.</i>', 3.5),
       line: "<i>Nobody is watching it. The screen is warm, like it's been on for hours.</i>",
       tell: 'The TV was on again last night. Nobody was watching it.' },
-    DRAWING: { from: ['drawing'], keep: true, at: [5.22, 0.45, -0.39], p: [5.28, 0.6, -0.48], show: prop('DRAWING'),
+    DRAWING: { from: PROOF_FROM.DRAWING, keep: true, at: [5.22, 0.45, -0.39], p: [5.28, 0.6, -0.48], show: prop('DRAWING'),
       cue: () => sub('<i>Out in the hall, a crayon squeaks across the wall.</i>', 3.5),
       line: "<i>Somebody kept drawing, right on the wall. And left the crayon. I don't have a black crayon.</i>",
       tell: "Somebody drew on the wall under the drawing. In black crayon. I don't have a black one." },
-    CHAIR: { from: ['chairs'], at: [-1.95, 0.5, 0.6], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, -1.95, 0.6, Math.PI / 2); else if (c) W.moveChair(2, c.x, c.z, c.rot); },
+    CHAIR: { from: PROOF_FROM.CHAIR, at: [-1.95, 0.5, 0.6], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, -1.95, 0.6, Math.PI / 2); else if (c) W.moveChair(2, c.x, c.z, c.rot); },
       cue: () => sub('<i>A chair scrapes across the dining room floor.</i>', 3.5),
       line: '<i>Somebody turned this chair to face the wall, right up close. Like a kid sent to sit in the corner.</i>',
       tell: 'Somebody turned a chair in the dining room to face the wall. Right up against it.' },
-    PHONE: { from: ['ring'], at: [-1.6, 1.15, 0.89], p: [-1.56, 1.3, 0.9], show: (on) => (on ? W.phone.pickUp() : W.phone.hangUp()), still: () => W.phone.off, took: () => { W.phone.hangUp(); sfx.click(); },
+    PHONE: { from: PROOF_FROM.PHONE, at: [-1.6, 1.15, 0.89], p: [-1.56, 1.3, 0.9], show: (on) => (on ? W.phone.pickUp() : W.phone.hangUp()), still: () => W.phone.off, took: () => { W.phone.hangUp(); sfx.click(); },
       line: "<i>It's off the hook. If I hold my breath, there's still breathing on the line.</i>",
       tell: 'The phone was off the hook. Somebody was still breathing on it.' },
-    HANDPRINT: { from: ['blackout'], keep: true, at: [-5.47, 1.47, -3.71], p: [-5.45, 1.45, -3.62], show: prop('HANDPRINT'),
+    HANDPRINT: { from: PROOF_FROM.HANDPRINT, keep: true, at: [-5.47, 1.47, -3.71], p: [-5.45, 1.45, -3.62], show: prop('HANDPRINT'),
       line: "<i>A handprint on the breaker box, black, like it's burned on. The fingers are way too long.</i>",
       tell: 'There is a handprint on the breaker box. Go look at the fingers.' },
-    TEDDY: { from: ['teddy'], at: [0, 0, 0], show: prop('TEDDY'), place: (s) => { PROOF.TEDDY.at = [s[0], s[1], s[2]]; if (WP.TEDDY) WP.TEDDY.at(s[0], s[1], s[2]); },
+    TEDDY: { from: PROOF_FROM.TEDDY, at: [0, 0, 0], show: prop('TEDDY'), place: (s) => { PROOF.TEDDY.at = [s[0], s[1], s[2]]; if (WP.TEDDY) WP.TEDDY.at(s[0], s[1], s[2]); },
       line: '<i>Stuffing. Somebody picked it out of my bear, a little at a time.</i>',
       tell: 'Somebody pulled the stuffing out of my bear. Look at him.' },
-    CANDLE: { from: ['vigil'], at: [5.2, 0.03, -0.95], show: () => {},   // the vigil's own tea light, left on the floor until dawn
+    CANDLE: { from: PROOF_FROM.CANDLE, at: [5.2, 0.03, -0.95], show: () => {},   // the vigil's own tea light, left on the floor until dawn
       line: '<i>The candle from the hall. Burned all the way down. Nobody in this house lit it.</i>',
       tell: 'There was a candle burning in the hall last night. None of us lit it.' },
   };
   const found = () => (env.RUN.evidence ||= []), foundAt = () => (env.RUN.evidenceAt ||= {});
   const isFound = (k) => found().includes(k);
   const pr = { n: 0, kinds: [], pending: new Map(), shown: new Set(), its: {}, hud: false };
-  // what a night can leave: its type's kinds and its events' (the vigil stops the events, and the drive ends the night soon after it starts;
-  // an event the director gave up on leaves nothing, so it drops out of the total)
+  // what a night can leave (see proofSources: an event the director gave up on drops out of the total)
   function proofKinds(plan) {
     if (!plan || plan.n < 2 || plan.n > 9) return [];
-    const src = new Set([plan.type]);
-    if (plan.type !== 'vigil') for (const e of plan.events) if (!e.dropped && (plan.type !== 'car' || e.t < plan.clock0 + 10)) src.add(e.id);
+    const src = proofSources(plan);
     return Object.keys(PROOF).filter((k) => PROOF[k].from.some((s) => src.has(s)) && (!isFound(k) || foundAt()[k] === plan.n));
   }
   // the house goes back to how it was, apart from what you found that stays (claw marks do not wash off)
@@ -294,11 +292,19 @@ export function createNights(env) {
     kinds: () => pr.kinds.slice(), pending: () => [...pr.pending.keys()], shown: () => [...pr.shown], kindsFor: proofKinds, start: proofStart, fire: proofFire, sync: proofSync, hud: proofHud, look: proofLook,
   };
 
+  // night n of this run. A run that has not reached night two (or one made from #seed=) takes the current planner and saves which it was; a
+  // run saved further on with no planVersion is from before PLAN_VERSION 2 and keeps the plans it has been playing
+  function planFor(n) {
+    const R = env.RUN;
+    if (!(R.night >= 2) || (env.HPARAM && env.HPARAM.seed)) R.planVersion = PLAN_VERSION;
+    return makePlan(R.seed, n, R.planVersion || 1);
+  }
+
   async function freeNight(n) {
     const t = ++tok;
     F.stage = 'n' + n; F.night = n;
     env.resetNight(); env.setPhase('night'); env.sfx.dread(Math.min(0.25 + n * 0.07, 0.8), 4);
-    const plan = makePlan(env.RUN.seed, n); if (env.HPARAM && env.HPARAM.type) plan.type = env.HPARAM.type;   // (#type=ring forces a night type for testing)
+    const plan = planFor(n); if (env.HPARAM && env.HPARAM.type) plan.type = env.HPARAM.type;   // (#type=ring forces a night type for testing)
     rnd = plan.r; F.plan = plan; F.typeName = TYPE_NAMES[plan.type];
     F.clock = plan.clock0; lastMin = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
     hunter.reset(); hunter.setLevel(n); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
@@ -576,5 +582,5 @@ export function createNights(env) {
     },
   };
 
-  return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: (n) => makePlan(env.RUN.seed, n) };
+  return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor };
 }
