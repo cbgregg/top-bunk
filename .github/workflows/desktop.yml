@@ -71,13 +71,28 @@ jobs:
       - name: Package
         run: npm run dist:${{ matrix.target }}
 
-      - name: The macOS app runs natively on Intel and Apple silicon
+      - name: The macOS app has Intel and Apple silicon code and loads the Steam module
         if: matrix.target == 'mac'
         run: |
-          for f in "dist/mac/Top Bunk.app/Contents/MacOS/Top Bunk" "dist/mac/Top Bunk.app/Contents/Frameworks/Electron Framework.framework/Electron Framework"; do
-            a=$(lipo -archs "$f"); echo "$f: $a"
-            case " $a " in *" x86_64 "*" arm64 "*|*" arm64 "*" x86_64 "*) ;; *) echo "::error::$f is not universal ($a)"; exit 1;; esac
+          app="dist/mac/Top Bunk.app"
+          for f in "$app/Contents/MacOS/Top Bunk" "$app/Contents/Frameworks/Electron Framework.framework/Electron Framework"; do
+            echo "$f: $(lipo -archs "$f")"
+            lipo "$f" -verify_arch x86_64 arm64 || { echo "::error::$f is not universal"; exit 1; }
           done
+          # the packaged Electron run as plain Node, requiring steamworks.js the way desktop/steam.js does
+          probe='require(process.argv[1]); if (process.arch !== process.argv[2]) throw new Error("ran as " + process.arch); console.log("steamworks.js loaded on", process.arch)'
+          mod="$PWD/$app/Contents/Resources/app.asar.unpacked/node_modules/steamworks.js"
+          if [ "$(uname -m)" = arm64 ]; then
+            ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/Top Bunk" -e "$probe" "$mod" arm64
+            if arch -x86_64 /usr/bin/true 2>/dev/null; then
+              ELECTRON_RUN_AS_NODE=1 arch -x86_64 "$app/Contents/MacOS/Top Bunk" -e "$probe" "$mod" x64
+            else
+              echo "::warning::no Rosetta on this runner, so the x86_64 slice was only checked with lipo"
+            fi
+          else
+            ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/Top Bunk" -e "$probe" "$mod" x64
+            echo "::warning::Intel runner, so the arm64 slice was only checked with lipo"
+          fi
 
       - name: Depot tarball (keeps executable bits and symlinks across the artifact round trip)
         shell: bash

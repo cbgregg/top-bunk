@@ -58,9 +58,10 @@ These are estimates. The game hasn't been timed on any of the hardware named bel
 
 The desktop build is the web game inside Electron 45 (Chromium), so it needs what Chromium needs to run WebGL 2. The OS lines are
 Electron 45's floor: Windows 10, macOS 13 Ventura (the app's Info.plist asks for 13.0), and Linux distributions that are still
-maintained. The macOS app is one universal bundle with Intel and Apple silicon code, so it doesn't need Rosetta; CI checks that both
-are in the bundle, but it hasn't been run on a Mac of either kind yet. The CPU and GPU lines
-are guesses from the presets: Low turns off ambient occlusion, bloom, colour grading and anti-aliasing and uses smaller shadow maps,
+maintained. The macOS app is one universal bundle with Intel and Apple silicon code side by side, so Apple silicon Macs run it
+without Rosetta. CI checks that both slices are in the bundle and starts the bundled Electron on its Apple silicon runner (natively,
+and under Rosetta when the runner has it), but nobody has played the game on a Mac of either kind yet. The CPU and GPU lines are
+guesses from the presets: Low turns off ambient occlusion, bloom, colour grading and anti-aliasing and uses smaller shadow maps,
 and High and Ultra turn them all on. The storage lines are the unpacked build plus room to spare (the Linux build is about 320 MB, the
 universal macOS app about 530 MB). Steamworks has one block per OS; the lines are the same except where noted.
 
@@ -127,7 +128,7 @@ ElevenLabs and are shipped as fixed audio files. No content is generated at runt
 | Input | Support | Notes |
 | --- | --- | --- |
 | Keyboard and mouse | Full | WASD / arrows, mouse look, E, Shift, Space, F, Esc |
-| Game controller | **Partial** (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads should work when Steam presents them as XInput, but none has been tried. The menus take d-pad and A / B in code, but not every screen has been played through on a pad yet. |
+| Game controller | **Partial** (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads should work when Steam presents them as XInput, but none has been tried. The menus take the d-pad or left stick, A to confirm and B to go back, but not every screen has been played through on a pad yet. |
 | Touch | Web build only | Not relevant to the Steam build |
 | Steam Cloud | Once Auto-Cloud is configured | One saved run plus settings and achievements. The desktop build keeps them as small JSON files in a `saves` folder; `STEAM.md` has the folder for each OS and the Auto-Cloud root paths to enter under Steamworks → Application → Steam Cloud. |
 | Steam Deck | Untested | Expect *Playable* at best until the Linux build has been tried on a Deck |
@@ -144,9 +145,13 @@ icons exist.
 | --- | --- | --- | --- |
 | English | yes | no | yes |
 
-English only. Every line is subtitled, but most lines aren't voiced. Only Mom and Dad on moving day and for most of the first two
-mornings have recordings. Their other lines, and grandpa's, play as a wordless murmur under the subtitle, and the kid's lines are text
-only. Leave *Full audio* unticked until every line in `assets/audio/lines.json` has a recording in `assets/audio/vo/`.
+English only. Every line is subtitled, but only some are voiced. The game has 83 scripted lines (78 in `assets/audio/lines.json` and
+five in the proof scene at breakfast, written into `js/main.js`), and 16 of them have a recording: everything Mom and Dad say on
+moving day and on the first morning, and most of the second morning. The other 67 aren't recorded. Mom's, Dad's and grandpa's lines
+from `lines.json` play as a wordless murmur under the subtitle; the kid's lines and the proof scene are text only. (The four other
+recordings in `assets/audio/vo/`, Mom and Dad through the wall, are only used by the trailer.)
+
+Leave *Full audio* unticked. It would take a recording of every line Mom, Dad and grandpa have, the proof scene included.
 
 ## Tags
 
@@ -168,9 +173,11 @@ Genre (Basic Info): Indie, Adventure. Steam does not have a Horror genre; the Ho
 
 ## Age-rating notes
 
-Steam requires its own Mature Content survey; official ratings are optional but free through the IARC questionnaire in Steamworks
-(gives ESRB, PEGI, USK, ClassInd, ACB and GRAC in one go) and some regions and promotions need them. Answer it from the content list
-above:
+The game has no rating yet, so neither the store page nor the press kit names one, not even as a guess. Steamworks makes you fill in
+its content survey before the store page and build go to review; an official board rating, once you have one, goes in the game's
+Ratings section. Germany needs one: since November 2024 Steam hides games there that have no German age rating, so read the Germany
+page of Valve's content survey docs before launch (Valve won't take a USK rating that came through IARC on another store). Answer
+the survey from the content list above:
 
 - Violence: horror and fear themes; the player character is caught by a monster (implied, cut to black); in one ending the monster
   takes the parents, pulled down out of sight with cracking and chewing sounds and a red flash, without blood, wounds or bodies.
@@ -178,10 +185,9 @@ above:
 - Language: mild, infrequent (one or two exclamations).
 - Sex and nudity, drugs, alcohol, gambling, user-generated content, in-game purchases, user interaction, location sharing: none.
 
-Don't put a rating on the page until the questionnaire returns one. Mark at least four screenshots as suitable for all ages: 02 (your
-room) and 06 (breakfast) have no creature in frame, and 03 (the hall) shows it only as the kid's crayon drawing. The fourth is 07:
-Dad, seen side-on, standing at the TV, with a tall dark shape in the static on the screen. 01, 04 and 05 show the thing and can stay
-mature-only if the review asks.
+Mark at least four screenshots as suitable for all ages: 02 (your room) and 06 (breakfast) have no creature in frame, and 03 (the
+hall) shows it only as the kid's crayon drawing. The fourth is 07: Dad, seen side-on, standing at the TV, with a tall dark shape in
+the static on the screen. 01, 04 and 05 show the thing and can stay mature-only if the review asks.
 
 ## Before the page goes live
 

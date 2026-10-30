@@ -22,8 +22,8 @@ unless you've found something they can't. How it ends on the last night depends 
 | Genre | First-person horror, single-player |
 | Players | 1 |
 | Length | Short: ten nights plus the mornings. A night's clock runs to dawn in about six real minutes, so a full run should take an hour to ninety minutes, more if it catches you |
-| Input | Keyboard and mouse; game controller with rumble (partial support); touch on the web build |
-| Languages | English: interface and subtitles. Mom and Dad are voiced on moving day and for most of the first two mornings; their other lines, and grandpa's, are subtitles over a murmur |
+| Input | Keyboard and mouse; game controller with rumble (partial support: not every screen has been checked on a pad); touch on the web build |
+| Languages | English: interface and subtitles. Only some lines are voiced: Mom and Dad on moving day and for most of the first two mornings. The rest of their lines, and grandpa's, are subtitles over a murmur, and the kid's are text only |
 | Engine | three.js (WebGL 2) in Electron for the desktop build; no engine licence, no middleware |
 | Rating | Not yet rated; horror themes, jump scares, flashing lights, no gore |
 | Press contact | *[email]* |
