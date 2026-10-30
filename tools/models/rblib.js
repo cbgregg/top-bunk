@@ -63,13 +63,34 @@ export const loadFBX = (u) => new Promise((res, rej) => new FBXLoader().load(u, 
 export const loadGLB = (u) => new Promise((res, rej) => new GLTFLoader().load(u, res, undefined, rej));
 export const loadTex = (u, srgb = true) => new Promise((res) => new THREE.TextureLoader().load(u, (t) => { if (srgb) t.colorSpace = THREE.SRGBColorSpace; res(t); }));
 
-// FBX avatar -> textured group (cm units, T-pose); strips the stray FBX light
-export async function buildAvatar(name) {
+// cut the triangles of one material out of a mesh (FBXLoader meshes are non-indexed, one group per material run)
+function dropMaterial(o, re) {
+  const mats = [].concat(o.material), geo = o.geometry;
+  if (geo.index || !Array.isArray(o.material)) throw new Error('dropMaterial: expected a non-indexed multi-material mesh');
+  const keep = mats.map((m) => !re.test(m.name || '')), remap = []; let n = 0;
+  keep.forEach((k, i) => { if (k) remap[i] = n++; });
+  const runs = geo.groups.filter((gr) => keep[gr.materialIndex]), total = runs.reduce((a, gr) => a + gr.count, 0);
+  for (const [key, attr] of Object.entries(geo.attributes)) {
+    const s = attr.itemSize, arr = new attr.array.constructor(total * s); let p = 0;
+    for (const gr of runs) { arr.set(attr.array.subarray(gr.start * s, (gr.start + gr.count) * s), p); p += gr.count * s; }
+    geo.setAttribute(key, new THREE.BufferAttribute(arr, s, attr.normalized));
+  }
+  geo.clearGroups(); let start = 0;
+  for (const gr of runs) { geo.addGroup(start, gr.count, remap[gr.materialIndex]); start += gr.count; }
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  o.material = mats.filter((m, i) => keep[i]);
+}
+
+// FBX avatar -> textured group (cm units, T-pose); strips the stray FBX light.
+// hair: false leaves out the hair cards (the *_opacity part) and their map: grandpa's cards show ragged dark tips
+// against the light, and the grey hair painted on his head texture reads fine without them
+export async function buildAvatar(name, { hair = true } = {}) {
   const g = await loadFBX('rb/' + name + '.fbx');
   g.children.filter((c) => c.isLight).forEach((l) => g.remove(l));
-  const [body, head, op] = await Promise.all([loadTex('rb/' + name + '/body.jpg'), loadTex('rb/' + name + '/head.jpg'), loadTex('rb/' + name + '/opacity.png')]);
+  const [body, head, op] = await Promise.all([loadTex('rb/' + name + '/body.jpg'), loadTex('rb/' + name + '/head.jpg'), hair ? loadTex('rb/' + name + '/opacity.png') : null]);
   body.userData.mimeType = 'image/jpeg'; head.userData.mimeType = 'image/jpeg';
   g.traverse((o) => { if (!o.isSkinnedMesh) return;
+    if (!hair) dropMaterial(o, /opacity/);
     o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
     const ms = [].concat(o.material).map((m) => { const nm = m.name || ''; const mm = new THREE.MeshStandardMaterial({ name: nm, roughness: 0.85, metalness: 0 });
       if (/body/.test(nm)) mm.map = body; else if (/head/.test(nm)) mm.map = head; else { mm.map = op; mm.transparent = false; mm.alphaTest = 0.45; mm.side = THREE.DoubleSide; }

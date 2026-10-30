@@ -4,11 +4,14 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { retargetClip, buildAvatar, loadGLB, loadFBX } from './rblib.js';
+import { sitClip } from './sit.js';
 const exp = (obj, animations = []) => new Promise((res, rej) => new GLTFExporter().parse(obj, (buf) => {
   let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); res(btoa(s));
 }, rej, { binary: true, animations, onlyVisible: false, maxTextureSize: 1024 }));
 const xbot = await loadGLB('models/Xbot.glb');
 const dad = await buildAvatar('Male_Adult_05'), mom = await buildAvatar('Female_Adult_01');
+// grandpa (the vigil): no hair cards, and a seated pose fitted to the vigil chair, since the shared clips all stand
+const grandpa = await buildAvatar('Male_Adult_03', { hair: false }), sit = sitClip(grandpa);
 const spirit = await loadFBX('rb/Male_Adult_06.fbx'); spirit.children.filter((c) => c.isLight).forEach((l) => spirit.remove(l));
 spirit.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; const ms = [].concat(o.material).map((m) => new THREE.MeshStandardMaterial({ name: m.name, color: 0x000000, roughness: 1, metalness: 0 })); o.material = Array.isArray(o.material) ? ms : ms[0]; } });
 const names = { idle: 'idle', walk: 'walk', run: 'run', agree: 'agree', headShake: 'headShake', sneak_pose: 'sneak', sad_pose: 'sad' };
@@ -16,5 +19,6 @@ const clips = Object.entries(names).map(([src, dst]) => retargetClip(dad, xbot.s
 const rig = new THREE.Group(); rig.name = 'rig'; rig.add(dad.getObjectByName('Bip01').clone(true));
 const out = {};
 out.dad = await exp(dad); out.mom = await exp(mom); out.spirit = await exp(spirit); out.anims = await exp(rig, clips);
-window.out = out; window.done = true; window.info = Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Math.round(v.length * 0.75 / 1024) + ' KB']));
+out.grandpa = await exp(grandpa, [sit.clip]);
+window.out = out; window.done = true; window.info = { ...Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Math.round(v.length * 0.75 / 1024) + ' KB'])), sit: sit.info };
 </script>
