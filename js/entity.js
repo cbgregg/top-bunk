@@ -1,11 +1,54 @@
-// The thing: a stretched black body, white eyes with black pupils, and the grin texture on the head bone.
+// The thing: a stretched black body with the face from creature.js on its head bone (one skull running down into the neck, white
+// ring eyes with black pupils that follow the player, the grin cut into the head).
 import * as THREE from 'three';
-import { smile as smileTex } from './textures.js';
+import { createFace, headGeometry, skinMaterial, tuckIntoNeck } from './creature.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
 
 const _v = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
+// the graphics preset lives in gfx, which main.js does not hand to the thing; it is looked up as the thing is drawn
+const preset = () => (typeof window !== 'undefined' && window.__game && window.__game.gfx && window.__game.gfx.quality) === 'low' ? 'low' : 'high';
+const ss = THREE.MathUtils.smoothstep;
+const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+// Skin weights for the skull-and-neck mesh on the body's skeleton. The skull moves with the head bone alone. Down the neck the
+// weights run from the body's own (copied from the nearest vertices of its shirt, so the neck's foot moves with the shoulders it
+// sits in) through the neck bone to the head, so a turn of the head twists the neck instead of shearing it at a seam.
+function skinWeights(geo, body, refVerts, bind, head, neck) {
+  const P = body.geometry.attributes.position, SI = body.geometry.attributes.skinIndex, SW = body.geometry.attributes.skinWeight, bones = body.skeleton.bones;
+  const under = (b) => { for (let o = bones[b].parent; o; o = o.parent) if (o === bones[head]) return true; return false; };
+  const map = bones.map((_, b) => (under(b) ? head : b));
+  const pos = geo.attributes.position, n = pos.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  const v = new THREE.Vector3(), q = new THREE.Vector3(), CELL = 3, grid = new Map(), key = (x, y, z) => x + ',' + y + ',' + z;
+  for (const i of refVerts) { q.fromBufferAttribute(P, i); const k = key(Math.floor(q.x / CELL), Math.floor(q.y / CELL), Math.floor(q.z / CELL)); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); }
+  const near = (p) => {
+    const cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL), cz = Math.floor(p.z / CELL), found = [];
+    for (let r = 1; r <= 6 && found.length < 6; r++) {
+      found.length = 0;
+      for (let x = cx - r; x <= cx + r; x++) for (let y = cy - r; y <= cy + r; y++) for (let z = cz - r; z <= cz + r; z++) for (const i of grid.get(key(x, y, z)) || []) found.push([q.fromBufferAttribute(P, i).distanceToSquared(p), i]);
+    }
+    return found.sort((a, b) => a[0] - b[0]).slice(0, 6);
+  };
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(pos, i);
+    // t: 0 where the neck goes into the shoulders, 1 on the skull (and right under the jaw, which turns with it)
+    const sk = (v.x / 0.209) ** 2 + (v.y / 0.264) ** 2 + (v.z / 0.198) ** 2;
+    const t = Math.max(ss(v.y, -0.33, -0.17), ss(-sk, -1.32, -1.02));
+    const w = new Map(), add = (b, x) => w.set(b, (w.get(b) || 0) + x);
+    if (t < 1) {
+      let tot = 0; const ref = new Map();
+      for (const [d2, j] of near(v.clone().applyMatrix4(bind))) { const k = 1 / (Math.sqrt(d2) + 0.5) ** 2; tot += k; for (let c = 0; c < 4; c++) { const b = map[SI.getComponent(j, c)]; ref.set(b, (ref.get(b) || 0) + SW.getComponent(j, c) * k); } }
+      for (const [b, x] of ref) add(b, (1 - t) * (1 - t) * x / tot);
+      add(neck, 2 * t * (1 - t));
+    }
+    add(head, t * t);
+    const top = [...w].sort((a, b) => b[1] - a[1]).slice(0, 4), sum = top.reduce((s, x) => s + x[1], 0);
+    top.forEach(([b, x], c) => { si[i * 4 + c] = b; sw[i * 4 + c] = x / sum; });
+  }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+}
 
 export class Entity {
   constructor(scene) {
@@ -14,11 +57,10 @@ export class Entity {
     this.root.add(this.body);
     scene.add(this.root);
 
-    const black = new THREE.MeshLambertMaterial({ color: 0x060607 });
-    const glow = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, fog: false });
-    glow.color.setRGB(2.4, 2.4, 2.4);   // brighter than white, so the bloom pass makes the eyes glow
-    const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
-    const cyl = (rt, rb, h, seg = 10) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), black); m.castShadow = true; return m; };
+    this.quality = 'high';
+    this.skins = { high: skinMaterial({}) };
+    this.cyls = [];
+    const cyl = (rt, rb, h, seg = 10) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), this.skins.high); m.castShadow = true; this.cyls.push(m); return m; };
 
     // legs
     this.legs = [-1, 1].map((s) => {
@@ -42,28 +84,12 @@ export class Entity {
       sh.rotation.z = s * 0.1;
       this.torso.add(sh); return sh;
     });
-    // neck + head
+    // neck + head: head is the face group (its origin the skull centre), smile its teeth; it gets its skull when first drawn
+    // without the rigged body, so a normal start never builds one it throws away
     const neck = cyl(0.04, 0.05, 0.24); neck.position.y = 1.0; this.torso.add(neck);
-    this.head = new THREE.Group(); this.head.position.y = 1.2; this.head.rotation.order = 'YXZ'; this.torso.add(this.head);
-    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 18), black); skull.scale.set(0.95, 1.2, 0.9); skull.castShadow = true; this.head.add(skull);
-
-    this.eyeBase = [new THREE.Vector3(-0.092, 0.075, 0.2), new THREE.Vector3(0.092, 0.075, 0.2)];
-    this.pupils = [];
-    for (let i = 0; i < 2; i++) {
-      const s = i ? 1 : -1;
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.074, 24, 16), glow);
-      eye.scale.set(0.95, 1.38, 0.42); eye.position.set(this.eyeBase[i].x, this.eyeBase[i].y, 0.172);
-      eye.rotation.z = s * -0.32; if (i) { eye.scale.multiplyScalar(1.08); eye.position.y -= 0.012; } this.head.add(eye);
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.05, 18, 12), pupilMat);
-      pupil.scale.set(1, 1.12, 0.35); pupil.position.copy(this.eyeBase[i]); this.head.add(pupil);
-      this.pupils.push(pupil);
-    }
-    const sm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.218, 0.218, 0.16, 48, 1, true, -1.32, 2.64),
-      new THREE.MeshBasicMaterial({ map: smileTex(), transparent: true, alphaTest: 0.4, toneMapped: false, fog: false })
-    );
-    sm.scale.z = 0.93; sm.position.y = -0.085; this.head.add(sm);
-    this.smile = sm;
+    this.face = this.head = createFace({ skull: false });
+    this.head.position.y = 1.2; this.head.rotation.order = 'YXZ'; this.torso.add(this.head);
+    this.smile = this.face.smile;
 
     // state
     this.t = 0; this.phase = 0; this.mode = 'idle'; this.speed = 0;
@@ -79,22 +105,60 @@ export class Entity {
 
   useRig(rig) {
     const K = 1.43;                                   // a 1.82 m man -> about 2.6 m
-    rig.setHeight(1.82 * K); rig.hideMaterials(/opacity/);
-    const black = new THREE.MeshLambertMaterial({ color: 0x060607 });
-    rig.root.traverse((o) => { if (o.isSkinnedMesh) o.material = Array.isArray(o.material) ? o.material.map((m) => (/opacity/.test(m.name) ? Object.assign(m, { visible: false }) : black)) : black; });
+    rig.setHeight(1.82 * K);
+    // the man's own head and his hair cards go (hidden as meshes: blacking out every material used to bring the cards back as
+    // dark blobs inside the skull), the rest of him takes the skin
+    let body = null; const refVerts = new Set();
+    rig.root.traverse((o) => {
+      if (!o.isSkinnedMesh) return;
+      const name = [].concat(o.material)[0].name;
+      if (/head|opacity/.test(name)) { o.visible = false; return; }
+      body ||= o;
+      const ix = o.geometry.index; for (let i = 0; i < ix.count; i++) refVerts.add(ix.getX(i));
+    });
+    this.rigMeshes = []; rig.root.traverse((o) => { if (o.isSkinnedMesh && o.visible) this.rigMeshes.push(o); });
+    this.skins.rig = { high: skinMaterial({ unit: rig.scale }) };
+    for (const o of this.rigMeshes) o.material = this.skins.rig.high;
     // long arms: stretch each arm along its bone; the forearm keeps scale 1 so it inherits the same stretch
     for (const s of ['L', 'R']) rig.bones[s + '_UpperArm'].scale.x = ARM_STRETCH;
     this.root.add(rig.root);
-    // the face (skull, glowing eyes, smile) rides on the head bone, upright in model space
+    // the face rides on the head bone, upright in model space
     const hb = rig.bones.Head;
     this.torso.remove(this.head); hb.add(this.head);
     this.head.rotation.order = 'XYZ';
     this.head.position.set(...FACE_POS);
     this.head.quaternion.copy(rig.restQ.Head).invert();
     this.head.scale.setScalar(1 / rig.scale);
+    this.head.updateMatrix();
+    // its skull and neck are one mesh skinned to the body's skeleton, bound so its skull part sits exactly where the face group does
+    const skel = body.skeleton, hi = skel.bones.indexOf(hb), bind = skel.boneInverses[hi].clone().invert().multiply(this.head.matrix);
+    const geo = headGeometry({ neck: true });
+    skinWeights(geo, body, refVerts, bind, hi, skel.bones.indexOf(rig.bones.Neck));
+    const P = body.geometry.attributes.position, N = body.geometry.attributes.normal, toFace = bind.clone().invert(), p = new THREE.Vector3(), n = new THREE.Vector3();
+    for (const i of refVerts) {
+      p.fromBufferAttribute(P, i).applyMatrix4(toFace); n.fromBufferAttribute(N, i).transformDirection(toFace);
+      if (tuckIntoNeck(p, n)) { P.setXYZ(i, ...p.applyMatrix4(bind).toArray()); N.setXYZ(i, ...n.transformDirection(bind).toArray()); }
+    }
+    P.needsUpdate = N.needsUpdate = true;
+    const head = new THREE.SkinnedMesh(geo);
+    head.name = 'creatureHead'; head.frustumCulled = false;
+    body.parent.add(head); head.bind(skel, bind);
+    this.face.setSkull(head);
     this.body.visible = false;
     rig.play('idle', { fade: 0, speed: 0.3 });
     this.rig = rig;
+    this.setQuality(this.quality, true);
+  }
+
+  // 'low' swaps the skin for the cheaper material (the face's own skull follows)
+  setQuality(q, force = false) {
+    if (q === this.quality && !force) return;
+    this.quality = q;
+    const low = q === 'low', pick = (set, opts) => set[q] || (set[q] = skinMaterial({ ...opts, low }));
+    const cylSkin = pick(this.skins, {});
+    for (const o of this.cyls) o.material = cylSkin;
+    if (this.rig) { const m = pick(this.skins.rig, { unit: this.rig.scale }); for (const o of this.rigMeshes) o.material = m; }
+    this.face.setQuality(q);
   }
 
   get visible() { return this.root.visible; }
@@ -118,6 +182,10 @@ export class Entity {
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0));
     r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
     r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt + Math.sin(t * 0.7) * 0.05);
+    // slow breathing: the chest opens and the shoulders lift a few millimetres
+    const br = 0.5 + 0.5 * Math.sin(t * 1.15);
+    r.bend(['Spine2'], [1], [1, 0, 0], -0.012 * br);
+    r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 0, 1], 0.02 * br);
     // arms out toward you
     if (this.reach > 0.01) {
       const dir = r.axisWorld(0, 0.1, 1).normalize();
@@ -127,21 +195,23 @@ export class Entity {
       }
     }
     r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 6 });
-    this.smile.scale.set(this.smileScale, 1 + (this.smileScale - 1) * 1.6, 0.93);
-    if (this.lookTarget) {
-      this.head.updateMatrixWorld(true);
-      _v.copy(this.lookTarget); this.head.worldToLocal(_v); _v.normalize();
-      for (let i = 0; i < 2; i++) {
-        const b = this.eyeBase[i];
-        this.pupils[i].position.set(b.x + THREE.MathUtils.clamp(_v.x, -1, 1) * 0.022, b.y + THREE.MathUtils.clamp(_v.y, -1, 1) * 0.04, b.z + 0.012);
-      }
+    // now and then, while it stands, it cocks its head: quick over, held a moment, eased back. At most once per 11 s, timed from the
+    // clock alone so a replay matches (after the look, which would straighten it out)
+    const n = Math.floor(t / 11), u = t - n * 11 - 3 - 6 * hash(n);
+    if (n > 0 && u > 0 && u < 0.9 && this.mode === 'idle' && this.reach < 0.2) {
+      const k = (u < 0.08 ? ss(u, 0, 0.08) : 1 - ss(u, 0.3, 0.9)) * (hash(n + 0.5) < 0.5 ? -1 : 1);
+      r.bend(['Head'], [1], [0, 0, 1], 0.08 * k);
+      r.bend(['Neck'], [1], [0, 1, 0], 0.03 * k);
     }
+    this.face.update(dt, { target: this.lookTarget, smile: this.smileScale });
   }
 
   update(dt) {
     if (!this.root.visible) return;
+    const q = preset(); if (q !== this.quality) this.setQuality(q);
     this.t += dt; const t = this.t;
     if (this.rig) { this.updateRig(dt); return; }
+    if (!this.face.skull) this.face.addSkull();
     const [hl, hr] = this.legs, [al, ar] = this.arms;
     let armSwing = 0, bob = 0, runLean = 0;
     if (this.mode === 'run' || this.mode === 'walk') {
@@ -175,17 +245,7 @@ export class Entity {
       this.head.rotation.x += (pitch - this.head.rotation.x) * Math.min(1, dt * 6);
     }
     this.head.rotation.z = this.tilt + Math.sin(t * 0.7) * 0.05;
-    this.smile.scale.set(this.smileScale, 1 + (this.smileScale - 1) * 1.6, 0.93);
-
-    // pupils
-    if (this.lookTarget) {
-      this.head.updateMatrixWorld(true);
-      _v.copy(this.lookTarget); this.head.worldToLocal(_v); _v.normalize();
-      for (let i = 0; i < 2; i++) {
-        const b = this.eyeBase[i];
-        this.pupils[i].position.set(b.x + THREE.MathUtils.clamp(_v.x, -1, 1) * 0.022, b.y + THREE.MathUtils.clamp(_v.y, -1, 1) * 0.04, b.z + 0.012);
-      }
-    }
+    this.face.update(dt, { target: this.lookTarget, smile: this.smileScale });
   }
 
   headWorld(out = new THREE.Vector3()) { this.root.updateMatrixWorld(true); return this.head.getWorldPosition(out); }
