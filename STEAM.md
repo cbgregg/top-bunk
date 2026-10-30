@@ -48,8 +48,9 @@ file and renaming it over the old one so a crash never leaves half a save:
 | Linux | `$XDG_DATA_HOME/Top Bunk/saves`, usually `~/.local/share/Top Bunk/saves` |
 
 On Windows and macOS that's inside Electron's user-data folder. On Linux the user-data folder is
-`~/.config/Top Bunk`, which no documented Steam Cloud root covers, so the saves go under the XDG data
-folder instead. The first time a desktop build starts on a machine, it copies whatever an older build
+`$XDG_CONFIG_HOME/Top Bunk` (usually `~/.config/Top Bunk`). Steam has no cloud root that follows
+`$XDG_CONFIG_HOME`, so the saves go under the XDG data folder instead, which `LinuxXdgDataHome` does
+follow. The first time a desktop build starts on a machine, it copies whatever an older build
 left in `localStorage` into the folder, unless that save already has a file there (one Steam Cloud
 brought down wins).
 

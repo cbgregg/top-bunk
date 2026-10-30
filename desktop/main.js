@@ -134,8 +134,8 @@ function registerIpc(steam) {
 
 // ---- saves ------------------------------------------------------------------------------------
 // One JSON file per key (js/store.js), in the folder Steam Auto-Cloud syncs (STEAM.md): <userData>/saves on Windows and macOS.
-// On Linux Electron's userData is under ~/.config, which Steam has no documented cloud root for, so the saves go under
-// $XDG_DATA_HOME instead (LinuxXdgDataHome); Steam and the game it launched read the same variable.
+// On Linux Electron's userData follows $XDG_CONFIG_HOME, which no Steam cloud root does, so the saves go under $XDG_DATA_HOME
+// instead (LinuxXdgDataHome); Steam and the game it launched read the same variable.
 const SAVE_KEY = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 const SAVE_MAX = 1 << 20;
 const saveFile = (key) => path.join(SAVES, `${key}.json`);
