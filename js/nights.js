@@ -99,6 +99,11 @@ export function createNights(env) {
       if (Math.hypot(P.pos.x - 7.0, P.pos.z + 3) < 12) env.say(id, { muffle: true });
     },
     encounter(kind, plan) { return encounter(kind, plan); },
+    // nothing else going on: it is not out, the night's scene is not asking anything of you, the phone and the TV are quiet
+    calm: () => !hunter.busy && hunter.cool <= 0 && !document.querySelector('#objective.show') && !W.phone.ringing && !W.tvFx.on,
+    // in your room, or somewhere with a clear view of its window (the end wall, past the foot of the bunk); not under the covers or in a closet
+    seesKidWindow: () => P.mode !== 'hide' && (env.roomAt(P.pos.x, P.pos.z) === 'bed' || (Math.hypot(P.pos.x - 7.9, P.pos.z - 2.85) < 9 && hunter.los(P.pos.x, P.pos.z, 7.9, 2.85))),
+    carPass: () => env.carPass(), faceAtWindow: () => env.faceAtWindow(),
     blackout(on) { F.blackout = on; env.nlMult(on ? 0 : 1, false); },
     startHunt, visibleNodes, objective: (t) => UI.objective(t),
     fired: (id) => proofFire(id),

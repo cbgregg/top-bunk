@@ -5,6 +5,7 @@
 //   D.r()  seeded random 0..1        D.P / D.F / D.W / D.E / D.sfx / D.UI / D.camera / D.hunter
 //   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)     D.sub(html, dur)
 //   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerRoom()  D.onBunk()
+//   D.calm() (nothing hunting you, no scene with an objective going)        D.seesKidWindow()               D.carPass() / D.faceAtWindow()
 //   D.fired(id)                      told after each event has run (some events leave proof behind, see nights.js)
 //   D.dropped(id)                    told when an event is given up on (its ok() never passed) or failed: its proof can no longer turn up
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
@@ -54,23 +55,29 @@ export function makePlan(seed, n) {
   const rank = { sight: 0.25, stalk: 0.55, hunt: 0.8 };
   const slots = kinds.map((k) => ({ k, t: t0 + span * clampN(rank[k] + (r() - 0.5) * 0.35, 0.02, 0.98) })).sort((a, b) => a.t - b.t);
   let last = -99; for (const s of slots) { s.t = Math.max(s.t, last + 22); last = s.t; plan.encounters.push({ t: Math.min(s.t, 350), kind: s.k, done: false, tries: 0 }); }
-  // small events fill the quiet: more of them each night
+  // small events fill the quiet: more of them each night. One that wants the house to itself (alone: minutes) is planned only between the
+  // night's opening scene and the middle of the night, with that many minutes clear of the event before it and the one after it.
   const count = poltergeist ? 16 : 9 + n * 2, gap = (345 - clock0 - 8) / count; let t = clock0 + 8 - gap * 0.3;
   const pool = EVENT_LIST.filter((e) => (poltergeist ? e.safe : n >= (e.minN || 1)));
-  const recent = [];
+  const recent = [], early = [clock0 + 35, clock0 + (345 - clock0) * 0.55];
+  let prev = -99, hold = 0;
+  const fits = (e) => !recent.includes(e.id) && !(e.once && plan.events.some((p) => p.id === e.id)) && (!e.alone || (t >= early[0] && Math.max(t, prev + e.alone) <= early[1]));
   for (let i = 0; i < count; i++) {
-    t += gap * (0.55 + r() * 0.9);
+    t = Math.max(t + gap * (0.55 + r() * 0.9), hold);
     if (t > 350) break;
-    const cand = pool.filter((e) => !recent.includes(e.id)), e = weighted(r, cand.map((c) => [c, c.w]));
+    const e = weighted(r, pool.filter(fits).map((c) => [c, c.w]));
+    if (e.alone) { t = Math.max(t, prev + e.alone); hold = t + e.alone; }
     recent.push(e.id); if (recent.length > 4) recent.shift();
     plan.events.push({ t, id: e.id, done: false });
+    prev = t;
   }
   return plan;
 }
 const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // -------------------------------------------------------------------------------------------------------------------------------------------
-// events: [{ id, w: weight, minN, ok(D) -> may it happen now?, run(D) }]
+// events: [{ id, w: weight, minN, ok(D) -> may it happen now?, run(D) }], and optionally once (at most one a night) and alone (minutes of the
+// clock with no other event or encounter before and after it)
 const room = (D) => D.playerRoom();
 const EVENT_LIST = [
   { id: 'creak', safe: true, w: 5, run: (D) => D.sfx.creak(0.2 + D.r() * 0.15, D.randPan()) },
@@ -94,6 +101,10 @@ const EVENT_LIST = [
   { id: 'bunkShake', safe: true, w: 2, minN: 2, ok: (D) => D.onBunk(), run: (D) => { D.shake(0.5); D.sfx.creak(0.35, 0); D.F.fear = Math.max(D.F.fear, 0.5); } },
   { id: 'steps', safe: true, w: 2, minN: 2, ok: (D) => !D.onBunk() && !D.hunter.busy, run: (D) => { D.F.echo = true; D.later(9, () => { D.F.echo = false; }); } },
   { id: 'flush', safe: true, w: 1, run: (D) => D.sfx.flush(D.pan(4.2, 1.5)) },
+  // a car goes by out front and its headlights slide through the house (about four minutes of the clock)
+  { id: 'carPass', w: 2, minN: 2, once: true, alone: 6, ok: (D) => D.calm(), run: (D) => D.carPass() },
+  // the huge pale face drifts past the windows (about twelve minutes): once a night, while you are in your room or can see its window
+  { id: 'windowFace', w: 2, minN: 2, once: true, alone: 20, ok: (D) => D.calm() && D.seesKidWindow(), run: (D) => D.faceAtWindow() },
   // the build-up to a hunt (flicker, violins, heavy steps) with no hunt after it
   { id: 'falseAlarm', w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0, run: (D) => { D.flicker(1.5); D.sfx.violins(0.3, 0.6); D.sfx.heavyStep(0.5, D.randPan()); D.later(0.85, () => D.sfx.heavyStep(0.4, D.randPan())); D.later(2.6, () => D.sfx.violins(0, 2.5)); D.F.fear = Math.max(D.F.fear, 0.8); } },
 ];
@@ -102,27 +113,31 @@ export const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
 // -------------------------------------------------------------------------------------------------------------------------------------------
 // the director itself: fires events and encounters as the clock reaches them
 export function createDirector(D) {
-  let plan = null, running = false, lockUntil = 0;
+  let plan = null, running = false, lockUntil = 0, lastAt = -99, holdUntil = 0;
+  const okNow = (ev) => { const def = EVENTS[ev.id]; return !def.ok || def.ok(D); };
   const dir = {
-    start(p) { plan = p; running = true; lockUntil = 0; },
+    start(p) { plan = p; running = true; lockUntil = 0; lastAt = -99; holdUntil = 0; },
     stop() { running = false; },
     get plan() { return plan; },
     update() {
       if (!running || !plan || D.F.dead) return;
       const c = D.F.clock, busy = D.F.script || D.F.cutscene || D.F.dead || D.F.pause;
+      // an event that wants the house to itself, once it is due and able to run, holds everything else back until it has had its quiet
+      const lone = busy ? null : plan.events.find((ev) => !ev.done && c >= ev.t && EVENTS[ev.id].alone && okNow(ev));
       // encounters first: they matter more
       for (const e of plan.encounters) {
         if (e.done || c < e.t) continue;
-        if (busy || D.hunter.busy || D.hunter.cool > 0 || D.now() < lockUntil) continue;
+        if (busy || lone || c < holdUntil || D.hunter.busy || D.hunter.cool > 0 || D.now() < lockUntil) continue;
         if (e.tries++ > 40 && c > e.t + 25) { e.done = true; continue; }
-        if (D.encounter(e.kind, plan)) { e.done = true; lockUntil = D.now() + 14; }
+        if (D.encounter(e.kind, plan)) { e.done = true; lockUntil = D.now() + 14; lastAt = c; }
       }
       for (const ev of plan.events) {
         if (ev.done || c < ev.t) continue;
-        if (busy || D.hunter.state === 'hunt' || D.hunter.state === 'loom') continue;
+        if (busy || D.hunter.state === 'hunt' || D.hunter.state === 'loom' || c < holdUntil || (lone && lone !== ev)) continue;
         const def = EVENTS[ev.id];
-        if (def.ok && !def.ok(D)) { if (c > ev.t + 40) { ev.done = ev.dropped = true; if (D.dropped) D.dropped(ev.id); } continue; }
-        ev.done = true;
+        if (!okNow(ev)) { if (c > ev.t + 40) { ev.done = ev.dropped = true; if (D.dropped) D.dropped(ev.id); } continue; }
+        if (def.alone && c - lastAt < def.alone) continue;
+        ev.done = true; lastAt = c; if (def.alone) holdUntil = c + def.alone;
         try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // (no proof for an event that never happened)
       }
     },

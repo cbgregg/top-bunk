@@ -1,5 +1,5 @@
-// A car's headlights slide across the bedroom, and then a huge pale face drifts past each window outside, moaning "eeeyyyeee".
-// Both lights live in the scene all along (a constant light count means no hitch).
+// Two night events (see director.js): a car's headlights slide across the bedroom, and a huge pale face drifts past each window outside,
+// moaning "eeeyyyeee". Both lights live in the scene all along (a constant light count means no hitch).
 import * as THREE from 'three';
 
 const V = THREE.Vector3;
@@ -27,6 +27,7 @@ export class WindowFace {
   }
   face() { this.t = 0; this.root.visible = true; }
   carPass() { this.ct = 0; this.car.shadow.autoUpdate = true; }
+  stop() { this.t = this.ct = -1; this.root.visible = false; this.light.intensity = 0; this.car.intensity = 0; this.car.shadow.autoUpdate = false; }
 
   update(dt) {
     this.clock += dt;

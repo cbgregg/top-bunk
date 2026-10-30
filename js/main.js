@@ -115,7 +115,7 @@ const P = {
   cam: new V3(), stamina: 1, exhausted: false, carrying: null, stepAcc: 0, bob: 0, speed: 0,
   breath: 1, breathT: 0, inhale: true, pod: null, podYaw: 0,
 };
-const F = { stage: 'day', night: 0, scare: false, coverPrompt: false, finalMorning: false, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, pushStart: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0, over: false };
+const F = { stage: 'day', night: 0, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0, over: false };
 let shake = 0, uiMode = 'title', paused = false, started = false, pressE = false;
 const keys = {};
 const echoes = [];
@@ -171,7 +171,8 @@ $('retry').addEventListener('click', retry);
 $('again').addEventListener('click', () => location.reload());
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); gfx.resize(); });
 
-// a car goes by outside (its light slides through the windows), and a while later something huge and pale drifts past them
+// two of the director's night events (director.js): a car goes by out front and its light slides through the windows, and something huge
+// and pale drifts past them
 function carPass() { WF.carPass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); UI.subtitle('<i>Headlights slide across the ceiling.</i>', 3); }
 function faceAtWindow() {
   WF.face(); sfx.moving('sfx/face_wail', { gain: 0.8, from: 0.6, to: -0.8, dur: 13 });
@@ -277,8 +278,7 @@ function updateInteract() {
     } else if (P.mode === 'hide') {
       if (F.live && nights && nights.canComeOut() && !F.breathCheck) { label = P.pod ? 'Come out' : 'Come out from under the covers'; act = () => nights.exitHide(); }
     } else if (P.mode === 'bunk') {
-      if (F.phase === 'morning') { if (F.morningReady) { label = 'Climb down'; act = F.finalMorning ? () => { F.pushStart = true; } : climbDown; } }
-      else if (F.coverPrompt) { label = 'Pull the covers over your head'; act = hideUnderCovers; }
+      if (F.phase === 'morning') { if (F.morningReady) { label = 'Climb down'; act = climbDown; } }
       else { label = 'Climb down'; act = climbDown; if (F.live) extra = ` &nbsp;·&nbsp; <b>${L('breath')}</b> Hide under the covers`; }
     } else if (P.mode === 'walk') {
       if (P.carrying && roomAt(P.pos.x, P.pos.z) === 'bed') { label = 'Put the box down'; act = dropBox; }
@@ -391,14 +391,14 @@ async function climbUp() {
   await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
   F.cutscene = false; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.pod = null; P.podYaw = HIDE_YAW;
   if (hiding || F.chase) {
-    P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); UI.objective('Stay quiet.'); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
+    P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
   } else P.mode = 'bunk';
 }
 // already up on the bunk when it comes: pull the blanket over your head
 async function hideUnderCovers() {
-  F.coverPrompt = false; F.cutscene = true; P.mode = 'cine'; const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
+  F.cutscene = true; P.mode = 'cine'; const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
   await tween(0.6, (k) => { P.cam.lerpVectors(from, BUNK_LIE, k); P.yaw = lerpAngle(y0, HIDE_YAW, k); P.pitch = lerp(p0, 0.15, k); });
-  F.cutscene = false; P.mode = 'hide'; P.pod = null; P.podYaw = HIDE_YAW; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); UI.blanket(true); sfx.whoosh(0); UI.objective(F.live ? null : 'Stay quiet.'); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
+  F.cutscene = false; P.mode = 'hide'; P.pod = null; P.podYaw = HIDE_YAW; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); UI.blanket(true); sfx.whoosh(0); UI.objective(null); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
 }
 async function climbDown() {
   if (F.cutscene) return;
@@ -468,7 +468,7 @@ function updateCamera(dt) {
   else camera.position.copy(P.cam);
   if (P.mode === 'hide') {
     const hy = P.pod ? P.podYaw : HIDE_YAW;
-    P.yaw = hy + clamp(angDiff(hy, P.yaw), F.scare || P.pod ? -0.9 : -0.55, F.scare || P.pod ? 0.9 : 0.55); P.pitch = clamp(P.pitch, -0.35, 0.4);
+    P.yaw = hy + clamp(angDiff(hy, P.yaw), P.pod ? -0.9 : -0.55, P.pod ? 0.9 : 0.55); P.pitch = clamp(P.pitch, -0.35, 0.4);
     camera.position.y += Math.sin(gameTime * (keys.Space || input.breath ? 0.6 : 2.4)) * 0.006;
   }
   if (P.mode === 'bunk') P.pitch = clamp(P.pitch, -1.2, 0.9);
@@ -526,9 +526,9 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
 }
 
 function resetNight() {
-  vigil.stop();
-  F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false; F.scare = false; F.coverPrompt = false;
-  F.splashed = false; F.pushStart = false; F.morningReady = false; F.finalMorning = false; P.breath = 1; P.stamina = 1; P.exhausted = false; shake = 0;
+  vigil.stop(); WF.stop();
+  F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false;
+  F.splashed = false; F.morningReady = false; P.breath = 1; P.stamina = 1; P.exhausted = false; shake = 0;
   carEnd(); F.live = false; F.script = false; F.blackout = false; F.clockGlitch = 0; F.fear = 0; P.pod = null; P.podYaw = HIDE_YAW; UI.pod(null); UI.clock(null); F.flashOn = false; flash.intensity = 0;
   W.tvFx.set(false); W.phone.setRinging(false); W.mirrorFx.hide(); W.curtainSee(false); W.nightLights.forEach((n) => { n.dead = false; }); if (nights) { nights.hunter.reset(); if (dad.fake) { dad.fake = false; sleepers(true); } }
   UI.blanket(false); UI.breath(1, false); UI.hint(null); UI.objective(null);
@@ -1159,7 +1159,7 @@ function update(dt) {
   if (input.lookX || input.lookY) lookBy(-input.lookX * 2.7 * dt, -input.lookY * 2.0 * dt);
   input.setBreathVisible(F.breathUI && !F.dead);
   vigil.update(dt);
-  input.setCoverVisible(P.mode === 'bunk' && !F.cutscene && !F.dead && !F.breathUI && (F.coverPrompt || F.live));
+  input.setCoverVisible(P.mode === 'bunk' && !F.cutscene && !F.dead && !F.breathUI && F.live);
   if (shake > 0.25) input.rumble(shake * 0.55, shake * 0.4, 140);
   if (P.mode === 'walk' && !F.cutscene && !F.dead) movePlayer(dt);
   else { P.vel.set(0, 0, 0); P.speed = 0; P.sprinting = false; UI.stamina(1, false); }
@@ -1169,7 +1169,7 @@ function update(dt) {
     nights.tick(dt);
     // from the bunk, the breath key pulls the covers over your head
     const dn = !!keys.Space || input.breath;
-    if (P.mode === 'bunk' && !F.cutscene && dn && !coverPrev && !F.coverPrompt) hideUnderCovers();
+    if (P.mode === 'bunk' && !F.cutscene && dn && !coverPrev) hideUnderCovers();
     coverPrev = dn;
   }
 
@@ -1265,13 +1265,13 @@ function powerOut(on) {
 }
 const vigil = createVigil({
   scene, P, F, sfx, UI, EYE, tween, wait, say, lerp, angDiff, ease, camera, powerOut, toBunk, addShake: (v) => { shake = Math.max(shake, v); },
-  setFovOff: (v) => { fovOff = v; },
+  setFovOff: (v) => { fovOff = v; }, initTexture: (t) => renderer.initTexture(t),
 });
 nights = createNights({
   vigil,
   P, F, W, E, sfx, UI, camera, mom, dad, L, RUN, saveRun, EYE, BUNK_SEAT, HPARAM, finaleScene: () => finaleScene(), carDream: () => carDream(),
   clamp, lerp, lerpAngle, tween, wait, waitFor, later,
-  time: () => gameTime, say, panFor, nlMult, setPhase, resetNight, caught, roomAt, sleepers, toBunk, enteredHide,
+  time: () => gameTime, say, panFor, nlMult, setPhase, resetNight, caught, roomAt, sleepers, toBunk, enteredHide, carPass, faceAtWindow,
   addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); },
   holding: () => !!keys.Space || input.breath || breathLatch,
   addShake: (v) => { shake = Math.max(shake, v); },
