@@ -16,14 +16,14 @@ unless you've found something they can't. How it ends on the last night depends 
 | Title | Top Bunk |
 | Developer | *[developer name]* |
 | Website | https://github.com/cbgregg/top-bunk |
-| Platforms | Windows, macOS, Linux (Steam); also runs in a web browser from GitHub Pages |
+| Platforms | Windows, macOS (Intel and Apple silicon), Linux (Steam); also runs in a web browser from GitHub Pages |
 | Release date | TBD |
 | Price | TBD |
 | Genre | First-person horror, single-player |
 | Players | 1 |
 | Length | Short: ten nights plus the mornings. A night's clock runs to dawn in about six real minutes, so a full run should take an hour to ninety minutes, more if it catches you |
-| Input | Keyboard and mouse, game controller (with rumble); touch on the web build |
-| Languages | English (interface and subtitles; moving day and the first morning are fully voiced) |
+| Input | Keyboard and mouse; game controller with rumble (partial support); touch on the web build |
+| Languages | English: interface and subtitles. Mom and Dad are voiced on moving day and for most of the first two mornings; their other lines, and grandpa's, are subtitles over a murmur |
 | Engine | three.js (WebGL 2) in Electron for the desktop build; no engine licence, no middleware |
 | Rating | Not yet rated; horror themes, jump scares, flashing lights, no gore |
 | Press contact | *[email]* |
@@ -43,9 +43,9 @@ unless you've found something they can't. How it ends on the last night depends 
   the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
 - Proof. Most nights the house leaves something behind, and what you find changes breakfast. How much you have by the tenth night
   decides which of three endings you get.
-- Graphics presets from Low to Ultra. Auto lowers the resolution, then the preset, when the frame rate drops on integrated graphics.
-- Keyboard and mouse or a controller. The prompts follow whichever you picked up last, and the pause and options menus work from
-  either.
+- Graphics presets from Low to Ultra. Auto lowers the resolution, then the preset, when the frame rate drops.
+- Keyboard and mouse or a controller, and the on-screen prompts follow whichever you used last. Controller support is partial for
+  now: not every screen has been played through on a pad.
 - Steam Achievements.
 
 ## Story in one paragraph (spoiler-light)

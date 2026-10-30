@@ -42,7 +42,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest, target: win,   unpacked: win-unpacked }
-          - { os: macos-latest,   target: mac,   unpacked: mac }            # x64 .app for Steam; mac-arm64 is built and zipped too
+          - { os: macos-latest,   target: mac,   unpacked: mac }            # universal .app (x64 + arm64, merged with lipo, so it has to build on macOS)
           - { os: ubuntu-latest,  target: linux, unpacked: linux-unpacked }
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +70,14 @@ jobs:
 
       - name: Package
         run: npm run dist:${{ matrix.target }}
+
+      - name: The macOS app runs natively on Intel and Apple silicon
+        if: matrix.target == 'mac'
+        run: |
+          for f in "dist/mac/Top Bunk.app/Contents/MacOS/Top Bunk" "dist/mac/Top Bunk.app/Contents/Frameworks/Electron Framework.framework/Electron Framework"; do
+            a=$(lipo -archs "$f"); echo "$f: $a"
+            case " $a " in *" x86_64 "*" arm64 "*|*" arm64 "*" x86_64 "*) ;; *) echo "::error::$f is not universal ($a)"; exit 1;; esac
+          done
 
       - name: Depot tarball (keeps executable bits and symlinks across the artifact round trip)
         shell: bash

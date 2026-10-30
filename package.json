@@ -71,9 +71,11 @@
     },
     "mac": {
       "target": [
-        { "target": "dir", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
+        { "target": "dir", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
       ],
+      "defaultArch": "universal",
+      "x64ArchFiles": "**/node_modules/steamworks.js/dist/osx/*.node",
       "category": "public.app-category.games",
       "identity": null,
       "hardenedRuntime": false,

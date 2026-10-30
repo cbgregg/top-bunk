@@ -43,9 +43,9 @@ There are three endings. Which one you get depends on how much proof you've foun
 [*] Hiding spots, a breath meter, a flashlight, stamina and doors that shut
 [*] Proof to find: what you turn up changes breakfast and decides which of three endings you get
 [*] The house gets worse each night: night lights die, the drawing in the hall changes, the clock lies
-[*] Every line is subtitled; Mom and Dad are fully voiced on moving day and the first morning
-[*] Keyboard and mouse or a game controller, with rumble; the menus work from either
-[*] Graphics presets from Low to Ultra, plus an Auto mode that holds the frame rate on laptops
+[*] Every line is subtitled. Mom and Dad are voiced on moving day and for most of the first two mornings; after that their lines are subtitles over a murmur
+[*] Keyboard and mouse, or a game controller with rumble
+[*] Graphics presets from Low to Ultra, plus an Auto mode that lowers the resolution, then the preset, when the frame rate drops
 [*] Steam Achievements
 [/list]
 
@@ -54,33 +54,38 @@ There are three endings. Which one you get depends on how much proof you've foun
 
 ## System requirements
 
-The desktop build is the web game inside Electron 45 (Chromium), so it needs what Chromium needs to run WebGL 2 at a steady frame
-rate. The OS lines are Electron 45's own floor (macOS 13 Ventura or later; Linux distributions that are still maintained). The rest
-are estimates from the render pipeline, not measurements: High adds HDR sky, ambient occlusion, bloom and soft shadows, and Low has
-none of them. Steamworks has one block per OS; the lines are the same except where noted.
+These are estimates. The game hasn't been timed on any of the hardware named below, so don't quote a frame rate anywhere on the page.
+
+The desktop build is the web game inside Electron 45 (Chromium), so it needs what Chromium needs to run WebGL 2. The OS lines are
+Electron 45's floor: Windows 10, macOS 13 Ventura (the app's Info.plist asks for 13.0), and Linux distributions that are still
+maintained. The macOS app is one universal bundle with Intel and Apple silicon code, so it doesn't need Rosetta. The CPU and GPU lines
+are guesses from the presets: Low turns off ambient occlusion, bloom, colour grading and anti-aliasing and uses smaller shadow maps,
+and High and Ultra turn them all on. The storage lines are the unpacked build plus room to spare (the Linux build is about 320 MB, the
+universal macOS app about 530 MB). Steamworks has one block per OS; the lines are the same except where noted.
 
 ### Minimum
 
 | | |
 | --- | --- |
-| OS | Windows 10 64-bit · macOS 13 (Ventura) · Ubuntu 22.04 or SteamOS 3 |
-| Processor | Dual-core 2.0 GHz (Intel Core i3 / AMD equivalent) |
+| OS | Windows 10 64-bit · macOS 13 (Ventura), Intel or Apple silicon · Ubuntu 22.04 or SteamOS 3 |
+| Processor | Dual-core 2.0 GHz (Intel Core i3 / AMD equivalent); on macOS, any Mac that runs macOS 13 |
 | Memory | 4 GB RAM |
-| Graphics | Any GPU with WebGL 2 (OpenGL ES 3.0 / DirectX 11 class), 1 GB VRAM; Intel HD 4000 or newer |
-| Storage | 500 MB available space |
+| Graphics | A GPU with WebGL 2 support (DirectX 11 / OpenGL ES 3.0 class), such as Intel HD Graphics 620 or newer |
+| Storage | 400 MB available space (macOS: 600 MB) |
 | Sound | Stereo output; headphones recommended |
-| Additional | 64-bit only. The Low and Medium presets are meant for integrated graphics. |
+| Additional | 64-bit only. Estimated, not measured. The Low and Medium presets are meant for integrated graphics. |
 
 ### Recommended
 
 | | |
 | --- | --- |
-| OS | Windows 11 64-bit · macOS 14 or later · Ubuntu 22.04 or SteamOS 3 |
-| Processor | Quad-core 3.0 GHz (Intel Core i5 / AMD Ryzen 5) |
+| OS | Windows 10 or 11 64-bit · macOS 13 or later · Ubuntu 22.04 or SteamOS 3 |
+| Processor | Quad-core 3.0 GHz (Intel Core i5 / AMD Ryzen 5); on macOS, Apple M1 or newer |
 | Memory | 8 GB RAM |
-| Graphics | NVIDIA GTX 1060 / AMD RX 580 / Apple M1 or better, for High at 1080p60 |
-| Storage | 500 MB on an SSD |
+| Graphics | NVIDIA GTX 1060 / AMD RX 580 class, or Apple M1 or newer |
+| Storage | 400 MB available space (macOS: 600 MB) |
 | Sound | Headphones |
+| Additional | Estimated, not measured. |
 
 ## Content warnings (for the description and the Mature Content survey)
 
@@ -121,14 +126,16 @@ ElevenLabs and are shipped as fixed audio files. No content is generated at runt
 | Input | Support | Notes |
 | --- | --- | --- |
 | Keyboard and mouse | Full | WASD / arrows, mouse look, E, Shift, Space, F, Esc |
-| Game controller | Full (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads work when Steam presents them as XInput. |
+| Game controller | **Partial** (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads should work when Steam presents them as XInput, but none has been tried. The menus take d-pad and A / B in code, but not every screen has been played through on a pad yet. |
 | Touch | Web build only | Not relevant to the Steam build |
-| Steam Cloud | **Not supported** | Progress (one run per seed, the night you reached) is saved locally in the app's user-data folder |
+| Steam Cloud | Once Auto-Cloud is configured | One saved run plus settings and achievements, kept as files in the app's user-data folder. Set up Auto-Cloud for that folder in Steamworks (Application → Steam Cloud). |
 | Steam Deck | Untested | Expect *Playable* at best until the Linux build has been tried on a Deck |
 
-Store Page → Basic Info → Supported Features: tick *Single-player* and *Full Controller Support* (once the title, pause, death and
-end screens are all confirmed usable from a pad; until then *Partial Controller Support*). The achievements are in the build
-(`steam/achievements.json`); tick *Steam Achievements* once their icons exist.
+Store Page → Basic Info → Supported Features: tick *Single-player* and *Partial Controller Support*. Switch to *Full Controller
+Support* only after every screen has been used on a pad from start to finish: title, new game (the seed entry), options, controls,
+credits, achievements, pause, death and the three endings. Tick *Steam Cloud* once Auto-Cloud is set up and a run has carried over
+from one machine to another. The achievements are in the build (`steam/achievements.json`); tick *Steam Achievements* once their
+icons exist.
 
 ## Languages
 
@@ -136,8 +143,9 @@ end screens are all confirmed usable from a pad; until then *Partial Controller 
 | --- | --- | --- | --- |
 | English | yes | no | yes |
 
-English only. Every line is subtitled. Moving day and the first morning are fully voiced; from the second morning on, most lines
-play as a murmur under the subtitle, so leave Full audio unticked.
+English only. Every line is subtitled, but only some are voiced: Mom and Dad on moving day and for most of the first two mornings.
+Their other lines, and grandpa's, play as a wordless murmur under the subtitle, and the kid's lines are text only. Leave *Full audio*
+unticked until every line in `assets/audio/lines.json` has a recording in `assets/audio/vo/`.
 
 ## Tags
 
@@ -170,10 +178,14 @@ above:
 - Sex and nudity, drugs, alcohol, gambling, user-generated content, in-game purchases, user interaction, location sharing: none.
 
 Don't put a rating on the page until the questionnaire returns one. Mark at least four screenshots as suitable for all ages: 02 (your
-room), 03 (the drawing), 06 (breakfast) and 07 (the TV, with a man's back to you) have no creature in frame; 01, 04 and 05 show the
-thing and can stay mature-only if the review asks.
+room) and 06 (breakfast) have no creature in frame, and 03 (the hall) shows it only as the kid's crayon drawing. The fourth is 07:
+Dad, seen side-on, standing at the TV, with a tall dark shape in the static on the screen. 01, 04 and 05 show the thing and can stay
+mature-only if the review asks.
 
 ## Before the page goes live
 
 - Make the 64×64 achieved and unachieved achievement icons, then tick *Steam Achievements* in Supported Features.
-- Try the system requirements on real hardware, and raise the minimum GPU if the Low preset can't hold 30 fps on it.
+- Try the system requirements on real hardware, and raise the minimum GPU if the Low preset can't hold 30 fps on it. Try the macOS
+  build on both an Intel Mac and an Apple silicon one.
+- Play every screen on a controller before switching to *Full Controller Support*.
+- Set up Auto-Cloud and check a run carries over between two machines before ticking *Steam Cloud*.

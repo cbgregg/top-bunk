@@ -7,7 +7,7 @@ What Steam needs to take the desktop build. `../STEAM.md` is the whole launch ch
 | --- | --- |
 | `app_build.vdf` | The app build script steamcmd runs: App ID, description, output folder, the three depots. |
 | `depot_build_windows.vdf` | Windows depot (AppID+1): `dist/win-unpacked/` from `npm run dist:win`. |
-| `depot_build_mac.vdf` | macOS depot (AppID+2): `dist/mac/` (the x64 `Top Bunk.app`) from `npm run dist:mac`. |
+| `depot_build_mac.vdf` | macOS depot (AppID+2): `dist/mac/` (the universal `Top Bunk.app`, Intel and Apple silicon) from `npm run dist:mac`. |
 | `depot_build_linux.vdf` | Linux depot (AppID+3): `dist/linux-unpacked/` from `npm run dist:linux`. |
 | `upload.sh` / `upload.ps1` | Wrap `steamcmd +login <account> +run_app_build app_build.vdf`; refuse to run while placeholders remain or a ContentRoot is missing. |
 | `achievements.json` | Achievement API names and texts to enter in Steamworks → Stats & Achievements (see `achievements.md`). |
@@ -40,7 +40,7 @@ When Steam launches the game it sets `SteamAppId` in the environment, which wins
 ```sh
 npm ci
 npm run dist:win      # on Windows  -> dist/win-unpacked/, dist/Top Bunk-<v>-win-x64.zip
-npm run dist:mac      # on macOS    -> dist/mac/Top Bunk.app, dist/mac-arm64/Top Bunk.app, zips
+npm run dist:mac      # on macOS    -> dist/mac/Top Bunk.app (universal), zip
 npm run dist:linux    # on Linux    -> dist/linux-unpacked/, dist/Top Bunk-<v>-linux-x64.tar.gz
 ```
 

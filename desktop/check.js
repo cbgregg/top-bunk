@@ -278,7 +278,7 @@ async function main() {
     assert.deepStrictEqual(targets('win').sort(), ['dir', 'zip']);
     assert.deepStrictEqual(archs('win', 'dir'), ['x64']);
     assert.deepStrictEqual(targets('mac').sort(), ['dir', 'zip']);
-    assert.deepStrictEqual(archs('mac', 'dir').sort(), ['arm64', 'x64']);
+    assert.deepStrictEqual(archs('mac', 'dir'), ['universal']);
     assert.deepStrictEqual(targets('linux').sort(), ['dir', 'tar.gz']);
     assert.strictEqual(b.linux.executableName, 'top-bunk');
     assert.strictEqual(b.mac.identity, null, 'no signing identity (builds without certificates)');

@@ -55,7 +55,7 @@ The game sees the shell as `window.desktop`:
   installs are fine). Signing needs an Authenticode certificate and `win.certificateFile` /
   `signtoolOptions` in the electron-builder config.
 - **macOS notarization**: `mac.identity` is `null`. Steam strips the quarantine attribute so Steam
-  installs run, but the arm64/x64 zips from GitHub will be blocked by Gatekeeper until the app is
+  installs run, but the universal zip from GitHub will be blocked by Gatekeeper until the app is
   signed with a Developer ID and notarized (`identity`, `hardenedRuntime: true`, `notarize`).
 - **Steam Cloud**: saves live in the browser `localStorage` inside Electron's user-data folder
   (`%APPDATA%\Top Bunk`, `~/Library/Application Support/Top Bunk`, `~/.config/Top Bunk`). Steam
