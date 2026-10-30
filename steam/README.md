@@ -101,6 +101,9 @@ launch option with it.
   default template if you enable it; there is no Steam Input action manifest yet.
 - **Depots** (SteamPipe → Depots): give each depot its operating system so the client installs only
   the matching one, and mark Windows and Linux as 64-bit.
+- **Steam Cloud** (Application → Steam Cloud): Auto-Cloud on the game's `saves` folder, one root path
+  (`WinAppDataRoaming`, `Top Bunk/saves`, `*.json`) with overrides for macOS and Linux. The quota and
+  every field are in `../STEAM.md`, "Saves and Steam Cloud".
 - Publish the app changes from the **Publish** tab when these are set.
 
 The store-page flags (supported features, controller support) are in `../store/description.md`.

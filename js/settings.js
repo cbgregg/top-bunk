@@ -1,5 +1,7 @@
-// Player settings, kept in localStorage ('topbunk.settings') and applied live: each module subscribes to the keys it cares
+// Player settings, saved under 'topbunk.settings' (store.js) and applied live: each module subscribes to the keys it cares
 // about with settings.on(key, fn). A setting another module owns (graphics quality lives in gfx) is reached through a delegate.
+import { store } from './store.js';
+
 const KEY = 'topbunk.settings';
 // brightness is in stops: the scene's exposure is multiplied by 2 ** brightness (0 leaves it as designed)
 export const DEFAULTS = { master: 0.85, music: 1, sfx: 1, voice: 1, sensitivity: 1, invertY: false, fov: 75, brightness: 0, headBob: true, subtitles: true, reduceFlashing: false };
@@ -12,10 +14,10 @@ const clean = (k, v) => {
   const r = RANGES[k]; return r ? Math.max(r[0], Math.min(r[1], v)) : v;
 };
 function load() {
-  let s = null; try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* ignore */ }
+  const s = store.get(KEY);
   if (s && typeof s === 'object') for (const k in DEFAULTS) if (k in s) data[k] = clean(k, s[k]);
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* ignore */ } }
+function save() { store.set(KEY, data); }
 function notify(k, v) { for (const fn of subs[k] || []) fn(v, k); for (const fn of subs['*'] || []) fn(v, k); }
 load();
 

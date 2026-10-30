@@ -4,7 +4,7 @@ import { buildWorld, roomAt } from './world.js';
 import { Entity } from './entity.js';
 import { Sound } from './audio.js';
 import { makePerson } from './people.js';
-import { Gfx } from './gfx.js';
+import { Gfx, QUALITY } from './gfx.js';
 import { WindowFace } from './windowface.js';
 import { Dust } from './dust.js';
 import * as UI from './ui.js';
@@ -16,6 +16,7 @@ import { createVigil } from './vigil.js';
 import { settings, flicker } from './settings.js';
 import { menu } from './menu.js';
 import { achievements } from './achievements.js';
+import { store } from './store.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -24,13 +25,13 @@ const DEBUG = HASHTOK.find((t) => t && !t.includes('=')) || '';   // a debug jum
 const HPARAM = Object.fromEntries(HASHTOK.filter((t) => t.includes('=')).map((t) => t.split('=')));   // #seed=ABCD-1234&night=5
 // the run: one seed decides what every night is; progress is kept between visits
 function loadRun() {
-  let r = null; try { r = JSON.parse(localStorage.getItem('topbunk.run')); } catch (e) { /* ignore */ }
+  let r = store.get('topbunk.run');
   if (HPARAM.seed) r = { seed: HPARAM.seed.toUpperCase(), night: +(HPARAM.night || 1), deaths: 0 };
   if (!r || !r.seed) r = { seed: newSeed(), night: 1, deaths: 0 };
   return r;
 }
 const RUN = loadRun();
-function saveRun() { try { localStorage.setItem('topbunk.run', JSON.stringify(RUN)); } catch (e) { /* ignore */ } }
+function saveRun() { store.set('topbunk.run', RUN); }
 const hasRun = () => RUN.night >= 2 || !!RUN.dayDone;   // (moving day is kept once it is over: Continue starts night one)
 
 // ---------- renderer ----------
@@ -65,9 +66,12 @@ const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#
 mom.group.position.set(0.6, 0, 1.6); dad.group.position.set(4.3, 0, -13.4);   // where the day starts them
 scene.add(mom.group, dad.group);
 
-const gfx = new Gfx(renderer, scene, camera);
+// the graphics preset is saved here with the rest (gfx's own copy in localStorage is only read when none is passed in)
+const savedQuality = store.get('topbunk.quality');
+const gfx = new Gfx(renderer, scene, camera, { quality: Object.hasOwn(QUALITY, savedQuality) ? savedQuality : null });
 const dust = new Dust(scene, camera);
-settings.delegate('quality', { get: () => gfx.mode, set: (v) => gfx.setMode(v), def: 'auto' });   // (the options menu's Graphics row; gfx keeps it)
+function setGraphics(v) { gfx.setMode(v); if (gfx.auto) store.remove('topbunk.quality'); else store.set('topbunk.quality', gfx.quality); }
+settings.delegate('quality', { get: () => gfx.mode, set: setGraphics, def: 'auto' });   // (the options menu's Graphics row)
 const BATH_I = 95;
 // the flashlight: a spot light carried on the camera (see toggleLight)
 const flash = new THREE.SpotLight(0xfff1d2, 0, 15, 0.5, 0.55, 1.2);
@@ -1166,7 +1170,7 @@ function endScreen(id) {
   $('endtitle').textContent = title; $('endtitle').classList.toggle('red', id !== 'ENDING_BELIEVED'); $('endtag').textContent = line;
   $('endinfo').textContent = `Seed ${RUN.seed}  ·  proof ${proofCount()} / ${nights.proof.total}`;
   uiMode = 'end'; document.exitPointerLock(); UI.show('end'); achievements.ending(id);
-  try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
+  store.remove('topbunk.run');
 }
 
 // ---------- per-frame ----------
@@ -1302,7 +1306,7 @@ UI.makeGrain();
 }
 // the title, pause, options and end menus (js/menu.js opens them when the #title / #pause / #end screens show)
 function newRun(seed) {   // New game: a run from moving day on the seed it was given (or a fresh one); a saved run is lost
-  try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
+  store.remove('topbunk.run');
   Object.assign(RUN, { seed: seed || newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();

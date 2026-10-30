@@ -1,4 +1,4 @@
-// Achievements. Each one unlocks once and is kept in localStorage ('topbunk.achievements', id -> when), with the counters some of them need
+// Achievements. Each one unlocks once and is saved under 'topbunk.achievements' (store.js, id -> when), with the counters some of them need
 // in 'topbunk.stats'. An unlock shows a card in the bottom-left corner and reaches Steam through the desktop shell (window.desktop.achieve)
 // when there is one. The ids are the Steamworks API names; steam/achievements.json is the same list for the Steamworks admin pages.
 //   achievements.unlock(id)    achievements.has(id)    achievements.list()    achievements.tick() (every frame, from main.js)
@@ -27,8 +27,11 @@ export const ACHIEVEMENTS = [
 ];
 const BY_ID = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
-const read = (k) => { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
-const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
+// imported at run time so the file still loads on its own: desktop/check.js reads ACHIEVEMENTS from it as a data: URL, where a
+// relative import can't resolve (it then has no store and nothing is saved)
+const store = await import('./store.js').then((m) => m.store, () => null);
+const read = (k) => { const v = store && store.get(k); return v && typeof v === 'object' ? v : {}; };
+const write = (k, v) => { if (store) store.set(k, v); };
 const got = read(KEY), stats = read(STATS);
 const G = {};   // from main.js (bind): F, P, W, RUN, sfx, menu, hunter(), test()
 const off = () => !!(G.test && G.test());   // the test mode (window.__game.start(), used by the trailer and the store shots) and the debug jumps earn nothing
