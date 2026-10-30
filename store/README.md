@@ -1,17 +1,17 @@
-# store/ — Steam store page assets
+# Steam store page assets
 
-Everything the Steamworks store page asks for, produced from the game itself so it never drifts from what ships. Nothing in this
-folder is loaded by the game.
+The art and copy the Steamworks store page asks for. The screenshots and capsules are rendered from the game itself, so they show
+what ships. Nothing in this folder is loaded by the game.
 
 | File | What it is | Where it goes in Steamworks |
 | --- | --- | --- |
 | `description.md` | Short description, "About this game" (BBCode), system requirements, content warnings, AI-generated content disclosure, input, languages, tags, age-rating notes, and a list of claims to re-check before the page goes live | Store Page → Basic Info (name, short description, genre, tags, supported features, languages, the AI-content questions) · Store Page → Description · Store Page → Mature Content · the IARC questionnaire |
 | `press-kit.md` | One-paragraph pitch, fact sheet, feature bullets, asset list | Not a Steamworks field: your website / press emails; the pitch and features also feed the Steam page |
-| `shots.js` | Playwright harness: drives the live game headless and captures the screenshots | — |
+| `shots.js` | Playwright script: drives the live game headless and captures the screenshots | |
 | `screenshots/01…08.png` | Eight 1920×1080 in-game screenshots | Store Page → Graphical Assets → Screenshots: upload all but 07, which is too dark to read as a thumbnail (Steam needs five); mark at least four "suitable for all ages" |
-| `capsules/*.html` | One HTML template per capsule, composed from the screenshots plus the title typography (`capsule.css` holds the shared look, `capsule.js` the ready signal and the `?s=2` zoom) | — |
-| `capsules/src/` | Wide (3840×1240) and tall (1000×1400) source renders for the capsules, from `shots.js --extra` | — |
-| `render_capsules.js` | Renders every template to `out/` at its exact size | — |
+| `capsules/*.html` | One HTML template per capsule, composed from the screenshots plus the title typography (`capsule.css` holds the shared look, `capsule.js` the ready signal and the `?s=2` zoom) | |
+| `capsules/src/` | Wide (3840×1240) and tall (1000×1400) source renders for the capsules, from `shots.js --extra` | |
+| `render_capsules.js` | Renders every template to `out/` at its exact size | |
 | `out/header_capsule.png` 460×215 (`_2x` 920×430) | Header capsule | Store Page → Graphical Assets → Header Capsule (Steam currently asks for 920×430; upload the `_2x`) |
 | `out/small_capsule.png` 462×174 | Small capsule | Graphical Assets → Small Capsule |
 | `out/main_capsule.png` 616×353 (`_2x` 1232×706) | Main capsule | Graphical Assets → Main Capsule (Steam currently asks for 1232×706; upload the `_2x`) |
@@ -46,7 +46,7 @@ node store/render_capsules.js --only header,logo --shots /some/other/screenshots
 
 Both scripts serve the repository root on a local port (`--port`, default 8800 and 8801) and open it in headless Chromium. Each shot
 in `shots.js` is a few lines of setup against `window.__game` (phase, camera, where the thing stands); edit those to re-frame. The
-HUD is hidden in every screenshot except 04, which keeps the hold-your-breath prompt and meter on purpose.
+HUD is hidden in every screenshot except 04, which keeps the hold-your-breath prompt and meter.
 
 The capsule templates load the game's own fonts from `css/fonts.css` (Special Elite for the title, Courier Prime for the rest) and
 nothing from the network; the renderer blocks the network as well, so a missing local font shows up as a fallback face.

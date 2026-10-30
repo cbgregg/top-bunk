@@ -2,10 +2,10 @@
 
 The desktop build is the web game wrapped in Electron (`desktop/`), packaged by electron-builder
 (`package.json` → `"build"`), uploaded with SteamPipe (`steam/`). This is the launch checklist, in
-order. Sizes and rules below are Valve's as of this writing; Steamworks shows the current numbers on
-each upload form, so trust the form when they disagree.
+order. Sizes and rules below are Valve's at the time of writing; Steamworks shows the current numbers on
+each upload form, and the form wins when they disagree.
 
-## 0. What you can do today, without a Steam app
+## 0. Before you have a Steam app
 
 ```sh
 npm ci
@@ -53,9 +53,9 @@ echo $APP > desktop/steam_appid.txt
 npm run check   # cross-checks the IDs
 ```
 
-Also set the `STEAM_APP_ID` repository variable on GitHub if you want CI uploads. Commit all of it:
-`desktop/steam_appid.txt` is tracked on purpose, it is how the shell knows which app it is when it is
-started outside Steam (when Steam starts it, the `SteamAppId` environment variable wins).
+Also set the `STEAM_APP_ID` repository variable on GitHub if you want CI uploads. Commit all of it,
+including `desktop/steam_appid.txt`: the shell reads the App ID from it when the game is started outside
+Steam (when Steam starts it, the `SteamAppId` environment variable wins).
 
 ## 3. Depots and launch options (Steamworks → App Admin)
 
@@ -86,7 +86,7 @@ Full detail, including the `steam/*.vdf` layout and the upload scripts: `steam/R
 
 Store Page → Graphical Assets. Sizes Steam currently requires (JPG or PNG unless noted); the game's
 logo must be readable on the capsules and nothing on them may carry review quotes, awards or
-discount text. The `store/` folder (produced separately) is meant to hold these at exactly these sizes:
+discount text. `store/` has the capsules and screenshots at these sizes (`store/README.md` lists the files):
 
 | Asset | Size | Notes |
 | --- | --- | --- |
@@ -104,22 +104,22 @@ discount text. The `store/` folder (produced separately) is meant to hold these 
 | Screenshots | at least 5, 1920 × 1080 (16:9) | in-game only, no marketing text or UI mock-ups; mark at least 4 as suitable for all ages |
 | Trailer | 1920 × 1080, H.264 MP4, 30 fps (60 accepted), 5+ Mbps, AAC audio 44.1/48 kHz | plus a 1920 × 1080 thumbnail; the whole video must be rated-appropriate |
 
-Also fill in: short description (≤ 300 characters), "About this game", system requirements for each OS
-(the Electron build needs a 64-bit OS, WebGL 2-capable GPU, ~1 GB RAM, ~400 MB disk), languages,
-genre/tags, features (Single-player, Steam Achievements, controller support), release date or
-"Coming soon", and the **Mature content** survey (horror themes, jump scares, frightening imagery).
+Also fill in: short description (≤ 300 characters), "About this game", system requirements for each OS,
+languages, genre/tags, features (Single-player, Steam Achievements, controller support), release date or
+"Coming soon", and the **Mature content** survey (horror themes, jump scares, frightening imagery). The
+text for all of these is in `store/description.md`.
 
 Content warnings that belong in the description and on the title screen:
 
-- **Flashing lights / photosensitivity**: lightning, TV static and jump-scare flashes are strobing
+- **Flashing lights / photosensitivity**: flickering lights, TV static and jump-scare flashes are strobing
   effects. The title screen says "Contains jump scares and flashing lights"; keep the same line in the
-  store description.
+  store description. Options → Reduce flashing softens them.
 - Headphones recommended, loud sudden sounds.
 
 ## 5. Achievements
 
-Stats & Achievements → Achievements → New, one per entry in `steam/achievements.json` (owned by the
-achievements work). Each needs:
+Stats & Achievements → Achievements → New, one per entry in `steam/achievements.json`
+(`steam/achievements.md` goes through the form field by field). Each needs:
 
 - **API name**: exactly the `id` the game passes to `window.desktop.achieve(id)` (the JSON's `apiName`).
 - Display name, description, hidden flag (keep spoilers hidden).
@@ -168,11 +168,11 @@ the app, a controller works. Test the Linux build on a Steam Deck if you can.
 
 Content ratings: Steam's own mature-content survey is mandatory. Official age ratings are optional
 on Steam but free through the **IARC** questionnaire in Steamworks (gives ESRB, PEGI, USK, ClassInd,
-ACB and GRAC ratings) and some storefront regions and promotions need them; fill it in truthfully
-(horror, fear, violence toward the player character, no gore, mild language (a few exclamations), no
-purchases), the same as the content warnings in `store/description.md`.
+ACB and GRAC ratings) and some storefront regions and promotions need them. Answer it the same way as
+the content warnings in `store/description.md`: horror, fear, violence toward the player character, no
+gore, mild language (a few exclamations), no purchases.
 
-## 8. Not done (deliberately, so nothing pretends to be)
+## 8. Not done yet
 
 - **Code signing**: Windows builds are unsigned (SmartScreen will warn on direct downloads; Steam
   installs are fine). Signing needs an Authenticode certificate and `win.certificateFile` /

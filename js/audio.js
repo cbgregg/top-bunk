@@ -1,4 +1,4 @@
-// Sound is synthesized with WebAudio. Recorded files (voices, music, jump scares, ambience — made by tools/gen_*.py)
+// Sound is synthesized with WebAudio. Recorded files (voices, music, jump scares and ambience, made by tools/gen_*.py)
 // layer on top when they load; every call falls back to the synth if a file is missing.
 // Every source goes through one of three buses (music, sfx, voice) on its way to the master, each with its own reverb send so its
 // volume covers its share of the reverb too. Synthesized sounds are sfx; a file's bus comes from its id (vo/ and music/) or its sfx.json kind.
@@ -221,12 +221,6 @@ export class Sound {
     this.tone({ f: 58, f2: 38, dur: 0.12, gain, wet: 0 });
     this.tone({ f: 52, f2: 34, dur: 0.14, gain: gain * 0.8, wet: 0, delay: 0.17 });
   }
-  stinger() {
-    if (this.play('sfx/scare_synth', { gain: 1, wet: 0.1 })) { this.play('sfx/scare_bang', { gain: 0.6, delay: 0.05 }); return; }
-    for (const f of [185, 196, 207.65, 277, 415.3, 440, 622]) this.tone({ type: 'sawtooth', f, f2: f * 0.94, attack: 0.01, dur: 2.6, gain: 0.07, wet: 0.5, pan: (Math.random() - 0.5) * 0.6 });
-    this.noiseHit({ dur: 1.6, type: 'bandpass', f: 3000, f2: 400, q: 0.8, gain: 0.45, wet: 0.5, attack: 0.01 });
-    this.tone({ f: 55, f2: 28, dur: 1.4, gain: 0.8, wet: 0.2 });
-  }
   scream() {
     if (!this.ctx) return;
     if (this.play('sfx/scare_strings', { gain: 2.0, wet: 0.1 })) { this.play('sfx/scare_synth', { gain: 1.0, delay: 0.04 }); return; }
@@ -282,14 +276,6 @@ export class Sound {
     for (let i = 0; i < 4; i++) this.tone({ f: 3000 + Math.random() * 3000, dur: 0.05, gain: 0.05, delay: 0.08 + Math.random() * 0.4, wet: 0.5 });
   }
   splash() { this.noiseHit({ dur: 0.9, type: 'bandpass', f: 1600, f2: 900, q: 0.6, gain: 0.35, attack: 0.08, wet: 0.35 }); }
-  thud() {
-    if (this.play('sfx/bunk_shove', { gain: 1.1, wet: 0.2 })) return;
-    this.tone({ f: 80, f2: 22, dur: 0.6, gain: 1.0, wet: 0.3 });
-    this.noiseHit({ dur: 0.25, f: 500, gain: 0.9, wet: 0.3 });
-    this.noiseHit({ dur: 0.15, f: 2500, gain: 0.25, wet: 0.2, delay: 0.02 });
-  }
-  shove() { this.play('sfx/scare_bang', { gain: 0.5 }); this.noiseHit({ dur: 0.25, type: 'bandpass', f: 400, f2: 1600, q: 0.7, gain: 0.7, attack: 0.02, wet: 0.2 }); }
-  ring() { this.tone({ f: 3900, dur: 5, gain: 0.05, attack: 0.02, wet: 0 }); }
   whoosh(pan = 0) { this.noiseHit({ dur: 0.7, type: 'bandpass', f: 300, f2: 2400, q: 1.2, gain: 0.45, attack: 0.15, pan, wet: 0.3 }); }
   gasp() { this.noiseHit({ dur: 0.45, type: 'bandpass', f: 1300, f2: 700, q: 1.1, gain: 0.6, attack: 0.04, wet: 0.15 }); }
   breath(inhale = true, gain = 0.12) { this.noiseHit({ dur: inhale ? 0.9 : 1.1, type: 'bandpass', f: inhale ? 900 : 700, f2: inhale ? 1300 : 450, q: 0.8, gain, attack: 0.45, wet: 0.05 }); }
@@ -360,7 +346,7 @@ export class Sound {
   flush(pan = 0) { if (!this.ctx) return; this.noiseHit({ dur: 2.6, type: 'bandpass', f: 800, f2: 2200, q: 0.6, gain: 0.3, pan, wet: 0.3, attack: 0.4 }); }
 
   // Silence before a scare makes it land: the whole mix ducks, and a jolt then hits well above everything else (the compressor keeps it from clipping).
-  // (both move the master relative to the player's master volume, this.level: 0.85 is the mix they were tuned at)
+  // (both move the master relative to the player's master volume, this.level)
   hush(sec = 3) {
     if (!this.ctx) return; const g = this.master.gain, t = this.now, L = this.level;
     g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(L * 0.165, t + 0.5); g.setValueAtTime(L * 0.165, t + sec - 0.1); g.linearRampToValueAtTime(L, t + sec + 0.4);

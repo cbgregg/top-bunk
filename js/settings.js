@@ -33,8 +33,6 @@ export const settings = {
   all() { const o = { ...data }; for (const k in delegates) o[k] = delegates[k].get(); return o; },
   // hand a key to another module: { get, set, def } (def is what reset() puts back)
   delegate(k, d) { delegates[k] = d; },
-  // fires every subscriber with the current values (call once the modules have subscribed)
-  applyAll() { for (const k in data) notify(k, data[k]); for (const k in delegates) notify(k, delegates[k].get()); },
   reset() { for (const k in DEFAULTS) this.set(k, DEFAULTS[k]); for (const k in delegates) if ('def' in delegates[k]) this.set(k, delegates[k].def); },
 };
 

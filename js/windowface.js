@@ -1,5 +1,5 @@
-// A night event from a childhood memory: a car's headlights slide across the bedroom, and then a huge pale face drifts past
-// each window outside, moaning "eeeyyyeee". Both lights live in the scene all along (a constant light count means no hitch).
+// A car's headlights slide across the bedroom, and then a huge pale face drifts past each window outside, moaning "eeeyyyeee".
+// Both lights live in the scene all along (a constant light count means no hitch).
 import * as THREE from 'three';
 
 const V = THREE.Vector3;
@@ -39,7 +39,7 @@ export class WindowFace {
         this.root.position.y += Math.sin(this.clock * 0.8) * 0.08;
         this.root.lookAt(this.look); this.root.rotation.z = Math.sin(this.clock * 0.5) * 0.12;
         const open = 0.35 + 0.65 * Math.abs(Math.sin(this.clock * 1.1)); this.mouth.scale.set(1.1, 0.5 + open * 1.5, 0.3);
-        this.light.position.copy(this.root.position).add(new V(0, 0, 0)).lerp(this.look, 0.15);
+        this.light.position.copy(this.root.position).lerp(this.look, 0.15);
         this.light.intensity = 9 * Math.min(1, k * 6, (1 - k) * 6);
       }
     }

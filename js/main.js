@@ -1,4 +1,4 @@
-// TOP BUNK — game loop, player, and the story script.
+// TOP BUNK: the game loop, the player and the story script.
 import * as THREE from 'three';
 import { buildWorld, roomAt } from './world.js';
 import { Entity } from './entity.js';
@@ -89,11 +89,8 @@ const BUNK_SEAT = new V3(6.03, 2.24, 3.02);
 const BUNK_LIE = new V3(6.13, 1.9, 3.02);
 const LADDER_MID = new V3(7.48, 1.55, 3.02);
 const LADDER_FLOOR = new V3(7.68, 0, 3.02);
-const BUNK_SIDE = new V3(6.03, 0, 2.12);
 const HIDE_YAW = 0;                         // lying on the top bunk you face the room (toward the front of the house, -z)
 const LADDER_YAW = Math.PI / 2;             // on the ladder you face the bunk (west)
-const HALL_DOOR = new V3(7.05, 0, -0.9);    // the hall in front of your door
-const HALL_MOUTH = new V3(1.6, 0, -0.9);    // just inside the living room, where the hall opens into it
 
 // ---------- helpers ----------
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
@@ -128,7 +125,7 @@ const P = {
   breath: 1, breathT: 0, inhale: true, pod: null, podYaw: 0,
 };
 const F = { stage: 'day', night: 0, scare: false, coverPrompt: false, finalMorning: false, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, pushStart: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0, over: false };
-let chase = null, shake = 0, uiMode = 'title', paused = false, started = false, pressE = false;
+let shake = 0, uiMode = 'title', paused = false, started = false, pressE = false;
 const keys = {};
 const echoes = [];
 
@@ -397,11 +394,10 @@ async function climbUp() {
   if (F.cutscene) return;
   F.cutscene = true; P.mode = 'cine';
   P.cam.copy(camera.position);
-  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, hiding = F.chase;   // (during a scare you climb up first, then pull the covers over your head yourself)
+  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, hiding = F.chase;   // (while it is hunting you, you climb straight under the covers)
   sfx.creak(0.25, 0);
   await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.3, k); });
   sfx.footstep(0.2, 0, 0.1);
-  if (hiding && F.chase && chase) { chase.approach = [new V3(6.6, 0, 1.2), BUNK_SIDE.clone()]; }
   const dest = hiding ? BUNK_LIE : BUNK_SEAT;
   await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
   F.cutscene = false; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.pod = null; P.podYaw = HIDE_YAW;
@@ -515,104 +511,7 @@ function handheld(dt) {
   if (Math.abs(camera.fov - fovNow) > 0.05) { camera.fov = fovNow; camera.updateProjectionMatrix(); }
 }
 
-// ---------- the chase ----------
-function lookingBack() { camera.getWorldDirection(fwd); return fwd.x < -0.55; }   // toward the living room end of the hall
-
-// The figure appears at the far end of the hall (where it opens into the living room), lit from behind. On the last night it comes for you;
-// on the first it only STANDS there while the violins scream.
-async function reveal(chasing = true) {
-  E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0; E.smileScale = 1;
-  E.root.position.copy(HALL_MOUTH); E.root.rotation.y = Math.PI / 2; E.lookTarget = camera.position;
-  sfx.stab(); sfx.violins(chasing ? 0.55 : 1, 0.3); shake = 0.35;
-  F.flicker = true;
-  await tween(0.55, (k) => { W.bathSpot.intensity = flicker('bath', Math.random() < k ? BATH_I : BATH_I * 0.05, BATH_I * (0.05 + 0.95 * k)); nlMult(flicker('nl', Math.random() < k ? 0 : 1, 1 - k), false); }, ease.lin);
-  W.bathSpot.intensity = BATH_I; nlMult(0.2, false);
-  UI.objective(chasing ? '<b class="red">RUN.</b> Get back to bed' : 'Get back to bed. <b class="red">Don\'t look at it.</b>');
-  sfx.tension(0.03, 0.4);
-  await tween(1.0, (k) => { E.tilt = k * 0.55; });
-  sfx.giggle(panFor(E.root.position));
-}
-function startChase() {
-  chase = { trail: [], approach: [], last: P.pos.clone(), t0: gameTime, stepAcc: 0, hb: 0, arrived: false };
-  const room = roomAt(P.pos.x, P.pos.z);
-  // if you're already in your room, it follows through the door
-  if (room === 'bed') chase.trail.push(HALL_DOOR.clone(), new V3(7.05, 0, 0.3));
-  chase.trail.push(P.pos.clone());
-  F.chase = true; E.mode = 'run';
-  sfx.drone(0.17, 0.5);
-  sfx.bed('music/chase', 0.6, 0.6); sfx.bed('music/night', 0, 1.5);
-  UI.hint(`Hold <b>${L('sprint')}</b> to sprint`, 3);
-}
-function updateChase(dt) {
-  if (!F.chase || !chase) return;
-  const c = chase, ep = E.root.position;
-  if (P.mode === 'walk' && P.pos.distanceTo(c.last) > 0.35) { c.trail.push(P.pos.clone()); c.last.copy(P.pos); }
-  const gap = Math.hypot(P.pos.x - ep.x, P.pos.z - ep.z);
-  let sp;
-  if (P.mode === 'walk' || P.mode === 'cine') {
-    const ramp = Math.min(1, 0.35 + (gameTime - c.t0) / 1.2);
-    sp = clamp(P.speed * 0.95 + (gap - 2.6) * 1.1, 3.1, 6.6) * ramp;
-  } else sp = 1.9;
-  let remaining = sp * dt, moved = false;
-  for (let guard = 0; remaining > 1e-4 && guard < 8; guard++) {
-    let target = c.trail.length ? c.trail[0] : (P.mode === 'walk' ? P.pos : c.approach[0]);
-    if (!target) { if (P.mode === 'hide') c.arrived = true; break; }
-    const dx = target.x - ep.x, dz = target.z - ep.z, d = Math.hypot(dx, dz);
-    if (d > 0.05) E.faceTowards(target.x, target.z, Math.min(1, dt * 10));
-    if (d <= remaining) {
-      ep.x = target.x; ep.z = target.z; remaining -= d; moved = true;
-      if (c.trail.length) c.trail.shift(); else if (target !== P.pos) c.approach.shift(); else break;
-    } else { ep.x += (dx / d) * remaining; ep.z += (dz / d) * remaining; remaining = 0; moved = true; }
-  }
-  E.mode = !moved ? 'idle' : sp > 2.6 ? 'run' : 'walk'; E.speed = sp / 3;
-  c.stepAcc += moved ? sp * dt : 0;
-  if (c.stepAcc > (E.mode === 'run' ? 1.05 : 0.8)) { c.stepAcc = 0; sfx.heavyStep(clamp(1.2 / (1 + gap * 0.25), 0.1, 0.9), panFor(ep)); }
-  c.hb -= dt;
-  if (c.hb <= 0) { sfx.heartbeat(0.55); c.hb = clamp(0.3 + gap * 0.05, 0.32, 0.9); }
-  if (P.mode === 'walk' && gap < 0.78) caught();
-}
-
-// It stands over the bunk while you lie under the blanket holding your breath. level 1..3: how long, and how close it gets.
-async function loomOverBed(level, walkIn = true) {
-  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath`, 7);
-  F.breathUI = true; sfx.violins(1, 0.4);
-  if (walkIn) {   // heavy, slow steps from wherever it is to the side of the bunk
-    E.mode = 'walk'; E.speed = 0.7; const from = E.root.position.clone(); let st = 0;
-    await tween(3.4, (k) => { E.root.position.lerpVectors(from, BUNK_SIDE, k); E.faceTowards(BUNK_SIDE.x, BUNK_SIDE.z, 1); st += 0.03; if (st > 1.1) { st = 0; sfx.heavyStep(0.6, panFor(E.root.position)); } }, ease.lin);
-    E.mode = 'idle';
-  }
-  F.chase = false; E.mode = 'idle';
-  F.breathCheck = true; F.grace = 1.3;
-  sfx.tension(0.045, 1); sfx.bed('music/chase', 0, 2);
-  const y0 = E.root.rotation.y;
-  await tween(1.6, (k) => { E.root.rotation.y = lerpAngle(y0, 0, Math.min(1, k * 2)); E.lean = k * 0.35; E.tilt = 0.55 - k * 0.95; });
-  sfx.whisper(panFor(E.root.position), 0.16);
-  await tween(2.2 + level * 0.3, (k) => { E.tilt = -0.4 + Math.sin(k * Math.PI * (1 + level * 0.5)) * 0.8; E.smileScale = 1 + k * 0.18; });   // (the whole breath-holding stretch stays under 8 s)
-  sfx.giggle(0);
-  await wait(1.6 + level * 0.4);
-  F.breathCheck = false;
-  UI.hint(null);
-  sfx.violins(0, 0.05);    // the violins stop dead
-  sfx.ceilingThump();
-  await tween(1.2, (k) => { E.lean = 0.35 * (1 - k); E.root.rotation.y = lerpAngle(0, Math.PI, k); E.smileScale = 1.18 - 0.18 * k; });
-  E.mode = 'walk'; E.speed = 0.6;
-  const from = E.root.position.clone(), to = HALL_DOOR.clone();
-  await tween(3.2, (k) => { E.root.position.lerpVectors(from, to, k); }, ease.lin);
-  E.visible = false; E.mode = 'idle';
-  sfx.tension(0, 3); sfx.drone(0.085, 4);
-  W.bathSpot.intensity = 0; F.flicker = false; F.scare = false;
-  await wait(2.5);
-  await wait(2.0);
-  UI.fade(1, 3); await wait(3.6);
-  F.breathUI = false; UI.blanket(false); UI.breath(1, false);
-}
-async function hideScript() {   // after the chase: wait until it has followed you to the bunk
-  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath`, 7);
-  F.breathUI = true;
-  await waitFor(() => chase.arrived);
-  await loomOverBed(3, false);
-}
-
+// ---------- getting caught, and starting over ----------
 async function caught(opts = {}) {   // opts.unseen: you are hurt by something you never see
   if (F.dead) return;
   F.dead = true; F.live = false; F.script = false; RUN.deaths++; saveRun(); UI.pod(null); UI.clock(null);
@@ -622,7 +521,7 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
   P.mode = 'cine'; P.cam.copy(camera.position);
   camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
   const cp = P.cam.clone();
-  // it lunges from where it actually is (if it is in front of you), not from a spot re-centred 1.7 m away: no backward pop at the moment it gets you
+  // it lunges from where it actually is when that is in front of you, so it never jumps backward as it gets you
   let dx = fwd.x, dz = fwd.z, d0 = 1.7;
   if (!opts.unseen && E.visible) { const ex = E.root.position.x - cp.x, ez = E.root.position.z - cp.z, d = Math.hypot(ex, ez); if (d > 0.3 && (ex * fwd.x + ez * fwd.z) / d > 0.25) { dx = ex / d; dz = ez / d; d0 = clamp(d, 0.8, 1.7); } }
   if (!opts.unseen) { E.visible = true; E.mode = 'idle'; E.reach = 1; E.lean = 0.12; E.smileScale = 1.3; E.tilt = 0.3; E.lookTarget = camera.position; }
@@ -790,7 +689,6 @@ function makeThing(kind) {
   return g;
 }
 const wpos = (o) => o.getWorldPosition(new V3());
-function reachTo(who, target) { who.pose = { ...(who.pose || {}), reach: target }; }
 const bodyH = (who) => who.group.userData.h || 1.75;
 
 // pick up a box and carry it; when done, the box is in the arms
@@ -800,7 +698,7 @@ function holdUp(who, box) {
 }
 async function setDown(who, box, spot) {
   const run = chore.run, h = bodyH(who), y0 = box.position.y, z0 = box.position.z;
-  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k - 0.0; box.position.z = z0 + 0.16 * k; });
+  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k;box.position.z = z0 + 0.16 * k; });
   if (!stillOn(run)) return false;
   scene.attach(box); box.position.set(spot.x, box.geometry.parameters.height / 2, spot.z); box.rotation.set(0, who.group.rotation.y + 0.15, 0); sfx.thump();
   W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
@@ -956,129 +854,6 @@ function faceParent(who) {
   who.head.getWorldPosition(tmp);
   const y0 = P.yaw, want = Math.atan2(-(tmp.x - P.pos.x), -(tmp.z - P.pos.z));
   tween(0.8, (k) => { P.yaw = lerpAngle(y0, want, k); P.pitch = lerp(P.pitch, 0.18, k); });
-}
-
-// what the night does to the house grows every night
-const NIGHT_DREAD = [0, 0.22, 0.5, 0.8];
-function beginNight(n, time, title) {
-  F.stage = 'n' + n; F.night = n; resetNight(); setPhase('night');
-  sfx.dread(NIGHT_DREAD[n], 4);
-  P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.yaw = HIDE_YAW + 0.25; P.pitch = -0.18; P.roll = 0;
-  UI.card(time, title, 4.5);
-}
-
-// NIGHT ONE: you get up for the bathroom. At the far end of the hall something tall is standing there. The violins go insane. It never moves.
-async function night1() {
-  beginNight(1, '2:47 AM', 'Night one');
-  await wait(2.5); UI.fade(0, 3);
-  await wait(2.0);
-  sfx.creak(0.3, -0.6);
-  UI.subtitle('<i>You really, really need to pee.</i>', 4);
-  later(3.5, carPass); later(10.5, faceAtWindow);
-  await wait(1.2);
-  UI.objective('Go to the bathroom');
-  UI.hint(`<b>${L('interact')}</b> climb down`, 6);
-  await waitFor(() => P.mode === 'walk' && roomAt(P.pos.x, P.pos.z) === 'hall');
-  await waitFor(() => P.pos.x > 5.0 && P.pos.x < 6.2 && P.pos.z < -0.4);
-  sfx.whisper(panFor(W.drawingMesh.getWorldPosition(tmp)), 0.08);
-  await waitFor(() => P.mode === 'walk' && P.pos.x < 5.0 && roomAt(P.pos.x, P.pos.z) === 'hall');
-  F.scare = true; F.coverPrompt = true;
-  await reveal(false);
-  // run back; it does not follow. When the lights stutter it is simply standing in your doorway.
-  await waitFor(() => roomAt(P.pos.x, P.pos.z) === 'bed' || P.mode === 'hide');
-  if (P.mode !== 'hide') {
-    UI.objective('Climb the ladder at the foot of the bunk');
-    UI.hint(`Go to the ladder and press <b>${L('interact')}</b> to climb up`, 8);
-    await tween(0.5, () => { nlMult(flicker('nl', Math.random() < 0.5 ? 0 : 1, 0.5), false); W.bathSpot.intensity = flicker('bath', Math.random() < 0.5 ? BATH_I : 0, BATH_I * 0.5); }, ease.lin);
-    W.bathSpot.intensity = 0; sfx.slamFar(0.5);
-    E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);
-  }
-  await waitFor(() => P.mode === 'bunk' || P.mode === 'hide');
-  if (P.mode === 'bunk') { UI.objective('<b class="red">Hide.</b> Pull the covers over your head'); UI.hint(`Press <b>${L('interact')}</b> to pull the covers over your head`, 8); }
-  await waitFor(() => P.mode === 'hide');
-  E.visible = true; E.root.position.set(7.05, 0, -0.35); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z); E.mode = 'idle';
-  UI.objective(`Hold your breath: keep <b>${L('breath')}</b> held (or tapped on) until the violins stop`);
-  UI.hint(`Hold <b>${L('breath')}</b> to hold your breath (or tap it once to keep holding)`, 10);
-  F.breathUI = true; sfx.violins(1, 0.3); sfx.tension(0.05, 1);
-  await wait(1.6);
-  F.breathCheck = true; F.grace = 1.3;
-  await tween(6.2, (k) => { E.tilt = 0.2 + Math.sin(k * Math.PI * 2) * 0.35; E.smileScale = 1 + k * 0.35; });
-  F.breathCheck = false; UI.hint(null); UI.objective(null);
-  sfx.violins(0, 0.04); sfx.ceilingThump();        // the violins stop dead
-  E.visible = false; F.flicker = false; F.scare = false; W.bathSpot.intensity = 0; nlMult(1, false);
-  sfx.tension(0, 2);
-  await wait(3);
-  await wait(2.0);
-  UI.fade(1, 3); await wait(3.6);
-  F.breathUI = false; UI.blanket(false); UI.breath(1, false);
-}
-
-// NIGHT TWO: your parents argue through the wall, something scratches inside the closet, and then it is standing in your room.
-async function night2() {
-  beginNight(2, '3:12 AM', 'Night two');
-  await wait(2.5); UI.fade(0, 3);
-  await wait(3.0);
-  await say('dad/n2_a', { muffle: true }); await say('mom/n2_a', { muffle: true }); await say('dad/n2_b', { muffle: true });
-  await wait(2.5);
-  sfx.scratch(0.5); UI.subtitle('<i>Something is scratching inside the closet.</i>', 4);
-  await wait(5.5);
-  sfx.ceilingThump(); await wait(2.5);
-  F.scare = true; F.coverPrompt = true; F.flicker = true;
-  E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.5; E.smileScale = 1.1; E.lookTarget = camera.position;
-  E.root.position.set(6.7, 0, 0.5); E.faceTowards(BUNK_SEAT.x, BUNK_SEAT.z);   // standing beside the closet, looking at you
-  sfx.stab(); sfx.violins(1, 0.3); shake = 0.5; sfx.tension(0.05, 1);
-  await tween(0.5, () => { nlMult(flicker('nl', Math.random() < 0.5 ? 0 : 1, 0.5), false); }, ease.lin);
-  nlMult(0.25, false);
-  UI.objective('<b class="red">Hide.</b> Pull the covers over your head');
-  await waitFor(() => P.mode === 'hide');
-  F.coverPrompt = false;
-  await loomOverBed(2, true);
-}
-
-// NIGHT THREE: your parents hear it too and still say it is you. The bathroom. The light goes. It comes for you down the hall.
-async function night3(resume = false) {
-  if (!resume) {
-    beginNight(3, '3:33 AM', 'Night three');
-    await wait(2.5); UI.fade(0, 3);
-    await wait(2.0);
-    sfx.creak(0.3, -0.6);
-    later(1.5, carPass); later(8.5, faceAtWindow);
-    await say('mom/n3_a', { muffle: true }); await say('dad/n3_a', { muffle: true });
-    UI.objective('Go to the bathroom at the end of the hall');
-    UI.hint(`<b>${L('interact')}</b> climb down`, 6);
-    await waitFor(() => P.mode === 'walk' && roomAt(P.pos.x, P.pos.z) === 'hall');
-    later(2.5, () => { if (!F.splashed) sfx.knock(panFor(new V3(4.5, 1.5, -1.5)), 0.25); });
-    await waitFor(() => P.pos.x > 5.0 && P.pos.x < 6.2 && P.pos.z < -0.4);
-    sfx.whisper(panFor(W.drawingMesh.getWorldPosition(tmp)), 0.08);
-    await waitFor(() => roomAt(P.pos.x, P.pos.z) === 'bath');
-    const bb = W.bulbs.bath; sfx.click();
-    await tween(0.4, () => { bb.light.intensity = flicker(bb, Math.random() < 0.5 ? bb.base : 0, bb.base); }, ease.lin);
-    bb.light.intensity = bb.base; bb.dome.material.emissiveIntensity = 2;
-    await waitFor(() => F.splashed);
-    await wait(1.8);
-    sfx.pop(); bb.light.intensity = 0; bb.dome.material.emissiveIntensity = 0; UI.flash('rgba(255,240,200,0.3)', 0.3);
-    await wait(0.9);
-    UI.objective('Go back to bed');
-  } else {
-    F.stage = 'n3'; F.night = 3; if (F.phase !== 'night') { resetNight(); setPhase('night'); UI.fade(0, 0.5); }
-    P.mode = 'walk'; P.pos.set(4.3, 0, -0.9); P.yaw = -Math.PI / 2; F.splashed = true; UI.objective('Go back to bed'); sfx.dread(NIGHT_DREAD[3], 2);
-  }
-  await chaseScript();
-  await finalMorning();
-}
-
-async function chaseScript() {
-  F.echo = false;
-  await waitFor(() => P.mode === 'walk' && roomAt(P.pos.x, P.pos.z) === 'hall');
-  F.echo = true; const t0 = gameTime;
-  sfx.tension(0.012, 3);
-  later(2.4, () => { if (F.echo) UI.subtitle("<i>Those aren't your footsteps.</i>", 3.5); });
-  await waitFor(() => P.pos.x > 6.0 || (lookingBack() && gameTime - t0 > 1.1) || gameTime - t0 > 16);
-  F.echo = false;
-  await reveal(true);
-  startChase();
-  await waitFor(() => P.mode === 'hide');
-  await hideScript();
 }
 
 // ---------- the mornings: you walk to the kitchen and tell them, and the camera follows the conversation ----------
@@ -1408,7 +1183,6 @@ function update(dt) {
   else { P.vel.set(0, 0, 0); P.speed = 0; P.sprinting = false; UI.stamina(1, false); }
   updateCamera(dt);
   updateInteract();
-  updateChase(dt);
   if (F.live && !F.dead && nights) {
     nights.tick(dt);
     // from the bunk, the breath key pulls the covers over your head

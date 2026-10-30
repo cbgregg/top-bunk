@@ -148,5 +148,5 @@ export function createVigil(env) {
     if (flicker) rig.spot.intensity = lightFlicker('vigil', Math.random() < 0.12 ? 2 : 26, 26);
   }
 
-  return { run, stop, update, isOn: () => on };
+  return { run, stop, update };
 }

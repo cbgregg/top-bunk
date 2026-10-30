@@ -10,9 +10,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 export const H = 2.7;      // ceiling height
 export const WT = 0.16;    // wall thickness
 
-// Room rectangles [minX, maxX, minZ, maxZ], measured to the middle of the walls. The house follows the owner's annotated plan: the FRONT is the
-// long wall facing the road (z = -4.5; seen from the road the viewer's left is +x). Along the front: two bedrooms, the front door and picture
-// window into the living room, then the lower utility wing. Behind them a back row: YOUR room (back-left corner), the bathroom, kitchen, dining.
+// Room rectangles [minX, maxX, minZ, maxZ], measured to the middle of the walls. The FRONT is the long wall facing the road
+// (z = -4.5; seen from the road the viewer's left is +x). Along the front: two bedrooms, the front door and picture window into the
+// living room, then the lower utility wing. Behind them a back row: YOUR room (back-left corner), the bathroom, kitchen, dining.
+// A narrow hall runs along the bedroom end between the two rows.
 export const ROOMS = {
   bed: [5.0, 8.1, -0.3, 3.6],        // yours: back-left corner
   bath: [3.3, 5.0, -0.3, 3.6],       // long and narrow, next to your room
@@ -100,7 +101,7 @@ export function buildWorld(scene) {
     mirror: std({ color: 0x9aa0a4, roughness: 0.08, metalness: 1 }),
     lamp: std({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.6 }),
     // 2002: dark brown carpet everywhere, white doors, plain white cabinets and appliances, oak and brass
-        carpet: std({ color: 0x4a3526, roughness: 1 }), lino: std({ color: 0xd6cbae, roughness: 0.45 }), slate: std({ color: 0x5c5a56, roughness: 0.7 }), bathFloor: std({ color: 0xd8bfc2, roughness: 0.3 }),
+    carpet: std({ color: 0x4a3526, roughness: 1 }), lino: std({ color: 0xd6cbae, roughness: 0.45 }), slate: std({ color: 0x5c5a56, roughness: 0.7 }), bathFloor: std({ color: 0xd8bfc2, roughness: 0.3 }),
     pinkTile: std({ map: T.tile, color: 0xe6b3bd, roughness: 0.25 }), brick: std({ color: 0xa0553f, roughness: 0.95 }), panel: std({ color: 0xc89a64, roughness: 0.7 }), butter: std({ color: 0xe6d28c, roughness: 0.92 }), drywall: std({ color: 0xe6e4de, roughness: 0.95 }),
     floralA: std({ map: T.floralA, roughness: 0.92 }), floralB: std({ map: T.floralB, roughness: 0.92 }), floralC: std({ map: T.floralC, roughness: 0.92 }), hallpaper: std({ map: T.wall, roughness: 0.92 }),
     borderRose: std({ map: T.borderRose, roughness: 0.8 }), borderTeal: std({ map: T.borderTeal, roughness: 0.8 }), borderBlue: std({ map: T.borderBlue, roughness: 0.8 }),
@@ -150,7 +151,7 @@ export function buildWorld(scene) {
   const house = new THREE.Group(); scene.add(house);
   const yard = new THREE.Group(); scene.add(yard);
 
-  const WALLMAT = { bed: 'drywall', hall: 'drywall', living: 'drywall', room2: 'drywall', parents: 'drywall', kitchen: 'drywall', dining: 'drywall', entry: 'drywall', bath: 'drywall' };   // the bedrooms are plain white drywall; the common rooms are cream like the listing, with a red kitchen window wall
+  const WALLMAT = { bed: 'drywall', hall: 'drywall', living: 'drywall', room2: 'drywall', parents: 'drywall', kitchen: 'drywall', dining: 'drywall', entry: 'drywall', bath: 'drywall' };   // one wall finish per room (all of them plain drywall)
   function wallMatAt(px, pz) {
     const r = roomAt(px, pz);
     return r === 'out' ? M.siding : M[WALLMAT[r]] || M.wall;
@@ -272,9 +273,7 @@ export function buildWorld(scene) {
     }
   }
 
-  // exterior shell. The FRONT (the road) is z = -4.5; seen from the road the viewer's left is +x. Along the front from the left: bedroom,
-  // bedroom, front door, picture window, then the lower utility wing. The back row is your room (back-left corner, +x), the bathroom,
-  // the kitchen and the dining nook. A narrow hall runs along the bedroom end between the front and back rows.
+  // exterior shell
   wall(-3.3, -4.5, 8.1, -4.5, [{ c: 6.9, w: 1.1, sill: 0.85, h: 1.25 }, { c: 4.4, w: 1.3, sill: 0.85, h: 1.25 }, { c: 1.9, w: 1.0 }, { c: -0.6, w: 2.4, sill: 0.55, h: 1.35 }]);
   wall(-8.1, -3.9, -3.3, -3.9);
   wall(8.1, -4.5, 8.1, 3.6, [{ c: -3.5, w: 1.2, sill: 0.85, h: 1.25 }, { c: 2.85, w: 0.8, sill: 0.85, h: 1.25 }]);
@@ -380,7 +379,7 @@ export function buildWorld(scene) {
   windowAt(true, 3.6, 1.4, -1, { sill: 1.0, w: 1.8, h: 0.9, curtains: true, real: true });                // back: kitchen, over the sink
   windowAt(true, 3.6, -2.3, -1, { w: 1.1, curtains: true, real: true });                                  // back: dining
 
-  // ---------- doors (white six-panel, like the photos) ----------
+  // ---------- doors (white six-panel) ----------
   // the leaf hangs from a hinge at (hx, hz) and extends along dir; closed doors fill the gap, open ones stand against it
   function door(hx, hz, dx, dz, { open = false } = {}) {
     const g = new THREE.Group(); g.position.set(hx, 0, hz); g.rotation.y = Math.atan2(-dz, dx);
@@ -508,7 +507,7 @@ export function buildWorld(scene) {
     defParent = null;
     solid(5.0, 7.22, 2.55, 3.55);
   }
-  // the white built-in closet and drawers on the hall wall beside the door, like the photo: louvered bifold doors, drawers, a cubby above
+  // the white built-in closet and drawers on the hall wall beside the door: louvered bifold doors, drawers, a cubby above
   {
     const wh = M.cabW, x0 = 5.15, x1 = 6.55, z0 = -0.22, z1 = 0.42, zf = z1 + 0.025;
     rbox(x0, x1, 0, 2.4, z0, z1, wh, 0.01);
@@ -726,7 +725,7 @@ export function buildWorld(scene) {
     const mat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.015, 0.6), std({ color: 0x3f5675, roughness: 1 })); mat.position.set(-4.9, 0.008, 0.45); house.add(mat);
   }
 
-  // ---------- the two front bedrooms (doors stay closed): each has a closet on the hall wall, as on the plan, and a low bed ----------
+  // ---------- the two front bedrooms (doors stay closed): each has a closet on the hall wall and a low bed ----------
   {
     // the end bedroom: brown wood sliding closet doors
     rbox(6.1, 6.85, 0, 2.1, -2.15, -1.58, M.oak, 0.01); box(6.46, 6.49, 0.05, 2.05, -2.17, -2.15, M.black, { uv: false });
@@ -748,12 +747,11 @@ export function buildWorld(scene) {
       const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n);
       for (let i = 0; i < n; i++) {
         const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z);
-        // each body: full height at the shoulders (the west end, by the pillows), tapering to the feet; a soft gaussian across
-        // the rise peaks just past the shoulders over the chest (a hand's breadth above it) and tapers to the feet; at the top edge it dips to meet the shoulders,
-        // so the heads on the pillows show over it (measured: Mom's chest tops at 0.86, Dad's at 0.95, their feet at ~0.77)
+        // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
+        // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
         const along = cl((x - X0) / (X1 - X0), 0, 1), h = Math.min(0.31 - along * 0.08, 0.25 + along * 0.6);
-        // a flat-topped rise the width of a body (so a leg off the centre line is still under it), falling away at the sides
-        // (Dad is broader: his side is a wider, flatter plateau that stays high out to the wall edge, so his far elbow is under it)
+        // across it, a flat-topped rise the width of a body, so a leg off the centre line is still under it; Dad is broader, and his
+        // plateau stays high out to the wall edge so his far elbow is covered
         const dm = (z + 3.4) / 0.34, dd = (z + 3.95) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
         bm[i] = h * 1.10 * Math.exp(-dm * dm * dm * dm * 2); bd[i] = h * 1.22 * Math.exp(-dd6 * 2);
       }
@@ -833,8 +831,8 @@ export function buildWorld(scene) {
     const vig = document.createElement('canvas'); vig.width = W; vig.height = H;
     { const vg = vig.getContext('2d'), r = vg.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.6); r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, 'rgba(0,0,0,0.8)'); vg.fillStyle = r; vg.fillRect(0, 0, W, H); }
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-    // the glass of the set (assets/props/tv.glb at 2.95, 0.55, -3.2, facing -x): measured from a head-on render, it is the 4:3 window
-    // left of the control strip, z -3.475..-3.057 and y 0.655..0.975 on the front face at x 2.715. The picture sits just inside that, a hair in front.
+    // the glass of the set (assets/props/tv.glb at 2.95, 0.55, -3.2, facing -x) is the 4:3 window left of the control strip,
+    // z -3.475..-3.057 and y 0.655..0.975 on the front face at x 2.715. The picture sits just inside that, a hair in front.
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.40, 0.30), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
     plane.rotation.y = -Math.PI / 2; plane.position.set(2.711, 0.815, -3.266); plane.visible = false; house.add(plane);
     const light = new THREE.PointLight(0x9db6ff, 0, 7, 1.6); light.position.set(2.2, 1.0, -3.2); scene.add(light);
@@ -994,7 +992,7 @@ export function buildWorld(scene) {
   carLight.castShadow = true; carLight.shadow.mapSize.set(1024, 1024); carLight.shadow.camera.near = 1; carLight.shadow.camera.far = 48; carLight.shadow.bias = -0.0006; carLight.shadow.autoUpdate = false;
   carLight.position.set(34, 0.8, -30); scene.add(carLight, carLight.target);
 
-  // window fill lights (no shadows — cheap "light through glass")
+  // window fill lights: cheap light through the glass, no shadows
   const fills = [
     new THREE.PointLight(0xffffff, 0, 6, 2), new THREE.PointLight(0xffffff, 0, 6, 2),
     new THREE.PointLight(0xffffff, 0, 7, 2), new THREE.PointLight(0xffffff, 0, 7, 2), new THREE.PointLight(0xffffff, 0, 4, 2),
@@ -1003,7 +1001,7 @@ export function buildWorld(scene) {
   fills[2].position.set(0, 1.6, -3.8); fills[3].position.set(0.3, 1.6, 2.6); fills[4].position.set(-2.3, 1.7, 2.6);
   fills.forEach((f) => scene.add(f));
 
-  // bathroom reveal spotlight (casts the long shadow down the hall)
+  // the hall spot: from the living-room end it lights the thing from behind and throws its long shadow down the hall
   const bathSpot = new THREE.SpotLight(0xffcf7a, 0, 32, 0.3, 0.35, 1.5);
   bathSpot.position.set(-1.5, 2.4, -0.9); bathSpot.target.position.set(7, 0.2, -0.9);
   bathSpot.castShadow = true; bathSpot.shadow.mapSize.set(1024, 1024); bathSpot.shadow.camera.near = 0.3; bathSpot.shadow.camera.far = 32; bathSpot.shadow.bias = -0.0005;
@@ -1052,8 +1050,8 @@ export function buildWorld(scene) {
   ];
   const dropSpots = [new THREE.Vector3(5.45, 0.55, 3.0), new THREE.Vector3(6.05, 0.55, 3.0), new THREE.Vector3(6.65, 0.55, 3.0)];   // on the bottom bunk
 
-  // the detached two-car garage (brown siding, gray shingles), behind the house on the left like the aerial photo (its doors face the house, a side door
-  // toward the concrete apron), and an arborvitae hedge along the east side. The group is built where the old garage stood and moved into place.
+  // the detached two-car garage (brown siding, gray shingles) behind the house on the left: its doors face the house, a side door faces
+  // the concrete apron. An arborvitae hedge runs along the east side. The garage is built in its own frame and GAR moves it into place.
   const GAR = { x: -4, z: 20 };
   {
     const GG = new THREE.Group(); GG.position.set(GAR.x, 0, GAR.z); yard.add(GG);
@@ -1075,7 +1073,7 @@ export function buildWorld(scene) {
     for (let i = 0; i < 12; i++) { m4.makeTranslation(9.8, 1.8, -5.5 + i * 1.0); hedge.setMatrixAt(i, m4); }
     hedge.castShadow = true; yard.add(hedge); solid(9.2, 10.4, -6, 5.6);
   }
-  // utility poles along the road, like the aerial photo (they also give the road something to rush past when you are in a car)
+  // utility poles along the road (they also give the road something to rush past when you are in a car)
   {
     const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.18, 8, 8), M.darkWood, 28), arms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, 2.4), M.darkWood, 28), mm = new THREE.Matrix4(); let n = 0;
     for (let x = -240; x <= 240 && n < 28; x += 40) { mm.makeTranslation(x, 4, -26.2); poles.setMatrixAt(n, mm); mm.makeTranslation(x, 7.6, -26.2); arms.setMatrixAt(n, mm); n++; }

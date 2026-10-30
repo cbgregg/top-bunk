@@ -1,9 +1,8 @@
-# Top Bunk — Steam store copy
+# Top Bunk: Steam store copy
 
 Everything on this page is pasted into Steamworks by hand (Store Page → Basic Info, → Description, → Supported Languages, → Mature
 Content). Steam's description fields take a BBCode subset (`[h2]`, `[b]`, `[list]`/`[*]`); the "About this game" section below is
-written in that subset so it can be pasted as-is. Nothing here claims a feature the game does not have; when the game changes, change
-this file in the same commit.
+written in that subset so it can be pasted as-is. When the game changes, change this file with it.
 
 Re-check before the page goes live:
 
@@ -42,7 +41,7 @@ It is bigger than you and faster than you. You do not fight it. You run, you bre
 You have a flashlight, two legs that get tired, doors you can shut behind you, and a house whose geography you had better learn fast.
 
 [h2]The house[/h2]
-A single-storey farmhouse from the early 2000s, built room by room: the brown carpet, the floral wallpaper, the white kitchen, the narrow hall of family photos, the box TV, the dining-room wall phone, the utility room with the breaker panel, the yard with the moving truck still parked on the gravel. Every night the house does a little more.
+A single-storey farmhouse from the early 2000s: the brown carpet, the floral wallpaper, the white kitchen, the narrow hall of family photos, the box TV, the dining-room wall phone, the utility room with the breaker panel, the yard with the moving truck still parked on the gravel. Every night the house does a little more.
 
 [h2]Nobody believes you[/h2]
 Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Most nights the house leaves something behind; find it, and you have something to show them in the morning. Show them enough and they start to listen.
@@ -51,11 +50,11 @@ There are three endings. Which one you get depends on how much proof you have fo
 
 [h2]Features[/h2]
 [list]
-[*] A short, focused horror story: ten nights, one house, one thing in the hallway
+[*] A short horror story over ten nights in one house
 [*] Seeded runs: the same seed replays the same ten nights; a new seed shuffles what each night is about
 [*] Hiding spots, a breath meter, a flashlight, stamina, and doors you can close
-[*] Evidence objectives: most nights leave something behind, and what you find shapes breakfast and decides which of three endings you get
-[*] A house that changes every night: night lights that die, a drawing that changes, a clock that lies
+[*] Proof to find: most nights leave something behind, and what you find changes breakfast and decides which of three endings you get
+[*] The house gets worse every night: night lights die, the drawing in the hall changes, the clock lies, the TV turns itself on
 [*] Mom and Dad are voiced, with subtitles
 [*] Keyboard and mouse or a game controller, with rumble; the pause and options menus work from any of them
 [*] Graphics presets from Low to Ultra, with an Auto mode that keeps the frame rate up on ordinary laptops

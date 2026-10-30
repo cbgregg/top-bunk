@@ -8,7 +8,7 @@ const load = (url) => new Promise((res, rej) => loader.load(url, res, undefined,
 let animsP = null;
 export const loadAnims = () => (animsP ||= load('assets/models/anims.glb').then((g) => { for (const c of g.animations) if (/^(walk|run|idle)$/.test(c.name)) seamless(c); return g.animations; }));
 
-// A looping clip whose last frame does not match its first pops the whole body once a cycle (the walk did, 9 cm at the hand every stride).
+// A looping clip whose last frame does not match its first pops the whole body once a cycle.
 // Find the true cycle: the time near the end where the pose is closest to frame 0; trim to it, and ease the last 12% of the cycle into the first frame.
 function seamless(clip) {
   const T = clip.duration, tracks = clip.tracks, q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion();
@@ -68,7 +68,6 @@ export class Rig {
     if (prev && prev !== a) prev._scheduleFading(fade, prev.getEffectiveWeight(), 0);
     this.cur = name;
   }
-  setSpeed(s) { const a = this.cur && this.actions[this.cur]; if (a) a.timeScale = s; }
 
   // ---- procedural layer on top of the clips: call after mixer.update ----
   worldQ(bone, out) { bone.updateWorldMatrix(true, false); return bone.getWorldQuaternion(out); }

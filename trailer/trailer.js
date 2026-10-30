@@ -133,7 +133,7 @@ export const SHOTS = T([
 ]);
 
 // ---------- the player ----------
-// opts: { fps, aspect: 'landscape' | 'portrait', letterbox, shots, duration, onFrame }
+// opts: { fps, aspect: 'landscape' | 'portrait', shots, duration, shutter, linkInBio, cta }
 export function attach(game, opts = {}) {
   const portrait = opts.aspect === 'portrait';
   const shots = opts.shots || (portrait ? PORTRAIT_SHOTS : SHOTS);
@@ -141,7 +141,6 @@ export function attach(game, opts = {}) {
   const fps = opts.fps || 30;
   const g = gameHelpers(game), ui = makeOverlays(portrait);
   const { camera } = game;
-  const flashLight = camera.children.find((o) => o.isSpotLight);
   const c = {   // the context a shot sees
     game, g, ui, THREE, V3, EYE_KID, P: game.P, F: game.F, W: game.W, E: game.E, UI: game.UI, camera, mom: game.mom, dad: game.dad, WF: game.WF,
     portrait, fps, opts, t: 0, st: 0, k: 0, shot: null,
@@ -150,7 +149,7 @@ export function attach(game, opts = {}) {
     fadeInOut(delay, fin, fout) { const st = this.st, dur = this.shot.dur; return this.ramp(st, delay, delay + fin, dur - fout, dur); },
     rnd: rng(7),
   };
-  let cur = null, began = false, frameN = 0, pending = false, finished = false, lastT = null;
+  let cur = null, began = false, pending = false, finished = false, lastT = null;
   const origRender = game.gfx.render.bind(game.gfx);
 
   // the shots are sequential, so the one that starts last before t is current (a start/end test would miss a frame where a rounded start
@@ -191,7 +190,7 @@ export function attach(game, opts = {}) {
   game.gfx.render = (dt) => { if (pending) { apply(); pending = false; } origRender(dt); };
   // one exposure at frame position i (fractional for the extra exposures of a blurred frame); the clock advances by the real gap
   function step(i, capture, sub) {
-    frameN = i; Math.random = rng(1000003 + i * 7919); c.subframe = sub;
+    Math.random = rng(1000003 + i * 7919); c.subframe = sub;
     const t = i / fps, gap = lastT !== null && t > lastT && t - lastT <= 1 / fps + 1e-9 ? t - lastT : 1 / fps; lastT = t; tick(t);
     const shot = c.shot, stepMs = gap * 1000, n = Math.max(1, Math.ceil(stepMs / 45)), subMs = stepMs / n, draw = capture && !shot.noRender;
     for (let s = 0; s < n; s++) { window.__norender = !draw || s < n - 1; window.__pump(subMs); }

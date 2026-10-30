@@ -1,12 +1,11 @@
 // Real PBR materials: colour + normal + packed AO/roughness/metal maps (assets/pbr, made by tools/assets/fetch_pbr.py).
-// The old canvas textures stay on the materials until these arrive, so nothing flashes and a missing file just keeps the old look.
+// The canvas textures stay on the materials until these arrive, so nothing flashes and a missing file just keeps the canvas look.
 import * as THREE from 'three';
 
 const loader = new THREE.TextureLoader();
 const metaP = fetch('assets/pbr/pbr.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const cache = new Map();
-let aniso = 8;
-export const setAnisotropy = (n) => { aniso = n; };
+const aniso = 8;
 
 function tex(url, srgb, rep) {
   const key = url + '@' + rep;

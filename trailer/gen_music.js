@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Placeholder trailer music: an ORIGINAL slow lullaby (72 bpm, D major) for a music box and a Rhodes-style electric piano, over a vinyl-crackle bed.
+// Placeholder trailer music: an original slow lullaby (72 bpm, D major) for a music box and a Rhodes-style electric piano, over a vinyl-crackle bed.
 // Pure Node, no dependencies: every sound is an oscillator and an envelope written straight into a 16-bit stereo WAV.
 // It is 2:19 long and its sections follow the shape of the recording the cut was timed to (intro 0:00-0:08, verse 0:08-0:32, verse 0:32-0:56,
 // bridge 0:56-1:20, verse 1:20-1:48, outro 1:48-2:19), so a licensed track drops into the same cue sheet unchanged.
@@ -53,11 +53,11 @@ function room(sig, wet = 0.18, size = 1) {
   for (let i = 0; i < out.length; i++) {
     const x = i < sig.length ? sig[i] : 0; let acc = 0;
     for (let k = 0; k < 4; k++) { const d = lines[k], j = idx[k], y = d[j]; d[j] = x + y * fb; idx[k] = (j + 1) % d.length; acc += y; }
-    out[i] = x + onePoleLPsample(acc * 0.25, k0) * wet;
+    out[i] = x + onePoleLPsample(acc * 0.25) * wet;
   }
   return out;
 }
-let k0 = 0; const onePoleLPsample = (() => { let y = 0; const a = 1 - Math.exp(-2 * Math.PI * 3200 / SR); return (x) => { y += a * (x - y); return y; }; })();
+const onePoleLPsample = (() => { let y = 0; const a = 1 - Math.exp(-2 * Math.PI * 3200 / SR); return (x) => { y += a * (x - y); return y; }; })();
 
 // ---------- envelopes ----------
 const env = (n, a, d, s, r, hold) => {   // ADSR in seconds; hold = note length in samples before the release starts
@@ -170,7 +170,7 @@ const SECTIONS = [
 function render() {
   const mix = new Buf(LEN + 2);
   const [vl, vr] = vinyl(LEN + 2); mix.addStereo(vl, vr, 0, 1);
-  const hum = (b) => (R() - 0.5) * 0.024;   // timing jitter: nobody plays exactly on the grid
+  const hum = () => (R() - 0.5) * 0.024;   // timing jitter: nobody plays exactly on the grid
   for (const S of SECTIONS) {
     let b = 0;
     for (const [name, beats] of S.chords) {
@@ -347,12 +347,12 @@ function syncedSteps(sec, period, seed) {
   return normalize(b.L, b.R, 0.8);
 }
 function closingSteps(sec) {   // something much heavier behind you, faster than you, getting closer
-  const b = new Buf(sec + 1); let t = 0.05, k = 0;
+  const b = new Buf(sec + 1); let t = 0.05;
   while (t < sec) {
     const g = 0.35 + 0.65 * (t / sec);
     b.add(room(thump(70, 30, 0.26, 0.9), 0.25, 1.2), t, g, 0.1);
     b.add(onePoleHP(thump(700, 300, 0.05, 0.4), 350), t + 0.008, g, 0.1);   // the knock in the boards
-    t += 0.3 - 0.1 * (t / sec) + (R() - 0.5) * 0.03; k++;
+    t += 0.3 - 0.1 * (t / sec) + (R() - 0.5) * 0.03;
   }
   return normalize(b.L, b.R, 0.8);
 }
@@ -402,7 +402,7 @@ writeWav(path.join(OUT, 'breath_slow.wav'), ...breathing(9));
 writeWav(path.join(OUT, 'tv_snow.wav'), ...tvSnow(8));
 writeWav(path.join(OUT, 'heartbeat.wav'), ...heartbeat(4, 0.56));
 writeWav(path.join(OUT, 'door_latch.wav'), ...latch());
-// (after the older files, so the seeded random gives them exactly the same sound as before)
+// one seeded random runs through every file in this order: add new sounds at the end, or every file after them changes
 writeWav(path.join(OUT, 'bed_creak.wav'), ...bedCreak());
 writeWav(path.join(OUT, 'hinge_creak.wav'), ...hingeCreak());
 writeWav(path.join(OUT, 'floor_creak.wav'), ...floorCreak());

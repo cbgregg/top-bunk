@@ -48,7 +48,6 @@ function serve(port) {
 // settled, just before the frames render (for anything the game loop would otherwise undo). Positions are world metres from js/world.js:
 // your room x 5..8.1, z -0.3..3.6 (bunk along the back wall, head at x 5, ladder at x 7.2); the hall z -1.5..-0.3 running from the
 // living room (x 3.3) to the dead end (x 8.1); the living room TV at (2.95, 0.55, -3.2) facing -x; the front door at (1.9, 0, -4.5).
-const EYE = 1.32;
 const SHOTS = [
   { id: '01_porch_night', what: 'The porch at night, from the yard, and something standing in the porch light',
     setup: () => { const g = window.__game, S = window.__shot;
@@ -85,11 +84,10 @@ const SHOTS = [
       g.P.pos.set(0.95, 0, 0.6); S.look([0.95, 1.3, 0.45], [1.45, 1.22, 1.85]); } },
   { id: '07_closet_louvers', what: 'Hiding in the closet: the room through the louvers, and it has come looking',
     setup: () => { const g = window.__game, S = window.__shot;
-      // the game's closet camera sits inside the closet box (the door leaves are solid; the louvers are the overlay), so for the picture the
-      // camera stands a hand's width outside the leaves, higher than the hiding kid's eyes, and the overlay does the slats. The slats pass a
-      // quarter of the light and the overlay's inset shadow eats the edges, so its face has to be big and dead centre: it stands a metre away,
-      // lit by the flashlight (the game turns it off while you hide; here it is what lights its face), and `after` aims the camera at its head.
-      // (A cine camera, not the hide mode: that mode clamps the pitch at 0.4 and the face would sit up in the overlay's dark border.)
+      // the game's closet camera sits inside the closet box (the leaves are solid, the louvers are the overlay), so this one stands a hand's
+      // width outside the leaves and the overlay does the slats. The slats and the overlay's inset shadow eat most of the light, so its face
+      // is a metre away, dead centre and lit by the flashlight; `after` aims at its head. A cine camera, because hide mode clamps the pitch
+      // at 0.4 and the face would sit in the overlay's dark border.
       g.setPhase('night'); S.nightLights(4); g.W.hemi.intensity = 0.9; g.renderer.toneMappingExposure = 1.6;
       S.look([5.95, 1.75, 0.52], [6.05, 2.35, 1.45]); S.flash(true, 12); g.UI.pod('louvers');
       S.thing([6.05, 0, 1.45], [5.95, 0.5], { tilt: 0.35, smile: 1.25, lean: 0.1 }); },

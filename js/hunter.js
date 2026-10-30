@@ -41,7 +41,6 @@ export function createHunter(ctx) {
   }
   const ep = () => E.root.position;
   const gap = () => Math.hypot(P.pos.x - ep().x, P.pos.z - ep().z);
-  const playerEye = () => camera.position;
   const sees = (maxD = 14) => !hidden() && gap() < maxD && los(ep().x, ep().z, P.pos.x, P.pos.z);
   const hidden = () => ctx.hidden();
   const playerNode = () => nearestNode(P.pos.x, P.pos.z, (k) => los(P.pos.x, P.pos.z, NODES[k][0], NODES[k][1])) || nearestNode(P.pos.x, P.pos.z);

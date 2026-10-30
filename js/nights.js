@@ -36,19 +36,19 @@ export function createNights(env) {
     sfx.creak(0.18, 0, 0); sfx.click();
     await tween(0.75, (k) => { P.cam.lerpVectors(from, to, k); P.yaw = lerpAngle(y0, pod.yaw, k); P.pitch = lerp(p0, 0, k); });
     P.pos.set(to.x, 0, to.z); P.pod = id; P.podYaw = pod.yaw;
-    F.cutscene = false; P.mode = 'hide'; env.enteredHide(); UI.pod(pod.overlay); if (id === 'tub') W.curtainSee && W.curtainSee(true);
-    sfx.whoosh && sfx.whoosh(0);
+    F.cutscene = false; P.mode = 'hide'; env.enteredHide(); UI.pod(pod.overlay); if (id === 'tub') W.curtainSee(true);
+    sfx.whoosh(0);
     hunter.notifyPod(id);
   }
   async function exitHide() {
     if (F.cutscene) return;
     const id = P.pod;
     if (!id) {   // under the covers of your bunk
-      UI.blanket(false); P.mode = 'bunk'; sfx.whoosh && sfx.whoosh(0); return;
+      UI.blanket(false); P.mode = 'bunk'; sfx.whoosh(0); return;
     }
     const pod = PODS[id]; F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
     const from = P.cam.clone(), y0 = P.yaw, to = new V3(pod.stand[0], env.EYE, pod.stand[1]);
-    UI.pod(null); if (id === 'tub') W.curtainSee && W.curtainSee(false);
+    UI.pod(null); if (id === 'tub') W.curtainSee(false);
     sfx.creak(0.18, 0, 0);
     await tween(0.6, (k) => { P.cam.lerpVectors(from, to, k); });
     P.pos.set(to.x, 0, to.z); P.vel.set(0, 0, 0); P.pod = null; P.mode = 'walk'; F.cutscene = false;
@@ -91,7 +91,7 @@ export function createNights(env) {
       W.mirrorFx.show(kind); if (kind === 'figure') { sfx.stab(); env.addShake(0.6); F.fear = 1; } else sfx.whisper(0.5, 0.12);
       later(kind === 'figure' ? 0.7 : 3.5, () => W.mirrorFx.hide());
     },
-    tvBlip() { W.tvFx.set(true); sfx.staticBurst && sfx.staticBurst(D.pan(2.9, -3.2), 2.2); later(2.2, () => { if (!tvHeld) W.tvFx.set(false); }); },
+    tvBlip() { W.tvFx.set(true); sfx.staticBurst(D.pan(2.9, -3.2), 2.2); later(2.2, () => { if (!tvHeld) W.tvFx.set(false); }); },
     clockGlitch() { F.clockGlitch = env.time() + 7; },
     drawingChange() { F.drawingLevel = (F.drawingLevel || 0) + 1; sfx.whisper(D.pan(5.6, -0.3), 0.1); },
     mutter() {
@@ -130,7 +130,6 @@ export function createNights(env) {
     }
     if (kind === 'stalk') {
       const node = hunter.pickSpawn(10); if (!node) return false; hunter.stalk(node);
-      if (hidden()) { /* it comes looking */ }
       return true;
     }
     const node = hunter.pickSpawn(9); if (!node) return false;
@@ -318,7 +317,7 @@ export function createNights(env) {
     F.breathCheck = false; F.chase = false; F.echo = false; W.nightLights.forEach((x) => { x.dead = false; }); F.blackout = false; env.nlMult(1, false);
     if (P.mode === 'hide' && P.pod) { UI.pod(null); P.pod = null; }
     await wait(1.0);
-    UI.clock('6:00 AM', `night ${n}`); sfx.chirp && sfx.chirp(0.2);
+    UI.clock('6:00 AM', `night ${n}`); sfx.chirp(0.2);
     UI.card('6:00 AM', 'You made it', 3.5); achievements.survived(n);
     await wait(3.2); UI.fade(1, 2.5); await wait(3);
     F.script = false; UI.clock(null);
@@ -355,19 +354,19 @@ export function createNights(env) {
         answered = true; F.script = true; W.phone.setRinging(false); W.phone.pickUp(); sfx.click(); obj(null);
         await wait(1.2); sub('<i>Breathing. Slow, wet, close to the receiver.</i>', 4); sfx.breath(true, 0.6); await wait(4.2);
         sfx.whisper(0, 0.24); sub('<i>"…I can see you."</i>', 3.5); await wait(2.4);
-        sfx.staticBurst && sfx.staticBurst(0, 1.4); await wait(1.5); sub('<i>The line goes to a dial tone, a very long way off.</i>', 3.5); await wait(2);
+        sfx.staticBurst(0, 1.4); await wait(1.5); sub('<i>The line goes to a dial tone, a very long way off.</i>', 3.5); await wait(2);
         W.phone.hangUp(); sfx.click(); F.script = false;
         if (alive(t)) proofFire('ring');
         if (!hunter.busy) hunter.stalk(hunter.pickSpawn(7) || 'archN');
       } });
-      const ringer = (async () => { while (alive(t) && W.phone.ringing && rings < 11) { sfx.phoneRing && sfx.phoneRing(D.pan(-1.5, 0.9)); F.fear = Math.max(F.fear, 0.25); rings++; await wait(1.7); } })();
+      (async () => { while (alive(t) && W.phone.ringing && rings < 11) { sfx.phoneRing(D.pan(-1.5, 0.9)); F.fear = Math.max(F.fear, 0.25); rings++; await wait(1.7); } })();
       await until(t, () => answered || rings >= 11); W.phone.setRinging(false); env.removeI(it);
       if (!answered && alive(t)) { obj(null); W.setDoor('parents', true); sub("<i>Your parents' door opens by itself.</i>", 3.5); proofFire('ring'); }
     },
     // the TV in the living room, and Dad's voice
     async static(plan, t) {
       await atClock(t, plan.clock0 + 24); if (!alive(t)) return;
-      W.tvFx.set(true); D.holdTv(true); sfx.staticBurst && sfx.staticBurst(D.pan(2.9, -3.2), 3); sub('<i>The TV just turned on in the living room.</i>', 3.5);
+      W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(2.9, -3.2), 3); sub('<i>The TV just turned on in the living room.</i>', 3.5);
       await wait(5); if (!alive(t)) return;
       env.say('dad/lure_a', { muffle: true }); obj('Dad is up. He wants you in the living room');
       // "Dad" stands in front of the TV with his back to you
@@ -382,7 +381,7 @@ export function createNights(env) {
         await wait(0.1);
       }
       if (alive(t) && revealed) {   // it was never Dad
-        achievements.unlock('NOT_DAD'); F.script = true; obj(null); W.tvFx.figure = 1; sfx.staticBurst && sfx.staticBurst(0, 0.6);
+        achievements.unlock('NOT_DAD'); F.script = true; obj(null); W.tvFx.figure = 1; sfx.staticBurst(0, 0.6);
         env.nlMult(0, false); D.flicker(1.4); await wait(0.5);
         dad.group.visible = false; dad.fake = false; dad.busy = false; W.tvFx.set(false); D.holdTv(false); W.tvFx.figure = 0;
         F.script = false;
@@ -413,7 +412,7 @@ export function createNights(env) {
     // the power fails: find the breaker in the utility room
     async blackout(plan, t) {
       await atClock(t, plan.clock0 + 5); if (!alive(t)) return;
-      D.blackout(true); sfx.pop && sfx.pop(); UI.flash && UI.flash('rgba(0,0,0,0.5)', 0.5);
+      D.blackout(true); sfx.pop(); UI.flash('rgba(0,0,0,0.5)', 0.5);
       sub('<i>The power just went out. Even the night lights.</i>', 4); await wait(5); if (!alive(t)) return;
       obj('Find the breaker in the utility room <span>(your flashlight: ' + env.lightLabel() + ')</span>');
       let fixed = false;
@@ -446,7 +445,7 @@ export function createNights(env) {
         await wait(1.2); sfx.scratch(D.pan(5.85, 0.2)); sub('<i>Something is inside the closet.</i>', 4); F.fear = Math.max(F.fear, 0.6);
       }, 20);
       when(() => true, async () => {
-        sfx.staticBurst && sfx.staticBurst(0.5, 1.2); await wait(0.9); sfx.whisper(-0.6, 0.28); sub('<i>(a whisper, almost words) "…not… yours…"</i>', 4.5); F.fear = Math.max(F.fear, 0.5);
+        sfx.staticBurst(0.5, 1.2); await wait(0.9); sfx.whisper(-0.6, 0.28); sub('<i>(a whisper, almost words) "…not… yours…"</i>', 4.5); F.fear = Math.max(F.fear, 0.5);
       }, 33);
       // the photo in the hall comes down only while you are looking at it, close by: a held silence, a tilt, a held breath, then the drop
       const frameSeen = () => {
@@ -457,7 +456,7 @@ export function createNights(env) {
       };
       when(frameSeen, async () => {
         const hf = W.hallFrame; F.script = true; F.fear = Math.max(F.fear, 0.6);
-        sfx.hush && sfx.hush(1.4); sfx.drone(0, 1.2);
+        sfx.hush(1.4); sfx.drone(0, 1.2);
         await wait(1.4); if (!alive(t)) return;                              // the silence: it is just hanging there
         await ramp(0.35, (k) => hf.tilt(0.1 * k)); sfx.creak(0.3, D.pan(4.75, -1.4));
         await wait(0.7); if (!alive(t)) return;                              // the held breath before it goes
@@ -470,11 +469,11 @@ export function createNights(env) {
         sfx.faucet(6, D.pan(4.7, 0.9)); sub('<i>The tap turns itself on.</i>', 3.5); await wait(3.2); W.mirrorFx.show('writing'); sfx.whisper(0.6, 0.18); await wait(4); W.mirrorFx.hide(); F.fear = Math.max(F.fear, 0.6);
       }, 25);
       when(() => room() === 'living', async () => {
-        W.tvFx.set(true); D.holdTv(true); sfx.staticBurst && sfx.staticBurst(D.pan(2.9, -3.2), 6); sub('<i>The TV turns on. Nobody touched it.</i>', 3.5); F.fear = Math.max(F.fear, 0.5);
+        W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(2.9, -3.2), 6); sub('<i>The TV turns on. Nobody touched it.</i>', 3.5); F.fear = Math.max(F.fear, 0.5);
         await wait(7); D.holdTv(false); W.tvFx.set(false); sfx.click();
       }, 40);
       when(() => room() === 'living' || room() === 'dining', async () => {
-        sfx.scrape && sfx.scrape(D.pan(-2.1, 2.3)); W.moveChair(1, -1.55, 2.3 + 0.35, Math.PI / 2 + 0.5); await wait(1.4); W.moveChair(0, -3.1, 2.0, Math.PI / 2 - 0.4); sfx.scrape && sfx.scrape(D.pan(-2.9, 2.0)); sub('<i>Chairs are moving in the dining room.</i>', 3.5);
+        sfx.scrape(D.pan(-2.1, 2.3)); W.moveChair(1, -1.55, 2.3 + 0.35, Math.PI / 2 + 0.5); await wait(1.4); W.moveChair(0, -3.1, 2.0, Math.PI / 2 - 0.4); sfx.scrape(D.pan(-2.9, 2.0)); sub('<i>Chairs are moving in the dining room.</i>', 3.5);
       }, 50);
       // every cabinet door in the kitchen at once, heard from anywhere in the house
       when(() => true, async () => {
@@ -490,9 +489,9 @@ export function createNights(env) {
       await until(t, () => F.clock >= c0 + 135 || (seen >= 6 && F.clock >= c0 + 75)); if (!alive(t)) return;
       await until(t, () => !F.script); if (!alive(t)) return;
       F.script = true; director.stop(); UI.objective(null); UI.hint(null); sfx.violins(0, 1.5); sfx.drone(0, 1.5);
-      sub('<i>The house goes quiet. Completely quiet.</i>', 5); sfx.hush && sfx.hush(5); await wait(5.5); if (!alive(t)) return;
+      sub('<i>The house goes quiet. Completely quiet.</i>', 5); sfx.hush(5); await wait(5.5); if (!alive(t)) return;
       for (const d of Object.keys(W.doors)) W.setDoor(d, false);
-      env.nlMult(0, false); F.flicker = true; sfx.jolt ? sfx.jolt(1) : sfx.stab(); sfx.slamFar(-0.7); sfx.slamFar(0.7); env.addShake(1.0); F.fear = 1;
+      env.nlMult(0, false); F.flicker = true; sfx.jolt(1); sfx.slamFar(-0.7); sfx.slamFar(0.7); env.addShake(1.0); F.fear = 1;
       sfx.violins(1, 0.3); sfx.whisper(0, 0.4); sub('<i>"GET OUT."</i>', 3);
       obj('<b class="red">Hide.</b> Get under the covers (' + env.lightLabel().toLowerCase() + ' off)');
       F.script = false;

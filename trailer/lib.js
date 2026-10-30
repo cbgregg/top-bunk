@@ -1,5 +1,5 @@
 // Shared helpers for the trailer cuts: camera maths, deterministic noise, the DOM overlays (cards, captions, camcorder, black, flash) and the
-// game-state helpers that put the house, the family and the thing where a shot needs them. Everything goes through window.__game; js/ is never edited.
+// game-state helpers that put the house, the family and the thing where a shot needs them. Everything goes through window.__game.
 import * as THREE from 'three';
 
 export const V3 = THREE.Vector3;
@@ -8,8 +8,8 @@ export const BATH_I = 95;                // the hall reveal spotlight, same as m
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const lerp = (a, b, k) => a + (b - a) * k;
 export const ease = {
-  lin: (k) => k, inOut: (k) => k * k * (3 - 2 * k), out: (k) => 1 - (1 - k) * (1 - k), in: (k) => k * k,
-  outCubic: (k) => 1 - Math.pow(1 - k, 3), inCubic: (k) => k * k * k,
+  inOut: (k) => k * k * (3 - 2 * k), out: (k) => 1 - (1 - k) * (1 - k), in: (k) => k * k,
+  outCubic: (k) => 1 - Math.pow(1 - k, 3),
 };
 export const mix3 = (a, b, k, out = new V3()) => out.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k));
 // a point as [x, y, z], whether it came as an array or a Vector3
@@ -100,7 +100,7 @@ function dots(g, text, x, y, p, align = 'left', color = '#f1f1e6') {
   return w;
 }
 
-// ---------- under the covers: the hook's checked quilt right in front of the lens, out of focus, lit only through the gap ----------
+// ---------- under the covers: the checked quilt right in front of the lens, out of focus, lit only through the gap ----------
 function quiltFabric(W, H) {
   const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), r = rng(5150);
   const cell = W * 0.15;
@@ -359,11 +359,6 @@ export function gameHelpers(game) {
       W.bathSpot.intensity = o.spot || 0; F.flicker = !!o.flicker;
     },
     flashlight(on) { if (flash) flash.intensity = on ? 26 : 0; F.flashOn = !!on; },
-    blackout(on) {   // the power is out: every light in the house (the same look as the vigil's)
-      F.blackout = on; game.nlMult(on ? 0 : 1, false);
-      if (on) { W.hemi.intensity = 0.02; W.sun.intensity = 0; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; scene.fog = new THREE.FogExp2(0x010206, 0.09); }
-      else game.setPhase('night', true);
-    },
     // the thing: {x, z, face:[x, z] | yaw, mode, speed, tilt, lean, reach, smile}
     thing(o) {
       E.visible = true; E.mode = o.mode || 'idle'; E.speed = o.speed ?? 1;
@@ -393,7 +388,6 @@ export function gameHelpers(game) {
     fear(v) { F.fear = Math.max(F.fear, v); },
     shake(v) { nights.D.shake(v); },
     door: (name, open) => W.setDoor(name, open, true),
-    EYE: game.EYE || 1.32,
   };
   return H;
 }

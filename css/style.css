@@ -64,8 +64,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .begin { font-family: 'Special Elite', monospace; font-size: 20px; letter-spacing: 3px; color: var(--ink); animation: blink 2.2s ease-in-out infinite; }
 @keyframes blink { 50% { opacity: 0.35 } }
 .note { font-size: 12px; letter-spacing: 1px; color: var(--dim); }
-.note.warn { display: none; color: var(--red); }
-.note.warn.show { display: block; }
 button { font-family: 'Special Elite', monospace; font-size: 18px; letter-spacing: 3px; padding: 12px 28px; color: var(--ink); background: transparent; border: 1px solid rgba(233,226,208,0.5); cursor: pointer; }
 button:hover { background: rgba(233,226,208,0.08); }
 
@@ -74,7 +72,6 @@ button:hover { background: rgba(233,226,208,0.08); }
 
 .note.gfx { margin: 0.6em 0 0; letter-spacing: 0.08em; }
 .note.gfx select { background: #0d0d0d; color: #cfc8b8; border: 1px solid #4a4538; font: inherit; padding: 0.15em 0.4em; margin-left: 0.6em; cursor: pointer; }
-
 
 /* ---------- touch controls (shown on touch devices) ---------- */
 #touch { position: fixed; inset: 0; z-index: 32; display: none; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
@@ -117,7 +114,7 @@ body.nightmare #game { animation: dream 0.9s steps(5) infinite; }
   100% { filter: hue-rotate(340deg) contrast(1.4) saturate(1.2); transform: scale(1.03) rotate(-0.2deg); }
 }
 
-/* ---------- menus (js/menu.js): the title and pause lists, and the Options / Credits / Controls panels over them ---------- */
+/* ---------- menus (js/menu.js): the title and pause lists, and the panels that open over them ---------- */
 .menu { display: flex; flex-direction: column; align-items: center; gap: 3px; width: min(380px, 88vw); margin: 0 auto 16px; }
 .menu .mi { position: relative; display: flex; align-items: center; justify-content: center; gap: 16px; width: 100%; min-height: 42px; margin: 0; padding: 6px 26px;
   font-family: 'Special Elite', monospace; font-size: 20px; letter-spacing: 3px; line-height: 1.2; text-align: center; color: var(--dim);
@@ -126,7 +123,7 @@ body.nightmare #game { animation: dream 0.9s steps(5) infinite; }
 .menu .mi:hover { background: transparent; }
 .menu .mi.focus { color: var(--ink); border-color: rgba(233,226,208,0.55); background: rgba(10,9,8,0.55); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); }
 .menu .mi.focus::before { content: '\203A'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); line-height: 1; color: var(--red); font-size: 22px; }
-.menu .mi:focus, .menu .mi:focus-visible { outline: none; }   /* (the .focus ring above is the focus ring, for every input device) */
+.menu .mi:focus, .menu .mi:focus-visible { outline: none; }   /* .focus above is the ring for every input device */
 body:has(.screen:not(.hidden)) #touch { visibility: hidden; }   /* the touch buttons stay out of the menus */
 #pause { background: radial-gradient(ellipse at center, rgba(0,0,0,0.55), rgba(0,0,0,0.9)); }
 .menu .mh { align-self: stretch; margin: 14px 0 3px; padding: 0 4px 4px; font-size: 10px; letter-spacing: 4px; text-transform: uppercase; text-align: left; color: var(--dim); border-bottom: 1px solid rgba(233,226,208,0.14); }
@@ -165,7 +162,7 @@ body:has(.screen:not(.hidden)) #touch { visibility: hidden; }   /* the touch but
 #pause .begin { font-size: 13px; letter-spacing: 2px; color: var(--dim); margin: 6px 0 0; }
 /* reduced flashing: the nightmare's colour strobe becomes a slow swell */
 body.reduce-flashing.nightmare #game { animation: dream 4.5s ease-in-out infinite alternate; }
-/* a phone held sideways (844 x 390 and the like): everything tighter, and the panels scroll */
+/* a phone held sideways: everything tighter, and the panels scroll */
 @media (max-height: 520px) {
   .screen > .panel { max-height: 100%; overflow-y: auto; overflow-x: hidden; padding: 10px 16px; }
   .panel h1 { font-size: clamp(34px, 12vh, 72px); letter-spacing: 6px; }
@@ -200,7 +197,7 @@ body.reduce-flashing.nightmare #game { animation: dream 4.5s ease-in-out infinit
 @media (max-height: 520px) { #achv { width: min(290px, 60vw); padding: 7px 12px 9px; } #achv b { font-size: 16px; } #achv span { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { #achv { transform: none; transition: opacity 0.4s; } }
 
-/* ---------- proof (js/nights.js): the night's find-proof line under the objective, and the count on the morning card ---------- */
+/* ---------- proof (js/nights.js): the line under the objective, and the count on the morning card ---------- */
 #proof { position: absolute; top: 22px; left: 26px; max-width: 46vw; font-family: 'Special Elite', monospace; font-size: 15px; letter-spacing: 0.5px; color: var(--ink); text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity 0.6s, top 0.4s; }
 #proof.show { opacity: 1; }
 #proof.alone::before { content: 'OBJECTIVE'; display: block; font-size: 10px; letter-spacing: 3px; color: var(--dim); margin-bottom: 4px; }

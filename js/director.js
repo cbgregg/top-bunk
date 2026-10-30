@@ -4,7 +4,7 @@
 // The context D that events run against is built in nights.js:
 //   D.r()  seeded random 0..1        D.P / D.F / D.W / D.E / D.sfx / D.UI / D.camera / D.hunter
 //   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)     D.sub(html, dur)
-//   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerNode()  D.playerRoom()
+//   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerRoom()  D.onBunk()
 //   D.fired(id)                      told after each event has run (some events leave proof behind, see nights.js)
 //   D.dropped(id)                    told when an event is given up on (its ok() never passed) or failed: its proof can no longer turn up
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
@@ -91,10 +91,10 @@ const EVENT_LIST = [
   { id: 'clockGlitch', safe: true, w: 2, minN: 2, run: (D) => D.clockGlitch() },
   { id: 'drawing', safe: true, w: 1, minN: 3, run: (D) => D.drawingChange() },
   { id: 'parentsMutter', safe: true, w: 2, run: (D) => D.mutter() },
-  { id: 'chairs', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.scrape && D.sfx.scrape(D.pan(-2.1, 2.3)); D.F.fear = Math.max(D.F.fear, 0.25); } },
+  { id: 'chairs', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.scrape(D.pan(-2.1, 2.3)); D.F.fear = Math.max(D.F.fear, 0.25); } },
   { id: 'bunkShake', safe: true, w: 2, minN: 2, ok: (D) => D.onBunk(), run: (D) => { D.shake(0.5); D.sfx.creak(0.35, 0); D.F.fear = Math.max(D.F.fear, 0.5); } },
   { id: 'steps', safe: true, w: 2, minN: 2, ok: (D) => !D.onBunk() && !D.hunter.busy, run: (D) => { D.F.echo = true; D.later(9, () => { D.F.echo = false; }); } },
-  { id: 'flush', safe: true, w: 1, run: (D) => D.sfx.flush && D.sfx.flush(D.pan(4.2, 1.5)) },
+  { id: 'flush', safe: true, w: 1, run: (D) => D.sfx.flush(D.pan(4.2, 1.5)) },
   // everything that happens before a hunt, and then nothing comes: the warning is never a promise
   { id: 'falseAlarm', w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0, run: (D) => { D.flicker(1.5); D.sfx.violins(0.3, 0.6); D.sfx.heavyStep(0.5, D.randPan()); D.later(0.85, () => D.sfx.heavyStep(0.4, D.randPan())); D.later(2.6, () => D.sfx.violins(0, 2.5)); D.F.fear = Math.max(D.F.fear, 0.8); } },
 ];

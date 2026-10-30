@@ -63,7 +63,7 @@ def main():
     jobs = [n for n in MODELS if (not only or n == only) and (force or not os.path.exists(os.path.join(OUT, n + '.glb')))]
     with ThreadPoolExecutor(3) as pool:
         for name, size in pool.map(one, jobs):
-            print(f'{name}: {size // 1024 if isinstance(size, int) else size} KB' if isinstance(size, int) else f'{name}: {size}', flush=True)
+            print(f'{name}: {size // 1024} KB' if isinstance(size, int) else f'{name}: {size}', flush=True)
 
 
 if __name__ == '__main__':

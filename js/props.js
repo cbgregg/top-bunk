@@ -23,7 +23,7 @@ export const loadProp = (name) => {
 };
 
 // One model: footprint centre (x, z), base on y, facing rot (radians, front = +Z), uniform scale s.
-// hide: the old stand-in meshes, hidden once the model is in. onLoad(holder, box) runs then too (for colliders).
+// hide: the stand-in meshes, hidden once the model is in. onLoad(holder, box) runs then too (for colliders).
 export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, hide = [], onLoad } = {}) {
   const holder = new THREE.Group(); holder.userData.prop = name; holder.position.set(x, y, z); holder.rotation.y = rot; parent.add(holder);
   loadProp(name).then((g) => {

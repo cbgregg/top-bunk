@@ -1,7 +1,7 @@
-# steam/ — SteamPipe upload configuration
+# SteamPipe upload configuration
 
-Everything Steam needs to take the desktop build (see `../STEAM.md` for the whole launch checklist, and
-`../desktop/` for the Electron shell itself).
+What Steam needs to take the desktop build. `../STEAM.md` is the whole launch checklist, and
+`../desktop/` is the Electron shell itself.
 
 | File | What it is |
 | --- | --- |
@@ -10,7 +10,7 @@ Everything Steam needs to take the desktop build (see `../STEAM.md` for the whol
 | `depot_build_mac.vdf` | macOS depot (AppID+2): `dist/mac/` (the x64 `Top Bunk.app`) from `npm run dist:mac`. |
 | `depot_build_linux.vdf` | Linux depot (AppID+3): `dist/linux-unpacked/` from `npm run dist:linux`. |
 | `upload.sh` / `upload.ps1` | Wrap `steamcmd +login <account> +run_app_build app_build.vdf`; refuse to run while placeholders remain or a ContentRoot is missing. |
-| `achievements.json` | Achievement API names and texts to enter in Steamworks > Stats & Achievements (owned by the achievements work). |
+| `achievements.json` | Achievement API names and texts to enter in Steamworks > Stats & Achievements (see `achievements.md`). |
 | `build/`, `app_build.generated.vdf` | steamcmd logs and the per-run copy of the app script; git-ignored. |
 
 Steam wants the plain electron-builder `dir` output as depot content, not the zips: each depot's
@@ -31,7 +31,7 @@ echo $APP > desktop/steam_appid.txt
 npm run check   # parses the VDFs and cross-checks the IDs
 ```
 
-`desktop/steam_appid.txt` is tracked on purpose: the shell reads it to know which app to initialise
+`desktop/steam_appid.txt` is tracked in git: the shell reads it to know which app to initialise
 (480 = Valve's Spacewar test app, which any Steam account can use to test achievements and the overlay).
 When Steam launches the game it sets `SteamAppId` in the environment, which wins over the file.
 
@@ -93,27 +93,27 @@ launch option with it.
 
 ## 5. Flags to set in Steamworks
 
-- **Steam overlay** — Application > Installation > General Installation: keep the overlay enabled (the
+- **Steam overlay** (Application > Installation > General Installation): keep the overlay enabled (the
   default). The shell starts Chromium with `in-process-gpu` and `disable-direct-composition` and
   repaints every frame, which is what the overlay needs to draw over an Electron window.
-- **Controller support** — Store Page > Basic Info > Supported Features: tick *Full Controller Support*
+- **Controller support** (Store Page > Basic Info > Supported Features): tick *Full Controller Support*
   only if every screen (title, pause, death, end) is usable with a pad; otherwise tick *Partial Controller
   Support*. The flags are store metadata; the game reads pads through the browser Gamepad API.
-- **Steam Input** (Application > Steam Input) — optional. Without a configuration, Steam exposes
+- **Steam Input** (Application > Steam Input): optional. Without a configuration, Steam exposes
   controllers as regular XInput/HID devices, which is what the game expects. Pick "Gamepad" as the
-  default template if you enable it; a full Steam Input action manifest is not done.
-- **Depots** (SteamPipe > Depots) — give each depot its operating system so the client installs only
+  default template if you enable it; there is no Steam Input action manifest yet.
+- **Depots** (SteamPipe > Depots): give each depot its operating system so the client installs only
   the matching one, and mark Windows and Linux as 64-bit.
 
 ## 6. Branches and CI
 
-- `default` — what customers get. Only ever set live from the website.
-- `beta` (create it under SteamPipe > Builds) — public or password-protected test branch; the upload
+- `default`: what customers get. Only ever set live from the website.
+- `beta` (create it under SteamPipe > Builds): public or password-protected test branch; the upload
   scripts and the CI job can set it live directly.
 - `.github/workflows/desktop.yml` builds on a `v*` tag or by hand, and uploads to Steam through
-  `game-ci/steam-deploy@v3` when the `STEAM_USERNAME` and `STEAM_CONFIG_VDF` secrets exist (the
-  `configVdf` is the `config/config.vdf` of a steamcmd that has logged in once with Steam Guard,
-  base64-encoded because the action decodes it: store the output of
+  `game-ci/steam-deploy@v3` when the `STEAM_USERNAME` and `STEAM_CONFIG_VDF` secrets exist. It uses the
+  same AppID+1/+2/+3 depot order as the files here and the `STEAM_APP_ID` repository variable.
+- `STEAM_CONFIG_VDF` is the `config/config.vdf` of a steamcmd that has logged in once with Steam Guard,
+  base64-encoded, because the action decodes it and a raw paste fails the job. Store the output of
   `base64 -w0 < ~/Steam/config/config.vdf`, or on macOS
-  `base64 -i ~/Library/Application\ Support/Steam/config/config.vdf`. A raw paste fails the job). It uses the same AppID+1/+2/+3 depot order as the files here and the
-  `STEAM_APP_ID` repository variable.
+  `base64 -i ~/Library/Application\ Support/Steam/config/config.vdf`.

@@ -1,9 +1,9 @@
 // Game controller and touch input, merged into one analog state that the game reads next to the keyboard and mouse.
 //   input.fx / input.fy   move (right / forward, -1..1)      input.lookX / input.lookY   look speed (right stick, -1..1)
 //   input.run / input.breath   held buttons                  input.scheme   which device was used last: 'kb' | 'pad' | 'touch'
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 //   input.menuActive() / input.onMenu(action)   set by js/menu.js: while a menu is up the controller drives it ('menuUp' 'menuDown' 'menuLeft'
 //   'menuRight' 'menuConfirm' 'menuBack', once per press, directions repeating while held) and A no longer interacts or confirms
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const input = {
   fx: 0, fy: 0, lookX: 0, lookY: 0, run: false, breath: false, scheme: 'kb', touchDevice: false, onScheme: null,
   setUse() {}, setBreathVisible() {}, rumble() {}, menuActive: null, onMenu: null,

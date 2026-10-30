@@ -21,7 +21,7 @@ def el(voice_id, speed=1.0):
     return (voice_id, speed)
 
 
-# account voices (the same ones Breachpoint uses): Sarah for Mom, Chris for Dad
+# ElevenLabs library voices: Sarah for Mom, Chris for Dad
 MOM = el('EXAVITQu4vr4xnSDxMaL', 1.0)
 DAD = el('iP95p4xoKVk53GoZ742B', 1.0)
 # Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).

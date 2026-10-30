@@ -1,9 +1,7 @@
-// The portrait cut (9:16, about 22 s) for Shorts / Reels / TikTok: a separate edit, not a crop. It plays as a tape a kid shot on the family
-// camcorder over ten nights in the house: one operator (still when hiding, flinching on a scare, stumbling in the run), one lens, a kid's
-// eye height, the camcorder's own date stamp, and captions that tell the story with the sound off. Hard cuts only.
-// it opens on the thing rising over the top bunk, rewinds to the day they moved in, and ends where the drawing on the wall said it would:
-// it pushes you off the top bunk. The last frame is its eyes in the dark over the mattress, which is the first frame again.
-// the full grin is held back: the hook has it, the bunk shows part of it through the blanket, the scare has it. Elsewhere it is eyes.
+// The portrait cut (9:16, about 22 s) for Shorts, Reels and TikTok, edited on its own rather than cropped. It plays as a tape a kid shot
+// on the family camcorder: one hand-held lens at a kid's eye height, the date stamp, captions that read with the sound off, hard cuts.
+// It opens on the thing rising over the top bunk, rewinds to moving day, and ends with it shoving you off the bunk; the last frame is its
+// eyes over the mattress, the first frame again, so the clip loops. The full grin is kept for the hook, the bunk and the scare.
 import { V3, clamp, lerp, ease, aim, xyz, lerpAngle, BATH_I } from './lib.js';
 
 const FOV = 70, EYE = 1.05;   // one lens (vertical fov; tighter framing is the camcorder's digital zoom), a kid holding it at eye height
@@ -17,7 +15,7 @@ const fbm = (t, s) => vnoise(t, s) * 0.62 + vnoise(t * 2.17 + 5.1, s + 13) * 0.2
 // a quick correction that overshoots a little and settles (0 -> 1 over about a fifth of a second)
 const settle = (d) => (d <= 0 ? 0 : d > 0.45 ? 1 : 1 - Math.exp(-d / 0.05) * Math.cos(d * 2 * Math.PI / 0.3));
 // a: aim wander (rad), f: how fast it wanders, roll, pos: how far the hands drift (m), step/bob: footfalls, tremor: fear in the fingers,
-// refr: how big the operator's re-framing corrections are (a person holding a camera keeps fixing the shot; a tripod never does)
+// refr: how big the operator's small re-framing corrections are
 const HANDS = {
   still: { a: 0.0012, f: 0.3, roll: 0.0008, pos: 0.001 },
   hold: { a: 0.012, f: 0.8, roll: 0.007, pos: 0.006, refr: 1 },

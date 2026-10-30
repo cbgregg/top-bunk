@@ -18,7 +18,7 @@ export const QUALITY = {
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
 
-// radians to turn the sky so its sun lines up with the game's sun light (tuned by eye in the yard)
+// radians to turn the sky so its sun lines up with the game's sun light
 const SKY_ROT = -1.125;
 
 const GradeShader = {
@@ -105,7 +105,7 @@ export class Gfx {
       ao.updateGtaoMaterial({ radius: p.ao.radius, distanceExponent: 1.2, thickness: 1.2, scale: 1.0, samples: p.ao.samples, distanceFallOff: 1, screenSpaceRadius: false });
       ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: p.ao.samples > 8 ? 12 : 8 });
       ao.blendIntensity = 1;
-      // the AO is computed at a fraction of the screen resolution (it is soft anyway) and upsampled: most of its cost
+      // the AO runs at a fraction of the screen resolution and is scaled up: it is soft anyway, and the pixel count is most of its cost
       const baseSize = ao.setSize.bind(ao), k = p.ao.res ?? 0.5;
       ao.setSize = (w, h) => baseSize(Math.max(2, Math.round(w * k)), Math.max(2, Math.round(h * k)));
       ao.setSize(innerWidth * dpr, innerHeight * dpr);

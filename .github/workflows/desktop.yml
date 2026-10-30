@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing yet (STEAM.md lists it under "not done")
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing yet (see STEAM.md)
 
 jobs:
   build:

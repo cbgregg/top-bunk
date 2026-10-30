@@ -4,7 +4,7 @@
     ELEVENLABS_API_KEY=... python3 tools/gen_sfx.py [--only scare_synth] [--force]
 
 Writes assets/sfx/<id>.mp3 and assets/sfx/sfx.json, which the game reads. Three kinds:
-  noise  the night brown-noise bed, made locally with ffmpeg (no key, no credits); a seamless loop
+  noise  the night brown-noise bed, made locally with ffmpeg (no key, no credits); it loops with no audible join
   sfx    ElevenLabs sound effects: jump-scare stingers, the shove off the bunk
   music  ElevenLabs Music: the creepy horror instruments (waterphone, detuned music box)
 The key is read from the environment only. Stingers are levelled loud on purpose; beds sit very low.
@@ -17,7 +17,7 @@ OUT = os.path.join(ROOT, 'assets', 'sfx')
 
 # id: (kind, prompt, seconds, loudness LUFS, loops)
 SFX = {
-    # the night bed: brown noise, low-passed, with a very slow swell (30 s period in a 60 s clip, so the loop is seamless)
+    # the night bed: brown noise, low-passed, with a very slow swell (30 s period in a 60 s clip, so the loop has no join)
     'night_brown_noise': ('noise', None, 60, -30, True),
     'scare_synth': ('sfx', 'Loud sudden horror jump scare stinger: a massive distorted analog synthesizer blast with a harsh '
                     'dissonant screech and a deep sub-bass boom, then an abrupt cut-off', 2.5, -9, False),
@@ -95,7 +95,7 @@ def make(id_):
         # brown noise, rumble only (no hiss), swelling slowly: volume swell with a 30 s period fits the 60 s loop exactly
         ff('-f', 'lavfi', '-i', f'anoisesrc=d={secs}:c=brown:r=44100:a=0.8',
            '-af', "highpass=f=25,lowpass=f=500,volume='0.8+0.2*sin(2*PI*t/30)':eval=frame", '-ac', '2', '-b:a', '128k', path)
-        # loudnorm would pump the swell flat; just set the level
+        # a wide LRA, so loudnorm sets the level without pumping the swell flat
         tmp = path + '.tmp.mp3'
         ff('-i', path, '-af', f'loudnorm=I={lufs}:TP=-1.5:LRA=20', '-ar', '44100', '-b:a', '128k', tmp)
         os.replace(tmp, path)
