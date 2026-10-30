@@ -110,8 +110,8 @@ over ten nights in the house, and it ends where the drawing on the wall said it 
   shots, and the rewind's counter. It sits under the film grain like the picture, inside the area Shorts, Reels and TikTok leave clear.
   A splice, or the camera hitting the floor, can tear a tracking band across a frame or two.
 - **Captions** in a bold sans with a black outline (one in the kid's red crayon, under the drawing), placed shot by shot in the empty part
-  of the frame and never below 62% of the height, where the platforms put their own text (`cap(c, text, y, from, to, o)`; `o` can set a
-  caption beside the subject, or `kid: true` for the crayon). They tell the story with the sound off. There are no voices.
+  of the frame, with the bottom of the text above about 66% of the height, where the platforms put their own text
+  (`cap(c, text, y, from, to, o)`; `o` can set a caption beside the subject, or `kid: true` for the crayon). They tell the story with the sound off. There are no voices.
 - **The grin is held back.** The hook has it, the bunk shows part of it through the blanket, and the scare has it; in the hall, at the
   door and in the run it is eyes and a shape. Its head tilt belongs to the hook and the last image only.
 - **The game's own situation.** The longest take is the mechanic: under the covers, filming through a narrow slit in the blanket (the
@@ -119,8 +119,10 @@ over ten nights in the house, and it ends where the drawing on the wall said it 
   it stops) while it stands over the bunk; its head jerks down on the heartbeats, and on the fourth it darts at the slit.
 - **The scare** is the hook paid off: back on the top bunk its face comes over the edge, stopping short of the lens so the black head frames
   the eyes and teeth, in the hardest, sharpest frames of the cut; its hands come up, it shoves, and the camera goes over the side; it lands
-  on the floor tipped over, looking up at it lying where the kid was, arms hanging, its head tilting. Hard cut.
-- **The end card** is the title in the kid's red crayon lettering from the drawing, written on over the dark room the tape began in;
+  on the floor tipped over, its lamp lighting the bunk from below, looking up at it lying where the kid was, arms hanging toward the lens,
+  its head tilting. Hard cut.
+- **The end card** is the title in the kid's red crayon lettering from the drawing, written on over the dark room the tape began in,
+  with one small line saying what it is (a horror game for PC) over the call to action;
   then two eyes switch on over the mattress, exactly where frame 0 finds them, and the hands carry over the cut, so it loops.
   `--bio` adds "link in bio"; `--cta web` swaps the Steam line for "play it free in your browser".
 - **Sound.** The same music (placeholder or `--music`) with its own plan (`music_plan.json: portrait`), mono and in a small room as the

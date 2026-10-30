@@ -82,8 +82,9 @@ const torch = (c, i) => { const f = c.camera.children.find((x) => x.isSpotLight)
 // hold a door at an exact angle (0 shut, 1 open) for this frame; the game's own door motion is too quick for a door that closes itself
 const doorTo = (c, name, a) => { const d = c.W.doors[name]; if (!d) return; d.a = a; d.target = a; d.apply(); };
 // a caption from `from` to `to` seconds into the shot, at height y (a share of the frame), put where the picture is empty.
-// nothing lower than 0.62: below that the platforms lay their own names, descriptions and buttons over the picture
-const cap = (c, text, y, from = 0, to = 1e9, o) => { if (c.st >= from && c.st < to) c.ui.caption(text, 1, Math.min(y, 0.62), o); };
+// y is the middle of the text; its bottom edge stays above 0.655: below that the platforms lay their own names, descriptions and buttons
+// over the picture (a line of caption is about 0.043 of the height)
+const cap = (c, text, y, from = 0, to = 1e9, o) => { if (c.st >= from && c.st < to) c.ui.caption(text, 1, Math.min(y, 0.655 - 0.0216 * text.split('\n').length), o); };
 // move the thing so its head is at p (its pose stays as the game last drew it)
 function headTo(c, p) { for (let k = 0; k < 2; k++) { c.E.headWorld(c.head); c.E.root.position.x += p[0] - c.head.x; c.E.root.position.y += p[1] - c.head.y; c.E.root.position.z += p[2] - c.head.z; } c.E.headWorld(c.head); }
 // aim one of its arms at a point (after the game has posed it): side 'L' or 'R', w how far
@@ -173,7 +174,7 @@ function hookPose(c, st) {
 }
 const HOOK_CAM = [[6.22, 1.95, 2.92], [6.3, 1.35, 1.4]], SCARE_TOP = [6.22, 1.95, 2.92];
 const hookSetup = (c) => { c.g.night(); c.g.thing({ x: 6.2, y: -1.02, z: 1.5, yaw: 0, tilt: 0, smile: 1.05 }); c.g.lookNow(HOOK_CAM[0]); c.P.pos.set(6.13, 0, 3.02); };
-const END_DUR = 1.4, EYES_DUR = 0.8;
+const END_DUR = 1.4, EYES_DUR = 0.8, SUN_AT = [6.3, 1.25, 3.3];
 
 export const PORTRAIT_SHOTS = T([
   // the hook: lying on the top bunk, something is already looking over the edge of the mattress; it rises and tilts its head
@@ -197,10 +198,10 @@ export const PORTRAIT_SHOTS = T([
     } },
   // the story: one caption a take, the house in the order you meet it
   { id: 'p_day', dur: 1.4, seed: 5, osd: osd('OCT 13 2004', [4, 18, 22, true], 2 * 60 + 31, { tracking: [0, 0.12] }),
-    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.moveTeddy(6.6, 1.79, 3.15); c.P.pos.set(-8, 0, -9); c.g.sunPatch(34); },
+    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.moveTeddy(6.6, 1.79, 3.15); c.P.pos.set(-8, 0, -9); c.g.sunPatch(48, SUN_AT); },
     update(c, k) {
-      c.g.sunPatch(34);   // (the low afternoon sun through the window: the first day is the brightest, warmest shot, next to every night after it)
-      stage(c, { dust: 0.14, expo: 1.45, grade: 'saturate(1.3) contrast(1.04)' });
+      c.g.sunPatch(48, SUN_AT);   // (the low afternoon sun through the window, across the top bunk: the first day is the brightest, warmest shot)
+      stage(c, { dust: 0.14, expo: 1.55, grade: 'saturate(1.3) contrast(1.04)' });
       shoot(c, [lerp(7.15, 7.05, k), EYE, lerp(-0.1, 0.12, k)], [6.15, 1.25, 3.1], 'walk');
       cap(c, 'i got the top bunk', 0.21);   // (on the wall above the bunk, clear of the bear)
     } },
@@ -248,7 +249,7 @@ export const PORTRAIT_SHOTS = T([
     update(c) {
       const st = c.st, SHUT = 0.45, OPEN = 0.95;
       doorTo(c, 'kid', st < SHUT ? 0.55 * (1 - ease.in(clamp((st - 0.02) / 0.43, 0, 1))) : st < OPEN ? 0 : 0.74 * ease.out(clamp((st - OPEN) / 0.5, 0, 1)));
-      c.E.visible = st >= SHUT; c.E.smile.visible = false; c.E.tilt = 0; c.E.lean = 0.4 + 0.06 * ease.inOut(clamp((st - 1.5) / 0.6, 0, 1));
+      c.E.visible = st >= OPEN; c.E.smile.visible = false; c.E.tilt = 0; c.E.lean = 0.4 + 0.06 * ease.inOut(clamp((st - 1.5) / 0.6, 0, 1));   // (not before it opens: its hand and the glow of its eye show through a shut door)
       c.E.headWorld(c.head);
       stage(c, { nl: 1.3, dust: 0.06 }); c.g.fear(0.6);
       const find = ease.inOut(clamp((st - OPEN - 0.42) / 0.3, 0, 1)), door = [7.05, 1.1, -0.3], face = [c.head.x - 0.12, c.head.y - 0.3, c.head.z];
@@ -271,8 +272,9 @@ export const PORTRAIT_SHOTS = T([
       c.E.headWorld(c.head);
       const [lx, lz] = at(st - 0.22), b = Math.sin(Math.min(st, HELD) * 1.7);
       stage(c, { nl: 1, dust: 0 }); c.g.fear(0.8);
-      shoot(c, [6.13, 1.9, 3.02], [c.head.x + lx - x, c.head.y - 0.05, c.head.z + lz - z], 'hide', { held: st > HELD, yaw: 0.06, pitch: -0.16 });
-      c.ui.quilt({ lift: 0.012 * (1 + b) / 2, glow: 0.6 + 0.3 * lean + 0.1 * jab });   // the slit rises and falls with the breath, and freezes when it stops
+      // its face sits low in the slit, so the ridge of the blanket hides the bottom of the grin: the full face is kept for the scare
+      shoot(c, [6.13, 1.9, 3.02], [c.head.x + lx - x, c.head.y - 0.05, c.head.z + lz - z], 'hide', { held: st > HELD, yaw: 0.06, pitch: -0.1 });
+      c.ui.quilt({ lift: 0.03 + 0.012 * (1 + b) / 2, glow: 0.6 + 0.3 * lean + 0.1 * jab });   // the slit rises and falls with the breath, and freezes when it stops
       cap(c, st < 1.0 ? 'hold your breath' : "hold your breath\nit can't see you", 0.62, 0.2, 2.2);
     } },
   // the run: down the hall, its shadow filling the end wall, the whip pan back, and it is right there coming at you with its hands out
@@ -282,12 +284,14 @@ export const PORTRAIT_SHOTS = T([
       const st = c.st, run = clamp(st / 0.75, 0, 1), x = lerp(4.3, 6.5, ease.out(run)), back = ease.inOut(clamp((st - 1.15) / 0.36, 0, 1)), lunge = ease.in(clamp((st - 1.5) / 0.5, 0, 1));
       const gap = st < 1.5 ? lerp(2.6, 1.75, clamp(st / 1.5, 0, 1)) : lerp(1.75, 1.05, lunge);
       // it runs bent over, and comes down at you: its face never towers straight above the lens, where the smile stops reading as a face
-      c.E.root.position.set(x - gap, -0.55 * back, -0.93); c.E.faceTowards(x, -0.9, 1); c.E.mode = lunge < 0.4 ? 'run' : 'idle'; c.E.reach = 0; c.E.lean = 0.3 + 0.25 * back; c.E.smileScale = 1.1 + 0.25 * lunge; c.E.tilt = 0;
+      c.E.root.position.set(x - gap, -0.55 * back, -0.93); c.E.faceTowards(x, -0.9, 1); c.E.mode = lunge < 0.4 ? 'run' : 'idle'; c.E.reach = 0; c.E.lean = 0.3 + 0.25 * back; c.E.tilt = 0;
+      c.E.smile.visible = false;   // (eyes and a shape: the grin is the scare's)
       c.E.headWorld(c.head); c.back = back; c.lunge = lunge;
       // the night lights low, so the hall light throws its shadow up the end wall; when the kid turns, it is a shape against that light
       stage(c, { nl: back > 0.5 ? 0.6 : 0.3, dust: 0.06, streak: st >= 1.15 && st < 1.5 ? [Math.sin(clamp((st - 1.15) / 0.36, 0, 1) * Math.PI) * 9, 0] : null }); c.g.fear(1);
-      // the face comes in a third of the way down the frame, under the date
-      const ahead = [x + 3, 1.2, -0.9], behind = [c.head.x, c.head.y - 0.7, c.head.z], a1 = aim([x, EYE, -0.9], ahead), a2 = aim([x, EYE, -0.9], behind);
+      // the face comes in a third of the way down the frame, under the date (aimed just under its head, and up to it as it closes in:
+      // aimed any lower, the eyes rise into the date and out of the top)
+      const ahead = [x + 3, 1.2, -0.9], behind = [c.head.x, c.head.y - lerp(0.15, -0.02, lunge), c.head.z], a1 = aim([x, EYE, -0.9], ahead), a2 = aim([x, EYE, -0.9], behind);
       const over = back < 1 ? 0 : Math.exp(-(st - 1.51) * 6) * Math.sin((st - 1.51) * 14) * 0.12;   // the turn overshoots and comes back
       shoot(c, [x, EYE, -0.9], ahead, run < 1 ? 'run' : 'hold', { yaw: lerpAngle(0, a2.yaw - a1.yaw, back) + over + 0.05 * back, pitch: (a2.pitch - a1.pitch) * back });
       if (st > 1.7) c.g.shake(0.6);
@@ -309,8 +313,9 @@ export const PORTRAIT_SHOTS = T([
       if (st < LAND) {
         // up over the edge in two or three frames; no head tilt here, the shove is the move
         const up = ease.outCubic(clamp((st + 0.045) / 0.105, 0, 1));
-        c.E.root.rotation.set(0, 0, 0); c.E.lean = 0.35; c.E.reach = reach; c.E.tilt = 0; c.E.smileScale = 1.3 + 0.1 * up + 0.1 * reach;
-        headTo(c, [6.24, lerp(1.6, 1.79, up), lerp(2.0, 2.13, up)]);
+        // a metre from the lens: the face fills about two thirds of the width with dark room round the black head, not the whole frame
+        c.E.root.rotation.set(0, 0, 0); c.E.lean = 0.35; c.E.reach = reach; c.E.tilt = 0; c.E.smileScale = 1.15 + 0.05 * up + 0.1 * reach;
+        headTo(c, [6.24, lerp(1.58, 1.76, up), lerp(1.86, 1.97, up)]);
       } else {
         // where the kid was: lying on the top bunk, its head over the edge, arms drifting down at the camera on the floor, the head tilting
         const b = st - LAND, k = ease.inOut(clamp(b / 0.68, 0, 1));
@@ -321,10 +326,12 @@ export const PORTRAIT_SHOTS = T([
       // the first frames after the silence are the hardest in the cut: true black, the whites clipping, the exposure kicking and settling
       const kick = Math.exp(-st / 0.05), fall = st >= SHOVE && st < LAND ? (st - SHOVE) / (LAND - SHOVE) : -1;
       stage(c, st < SHOVE ? { nl: 0.3, dust: 0, expo: 1.2 * (1 + 0.2 * kick), contrast: 1.1 + 0.16 * kick } : st < LAND ? { nl: 1.0, dust: 0, streak: [2, Math.sin(fall * Math.PI) * 10] } : { nl: 1.45, dust: 0 });
+      // on the floor the camcorder's lamp points up at it: the black body and the hanging arms read against the dark, lit from below
+      torch(c, st < LAND ? 0 : 3.5);
       c.g.fear(1);
       const floor = [6.28, 0.14, 1.98];
       // eyes a third of the way down the frame; then the camera dips as its hands come up at the lens
-      if (st < SHOVE) shoot(c, SCARE_TOP, [c.head.x, c.head.y - 0.15, c.head.z], 'hide', { held: true, pitch: -0.15 * ease.inOut(clamp((st - 0.22) / 0.13, 0, 1)) });
+      if (st < SHOVE) shoot(c, SCARE_TOP, [c.head.x, c.head.y - 0.08, c.head.z], 'hide', { held: true, pitch: -0.08 * ease.inOut(clamp((st - 0.22) / 0.13, 0, 1)) });
       else if (st < LAND) {
         // the fall: off the edge, tumbling over backwards and round, the floor coming up
         const k = fall, d = ease.out(k), a0 = aim(SCARE_TOP, [6.24, 1.45, 2.2]), a1 = aim(floor, [6.2, 1.5, 2.4]);
@@ -335,11 +342,19 @@ export const PORTRAIT_SHOTS = T([
         const b = st - LAND, bounce = Math.exp(-b * 9) * Math.sin(b * 30) * 0.05;
         shoot(c, [floor[0], floor[1] + Math.max(0, bounce), floor[2]], [c.head.x, c.head.y - 0.12, c.head.z], 'still', { roll: 0.45 + bounce * 2, pitch: bounce });
       }
+    },
+    // its hands come up over the edge of the mattress at the lens, either side of the face, before the shove; on the floor they hang down
+    // from the bunk toward the camera
+    post(c) {
+      const st = c.st, reach = ease.out(clamp((st - 0.2) / 0.14, 0, 1));
+      if (st < 0.62) { armTo(c, 'L', [5.98, 1.9, 2.8], reach); armTo(c, 'R', [6.48, 1.88, 2.8], reach); }
+      else { const k = ease.inOut(clamp((st - 0.62) / 0.68, 0, 1)); armTo(c, 'L', [6.12, 0.2, 2.15 - 0.1 * k], 0.9); armTo(c, 'R', [6.5, 0.3, 2.25], 0.75); }
     } },
   // the title in the kid's crayon, written on over the dark room the tape began in (c.opts.linkInBio / c.opts.cta pick the line for the platform)
   { id: 'p_end', dur: END_DUR, seed: 3, camcorder: false, setup: hookSetup,
     update(c) {
-      const o = c.opts || {}, line = o.cta === 'web' ? 'play it free in your browser<br>link in bio' : o.linkInBio ? 'wishlist on Steam<br>link in bio' : 'wishlist on Steam';
+      const o = c.opts || {}, web = o.cta === 'web', kick = `<span class="kick">${web ? 'a horror game' : 'a horror game for PC'}</span>`;
+      const line = kick + (web ? 'play it free in your browser<br>link in bio' : o.linkInBio ? 'wishlist on Steam<br>link in bio' : 'wishlist on Steam');
       hookPose(c, 0); c.g.lookNow(HOOK_CAM[0]); c.g.eyes(0); c.E.smile.visible = false; doorTo(c, 'kid', 1);
       stage(c, { nl: 0, dust: 0, expo: 0.24 });
       shoot(c, ...HOOK_CAM, 'hide', { t: c.st - END_DUR - EYES_DUR });

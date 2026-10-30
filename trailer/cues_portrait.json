@@ -15,7 +15,7 @@
   { "t": 5.45, "file": "trailer/music/relay_click.wav", "gain": 0.25, "pan": 0.3 },
   { "t": 5.45, "file": "assets/sfx/night_brown_noise.mp3", "src": 3, "gain": 0.15, "pan": 0, "dur": 1.0, "fadeIn": 0.01, "fadeOut": 0.05 },
   { "t": 5.46, "file": "assets/sfx/low_drone.mp3", "gain": 0.4, "pan": 0, "dur": 1.0, "fadeIn": 0.02, "fadeOut": 0.4 },
-  { "t": 5.48, "file": "trailer/music/gasp.wav", "gain": 0.45, "pan": 0 },
+  { "t": 5.48, "file": "trailer/music/gasp.wav", "gain": 0.35, "pan": 0 },
 
   { "t": 6.45, "file": "assets/sfx/night_brown_noise.mp3", "gain": 0.15, "pan": 0, "dur": 1.9, "fadeIn": 0.05, "fadeOut": 0.05 },
 
@@ -23,33 +23,34 @@
   { "t": 8.35, "file": "trailer/music/tv_snow.wav", "gain": 0.06, "pan": 0.2, "dur": 1.1, "hp": 400, "lp": 5000, "fadeOut": 0.02 },
   { "t": 9.45, "file": "trailer/music/tv_snow.wav", "src": 1.5, "gain": 0.07, "pan": 0.1, "dur": 0.97, "hp": 400, "lp": 5000, "fadeOut": 0.01 },
   { "t": 10.42, "file": "trailer/music/crt_off.wav", "gain": 0.35, "pan": 0.1 },
-  { "t": 10.6, "file": "trailer/music/cam_handling.wav", "gain": 0.6, "pan": 0 },
+  { "t": 10.6, "file": "trailer/music/cam_handling.wav", "gain": 0.4, "pan": 0 },
   { "t": 10.62, "file": "trailer/music/gasp.wav", "gain": 0.4, "pan": 0 },
 
   { "t": 11.0, "file": "assets/sfx/night_brown_noise.mp3", "gain": 0.15, "pan": 0, "dur": 2.3, "fadeIn": 0.05, "fadeOut": 0.05 },
   { "t": 11.45, "file": "trailer/music/door_latch.wav", "gain": 0.2, "pan": 0.25 },
   { "t": 11.45, "file": "assets/sfx/door_slam_far.mp3", "gain": 0.1, "pan": 0.25, "dur": 0.5, "fadeOut": 0.2 },
-  { "t": 11.95, "file": "trailer/music/hinge_creak.wav", "gain": 0.5, "pan": 0.25 },
-  { "t": 11.95, "file": "assets/sfx/low_drone.mp3", "gain": 0.5, "pan": 0, "dur": 4.2, "fadeIn": 0.3, "fadeOut": 0.1 },
+  { "t": 11.95, "file": "trailer/music/hinge_creak.wav", "gain": 0.4, "pan": 0.25 },
+  { "t": 11.95, "file": "assets/sfx/low_drone.mp3", "gain": 0.4, "pan": 0, "dur": 4.2, "fadeIn": 0.3, "fadeOut": 0.1 },
   { "t": 12.3, "file": "trailer/music/floor_creak.wav", "gain": 0.45, "pan": 0.2 },
   { "t": 12.42, "file": "trailer/music/gasp.wav", "gain": 0.25, "pan": 0 },
 
   { "t": 13.3, "file": "trailer/music/breath_slow.wav", "gain": 0.4, "pan": 0, "dur": 1.0, "fadeOut": 0.08 },
-  { "t": 13.3, "file": "trailer/music/heavy_steps.wav", "gain": 0.6, "pan": 0.3, "lp": 900, "dur": 1.0, "fadeOut": 0.2 },
+  { "t": 13.3, "file": "trailer/music/heavy_steps.wav", "gain": 0.45, "pan": 0.3, "lp": 900, "dur": 1.0, "fadeOut": 0.2 },
   { "t": 14.05, "file": "trailer/music/floor_creak.wav", "gain": 0.35, "pan": 0.2, "lp": 1200 },
   { "t": 14.3, "file": "trailer/music/heartbeat.wav", "gain": 0.45, "pan": 0, "dur": 1.85, "fadeIn": 0.12, "fadeOut": 0.03 },
   { "t": 14.3, "file": "trailer/music/heart_ticks.wav", "gain": 0.5, "pan": 0, "dur": 1.85, "fadeOut": 0.03 },
   { "t": 15.6, "file": "assets/sfx/violin_swell.mp3", "gain": 0.5, "pan": 0, "dur": 0.55, "fadeIn": 0.4, "fadeOut": 0.02 },
   { "t": 15.98, "file": "trailer/music/bed_creak.wav", "gain": 0.35, "pan": 0.2 },
 
-  { "t": 16.15, "file": "trailer/music/run_steps_chase.wav", "gain": 0.55, "pan": 0, "dur": 0.85, "fadeOut": 0.05 },
-  { "t": 16.15, "file": "trailer/music/steps_closing.wav", "gain": 0.4, "pan": 0, "dur": 1.4, "fadeOut": 0.1 },
+  { "t": 16.15, "file": "trailer/music/run_steps_chase.wav", "gain": 0.45, "pan": 0, "dur": 0.85, "fadeOut": 0.05 },
+  { "t": 16.15, "file": "trailer/music/steps_closing.wav", "gain": 0.32, "pan": 0, "dur": 1.4, "fadeOut": 0.1 },
   { "t": 16.15, "file": "trailer/music/breath_panic.wav", "src": 0.32, "gain": 0.45, "pan": 0, "dur": 2.0 },
-  { "t": 16.15, "file": "assets/sfx/violin_storm.mp3", "gain": 0.36, "pan": 0, "dur": 2.0 },
-  { "t": 17.3, "file": "assets/sfx/violin_storm.mp3", "src": 1.15, "gain": 0.34, "pan": 0, "dur": 0.85, "fadeIn": 0.85 },
+  { "t": 16.15, "file": "assets/sfx/violin_storm.mp3", "gain": 0.3, "pan": 0, "dur": 2.0 },
+  { "t": 17.3, "file": "assets/sfx/violin_storm.mp3", "src": 1.15, "gain": 0.5, "pan": 0, "dur": 0.85, "fadeIn": 0.85 },
   { "t": 17.3, "file": "trailer/music/cam_handling.wav", "gain": 0.45, "pan": 0 },
   { "t": 17.64, "file": "assets/sfx/scare_bang.mp3", "gain": 0.2, "pan": 0, "drive": 2, "hp": 150, "dur": 0.4, "fadeOut": 0.15 },
   { "t": 17.66, "file": "trailer/music/gasp.wav", "gain": 0.55, "pan": 0 },
+  { "t": 18.0, "file": "trailer/music/gasp.wav", "gain": 0.5, "pan": 0 },
 
   { "t": 18.75, "file": "assets/sfx/violin_stab.mp3", "gain": 1.4, "pan": 0, "dur": 0.27, "fadeOut": 0.02 },
   { "t": 19.0, "file": "assets/sfx/violin_stab.mp3", "src": 0.25, "gain": 0.7, "pan": 0, "dur": 0.39, "fadeIn": 0.02, "fadeOut": 0.03 },
@@ -65,7 +66,7 @@
   { "t": 19.48, "file": "assets/sfx/night_brown_noise.mp3", "src": 5, "gain": 0.3, "lp": 600, "pan": 0, "dur": 0.57, "fadeIn": 0.01, "fadeOut": 0.02 },
   { "t": 19.48, "file": "trailer/music/zoom_motor.wav", "gain": 0.05, "lp": 2500, "pan": 0, "dur": 0.57, "fadeIn": 0.05, "fadeOut": 0.02 },
 
-  { "t": 20.07, "file": "trailer/music/box_note.wav", "gain": 0.5, "pan": 0 },
+  { "t": 20.07, "file": "trailer/music/box_note.wav", "gain": 0.2, "pan": 0 },
 
   { "t": 21.45, "file": "assets/sfx/night_brown_noise.mp3", "gain": 0.15, "pan": 0, "dur": 0.8, "fadeIn": 0.05 },
   { "t": 21.75, "file": "trailer/music/bed_creak.wav", "gain": 0.4, "pan": 0 }

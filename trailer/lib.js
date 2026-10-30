@@ -68,6 +68,8 @@ const CSS = `
   -webkit-text-stroke: 0.09em #000; }
 .tr-portrait #tr-cards .line { font-family: 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif; font-weight: 700; color: #fff; letter-spacing: 0; line-height: 1.25; margin-top: 2.2vh;
   -webkit-text-stroke: 0.08em #000; paint-order: stroke fill; }
+/* what it is, smaller, over the call to action: someone who was just scared needs to know it is a game they can play */
+.tr-portrait #tr-cards .line .kick { display: block; font-size: 0.6em; color: #d9d3c6; margin-bottom: 0.25em; }
 `;
 
 // ---------- the camcorder's on-screen text: a 5x7 dot font like the chip in a 2004 camcorder draws, so no font file is involved ----------
@@ -121,7 +123,7 @@ function quiltFabric(W, H) {
 }
 // the slit the kid holds open to film through: the blanket hangs in a wavy edge across the top, the ridge over the chest crosses below it,
 // and the two meet in a point on the left. Neither edge is smooth: cloth folds and bunches. lift raises the ridge (the chest breathing)
-const slitTop = (x, W, H) => H * (0.215 + 0.022 * Math.sin(x / W * 5.1 + 1.2) + 0.011 * Math.sin(x / W * 13 + 0.4) + 0.05 * Math.exp(-((((x / W) - 0.86) / 0.07) ** 2)));   // (a fold hangs lower on the right)
+const slitTop = (x, W, H) => H * (0.215 + 0.022 * Math.sin(x / W * 5.1 + 1.2) + 0.011 * Math.sin(x / W * 13 + 0.4) + 0.03 * Math.exp(-((((x / W) - 0.86) / 0.06) ** 2)));   // (a fold hangs lower on the right)
 const slitBot = (x, W, H, o) => H * (0.5 + 0.02 * Math.sin(x / W * 6.3 + 0.5) + 0.01 * Math.sin(x / W * 15 + 1.7) - (o.lift || 0));
 const SLIT_TIP = [0.12, 0.39];
 function quiltGap(g, W, H, o) {
@@ -230,7 +232,7 @@ function overlayApi(portrait) {
   const big = cards.querySelector('.big'), small = cards.querySelector('.small'), line = cards.querySelector('.line'), kid = cards.querySelector('.kid'), capText = cap.firstElementChild;
   // sizes in px from the viewport (so a 360-wide preview and a 1080-wide render look the same)
   const px = (f) => Math.round((portrait ? W() : H()) * f) + 'px';
-  big.style.fontSize = px(portrait ? 0.13 : 0.19); big.style.letterSpacing = px(0.012); small.style.fontSize = px(portrait ? 0.028 : 0.032); line.style.fontSize = px(portrait ? 0.072 : 0.07);
+  big.style.fontSize = px(portrait ? 0.13 : 0.19); big.style.letterSpacing = px(0.012); small.style.fontSize = px(portrait ? 0.028 : 0.032); line.style.fontSize = px(portrait ? 0.084 : 0.07);
   const capSize = px(portrait ? 0.064 : 0.047), kidCapSize = px(0.074);
   capText.style.fontSize = capSize; if (!portrait) cap.style.paddingBottom = Math.round(H() * 0.12) + 'px';
   cam.style.filter = `blur(${(W() / 900).toFixed(2)}px)`;
