@@ -184,6 +184,6 @@ above, truthfully:
 - Sex and nudity, drugs, alcohol, gambling, user-generated content, in-game purchases, user interaction, location sharing: none.
 
 Expected outcome is in the Teen / PEGI 16 range because of the horror intensity rather than any explicit content; do not state a
-rating on the page until the questionnaire has returned one. Mark at least four of the eight screenshots as suitable for all ages:
-02 (your room), 03 (the drawing), 06 (breakfast) and 08 (the TV, with a man's back to you) have no creature in frame and are the
-safe choices; 01, 04, 05 and 07 show the thing and can stay mature-only if the review asks.
+rating on the page until the questionnaire has returned one. Upload seven screenshots (07, the closet, is too dark at thumbnail size)
+and mark at least four as suitable for all ages: 02 (your room), 03 (the drawing), 06 (breakfast) and 08 (the TV, with a man's back to
+you) have no creature in frame and are the safe choices; 01, 04 and 05 show the thing and can stay mature-only if the review asks.

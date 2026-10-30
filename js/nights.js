@@ -102,6 +102,7 @@ export function createNights(env) {
     blackout(on) { F.blackout = on; env.nlMult(on ? 0 : 1, false); },
     startHunt, visibleNodes, objective: (t) => UI.objective(t),
     fired: (id) => proofFire(id),
+    dropped: () => { if (F.plan && F.plan.n === pr.n) { pr.kinds = proofKinds(F.plan); proofLine(); } },
   };
   let tvHeld = false;
   D.holdTv = (v) => { tvHeld = v; };
@@ -208,11 +209,12 @@ export function createNights(env) {
   const found = () => (env.RUN.evidence ||= []), foundAt = () => (env.RUN.evidenceAt ||= {});
   const isFound = (k) => found().includes(k);
   const pr = { n: 0, kinds: [], pending: new Map(), shown: new Set(), its: {}, hud: false };
-  // what a night can leave: its type's kinds and its events' (the vigil stops the events, and the drive ends the night soon after it starts)
+  // what a night can leave: its type's kinds and its events' (the vigil stops the events, and the drive ends the night soon after it starts;
+  // an event the director gave up on leaves nothing, so it drops out of the total)
   function proofKinds(plan) {
     if (!plan || plan.n < 2 || plan.n > 9) return [];
     const src = new Set([plan.type]);
-    if (plan.type !== 'vigil') for (const e of plan.events) if (plan.type !== 'car' || e.t < plan.clock0 + 10) src.add(e.id);
+    if (plan.type !== 'vigil') for (const e of plan.events) if (!e.dropped && (plan.type !== 'car' || e.t < plan.clock0 + 10)) src.add(e.id);
     return Object.keys(PROOF).filter((k) => PROOF[k].from.some((s) => src.has(s)) && (!isFound(k) || foundAt()[k] === plan.n));
   }
   // the house goes back to how it was, apart from what you found that stays (claw marks do not wash off)

@@ -6,6 +6,7 @@
 //   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)     D.sub(html, dur)
 //   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerNode()  D.playerRoom()
 //   D.fired(id)                      told after each event has run (some events leave proof behind, see nights.js)
+//   D.dropped(id)                    told when an event is given up on (its ok() never passed) or failed: its proof can no longer turn up
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
 import { NODES, nearestNode, dist as navDist } from './nav.js';
 
@@ -121,9 +122,9 @@ export function createDirector(D) {
         if (ev.done || c < ev.t) continue;
         if (busy || D.hunter.state === 'hunt' || D.hunter.state === 'loom') continue;
         const def = EVENTS[ev.id];
-        if (def.ok && !def.ok(D)) { if (c > ev.t + 40) ev.done = true; continue; }
+        if (def.ok && !def.ok(D)) { if (c > ev.t + 40) { ev.done = ev.dropped = true; if (D.dropped) D.dropped(ev.id); } continue; }
         ev.done = true;
-        try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); }   // (no proof for an event that never happened)
+        try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // (no proof for an event that never happened)
       }
     },
   };

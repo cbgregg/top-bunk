@@ -10,7 +10,7 @@
       { "out": [113, 139], "src": 113, "rate": 1, "lp": 500, "vib": 0.1, "gain": 0.16, "fadeIn": 1.5, "fadeOut": 9 }
     ],
     "mute": [[108, 110]],
-    "duck": { "gain": 0.4, "ramp": 0.3 }
+    "duck": { "gain": 0.3, "ramp": 0.3 }
   },
   "portrait": {
     "_comment": "The song comes in after the rewind, on the first daylight shot; it warps through the TV, cuts out when the set switches itself off, and comes back slower from beyond the door until the latch shuts it out. From there it is room tone, a held breath, a hinge, the heartbeat and the run, then a hole of tape hiss before the scare, a dropout as the camera hits the floor, and the record again, faint, under the title. It is mono and in a small room throughout, as the camcorder's mic would hear it in the house. loudness/truePeak: the finished mix is set to this integrated loudness (LUFS) under this ceiling (dBTP), where Shorts, Reels and TikTok play it.",

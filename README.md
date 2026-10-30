@@ -87,7 +87,7 @@ Performance work (so it runs well on ordinary laptops and phones): the house's s
 
 | Part | Source |
 |---|---|
-| Surfaces: floors, walls, siding, roof, grass, tile, counters | PBR materials from Poly Haven and ambientCG (CC0), packed by `tools/assets/fetch_pbr.py` into `assets/pbr/` |
+| Surfaces: floors, walls, siding, roof, grass, tile | PBR materials from Poly Haven and ambientCG (CC0), packed by `tools/assets/fetch_pbr.py` into `assets/pbr/` |
 | Sky and ambient light | Poly Haven HDRIs (CC0), `tools/assets/fetch_sky.py` into `assets/sky/` |
 | Furniture, plants, a tree, rocks, grass | Poly Haven models (CC0), compressed by `tools/assets/fetch_models.py` into `assets/props/` |
 | Kitchen, bathroom, windows, house | built in code (`js/world.js`) |

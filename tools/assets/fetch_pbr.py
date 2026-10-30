@@ -33,7 +33,6 @@ SETS = {
     'wall':     ('acg', 'PaintedPlaster017', 1024, 1.8),
     'grass':    ('acg', 'Grass004', 1024, 2.0),
     'tile':     ('acg', 'Tiles105', 512, 0.9),
-    'counter':  ('ph', 'terrazzo_tiles', 512, None),
     'carpet':   ('acg', 'Carpet012', 512, 0.8),
     'panel':    ('ph', 'coated_pine', 512, 0.6),
 }
