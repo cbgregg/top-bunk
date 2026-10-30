@@ -49,10 +49,10 @@ export const list = () => ACHIEVEMENTS.map((a) => ({ ...a, unlocked: !!got[a.id]
 export const stat = (k) => +stats[k] || 0;
 export function count(k, by = 1) { stats[k] = stat(k) + by; write(STATS, stats); return stats[k]; }
 
-// the run in progress (by its seed): which nights were survived, and which you were caught on
+// the run in progress: which nights were survived, and which you were caught on. a replayed seed starts a fresh record
 function run() {
-  const seed = G.RUN && G.RUN.seed;
-  if (!stats.run || stats.run.seed !== seed) stats.run = { seed, died: [], survived: [] };
+  const seed = G.RUN && G.RUN.seed, started = G.RUN && G.RUN.started;
+  if (!stats.run || stats.run.seed !== seed || stats.run.started !== started) stats.run = { seed, started, died: [], survived: [] };
   return stats.run;
 }
 // dawn of night n (nights.js)

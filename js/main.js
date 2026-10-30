@@ -4,7 +4,7 @@ import { buildWorld, roomAt } from './world.js';
 import { Entity } from './entity.js';
 import { Sound } from './audio.js';
 import { makePerson } from './people.js';
-import { Gfx, QUALITY } from './gfx.js';
+import { Gfx } from './gfx.js';
 import { WindowFace } from './windowface.js';
 import { Dust } from './dust.js';
 import * as UI from './ui.js';
@@ -66,12 +66,9 @@ const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#
 mom.group.position.set(0.6, 0, 1.6); dad.group.position.set(4.3, 0, -13.4);   // where the day starts them
 scene.add(mom.group, dad.group);
 
-// the graphics preset is saved here with the rest (gfx's own copy in localStorage is only read when none is passed in)
-const savedQuality = store.get('topbunk.quality');
-const gfx = new Gfx(renderer, scene, camera, { quality: Object.hasOwn(QUALITY, savedQuality) ? savedQuality : null });
+const gfx = new Gfx(renderer, scene, camera);
 const dust = new Dust(scene, camera);
-function setGraphics(v) { gfx.setMode(v); if (gfx.auto) store.remove('topbunk.quality'); else store.set('topbunk.quality', gfx.quality); }
-settings.delegate('quality', { get: () => gfx.mode, set: setGraphics, def: 'auto' });   // (the options menu's Graphics row)
+settings.delegate('quality', { get: () => gfx.mode, set: (v) => gfx.setMode(v), def: 'auto' });   // (the options menu's Graphics row)
 const BATH_I = 95;
 // the flashlight: a spot light carried on the camera (see toggleLight)
 const flash = new THREE.SpotLight(0xfff1d2, 0, 15, 0.5, 0.55, 1.2);
@@ -1307,7 +1304,7 @@ UI.makeGrain();
 // the title, pause, options and end menus (js/menu.js opens them when the #title / #pause / #end screens show)
 function newRun(seed) {   // New game: a run from moving day on the seed it was given (or a fresh one); a saved run is lost
   store.remove('topbunk.run');
-  Object.assign(RUN, { seed: seed || newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();
 }

@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { store } from './store.js';
 
 export const QUALITY = {
   ultra:  { dpr: 2,    msaa: 4, ao: { samples: 16, radius: 0.55, res: 0.7 }, bloom: 0.45, grade: true,  sun: 4096, spot: 2048 },
@@ -51,7 +52,7 @@ const GradeShader = {
 export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
-    let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* ignore */ }
+    const saved = store.get(KEY), q = quality || saved;
     this.autoQuality = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high';   // phones start lighter
     this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
@@ -148,14 +149,14 @@ export class Gfx {
   setQuality(q, { save = true } = {}) {
     if (!QUALITY[q] || q === this.quality) return;
     this.quality = q; this.build();
-    if (save) try { localStorage.setItem(KEY, q); this.auto = false; } catch (e) { /* ignore */ }
+    if (save) { store.set(KEY, q); this.auto = false; }
     this.slow = 0; if (this.onChange) this.onChange(q);
   }
   // the options menu's setting: 'auto' (a preset picked for the device, stepped down when frames are slow) or a preset kept as chosen
   get mode() { return this.auto ? 'auto' : this.quality; }
   setMode(m) {
-    if (m === 'auto') { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } this.auto = true; this.age = 0; this.setQuality(this.autoQuality, { save: false }); }
-    else if (QUALITY[m]) { this.setQuality(m, { save: false }); this.auto = false; try { localStorage.setItem(KEY, m); } catch (e) { /* ignore */ } }
+    if (m === 'auto') { store.remove(KEY); this.auto = true; this.age = 0; this.setQuality(this.autoQuality, { save: false }); }
+    else if (QUALITY[m]) { this.setQuality(m, { save: false }); this.auto = false; store.set(KEY, m); }
   }
 
   // dynamic resolution: render at a lower pixel ratio when frames are slow, and creep back up when there is headroom
