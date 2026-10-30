@@ -58,7 +58,8 @@ These are estimates. The game hasn't been timed on any of the hardware named bel
 
 The desktop build is the web game inside Electron 45 (Chromium), so it needs what Chromium needs to run WebGL 2. The OS lines are
 Electron 45's floor: Windows 10, macOS 13 Ventura (the app's Info.plist asks for 13.0), and Linux distributions that are still
-maintained. The macOS app is one universal bundle with Intel and Apple silicon code, so it doesn't need Rosetta. The CPU and GPU lines
+maintained. The macOS app is one universal bundle with Intel and Apple silicon code, so it doesn't need Rosetta; CI checks that both
+are in the bundle, but it hasn't been run on a Mac of either kind yet. The CPU and GPU lines
 are guesses from the presets: Low turns off ambient occlusion, bloom, colour grading and anti-aliasing and uses smaller shadow maps,
 and High and Ultra turn them all on. The storage lines are the unpacked build plus room to spare (the Linux build is about 320 MB, the
 universal macOS app about 530 MB). Steamworks has one block per OS; the lines are the same except where noted.
@@ -128,7 +129,7 @@ ElevenLabs and are shipped as fixed audio files. No content is generated at runt
 | Keyboard and mouse | Full | WASD / arrows, mouse look, E, Shift, Space, F, Esc |
 | Game controller | **Partial** (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads should work when Steam presents them as XInput, but none has been tried. The menus take d-pad and A / B in code, but not every screen has been played through on a pad yet. |
 | Touch | Web build only | Not relevant to the Steam build |
-| Steam Cloud | Once Auto-Cloud is configured | One saved run plus settings and achievements, kept as files in the app's user-data folder. Set up Auto-Cloud for that folder in Steamworks (Application → Steam Cloud). |
+| Steam Cloud | Once Auto-Cloud is configured | One saved run plus settings and achievements. The desktop build keeps them as small JSON files in a `saves` folder; `STEAM.md` has the folder for each OS and the Auto-Cloud root paths to enter under Steamworks → Application → Steam Cloud. |
 | Steam Deck | Untested | Expect *Playable* at best until the Linux build has been tried on a Deck |
 
 Store Page → Basic Info → Supported Features: tick *Single-player* and *Partial Controller Support*. Switch to *Full Controller
@@ -143,9 +144,9 @@ icons exist.
 | --- | --- | --- | --- |
 | English | yes | no | yes |
 
-English only. Every line is subtitled, but only some are voiced: Mom and Dad on moving day and for most of the first two mornings.
-Their other lines, and grandpa's, play as a wordless murmur under the subtitle, and the kid's lines are text only. Leave *Full audio*
-unticked until every line in `assets/audio/lines.json` has a recording in `assets/audio/vo/`.
+English only. Every line is subtitled, but most lines aren't voiced. Only Mom and Dad on moving day and for most of the first two
+mornings have recordings. Their other lines, and grandpa's, play as a wordless murmur under the subtitle, and the kid's lines are text
+only. Leave *Full audio* unticked until every line in `assets/audio/lines.json` has a recording in `assets/audio/vo/`.
 
 ## Tags
 
