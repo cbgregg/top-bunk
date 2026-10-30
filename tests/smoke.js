@@ -364,7 +364,9 @@ let BASE = '';
         ok(t.h1 && t.items.length >= 4 && t.items.every(([, i]) => i) && t.overflowX <= 0, `title does not fit ${t.vw}x${t.vh}: ${JSON.stringify(t)}`);
         ok(t.items.every(([, , h]) => h >= 30), `title entries smaller than a thumb: ${JSON.stringify(t.items)}`);
         ok(t.buttons.length === 6, `touch buttons: ${t.buttons}`);
-        await page.tap('#title-menu [data-entry="new"]');
+        await page.tap('#title-menu [data-entry="new"]');   // New game opens its panel (the seed), and Start begins the run
+        await until(page, () => window.__game.menu.state.open.join() === 'title,newgame', null, 10e3);
+        await page.tap('#menu [data-entry="start"]');
         await until(page, () => document.getElementById('title').classList.contains('hidden') && window.__game.F.stage === 'day', null, 120e3);
         const b = await page.evaluate(() => {
           const vw = innerWidth, vh = innerHeight, vis = getComputedStyle(document.getElementById('touch')).visibility;
@@ -378,7 +380,7 @@ let BASE = '';
         const pz = await page.evaluate(() => { const vh = innerHeight, items = [...document.querySelectorAll('#pause-menu .mi')]; return { paused: !document.getElementById('pause').classList.contains('hidden'), n: items.length, fit: items.every((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= vh + 1; }) }; });
         ok(pz.paused && pz.n >= 5 && pz.fit, `pause on a phone: ${JSON.stringify(pz)}`);
         clean(w);
-        return `844x390 touch: ${t.items.length} title entries on screen (${Math.min(...t.items.map(([, , h]) => h))} px or taller), "Tap to begin"; New game by tap starts the day; USE, RUN, LIGHT and II on screen; II pauses and the ${pz.n}-entry pause menu fits`;
+        return `844x390 touch: ${t.items.length} title entries on screen (${Math.min(...t.items.map(([, , h]) => h))} px or taller), "Tap to begin"; New game then Start by tap starts the day; USE, RUN, LIGHT and II on screen; II pauses and the ${pz.n}-entry pause menu fits`;
       } finally { await pctx.close(); }
     });
 

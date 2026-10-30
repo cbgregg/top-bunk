@@ -131,6 +131,20 @@ export class Gfx {
     if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
   }
 
+  // the colour a grey surface of linear value v ends up on screen at night with exposure e, taken through the same steps as the picture:
+  // ACES filmic, sRGB, then the grade's night terms (GradeShader at night = 1) when this preset grades. The brightness calibration draws with it.
+  shade(v, e) {
+    const x = v * e / 0.6, t = THREE.MathUtils.clamp((x * (x + 0.0245786) - 0.000090537) / (x * (0.983729 * x + 0.432951) + 0.238081), 0, 1);
+    const l = t <= 0.0031308 ? t * 12.92 : 1.055 * t ** (1 / 2.4) - 0.055;
+    let c = [l, l, l];
+    if (this.pass.grade) {
+      const k = 0.72 * (1 - THREE.MathUtils.smoothstep(l, 0.04, 0.36)), con = this.pass.grade.uniforms.contrast.value;
+      const dark = [0.5, 0.82, 1.5], cast = [0.7, 0.84, 1.12], lift = [0.4, 0.7, 1.3];
+      c = c.map((y, i) => ((y + (y * dark[i] - y) * k) * (1 + (cast[i] - 1) * 0.65) * 0.86 + 0.016 * lift[i] - 0.5) * con + 0.5);
+    }
+    return c.map((y) => Math.round(THREE.MathUtils.clamp(y, 0, 1) * 255));
+  }
+
   setQuality(q, { save = true } = {}) {
     if (!QUALITY[q] || q === this.quality) return;
     this.quality = q; this.build();

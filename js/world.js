@@ -31,6 +31,27 @@ export function roomAt(x, z) {
   return 'out';
 }
 
+// The TV model's texture (assets/props/tv.glb) carries an existing maker's badge, on the front panel and down the side. Each is painted over with
+// the median colour of its own patch (the plate or plastic around the lettering), in the colour map and in the roughness/metalness map,
+// where the lettering would otherwise still show in a highlight.
+const TV_BADGES = [[381, 711, 95, 19], [511, 750, 26, 98]];   // x, y, w, h on the 1024 px texture
+function plainTv(holder) {
+  holder.traverse((o) => {
+    const m = o.isMesh && o.material; if (!m) return;
+    for (const t of new Set([m.map, m.roughnessMap, m.metalnessMap])) {
+      const img = t && t.image; if (!img || !img.width || t.userData.plain) continue;
+      const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+      const g = cv.getContext('2d', { willReadFrequently: true }), k = img.width / 1024; g.drawImage(img, 0, 0);
+      for (const r of TV_BADGES) {
+        const [x, y, w, h] = r.map((v) => Math.round(v * k)), d = g.getImageData(x, y, w, h).data, ch = [[], [], []];
+        for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 3; c++) ch[c].push(d[i + c]);
+        g.fillStyle = `rgb(${ch.map((a) => a.sort((p, q) => p - q)[a.length >> 1]).join(',')})`; g.fillRect(x, y, w, h);
+      }
+      t.image = cv; t.needsUpdate = true; t.userData.plain = true;
+    }
+  });
+}
+
 // UVs in world meters, chosen by face normal. Texture.repeat sets the tile size.
 function worldUV(geo) {
   const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
@@ -770,7 +791,7 @@ export function buildWorld(scene) {
   });
   // living room
   prop('table', { x: 2.9, z: -3.2, rot: -PI / 2 }, { tag: 'tv', old: [cTv], box: [2.45, 3.25, -3.95, -2.45] });
-  prop('tv', { x: 2.95, y: 0.55, z: -3.2, rot: -PI / 2 });
+  const tvSet = prop('tv', { x: 2.95, y: 0.55, z: -3.2, rot: -PI / 2 }, { after: () => plainTv(tvSet) });
   prop('sofa', { x: -2.6, z: -2.4, rot: PI / 2 }, { tag: 'couch', old: [cCouch], box: [-3.05, -2.15, -3.3, -1.5] });
   prop('table', { x: -1.2, z: -3.0, rot: PI / 2 }, { tag: 'coffee', old: [cCoffee], box: [-1.6, -0.8, -3.9, -2.1] });   // (pushed toward the front wall so there is a lane behind it through the living room)
   prop('armchair', { x: -2.55, z: -4.05, rot: 0 }, { box: [-2.98, -2.12, -4.42, -3.66] });   // front-left corner, clear of the picture window and of the lane through the living room

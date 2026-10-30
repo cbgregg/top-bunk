@@ -1,8 +1,9 @@
 // Player settings, kept in localStorage ('topbunk.settings') and applied live: each module subscribes to the keys it cares
 // about with settings.on(key, fn). A setting another module owns (graphics quality lives in gfx) is reached through a delegate.
 const KEY = 'topbunk.settings';
-export const DEFAULTS = { master: 0.85, music: 1, sfx: 1, voice: 1, sensitivity: 1, invertY: false, fov: 75, headBob: true, subtitles: true, reduceFlashing: false };
-export const RANGES = { master: [0, 1], music: [0, 1], sfx: [0, 1], voice: [0, 1], sensitivity: [0.3, 3], fov: [60, 100] };
+// brightness is in stops: the scene's exposure is multiplied by 2 ** brightness (0 leaves it as designed)
+export const DEFAULTS = { master: 0.85, music: 1, sfx: 1, voice: 1, sensitivity: 1, invertY: false, fov: 75, brightness: 0, headBob: true, subtitles: true, reduceFlashing: false };
+export const RANGES = { master: [0, 1], music: [0, 1], sfx: [0, 1], voice: [0, 1], sensitivity: [0.3, 3], fov: [60, 100], brightness: [-1, 1] };
 const data = { ...DEFAULTS }, subs = {}, delegates = {};
 
 const clean = (k, v) => {

@@ -43,7 +43,7 @@
       <p id="mobile" class="note">Keyboard and mouse, a game controller, or touch. Landscape works best on a phone.</p>
     </div>
   </div>
-  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><nav id="pause-menu" class="menu" aria-label="Pause menu"></nav><p class="begin" id="resume">Click to resume</p></div></div>
+  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><nav id="pause-menu" class="menu" aria-label="Pause menu"></nav><p class="begin" id="resume">Click to resume</p><p id="pauseinfo" class="note"></p></div></div>
   <div id="menu" class="screen hidden"></div>
   <!-- hidden: js/menu.js moves the controls table into its Controls panel -->
   <div id="menu-keep" hidden>
@@ -52,9 +52,10 @@
   <div id="death" class="screen hidden"><div class="panel"><h2 class="red">It found you.</h2><button id="retry">Try again</button></div></div>
   <div id="end" class="screen hidden">
     <div class="panel">
-      <h1>TOP BUNK</h1>
+      <h2 id="endtitle"></h2>
       <p class="tag" id="endtag"></p>
-      <button id="again">Play again</button>
+      <nav id="end-menu" class="menu" aria-label="End menu"></nav>
+      <p id="endinfo" class="note"></p>
     </div>
   </div>
   <div id="loading">Unpacking…</div>

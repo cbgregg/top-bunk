@@ -43,6 +43,11 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 $('game').appendChild(renderer.domElement);
 const canvas = renderer.domElement;
+// each phase's exposure (setPhase), times the brightness setting's 2 ** brightness, which only the 3D picture sees
+const EXPOSURE = { day: 0.8, night: 1, morning: 0.85 };
+let exposure = EXPOSURE.night;
+function setExposure(e = exposure) { exposure = e; renderer.toneMappingExposure = e * 2 ** settings.get('brightness'); }
+settings.on('brightness', () => setExposure());
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.03, 700);
@@ -138,9 +143,14 @@ document.addEventListener('mousemove', (e) => {
   if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car')) return;
   P.yaw -= e.movementX * 0.0022 * look.s; P.pitch = clamp(P.pitch - e.movementY * 0.0022 * look.s * look.y, -1.45, 1.45);
 });
+// the pause menu says where you are and the run's seed, so it can be shared or played again
+function pauseInfo() {
+  const s = F.stage, n = s.slice(1);
+  $('pauseinfo').textContent = `${s === 'day' ? 'Moving day' : s[0] === 'b' ? `Morning ${n}` : `Night ${n} of 10`}  ·  seed ${RUN.seed}`;
+}
 // pause / resume without the mouse (controller Start, the touch pause button)
 function setPause(on) {
-  if (on && uiMode === 'playing') { uiMode = 'pause'; paused = true; UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; if (document.pointerLockElement) document.exitPointerLock(); }
+  if (on && uiMode === 'playing') { uiMode = 'pause'; paused = true; pauseInfo(); UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; if (document.pointerLockElement) document.exitPointerLock(); }
   else if (!on && uiMode === 'pause') { uiMode = 'playing'; paused = false; UI.hide('pause'); sfx.resume(); if (input.scheme === 'kb') lock(); }
 }
 // the A button on a menu screen is a click on its button
@@ -161,14 +171,13 @@ function lock() { try { const p = canvas.requestPointerLock(); if (p && p.catch)
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
   if (locked && uiMode === 'pause') { uiMode = 'playing'; paused = false; UI.hide('pause'); sfx.resume(); }
-  else if (!locked && uiMode === 'playing') { uiMode = 'pause'; paused = true; UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; }
+  else if (!locked && uiMode === 'playing') { uiMode = 'pause'; paused = true; pauseInfo(); UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; }
 });
 $('pause').addEventListener('click', () => { lock(); setTimeout(() => { if (uiMode === 'pause' && document.pointerLockElement !== canvas) setPause(false); }, 200); });
 canvas.addEventListener('click', () => { if (uiMode === 'playing' && input.scheme === 'kb' && document.pointerLockElement !== canvas) lock(); });   // (a resume the browser refused to lock: click to take the mouse back)
 $('title').addEventListener('click', startGame);
 $('start').addEventListener('click', (e) => { e.stopPropagation(); startGame(); });
 $('retry').addEventListener('click', retry);
-$('again').addEventListener('click', () => location.reload());
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); gfx.resize(); });
 
 // two of the director's night events (director.js): a car goes by out front and its light slides through the windows, and something huge
@@ -229,7 +238,7 @@ function setPhase(p, silent = false) {
   W.bathSpot.intensity = 0;
   W.frontDoor.setOpen(day);
   W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
-  renderer.toneMappingExposure = day ? 0.8 : night ? 1.0 : 0.85;
+  setExposure(EXPOSURE[day ? 'day' : night ? 'night' : 'morning']);
   if (p === 'night') sleepers(true); else { sleepers(false); mom.group.visible = dad.group.visible = day; }
   if (sfx.ctx && !silent) {
     sfx.wind(day ? 0.035 : night ? 0.06 : 0.025, 2);
@@ -1120,7 +1129,7 @@ async function finaleGruesome() {
   await takeThem(dad); await wait(0.6); await takeThem(mom);
   UI.flash('rgba(120,0,0,0.9)', 1.2); shake = 1.2; E.visible = false; sfx.drone(0, 1); sfx.tension(0, 1);
   await wait(1.2);
-  await endGame('They saw it.<br>Then it had them.'); achievements.ending('ENDING_TAKEN');
+  await endGame('ENDING_TAKEN');
   return true;
 }
 async function finaleNeverBelieved() {
@@ -1128,15 +1137,13 @@ async function finaleNeverBelieved() {
   E.visible = true; E.mode = 'idle'; E.root.position.set(6.4, 0, 1.6); E.faceTowards(6.03, 3.02);
   E.reach = 0.5; E.smileScale = 1.6; E.tilt = 0.4; sfx.stab(); shake = 1; await wait(2);
   sfx.scream(); UI.flash('rgba(255,255,255,0.6)', 0.4); await wait(1.5);
-  await endGame('They never believed you.'); achievements.ending('ENDING_ALONE');
+  await endGame('ENDING_ALONE');
 }
-// the game is over: the ending's line goes on the end screen, and the run is cleared
-async function endGame(line) {
+// the night ends badly: the picture goes black and the end screen comes up
+async function endGame(id) {
   F.over = true; F.cutscene = true; F.script = true; F.live = false; UI.objective(null); UI.hint(null); UI.prompt(null); UI.clock(null);
   UI.fade(1, 2.5); await wait(3);
-  $('endtag').innerHTML = line;
-  uiMode = 'end'; document.exitPointerLock(); UI.show('end');
-  try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
+  endScreen(id);
 }
 
 // after the last night they take you away from the house
@@ -1145,8 +1152,20 @@ async function endingScript() {
   await carLeaving();
   UI.card('7:12 AM', 'They believed you', 4.5);
   await wait(5);
-  $('endtag').innerHTML = 'They believed you.<br>Nobody went back for the rest of your things.';
-  uiMode = 'end'; document.exitPointerLock(); UI.show('end'); achievements.ending('ENDING_BELIEVED');
+  endScreen('ENDING_BELIEVED');
+}
+
+// the end screen: each ending's own title and closing line, the seed and the proof found; the run is cleared
+const ENDINGS = {
+  ENDING_ALONE: ['They never believed you.', 'Their door stayed shut. By morning the top bunk was empty.'],
+  ENDING_TAKEN: ['They saw it.', 'Then it had them. The farmhouse is up for rent again.'],
+  ENDING_BELIEVED: ['They believed you.', 'Nobody went back for the rest of your things.'],
+};
+function endScreen(id) {
+  const [title, line] = ENDINGS[id];
+  $('endtitle').textContent = title; $('endtitle').classList.toggle('red', id !== 'ENDING_BELIEVED'); $('endtag').textContent = line;
+  $('endinfo').textContent = `Seed ${RUN.seed}  ·  proof ${proofCount()} / ${nights.proof.total}`;
+  uiMode = 'end'; document.exitPointerLock(); UI.show('end'); achievements.ending(id);
   try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
 }
 
@@ -1281,10 +1300,10 @@ UI.makeGrain();
 {   // the title screen shows which run you are on
   $('runinfo').textContent = hasRun() ? `Continue: night ${Math.min(RUN.night, 10)} of 10  ·  seed ${RUN.seed}` : `Seed ${RUN.seed}`;
 }
-// the title, pause and options menus (js/menu.js opens them when the #title / #pause screens show)
-function newRun() {   // New game over a saved run: a fresh seed from the first day
+// the title, pause, options and end menus (js/menu.js opens them when the #title / #pause / #end screens show)
+function newRun(seed) {   // New game: a run from moving day on the seed it was given (or a fresh one); a saved run is lost
   try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
-  Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: seed || newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();
 }
@@ -1296,7 +1315,12 @@ menu.init({
   resume: () => setPause(false), pause: () => setPause(true), canPause: () => uiMode === 'playing',
   stage: () => F.stage, canRestart: () => !F.over, restartNight: restartStage,
   quitToTitle: () => location.reload(),   // (the run is saved at each dawn and when moving day is over)
+  nextSeed: () => (hasRun() ? newSeed() : RUN.seed),   // (no run yet: the seed the title shows)
+  shade: (v) => gfx.shade(v, EXPOSURE.night * 2 ** settings.get('brightness')),
+  // the end screen's Play again: back to the title with the New game panel open (a fresh page, as Main menu gives)
+  playAgain: () => { try { sessionStorage.setItem('topbunk.next', 'new'); } catch (e) { /* ignore */ } location.reload(); },
 });
+try { if (sessionStorage.getItem('topbunk.next') === 'new') { sessionStorage.removeItem('topbunk.next'); menu.newGame(); } } catch (e) { /* ignore */ }
 titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');

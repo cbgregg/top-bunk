@@ -160,6 +160,18 @@ body:has(.screen:not(.hidden)) #touch { visibility: hidden; }   /* the touch but
 .menu-body .note { margin-top: 14px; }
 #pause .menu { margin-top: 4px; }
 #pause .begin { font-size: 13px; letter-spacing: 2px; color: var(--dim); margin: 6px 0 0; }
+#pauseinfo, #endinfo { letter-spacing: 2px; }
+/* the seed field (New game): typed into, or stepped through a character at a time on a controller */
+.mi .mcode { width: 7.6em; padding: 2px 4px; font: inherit; letter-spacing: 2px; text-align: center; text-transform: uppercase; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid rgba(233,226,208,0.35); border-radius: 0; outline: none; caret-color: var(--red); user-select: text; -webkit-user-select: text; }
+.mi .mcode::placeholder { color: var(--dim); opacity: 1; }
+.mi .mcode:focus { border-bottom-color: var(--ink); background: rgba(233,226,208,0.07); }
+.mi .mcode::selection { background: var(--red); color: #fff; }
+/* the brightness calibration under its slider: three greys on black, as the night scene would show them */
+.menu .mfig { display: flex; gap: 14px; align-self: center; margin: 2px 0 6px; padding: 10px 16px; background: #000; border: 1px solid rgba(233,226,208,0.14); }
+.menu .mfig i { display: block; width: 38px; height: 38px; }
+/* the end screen: the ending's title and closing line, then its menu */
+#end h2 { font-size: clamp(34px, 6vw, 60px); letter-spacing: 3px; margin: 0 0 6px; }
+#end .tag { max-width: 34em; margin: 6px auto 24px; }
 /* reduced flashing: the nightmare's colour strobe becomes a slow swell */
 body.reduce-flashing.nightmare #game { animation: dream 4.5s ease-in-out infinite alternate; }
 /* a phone held sideways: everything tighter, and the panels scroll */
@@ -177,6 +189,10 @@ body.reduce-flashing.nightmare #game { animation: dream 4.5s ease-in-out infinit
   .menu-panel .menu .mi { min-height: 36px; font-size: 15px; }
   .menu .mh { margin-top: 8px; }
   .menu-hint { margin-top: 4px; }
+  .menu .mfig { padding: 6px 12px; }
+  .menu .mfig i { width: 26px; height: 26px; }
+  #end h2 { font-size: 30px; }
+  #end .tag { margin-bottom: 10px; }
 }
 
 /* ---------- achievements (js/achievements.js): the unlock card, and the list in the menu ---------- */
