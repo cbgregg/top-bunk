@@ -3,7 +3,7 @@
 // A shot is { id, t, dur, setup(c), update(c, k) } where c is the context below. The camera is set every frame by the shot (c.cam), then the game's
 // own handheld tremor goes on top, so nothing is ever perfectly still. Text cards, captions and fades are DOM injected at runtime.
 import * as THREE from 'three';
-import { V3, EYE_KID, BATH_I, clamp, lerp, ease, mix3, xyz, aim, lerpAngle, wobble, rng, path, makeOverlays, gameHelpers } from './lib.js';
+import { V3, EYE_KID, BATH_I, clamp, lerp, ease, mix3, xyz, aim, lerpAngle, wobble, rng, path, makeOverlays, gameHelpers, plainTv } from './lib.js';
 import { PORTRAIT_SHOTS, PORTRAIT_DURATION } from './shots_portrait.js';
 
 export const LANDSCAPE_DURATION = 139;   // 2:19, the length of the recording the cut is timed to
@@ -61,13 +61,16 @@ export const SHOTS = T([
   { id: 'window_face', dur: 6,
     setup(c) { c.g.night({ lights: 1 }); c.g.windowFace(0.23); c.P.pos.set(6.03, 0, 3.02); },
     update(c, k) { c.WF.t = 0.23 + 0.08 * k; c.cam.pos = [6.3, 2.14, 2.95]; c.cam.look = [8.1, 1.78, 2.85]; c.cam.fov = 50; c.g.fear(0.4); } },   // (the face is driven by hand: it slides into the window and hangs there)
+  // the game's hiding camera sits inside the closet body (the leaves are solid, the slats are the overlay), so this one stands a hand's width
+  // outside the leaves, as store screenshot 07 does, and keeps the thing's head between the slats while it comes in
   { id: 'closet', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.UI.pod('louvers'); c.g.flashlight(true); c.P.pos.set(5.85, 0, 0.04); c.g.thing({ x: 7.3, z: 0.55, face: [6.1, 1.8], mode: 'walk', speed: 0.2, tilt: 0.25, look: false }); c.walkFrom = [7.3, 0, 0.55]; c.walkTo = [6.05, 0, 1.85]; },   // (your torch is on in there: it is the only thing that lights the room through the slats)
+    setup(c) { c.g.night({ lights: 1 }); c.UI.pod('louvers'); c.g.flashlight(true); c.P.pos.set(5.95, 0, 0.52); c.g.thing({ x: 7.45, z: 2.2, face: [6.1, 1.45], mode: 'walk', speed: 0.2, tilt: 0.25, look: false }); c.walkFrom = [7.45, 0, 2.2]; c.walkTo = [6.1, 0, 1.45]; c.head = new V3(); },   // (your torch is on in there: it is what lights its face through the slats)
     update(c, k) {
       const w = clamp((k - 0.08) / 0.6, 0, 1), p = mix3(c.walkFrom, c.walkTo, w); c.E.root.position.copy(p);
       if (w < 1) { c.E.mode = 'walk'; c.E.faceTowards(c.walkTo[0], c.walkTo[2], 1); c.E.lookTarget = null; }
-      else { c.E.mode = 'idle'; c.E.faceTowards(5.85, 0.3, 0.12); c.E.lookTarget = c.camera.position; c.E.tilt = 0.5; c.E.smileScale = 1.1; }
-      c.cam.pos = [5.85, 1.05, 0.04]; c.cam.yaw = Math.PI + 0.1 - 0.25 * ease.inOut(w) + wobble(c.st * 0.5, 2) * 0.02; c.cam.pitch = 0.0; c.cam.fov = 58; c.g.fear(0.6);
+      else { c.E.mode = 'idle'; c.E.faceTowards(5.95, 0.52, 0.12); c.E.lookTarget = c.camera.position; c.E.tilt = 0.5; c.E.smileScale = 1.1; }
+      c.E.headWorld(c.head);
+      c.cam.pos = [5.95, 1.6 + wobble(c.st * 0.5, 2) * 0.01, 0.52]; c.cam.look = [c.head.x, c.head.y - 0.12, c.head.z]; c.cam.fov = 58; c.g.fear(0.6);
     } },
   { id: 'hall_stand', dur: 6,
     setup(c) { c.g.night({ lights: 0.25, spot: BATH_I, flicker: true }); c.g.thing({ x: 1.6, z: -0.9, yaw: Math.PI / 2, tilt: 0 }); c.P.pos.set(6.9, 0, -0.9); },
@@ -87,7 +90,7 @@ export const SHOTS = T([
       c.E.headWorld(c.head);
       c.cam.pos = [c.head.x + lerp(0.95, 0.7, ease.inOut(k)), c.head.y - 0.08, c.head.z + 0.05]; c.cam.look = [c.head.x, c.head.y + 0.02, c.head.z]; c.cam.fov = 36; c.g.fear(1);
     } },
-  { id: 'chase', dur: 8,
+  { id: 'chase', dur: 8, teaser: 2.5,   // (the ten-second teaser: the run, the cut, the scare and the first of the title)
     setup(c) {
       c.g.night({ lights: 0.4, spot: BATH_I * 0.5, flicker: true }); c.g.door('kid', true);
       // the route: from the living room into the hall, down it, through your door and up to the foot of the bunk. The thing runs the same route behind you.
@@ -161,13 +164,14 @@ export function attach(game, opts = {}) {
   function apply() {
     const shot = c.shot; if (!shot) return;
     c.cam.look = null; c.cam.roll = 0; c.cam.sway = portrait ? 1 : 0; c.black = 0;
-    ui.card(null); ui.caption(null); ui.flash(0);   // a shot that wants them asks every frame
+    ui.card(null); ui.caption(null); ui.flash(0); ui.quilt(null);   // a shot that wants them asks every frame
     shot.update(c, c.k);
     const cam = c.cam, P = game.P, F = game.F, pos = xyz(cam.pos);
     P.mode = 'cine'; F.cutscene = true;
     if (cam.look) { const a = aim(pos, cam.look); cam.yaw = a.yaw; cam.pitch = a.pitch; }
     P.cam.set(pos[0], pos[1], pos[2]); P.yaw = cam.yaw; P.pitch = cam.pitch; P.roll = cam.roll || 0;
     game.cam();   // the game places the camera from P and adds its own tremor and shake, and the thing looks at it
+    if (shot.post) shot.post(c);   // (after the game has posed the thing: a shot can still bend a limb for this frame)
     if (cam.sway) {   // the handheld layer: a phone held by a person, never a tripod
       const t = c.t, s = cam.sway * 0.007;
       camera.rotation.y += wobble(t * 1.9, 3) * s + Math.sin(t * 0.31) * 0.012;
@@ -181,10 +185,20 @@ export function attach(game, opts = {}) {
     if (shot.fadeIn && st < shot.fadeIn) blk = Math.max(blk, 1 - st / shot.fadeIn);
     if (shot.fadeOut && st > dur - shot.fadeOut) blk = Math.max(blk, (st - (dur - shot.fadeOut)) / shot.fadeOut);
     ui.black(blk); ui.hideFade();
-    if (!c.subframe) ui.grain((c.rnd() * 14 - 7).toFixed(1), (c.rnd() * 14 - 7).toFixed(1), portrait ? 0.7 : 0.55);   // (grain is per frame, not per exposure)
+    if (!c.subframe) ui.grain((c.rnd() * 14 - 7).toFixed(1), (c.rnd() * 14 - 7).toFixed(1), portrait ? 1 : 0.55);   // (grain is per frame, not per exposure; overlaid in portrait, so it needs the full strength)
     if (portrait) ui.camcorder(shot.camcorder === false ? null : shot.osd ? shot.osd(c) : shot.black ? null : { stamp: shot.stamp || '', blink: Math.floor(c.t * 2) % 2 === 0 });
   }
   game.gfx.render = (dt) => { if (pending) { apply(); pending = false; } origRender(dt); };
+  // one exposure at frame position i (fractional for the extra exposures of a blurred frame); the clock advances by the real gap
+  function step(i, capture, sub) {
+    frameN = i; Math.random = rng(1000003 + i * 7919); c.subframe = sub;
+    const t = i / fps, gap = lastT !== null && t > lastT && t - lastT <= 1 / fps + 1e-9 ? t - lastT : 1 / fps; lastT = t; tick(t);
+    const shot = c.shot, stepMs = gap * 1000, n = Math.max(1, Math.ceil(stepMs / 45)), subMs = stepMs / n, draw = capture && !shot.noRender;
+    for (let s = 0; s < n; s++) { window.__norender = !draw || s < n - 1; window.__pump(subMs); }
+    window.__norender = false;
+    if (pending) { apply(); pending = false; }   // (nothing was drawn: a black card, or a frame nobody will look at)
+    return { t, shot: shot.id, finished };
+  }
 
   // step the trailer to time t (seconds): picks the shot, runs setup on a change, and marks the frame pending for the render hook
   function tick(t) {
@@ -207,8 +221,10 @@ export function attach(game, opts = {}) {
       ui.letterbox(!!letterbox && !portrait);
       // the bottom bunk is for boxes (the story's own dressing)
       for (const [i, s] of game.W.dropSpots.entries()) if (i < 2) game.W.cardboardBox(s.x, s.y, s.z, 0.5, 0.44, 0.5, 3, i ? -0.3 : 0.2);
+      // a real company's badge on the haunted TV has no place in an ad
+      if (!plainTv(game.scene)) console.warn('trailer: the TV model had no texture to clean');
       g.reset();
-      try { await document.fonts.ready; } catch (e) { /* fine */ }
+      try { await document.fonts.load('bold 40px "Gloria Hallelujah"'); await document.fonts.ready; } catch (e) { /* fine */ }
       // compile every lighting variant now instead of in the middle of a shot
       const rt = game.gfx.composer && game.gfx.composer.renderTarget1;
       try { for (const p of ['title', 'day', 'morning', 'night']) { game.setPhase(p, true); if (rt) game.renderer.setRenderTarget(rt); await game.renderer.compileAsync(game.scene, camera); game.renderer.setRenderTarget(null); } } catch (e) { game.renderer.setRenderTarget(null); }
@@ -217,15 +233,19 @@ export function attach(game, opts = {}) {
     // headless: step to frame i. Pumps the game's clock in sub-steps (dt never over the game's 50 ms cap) and, when the frame is going to be
     // captured, renders on the last one. A frame that is not captured still runs the game and the shot (so doors close and walks happen on time)
     // but never touches the GPU: SwiftShader executes every queued draw whether or not a screenshot follows, and that is what costs seconds.
-    // i can be fractional: the extra exposures of a frame for motion blur (render.js --shutter); the clock then advances by the real gap
+    // motion blur: a captured frame can be several exposures spread over a thirtieth of a second (a camcorder's shutter at night), averaged
+    // under the overlays; opts.shutter = N forces N everywhere, otherwise each shot's own `shutter` (a number, or a function of the shot time)
     frame(i, capture = true) {
-      frameN = i; Math.random = rng(1000003 + i * 7919); c.subframe = i % 1 !== 0;
-      const t = i / fps, gap = lastT !== null && t > lastT && t - lastT <= 1 / fps + 1e-9 ? t - lastT : 1 / fps; lastT = t; tick(t);
-      const shot = c.shot, stepMs = gap * 1000, n = Math.max(1, Math.ceil(stepMs / 45)), sub = stepMs / n, draw = capture && !shot.noRender;
-      for (let s = 0; s < n; s++) { window.__norender = !draw || s < n - 1; window.__pump(sub); }
-      window.__norender = false;
-      if (pending) { apply(); pending = false; }   // (nothing was drawn: a black card, or a frame nobody will look at)
-      return { t, shot: shot.id, finished };
+      const t0 = i / fps, s0 = select(t0), want = typeof opts.shutter === 'number' ? opts.shutter : typeof s0.shutter === 'function' ? s0.shutter(t0 - s0.t) : s0.shutter || 1;
+      const n = !capture || s0.noRender ? 1 : Math.max(1, Math.min(8, Math.round(want))), shut = Math.min(1 / fps, 1 / 30, s0.t + s0.dur - t0 - 1e-6);   // (never past the cut)
+      ui.acc.clear();
+      let r;
+      for (let e = 0; e < n; e++) {
+        r = step(i + e * shut * fps / n, capture, e > 0);
+        if (n > 1) { const cv = document.querySelector('#game canvas'); if (cv) ui.acc.add(cv, cv.style.filter); }
+      }
+      if (n > 1) ui.acc.show();
+      return { ...r, exposures: n };
     },
     // live (boot.js): called from the game's own rAF loop through the render hook
     play(t0 = performance.now()) { const hook = game.gfx.render; game.gfx.render = (dt) => { tick(Math.min(duration, (performance.now() - t0) / 1000)); hook(dt); }; },

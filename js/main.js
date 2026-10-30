@@ -31,6 +31,7 @@ function loadRun() {
 }
 const RUN = loadRun();
 function saveRun() { try { localStorage.setItem('topbunk.run', JSON.stringify(RUN)); } catch (e) { /* private mode */ } }
+const hasRun = () => RUN.night >= 2 || !!RUN.dayDone;   // (moving day is kept once it is over: Continue starts night one)
 
 // ---------- renderer ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: DEBUG === 'shot' });
@@ -126,7 +127,7 @@ const P = {
   cam: new V3(), stamina: 1, exhausted: false, carrying: null, stepAcc: 0, bob: 0, speed: 0,
   breath: 1, breathT: 0, inhale: true, pod: null, podYaw: 0,
 };
-const F = { stage: 'day', night: 0, scare: false, coverPrompt: false, finalMorning: false, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, pushStart: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0 };
+const F = { stage: 'day', night: 0, scare: false, coverPrompt: false, finalMorning: false, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, pushStart: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0, over: false };
 let chase = null, shake = 0, uiMode = 'title', paused = false, started = false, pressE = false;
 const keys = {};
 const echoes = [];
@@ -641,7 +642,7 @@ function resetNight() {
   F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false; F.scare = false; F.coverPrompt = false;
   F.splashed = false; F.pushStart = false; F.morningReady = false; F.finalMorning = false; P.breath = 1; P.stamina = 1; P.exhausted = false; shake = 0;
   carEnd(); F.live = false; F.script = false; F.blackout = false; F.clockGlitch = 0; F.fear = 0; P.pod = null; P.podYaw = HIDE_YAW; UI.pod(null); UI.clock(null); F.flashOn = false; flash.intensity = 0;
-  W.tvFx.set(false); W.phone.setRinging(false); W.mirrorFx.hide(); W.nightLights.forEach((n) => { n.dead = false; }); if (nights) { nights.hunter.reset(); if (dad.fake) { dad.fake = false; sleepers(true); } }
+  W.tvFx.set(false); W.phone.setRinging(false); W.mirrorFx.hide(); W.curtainSee(false); W.nightLights.forEach((n) => { n.dead = false; }); if (nights) { nights.hunter.reset(); if (dad.fake) { dad.fake = false; sleepers(true); } }
   UI.blanket(false); UI.breath(1, false); UI.hint(null); UI.objective(null);
   E.visible = false; E.reach = 0; E.lean = 0; E.smileScale = 1; E.tilt = 0; E.mode = 'idle';
   W.bathSpot.intensity = 0; sfx.violins(0, 0.3);
@@ -650,6 +651,23 @@ function retry() {   // you were caught: that night starts again
   UI.hide('death'); uiMode = 'playing'; lock();
   resetNight(); setPhase('night');
   UI.fade(0, 1.5);
+  playFrom(F.stage, true);
+}
+// the pause menu's Restart: the day, night or morning you are on, from its start, without leaving the page (killAll drops whatever was
+// playing, as getting caught does)
+const BOX_HOME = W.pickups.map((b) => [b.position.clone(), b.rotation.clone()]);
+function restartStage() {
+  if (F.over || !started) return;
+  setPause(false); killAll(); UI.fade(1, 0.05);
+  UI.subtitle(null); UI.prompt(null); UI.stamina(1, false); P.vel.set(0, 0, 0);
+  sfx.bed('music/chase', 0, 0.3); sfx.tension(0, 0.3);
+  if (F.stage === 'day') {   // the boxes go back on the truck and the family back to where the day starts them
+    P.carrying = null;
+    W.pickups.forEach((b, i) => { if (b.parent !== W.yard) { if (b.parent) b.parent.remove(b); W.yard.add(b); } b.position.copy(BOX_HOME[i][0]); b.rotation.copy(BOX_HOME[i][1]); });
+    F.boxes = 0; F.momReady = false; F.talkedMom = false; dadIdx = 0; endChores();
+    for (const p of [mom, dad]) { p.held = false; p.talking = false; p.walking = 0; idle(p); }
+  }
+  resetNight();
   playFrom(F.stage, true);
 }
 
@@ -671,9 +689,13 @@ for (let n = 2; n <= 10; n++) {   // nights two to ten are seeded, free-roaming 
   STAGES['n' + n] = () => nights.freeNight(n); ORDER.push('n' + n);
   if (n < 10) { STAGES['b' + n] = () => breakfast(n); ORDER.push('b' + n); }
 }
+let playTok = 0;
 async function playFrom(stage, resume = false) {
-  const list = ORDER.slice(ORDER.indexOf(stage));
-  for (let i = 0; i < list.length; i++) await STAGES[list[i]](resume && i === 0);
+  const t = ++playTok, list = ORDER.slice(ORDER.indexOf(stage));
+  for (let i = 0; i < list.length; i++) {
+    await STAGES[list[i]](resume && i === 0);
+    if (t !== playTok || F.over) return;   // a restart took over, or a bad ending already ended the game
+  }
   await endingScript();
 }
 
@@ -689,7 +711,7 @@ async function startGame() {
   if (DEBUG === 'breakfast') { await playFrom('b1'); return; }
   if (/^n\d+$/.test(DEBUG) || /^night\d+$/.test(DEBUG)) { await playFrom('n' + DEBUG.replace(/\D/g, '')); return; }
   if (DEBUG === 'morning') { await endingScript(); return; }
-  if (!DEBUG && RUN.night >= 2) { await playFrom('n' + Math.min(RUN.night, 10)); return; }   // the run continues where you died or stopped
+  if (!DEBUG && hasRun()) { await playFrom('n' + Math.min(RUN.night, 10)); return; }   // the run continues where you died or stopped
   await playFrom('day');
 }
 
@@ -928,6 +950,7 @@ async function dayScript() {
   await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('mom/teeth');
   UI.fade(1, 2.5); await wait(3);
   F.birds = false; F.cutscene = false; endChores();
+  RUN.dayDone = true; saveRun();
 }
 function faceParent(who) {
   who.head.getWorldPosition(tmp);
@@ -1352,7 +1375,7 @@ async function finaleNeverBelieved() {
 }
 // the game is over: the ending's line goes on the end screen, and the run is cleared
 async function endGame(line) {
-  F.cutscene = true; F.script = true; F.live = false; UI.objective(null); UI.hint(null); UI.prompt(null); UI.clock(null);
+  F.over = true; F.cutscene = true; F.script = true; F.live = false; UI.objective(null); UI.hint(null); UI.prompt(null); UI.clock(null);
   UI.fade(1, 2.5); await wait(3);
   $('endtag').innerHTML = line;
   uiMode = 'end'; document.exitPointerLock(); UI.show('end');
@@ -1361,7 +1384,7 @@ async function endGame(line) {
 
 // after the last night they take you away from the house
 async function endingScript() {
-  UI.fade(1, 2); await wait(2.5);
+  F.over = true; UI.fade(1, 2); await wait(2.5);
   await carLeaving();
   UI.card('7:12 AM', 'They believed you', 4.5);
   await wait(5);
@@ -1454,7 +1477,7 @@ function update(dt) {
   E.update(dt);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
   achievements.tick();
-  if (nights) nights.proof.hud(F.live && !F.dead);
+  if (nights) nights.proof.hud(F.live && !F.dead && !F.script);   // (not over a scripted scene: the vigil, the drive, a scare)
 }
 
 let breathLatch = false, breathPrev = false, breathDownAt = 0, coverPrev = false, nights = null;
@@ -1500,22 +1523,25 @@ nights = createNights({
 });
 UI.makeGrain();
 {   // the title screen shows which run you are on
-  $('runinfo').textContent = RUN.night > 1 ? `Continue: night ${RUN.night} of 10  ·  seed ${RUN.seed}` : `Seed ${RUN.seed}`;
+  $('runinfo').textContent = hasRun() ? `Continue: night ${Math.min(RUN.night, 10)} of 10  ·  seed ${RUN.seed}` : `Seed ${RUN.seed}`;
   $('newrun').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); try { localStorage.removeItem('topbunk.run'); } catch (err) { /* ignore */ } location.hash = ''; location.reload(); });
   $('newrun').addEventListener('pointerdown', (e) => e.stopPropagation());
 }
 // the title, pause and options menus (js/menu.js opens them when the #title / #pause screens show)
 function newRun() {   // New game over a saved run: a fresh seed from the first day
   try { localStorage.removeItem('topbunk.run'); } catch (e) { /* ignore */ }
-  Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {} }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: newSeed(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();
 }
-achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter, test: () => uiMode === 'test' });   // (before menu.init: it adds its panel to the title and pause menus)
+// the test mode and the debug jumps (#night5, #morning, #proof=4, #type=vigil, #night=6) earn nothing
+const jumped = !!DEBUG || ['proof', 'type', 'night'].some((k) => HPARAM[k] !== undefined);
+achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter, test: () => uiMode === 'test' || jumped });   // (before menu.init: it adds its panel to the title and pause menus)
 menu.init({
-  startGame, newGame: newRun, hasSave: () => RUN.night >= 2, night: () => Math.min(RUN.night, 10),
+  startGame, newGame: newRun, hasSave: hasRun, night: () => Math.min(RUN.night, 10),
   resume: () => setPause(false), pause: () => setPause(true), canPause: () => uiMode === 'playing',
-  restartNight: () => location.reload(), quitToTitle: () => location.reload(),   // (the run is saved at each dawn, so a reload starts this night again)
+  stage: () => F.stage, canRestart: () => !F.over, restartNight: restartStage,
+  quitToTitle: () => location.reload(),   // (the run is saved at each dawn and when moving day is over)
 });
 titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');

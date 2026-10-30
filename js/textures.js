@@ -1,4 +1,4 @@
-// Procedural canvas textures — no external image assets needed.
+// Procedural canvas textures: the wallpaper, the drawing, the grin, and the stand-ins until (or unless) the assets/pbr sets load (js/pbr.js).
 import * as THREE from 'three';
 
 export function rng(seed = 1) {

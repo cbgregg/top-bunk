@@ -82,6 +82,6 @@ everything else; both are open fonts (SIL OFL, see `assets/fonts/LICENSE-fonts.m
 ## Credits
 
 Built with three.js. Character models from Microsoft Rocketbox (MIT) with Mixamo animation clips; surface textures, sky and props from
-Poly Haven and ambientCG (CC0); the parents' voice lines and the music were generated with ElevenLabs and shipped as fixed audio files
+Poly Haven and ambientCG (CC0); the parents' voice lines, the music and most of the sound effects were generated with ElevenLabs and shipped as fixed audio files
 (disclosed on the Steam page as pre-generated AI content; nothing is generated at runtime). Full list and licences: `CREDITS.md` in
 the repository.

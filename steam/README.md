@@ -51,7 +51,8 @@ a macOS bundle and macOS/Linux content built or uploaded from Windows loses its 
 The Steamworks native module (`steamworks.js`) is unpacked next to `app.asar` and finds
 `steam_api64.dll` / `libsteam_api.dylib` / `libsteam_api.so` beside itself; the Windows and Linux
 builds also carry a copy next to the executable, as the steamworks.js README recommends. Each depot
-excludes the other two platforms' binaries.
+excludes the other two platforms' binaries (the upload scripts through the depot files' exclusions, CI
+by deleting them when it unpacks the builds, since steam-deploy writes its own depot files).
 
 ## 3. Upload
 
@@ -80,8 +81,8 @@ overlay, an achievement unlocks, F11 / Alt+Enter toggles fullscreen, the in-game
 | Linux | `top-bunk` | Launch (Default) | Linux + SteamOS | 64-bit |
 
 Leave "Arguments" empty. Supported shell flags, should you need them: `--windowed` (start in a
-window), `--no-steam` (do not initialise Steamworks), `--devtools`, `--hash=<name>` (open
-`index.html#<name>`, e.g. `night`).
+window), `--no-steam` (do not initialise Steamworks), `--devtools`. The `--hash=<name>` debug jump
+works in a packaged build only together with `--devtools`, and a jump earns no achievements.
 
 Linux note: Electron's Chromium sandbox needs either unprivileged user namespaces (SteamOS, Fedora,
 Arch, most distros) or a set-uid `chrome-sandbox`, which a Steam install does not preserve. Ubuntu
@@ -111,6 +112,8 @@ launch option with it.
   scripts and the CI job can set it live directly.
 - `.github/workflows/desktop.yml` builds on a `v*` tag or by hand, and uploads to Steam through
   `game-ci/steam-deploy@v3` when the `STEAM_USERNAME` and `STEAM_CONFIG_VDF` secrets exist (the
-  `configVdf` is the `config/config.vdf` of a steamcmd that has logged in once with Steam Guard; see the
-  action's README). It uses the same AppID+1/+2/+3 depot order as the files here and the
+  `configVdf` is the `config/config.vdf` of a steamcmd that has logged in once with Steam Guard,
+  base64-encoded because the action decodes it: store the output of
+  `base64 -w0 < ~/Steam/config/config.vdf`, or on macOS
+  `base64 -i ~/Library/Application\ Support/Steam/config/config.vdf`. A raw paste fails the job). It uses the same AppID+1/+2/+3 depot order as the files here and the
   `STEAM_APP_ID` repository variable.

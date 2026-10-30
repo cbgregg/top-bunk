@@ -5,7 +5,9 @@
 # wants, plus zip / tar.gz for direct downloads) and uploads them as artifacts. When the Steam secrets
 # exist, the "steam" job pushes the three unpacked builds to SteamPipe with game-ci/steam-deploy.
 #
-# Secrets:   STEAM_USERNAME, STEAM_CONFIG_VDF (steamcmd's config/config.vdf after one Steam Guard login)
+# Secrets:   STEAM_USERNAME, STEAM_CONFIG_VDF (steamcmd's config/config.vdf after one Steam Guard login,
+#            base64-encoded: the action decodes it. Store the output of `base64 -w0 < ~/Steam/config/config.vdf`;
+#            on macOS `base64 -i ~/Library/Application\ Support/Steam/config/config.vdf`. A raw paste fails the job.)
 # Variables: STEAM_APP_ID (falls back to desktop/steam_appid.txt; 480 = Spacewar is refused)
 name: Desktop builds
 
@@ -114,6 +116,12 @@ jobs:
       - name: Unpack the depots
         run: |
           for t in win mac linux; do mkdir -p "depots/$t"; tar -xzf "dist/depot-$t.tar.gz" -C "depots/$t" --strip-components=1; done
+          # steam-deploy writes its own depot scripts without steam/depot_build_*.vdf's exclusions: drop the other platforms' Steamworks binaries here
+          for t in win mac linux; do
+            find "depots/$t" -type d -path '*steamworks.js/dist' | while read -r d; do
+              case $t in win) rm -rf "$d/osx" "$d/linux64" "$d"/win64/*.lib;; mac) rm -rf "$d/win64" "$d/linux64";; linux) rm -rf "$d/win64" "$d/osx";; esac
+            done
+          done
           ls -la depots/*
 
       - name: App ID

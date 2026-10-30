@@ -90,9 +90,9 @@ discount text. The `store/` folder (produced separately) is meant to hold these 
 
 | Asset | Size | Notes |
 | --- | --- | --- |
-| Header capsule | 920 × 430 | store page top, search, "recommended" |
+| Header capsule | 920 × 430 | store page top, search, "recommended"; upload `store/out/header_capsule_2x.png` (the plain-named file is the old 460 × 215 size) |
 | Small capsule | 462 × 174 | lists, search results; logo must stay legible |
-| Main capsule | 1232 × 706 | front page features |
+| Main capsule | 1232 × 706 | front page features; upload `store/out/main_capsule_2x.png` (the plain-named file is the old 616 × 353 size) |
 | Vertical capsule | 748 × 896 | front page, sale pages |
 | Page background | 1438 × 810 | optional, shown blurred behind the page |
 | Library capsule | 600 × 900 | the user's library grid |
@@ -112,7 +112,8 @@ genre/tags, features (Single-player, Steam Achievements, controller support), re
 Content warnings that belong in the description and on the title screen:
 
 - **Flashing lights / photosensitivity**: lightning, TV static and jump-scare flashes are strobing
-  effects. The title screen currently says "Contains jump scares"; add "and flashing lights".
+  effects. The title screen says "Contains jump scares and flashing lights"; keep the same line in the
+  store description.
 - Headphones recommended, loud sudden sounds.
 
 ## 5. Achievements
@@ -120,7 +121,7 @@ Content warnings that belong in the description and on the title screen:
 Stats & Achievements → Achievements → New, one per entry in `steam/achievements.json` (owned by the
 achievements work). Each needs:
 
-- **API name**: exactly the `id` the game passes to `window.desktop.achieve(id)` (the JSON's `name`).
+- **API name**: exactly the `id` the game passes to `window.desktop.achieve(id)` (the JSON's `apiName`).
 - Display name, description, hidden flag (keep spoilers hidden).
 - Two icons, **64 × 64 JPG**: unlocked and locked (grey) versions.
 
@@ -139,10 +140,16 @@ npm run dist:mac    # dist/mac/Top Bunk.app (x64, the Steam depot), dist/mac-arm
 npm run dist:linux  # dist/linux-unpacked/, dist/Top Bunk-<v>-linux-x64.tar.gz
 ```
 
+The app icon is `desktop/build/icon.png` (1024 × 1024, written by `node store/render_capsules.js`);
+electron-builder derives the Windows `.ico` and the macOS `.icns` from it.
+
 Then either `STEAM_USERNAME=<account> steam/upload.sh` (`steam/upload.ps1` on Windows; both take
 `--preview` for a dry run), or in CI add the `STEAM_USERNAME` and `STEAM_CONFIG_VDF` secrets and the
-`STEAM_APP_ID` variable and push a tag. Upload macOS and Linux content from macOS, Linux or CI, not from
-Windows, which drops executable bits.
+`STEAM_APP_ID` variable and push a tag. `STEAM_CONFIG_VDF` is steamcmd's `config/config.vdf` after one
+Steam Guard login, **base64-encoded** (the action decodes it, and a raw paste fails the job): store the
+output of `base64 -w0 < ~/Steam/config/config.vdf`, or on macOS
+`base64 -i ~/Library/Application\ Support/Steam/config/config.vdf`. Upload macOS and Linux content from
+macOS, Linux or CI, not from Windows, which drops executable bits.
 
 Then in Steamworks: SteamPipe → Builds → set the build live on **default** (only the website can do
 that), install the game through the Steam client on each OS, and check: it starts fullscreen, Shift+Tab
@@ -162,7 +169,8 @@ the app, a controller works. Test the Linux build on a Steam Deck if you can.
 Content ratings: Steam's own mature-content survey is mandatory. Official age ratings are optional
 on Steam but free through the **IARC** questionnaire in Steamworks (gives ESRB, PEGI, USK, ClassInd,
 ACB and GRAC ratings) and some storefront regions and promotions need them; fill it in truthfully
-(horror, fear, violence toward the player character, no gore, no language, no purchases).
+(horror, fear, violence toward the player character, no gore, mild language (a few exclamations), no
+purchases), the same as the content warnings in `store/description.md`.
 
 ## 8. Not done (deliberately, so nothing pretends to be)
 
@@ -172,8 +180,6 @@ ACB and GRAC ratings) and some storefront regions and promotions need them; fill
 - **macOS notarization**: `mac.identity` is `null`. Steam strips the quarantine attribute so Steam
   installs run, but the arm64/x64 zips from GitHub will be blocked by Gatekeeper until the app is
   signed with a Developer ID and notarized (`identity`, `hardenedRuntime: true`, `notarize`).
-- **App icon**: electron-builder uses Electron's default icon. Drop a 1024 × 1024 `icon.png` into
-  `desktop/build/` and electron-builder derives `.ico` / `.icns`.
 - **Steam Cloud**: saves live in the browser `localStorage` inside Electron's user-data folder
   (`%APPDATA%\Top Bunk`, `~/Library/Application Support/Top Bunk`, `~/.config/Top Bunk`). Steam
   Auto-Cloud could sync those paths (Steamworks → Application → Steam Cloud) but is not configured or

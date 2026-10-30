@@ -14,11 +14,14 @@ const $ = (id) => document.getElementById(id);
 const val = (v) => (typeof v === 'function' ? v() : v);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pct = (v) => `${Math.round(v * 100)}%`;
-const H = {};   // from main.js (menu.init): startGame, newGame, hasSave, night, resume, pause, canPause, restartNight, quitToTitle
+const H = {};   // from main.js (menu.init): startGame, newGame, hasSave, night, resume, pause, canPause, stage, canRestart, restartNight, quitToTitle
 const saved = () => !!(H.hasSave && H.hasSave());
 const desktop = () => !!(window.desktop && window.desktop.isDesktop);
 const quitApp = () => { if (window.desktop && window.desktop.quit) window.desktop.quit(); };
-const KEYS = { kb: '↑ ↓ choose  ·  ← → change  ·  Enter select  ·  Esc back', pad: 'D-pad choose  ·  left / right change  ·  A select  ·  B back', touch: 'Tap to choose  ·  ‹ › change' };
+// Restart and leaving depend on where you are: moving day is kept only once it is over, and a morning goes on to the next night
+const part = () => { const s = (H.stage && H.stage()) || 'n'; return s === 'day' ? 'day' : s[0] === 'b' ? 'morning' : 'night'; };
+const kept = () => ({ day: 'Moving day is not kept until it is over: it starts again from the beginning.', night: 'Your run is kept: you start this night again next time.', morning: `Your run is kept: you go on from night ${H.night ? H.night() : 2} next time.` }[part()]);
+const KEYS = { kb: 'Up / down choose  ·  left / right change  ·  Enter select  ·  Esc back', pad: 'D-pad choose  ·  left / right change  ·  A select  ·  B back', touch: 'Tap to choose  ·  ‹ › change' };
 
 export const MENUS = {
   title: [
@@ -34,9 +37,10 @@ export const MENUS = {
     { id: 'resume', label: 'Resume', action: () => H.resume() },
     { id: 'options', label: 'Options', panel: 'options' },
     { id: 'controls', label: 'Controls', panel: 'controls' },
-    { id: 'restart', label: 'Restart night', action: () => ask({ title: 'Restart night', text: 'Start this night again from the beginning?', yes: 'Restart', action: () => H.restartNight() }) },
-    { id: 'title', label: 'Quit to title', action: () => ask({ title: 'Quit to title', text: 'Leave this night? Your run is kept: you start the night again next time.', yes: 'Quit to title', action: () => H.quitToTitle() }) },
-    { id: 'quit', label: 'Quit game', when: desktop, action: () => ask({ title: 'Quit game', text: 'Close the game? Your run is kept: you start this night again next time.', yes: 'Quit', action: quitApp }) },
+    { id: 'restart', label: () => `Restart ${part()}`, when: () => !H.canRestart || H.canRestart(),
+      action: () => ask({ title: `Restart ${part()}`, text: `Start ${part() === 'day' ? 'moving day' : `this ${part()}`} again from the beginning?`, yes: 'Restart', action: () => H.restartNight() }) },
+    { id: 'title', label: 'Quit to title', action: () => ask({ title: 'Quit to title', text: `Leave for the title screen? ${kept()}`, yes: 'Quit to title', action: () => H.quitToTitle() }) },
+    { id: 'quit', label: 'Quit game', when: desktop, action: () => ask({ title: 'Quit game', text: `Close the game? ${kept()}`, yes: 'Quit', action: quitApp }) },
   ],
   options: [
     { type: 'heading', label: 'Sound' },
@@ -64,7 +68,7 @@ const CREDITS = `<dl class="credits">
 <dt>Animation</dt><dd>Idle, walk, run and gesture clips from Mixamo (Adobe), as shipped in the three.js example Xbot.glb, retargeted onto the Rocketbox skeleton.</dd>
 <dt>3D engine</dt><dd>three.js r170, MIT License, © 2010–2024 three.js authors.</dd>
 <dt>Fonts</dt><dd>Special Elite (Astigmatic) and Permanent Marker (Font Diner), Apache License 2.0. Courier Prime (Alan Dague-Greene) and Gloria Hallelujah (Kimberly Geswein), SIL Open Font License 1.1.</dd>
-<dt>Voices and music</dt><dd>Generated with ElevenLabs.</dd>
+<dt>Voices, music and sound effects</dt><dd>Generated with ElevenLabs (the night's brown noise is made with ffmpeg).</dd>
 <dt>Surfaces, models and sky</dt><dd>Poly Haven and ambientCG, CC0.</dd>
 <dt>Photographs in the frames</dt><dd>Public domain, via Wikimedia Commons: Arthur Rothstein (Family in a wagon, Lee County, Mississippi, 1935), Russell Lee (the England family reunion, NARA 540764), US National Park Service (Mount Rainier and lake reflection), Gorgo (Moraine Lake), NYPL (Sailing at Sunset, New Dorp Beach), Mount Rainier National Park (wildflowers).</dd>
 </dl><p class="note">The full license texts ship with the game: vendor/three/LICENSE, assets/models/LICENSE-Rocketbox.md, assets/fonts/LICENSE-fonts.md.</p>`;

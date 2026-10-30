@@ -5,7 +5,7 @@
 //
 //   electron .                 play (fullscreen; F11 or Alt+Enter toggles)
 //   electron . --windowed      start in a window
-//   electron . --hash=night    same as opening index.html#night (dev shortcut, see README)
+//   electron . --hash=night    same as opening index.html#night (dev shortcut, see README; a packaged build needs --devtools too)
 //   electron . --no-steam      do not touch Steam
 //   electron . --smoke         load the game, print SMOKE_OK / SMOKE_FAIL <reason>, exit 0 / 1 within 90 s
 const { app, BrowserWindow, Menu, ipcMain, protocol, session, shell } = require('electron');
@@ -34,14 +34,12 @@ function main() {
   protocol.registerSchemesAsPrivileged([{ scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true, codeCache: true } }]);
 
   if (SMOKE) {
-    // Headless CI boxes have no GPU: let Chromium rasterize WebGL with SwiftShader, and reach a CDN
-    // import map through the runner's proxy if it has one.
+    // Headless CI boxes have no GPU: let Chromium rasterize WebGL with SwiftShader.
     app.commandLine.appendSwitch('enable-unsafe-swiftshader');
     app.commandLine.appendSwitch('use-gl', 'angle');
     app.commandLine.appendSwitch('use-angle', 'swiftshader');
     app.commandLine.appendSwitch('ignore-gpu-blocklist');
     app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-    if (process.env.HTTPS_PROXY) app.commandLine.appendSwitch('proxy-server', process.env.HTTPS_PROXY);
     process.on('uncaughtException', (e) => smokeEnd(false, `uncaught: ${e && e.stack || e}`));
   }
 
@@ -64,6 +62,7 @@ function main() {
     session.defaultSession.setPermissionCheckHandler((wc, permission) => allowed.has(permission));
     Menu.setApplicationMenu(process.platform === 'darwin' ? macMenu() : null);   // macOS keeps Cmd+Q, Cmd+H; elsewhere no menu at all
     registerIpc(steam);
+    if (SMOKE) blockNetwork();
     win = createWindow();
     if (SMOKE) smoke(win, steam);
   });
@@ -86,7 +85,7 @@ function createWindow() {
     if (input.key === 'F11' || (input.key === 'Enter' && input.alt && !input.control && !input.meta)) { e.preventDefault(); toggleFullscreen(w); }
     else if (input.key === 'F12' && DEVTOOLS) { e.preventDefault(); w.webContents.toggleDevTools(); }
   });
-  const hash = opt('--hash');
+  const hash = !app.isPackaged || flag('--devtools') ? opt('--hash') : null;   // (a jump from the Steam launch options would skip the game)
   w.loadURL(`${ORIGIN}/index.html${hash ? '#' + hash : ''}`);
   return w;
 }
@@ -116,6 +115,11 @@ function registerIpc(steam) {
 }
 
 // ---- smoke test -------------------------------------------------------------------------------
+// The game must run with no network at all: in smoke mode every http(s) request is refused and fails the run.
+const blocked = [];
+function blockNetwork() {
+  session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (d, cb) => { blocked.push(d.url); cb({ cancel: true }); });
+}
 let smokeDone = false;
 function smokeEnd(ok, why) {
   if (smokeDone) return; smokeDone = true;
@@ -143,6 +147,7 @@ async function smoke(w, steam) {
     try { r = await w.webContents.executeJavaScript(probe, true); } catch (e) { /* page still loading */ }
     if (!r || !r.game) continue;
     if (!r.desktop) return smokeEnd(false, 'window.__game is up but window.desktop is missing: preload did not run' + tail());
+    if (blocked.length) return smokeEnd(false, `tried the network (${blocked.length}): ${blocked.slice(0, 3).join(' | ')}`);
     let ach = 'threw';
     try { ach = await w.webContents.executeJavaScript('window.desktop.achieve("SMOKE_TEST")', true); } catch (e) { /* reported below */ }
     smokeEnd(true, `window.__game ready in ${Date.now() - t0}ms; renderer=${r.renderer}; desktop bridge ok; steam=${steam.isSteam}; achieve->${ach}${tail()}`);

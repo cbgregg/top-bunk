@@ -5,6 +5,7 @@
 - **3D engine:** [three.js](https://threejs.org) r170, MIT License, Copyright © 2010-2024 three.js authors (full text in `vendor/three/LICENSE`). Vendored in `vendor/three/` (the core build plus the addons the game imports) so the game runs offline.
 - **Fonts:** Special Elite (Astigmatic) and Permanent Marker (Font Diner), Apache License 2.0; Courier Prime (Alan Dague-Greene) and Gloria Hallelujah (Kimberly Geswein), SIL Open Font License 1.1. Self-hosted latin WOFF2 subsets in `assets/fonts/`, loaded by `css/fonts.css`; copyright lines and full license texts in `assets/fonts/LICENSE-fonts.md`.
 - **Voices and music:** generated with ElevenLabs (see `tools/`).
+- **Sound effects:** generated with ElevenLabs (`tools/gen_sfx.py`, into `assets/sfx/`), except `night_brown_noise`, which is made with ffmpeg. The trailers use the same files.
 - **Surfaces, models and sky:** [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), all CC0 (no attribution required): the PBR materials in `assets/pbr/`, the HDRI skies in `assets/sky/`, and the furniture, plant, tree, grass and rock models in `assets/props/`.
 - **Photographs in the picture frames** (public domain, via Wikimedia Commons; `assets/photos/`, fetched by `tools/assets/fetch_photos.py`):
   - `family1`: Family in a wagon, Lee County, Mississippi, 1935.jpg - Arthur Rothstein, Public domain ([source](https://commons.wikimedia.org/wiki/File:Family_in_a_wagon,_Lee_County,_Mississippi,_1935.jpg))

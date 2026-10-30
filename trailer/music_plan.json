@@ -1,5 +1,5 @@
 {
-  "_comment": "How the song is laid under each cut. Times are seconds in the trailer (out) and in the song (src). rate < 1 slows the record and drops its pitch (asetrate), lp is a low-pass in Hz, vib is tape wow depth (0..1), gain is linear. mute windows silence EVERYTHING (the hard cut before the scare).",
+  "_comment": "How the song is laid under each cut. Times are seconds in the trailer (out) and in the song (src). rate < 1 slows the record and drops its pitch (asetrate), lp / hp are a low-pass / high-pass in Hz, vib is tape wow depth (0..1), mono folds it to one channel, room is a small room around it (wet, 0..1), gain is linear. mute windows silence EVERYTHING (the hard cut before the scare); muteFloor (dBFS) leaves the tape's own hiss under them at that level instead of digital silence. duck lowers the song to gain under every voice line (the assets/audio/vo cues), ramping over ramp seconds, so the lines read over it.",
   "landscape": {
     "segments": [
       { "out": [0, 56], "src": 0, "rate": 1, "gain": 1, "fadeIn": 0.02 },
@@ -9,18 +9,20 @@
       { "out": [94, 108], "src": 94, "rate": 0.86, "lp": 800, "vib": 0.35, "gain": 0.85 },
       { "out": [113, 139], "src": 113, "rate": 1, "lp": 500, "vib": 0.1, "gain": 0.16, "fadeIn": 1.5, "fadeOut": 9 }
     ],
-    "mute": [[108, 110]]
+    "mute": [[108, 110]],
+    "duck": { "gain": 0.4, "ramp": 0.3 }
   },
   "portrait": {
-    "_comment": "The song comes in on the first daylight shot, sits under the voices, warps through the TV and the door, and stops dead when the door opens again. From there it is room tone, breath, the heartbeat and the run, then true silence before the scare. loudness/truePeak: the finished mix is set to this integrated loudness (LUFS) under this ceiling (dBTP), where Shorts, Reels and TikTok play it.",
+    "_comment": "The song comes in after the rewind, on the first daylight shot; it warps through the TV, cuts out when the set switches itself off, and comes back slower from beyond the door until the latch shuts it out. From there it is room tone, a held breath, a hinge, the heartbeat and the run, then a hole of tape hiss before the scare, a dropout as the camera hits the floor, and the record again, faint, under the title. It is mono and in a small room throughout, as the camcorder's mic would hear it in the house. loudness/truePeak: the finished mix is set to this integrated loudness (LUFS) under this ceiling (dBTP), where Shorts, Reels and TikTok play it.",
     "segments": [
-      { "out": [2.45, 6.95], "src": 8, "rate": 1, "gain": 0.24, "fadeIn": 0.02 },
-      { "out": [6.95, 10.25], "src": 12.5, "rate": 0.98, "lp": 3500, "vib": 0.08, "gain": 0.22 },
-      { "out": [10.25, 12.65], "src": 15.73, "rate": 0.95, "lp": 2200, "vib": 0.15, "gain": 0.26 },
-      { "out": [12.65, 14.85], "src": 18.01, "rate": 0.88, "lp": 1200, "vib": 0.3, "gain": 0.32, "fadeOut": 0.03 },
-      { "out": [26.05, 27.75], "src": 113, "rate": 1, "lp": 900, "gain": 0.22, "fadeIn": 0.08, "fadeOut": 0.5 }
+      { "out": [2.55, 6.45], "src": 8, "rate": 1, "lp": 5000, "mono": true, "room": 0.5, "gain": 0.26, "fadeIn": 0.02 },
+      { "out": [6.45, 9.45], "src": 11.9, "rate": 0.98, "lp": 3500, "vib": 0.08, "mono": true, "room": 0.5, "gain": 0.24 },
+      { "out": [9.45, 10.42], "src": 14.84, "rate": 0.95, "lp": 2200, "vib": 0.15, "mono": true, "room": 0.5, "gain": 0.18, "fadeOut": 0.02 },
+      { "out": [11.0, 11.46], "src": 16.3, "rate": 0.88, "lp": 1200, "vib": 0.3, "mono": true, "room": 0.5, "gain": 0.34, "fadeIn": 0.05, "fadeOut": 0.02 },
+      { "out": [20.05, 21.45], "src": 113, "rate": 1, "lp": 900, "hp": 250, "mono": true, "room": 0.5, "gain": 0.1, "fadeIn": 0.1, "fadeOut": 0.3 }
     ],
-    "mute": [[24.15, 24.75]],
+    "mute": [[18.15, 18.75], [19.41, 19.48]],
+    "muteFloor": -52,
     "loudness": -14,
     "truePeak": -1
   }

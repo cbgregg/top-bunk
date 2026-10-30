@@ -31,7 +31,7 @@ const read = (k) => { try { const v = JSON.parse(localStorage.getItem(k)); retur
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } };
 const got = read(KEY), stats = read(STATS);
 const G = {};   // from main.js (bind): F, P, W, RUN, sfx, menu, hunter(), test()
-const off = () => !!(G.test && G.test());   // the test mode (window.__game.start(), used by the trailer and the store shots) earns nothing
+const off = () => !!(G.test && G.test());   // the test mode (window.__game.start(), used by the trailer and the store shots) and the debug jumps earn nothing
 const steam = () => (typeof window !== 'undefined' && window.desktop && window.desktop.achieve ? window.desktop : null);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

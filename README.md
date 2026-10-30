@@ -1,6 +1,6 @@
 # TOP BUNK
 
-A short first-person horror game built with [Three.js](https://threejs.org), runs straight from GitHub Pages — no build step. Every texture is drawn on canvas at load. Sound is synthesized with WebAudio and layered with recorded voices, music and jump scares (see Audio); if those files are missing, the synth covers everything. Mom, Dad and the spirit are real rigged character models (see Characters).
+A short first-person horror game built with [Three.js](https://threejs.org). It runs straight from GitHub Pages with no build step. Surfaces use the PBR texture sets in `assets/pbr/`, the frames on the walls hold the photographs in `assets/photos/` and the sky comes from `assets/sky/`; the wallpaper, the crayon drawing and the fallback for any missing file are drawn on canvas at load (see Graphics). Sound is synthesized with WebAudio and layered with recorded voices, music and jump scares (see Audio); if those files are missing, the synth covers everything. Mom, Dad and the spirit are real rigged character models (see Characters).
 
 > The rent on the old farmhouse was cheap. Now we know why.
 
@@ -39,13 +39,13 @@ python3 -m http.server 8000
 
 ## Deploy to GitHub Pages
 
-Settings → Pages → **Deploy from a branch** → `main` / `(root)`. The site will be at `https://<user>.github.io/<repo>/`.
+Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml` then deploys every push to `main`. The site will be at `https://<user>.github.io/<repo>/`.
 
 ## Project layout
 
 | File | Purpose |
 |---|---|
-| `index.html` | HUD, title/pause/death/end screens, import map for Three.js (CDN) |
+| `index.html` | HUD, title/pause/death/end screens, import map for the vendored Three.js r170 (`vendor/three`) |
 | `css/style.css` | HUD and screen styling, film grain, vignette, blanket overlay |
 | `js/main.js` | Game loop, player controller, collisions, story script, chase/hide logic |
 | `js/world.js` | The 2002 ranch house (carpet, floral wallpaper, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights |
@@ -56,7 +56,7 @@ Settings → Pages → **Deploy from a branch** → `main` / `(root)`. The site 
 
 ## Dev shortcuts
 
-Append a hash to the URL to jump ahead: `#night`, `#chase`, `#morning`.
+Append a hash to the URL to jump ahead: `#night`, `#chase`, `#morning`. A jump earns no achievements.
 
 ## Audio
 

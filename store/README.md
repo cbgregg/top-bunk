@@ -25,8 +25,9 @@ folder is loaded by the game.
 | `out/client_icon.png` / `.ico` 32×32 | Client icon | Graphical Assets → Client Icon (.ico; macOS also wants an .icns, made from the same PNG) |
 
 Rules Steam enforces on the capsules: the logo must be legible at the displayed size, no review quotes, award badges or discount
-text, and the screenshots must be in-game captures with no marketing text or UI mock-ups. The capsules here carry only the title and
-the tagline. The sizes above are the ones this folder produces; Steamworks prints the sizes it currently wants on each upload form,
+text, and the screenshots must be in-game captures with no marketing text or UI mock-ups. The base capsules may show only game
+artwork, the game's name and an official subtitle, so the capsules here carry the title and nothing else; the tagline stays in the
+"About this game" text. The sizes above are the ones this folder produces; Steamworks prints the sizes it currently wants on each upload form,
 and the form wins when they disagree (the `_2x` renders exist for the two capsules Steam has already doubled).
 
 ## Regenerating
@@ -48,8 +49,9 @@ in `shots.js` is a few lines of setup against `window.__game` (phase, camera, wh
 HUD is hidden in every screenshot except 04, which keeps the hold-your-breath prompt and meter on purpose.
 
 The capsule templates load the game's own fonts from `css/fonts.css` (Special Elite for the title, Courier Prime for the rest) and
-fall back to Google Fonts only when that file is missing; the renderer blocks the network so a missing local font shows up as a
-fallback face rather than silently fetching.
+nothing from the network; the renderer blocks the network as well, so a missing local font shows up as a fallback face.
+`render_capsules.js` also writes the desktop app's icon, `desktop/build/icon.png` (1024×1024, the community icon's face), which
+electron-builder turns into the Windows `.ico` and the macOS `.icns`.
 
 ## Not in this folder
 

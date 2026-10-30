@@ -236,14 +236,19 @@ let BASE = '';
         await sleep(1500);
         const frozen = await page.evaluate((t) => window.__game.gameTime - t, p.t);
         ok(frozen === 0, `the game clock ran ${frozen.toFixed(3)} s while paused`);
-        // an unlock: the card shows (a paused game is calm), it is saved, and the saved list is what the module loads
+        // an unlock: the card shows (a paused game is calm), it is saved, and the saved list is what the module loads. A debug jump (#night)
+        // earns nothing, so first that is checked, then the jump is let off for the one unlock.
         const a = await page.evaluate(async () => {
-          const ach = window.__game.achievements, first = ach.unlock('GLOVE_BOX'), again = ach.unlock('GLOVE_BOX');
+          const ach = window.__game.achievements, jumped = ach.unlock('GLOVE_BOX');
+          ach.bind({ test: () => false });
+          const first = ach.unlock('GLOVE_BOX'), again = ach.unlock('GLOVE_BOX');
+          ach.bind({ test: () => true });
           const t0 = performance.now(); let el = null;
           while (performance.now() - t0 < 3000) { el = document.querySelector('#achv.show'); if (el) break; await new Promise((r) => setTimeout(r, 100)); }
           const fresh = await import(`./js/achievements.js?smoke=${Date.now()}`);
-          return { first, again, card: el ? [...el.children].map((c) => c.textContent).join(' / ') : null, stored: Object.keys(JSON.parse(localStorage.getItem('topbunk.achievements') || '{}')), reloaded: fresh.has('GLOVE_BOX'), has: ach.has('GLOVE_BOX') };
+          return { jumped, first, again, card: el ? [...el.children].map((c) => c.textContent).join(' / ') : null, stored: Object.keys(JSON.parse(localStorage.getItem('topbunk.achievements') || '{}')), reloaded: fresh.has('GLOVE_BOX'), has: ach.has('GLOVE_BOX') };
         });
+        ok(a.jumped === false, `a debug jump unlocked an achievement: ${JSON.stringify(a)}`);
         ok(a.first === true && a.again === false && a.has, `unlock(): ${JSON.stringify(a)}`);
         ok(a.card && /Eyes on the road/.test(a.card), `no achievement card: ${JSON.stringify(a)}`);
         ok(a.stored.includes('GLOVE_BOX') && a.reloaded, `not saved: ${JSON.stringify(a)}`);

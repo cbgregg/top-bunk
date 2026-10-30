@@ -68,7 +68,9 @@ There are three endings. Which one you get depends on how much proof you have fo
 ## System requirements
 
 The desktop build is the web game inside Electron (Chromium), so what it needs is what Chromium needs to run WebGL 2 at a steady
-frame rate. These are working estimates from the render pipeline (HDR sky, ambient occlusion, bloom, soft shadows on High; none of
+frame rate. The OS floor is Electron's: the build ships Electron 45, whose macOS binaries need Ventura or later, and its Linux
+support covers distributions still maintained for free; check it again whenever the Electron version changes. The rest are working
+estimates from the render pipeline (HDR sky, ambient occlusion, bloom, soft shadows on High; none of
 that on Low): check them on real hardware before the page goes live, and raise the GPU line if the Low preset does not hold 30 fps
 on it. Steamworks has one block per OS; the lines are the same except where noted.
 
@@ -76,7 +78,7 @@ on it. Steamworks has one block per OS; the lines are the same except where note
 
 | | |
 | --- | --- |
-| OS | Windows 10 64-bit · macOS 11 (Big Sur) · Ubuntu 20.04 or SteamOS 3 |
+| OS | Windows 10 64-bit · macOS 13 (Ventura) · Ubuntu 22.04 or SteamOS 3 |
 | Processor | Dual-core 2.0 GHz (Intel Core i3 / AMD equivalent) |
 | Memory | 4 GB RAM |
 | Graphics | Any GPU with WebGL 2 (OpenGL ES 3.0 / DirectX 11 class), 1 GB VRAM; Intel HD 4000 or newer |
@@ -88,7 +90,7 @@ on it. Steamworks has one block per OS; the lines are the same except where note
 
 | | |
 | --- | --- |
-| OS | Windows 11 64-bit · macOS 13 · Ubuntu 22.04 or SteamOS 3 |
+| OS | Windows 11 64-bit · macOS 14 or later · Ubuntu 22.04 or SteamOS 3 |
 | Processor | Quad-core 3.0 GHz (Intel Core i5 / AMD Ryzen 5) |
 | Memory | 8 GB RAM |
 | Graphics | NVIDIA GTX 1060 / AMD RX 580 / Apple M1 or better, for High at 1080p60 |
@@ -118,13 +120,16 @@ shows the description above the store page for users with the horror filter on.
 Steamworks asks about AI-generated content in the app's content survey (App Admin → Edit Store Page → Basic Info, the "AI Generated
 Content" questions; the answer is shown on the store page). Answer truthfully from `CREDITS.md`:
 
-- **Pre-generated content: yes.** The voice lines for Mom and Dad and the music tracks were generated with ElevenLabs
-  (`tools/gen_voice.py`, `tools/gen_music.py`) and are shipped as fixed audio files; the subtitles were written by hand.
+- **Pre-generated content: yes.** The voice lines for Mom and Dad, the music tracks and the sound effects in `assets/sfx/` (the
+  jump-scare stingers, the violins, the whispers and drones, the slams, thumps and scratches, the car going by, the waterphone and
+  the music box; all but the brown-noise bed, which ffmpeg makes) were generated with ElevenLabs (`tools/gen_voice.py`,
+  `tools/gen_music.py`, `tools/gen_sfx.py`) and are shipped as fixed audio files; the subtitles were written by hand. The trailers
+  use the same files.
 - **Live-generated content: no.** Nothing is generated while the game runs; there is no network use at all.
 - Everything else (the 3D models, textures, sky, photographs, fonts, code) is listed in `CREDITS.md` with its licence and is not AI-generated.
 
-Suggested disclosure text for the survey: "The parents' voice lines and the music were generated with ElevenLabs and are shipped as
-fixed audio files. No content is generated at runtime."
+Suggested disclosure text for the survey: "The parents' voice lines, the music and most of the sound effects were generated with
+ElevenLabs and are shipped as fixed audio files. No content is generated at runtime."
 
 ## Supported input
 

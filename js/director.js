@@ -122,8 +122,8 @@ export function createDirector(D) {
         if (busy || D.hunter.state === 'hunt' || D.hunter.state === 'loom') continue;
         const def = EVENTS[ev.id];
         if (def.ok && !def.ok(D)) { if (c > ev.t + 40) ev.done = true; continue; }
-        ev.done = true; try { def.run(D); } catch (e) { console.warn('event failed', ev.id, e); }
-        if (D.fired) D.fired(ev.id);
+        ev.done = true;
+        try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); }   // (no proof for an event that never happened)
       }
     },
   };
