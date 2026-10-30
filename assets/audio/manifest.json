@@ -1,7 +1,6 @@
 {
 "files": [
 "vo/dad/cheap",
-"vo/dad/ending",
 "vo/dad/line_1",
 "vo/dad/line_2",
 "vo/dad/line_3",
@@ -9,13 +8,9 @@
 "vo/dad/m2_a",
 "vo/dad/mom_looking",
 "vo/dad/n2_a",
-"vo/dad/n2_b",
 "vo/dad/n3_a",
 "vo/dad/welcome",
-"vo/mom/again",
-"vo/mom/bottom_bunk",
 "vo/mom/boxes_first",
-"vo/mom/breakfast",
 "vo/mom/helper",
 "vo/mom/landlord",
 "vo/mom/m1_a",
@@ -24,7 +19,6 @@
 "vo/mom/m2_b",
 "vo/mom/n2_a",
 "vo/mom/n3_a",
-"vo/mom/teeth",
-"vo/mom/thump"
+"vo/mom/teeth"
 ]
 }

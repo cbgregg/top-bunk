@@ -8,7 +8,7 @@ const FOV = 70, EYE = 1.05;   // one lens (vertical fov; tighter framing is the 
 const T = (list) => { let t = 0; for (const s of list) { s.t = +t.toFixed(3); t += s.dur; } return list; };
 
 // ---------- the operator ----------
-// smooth noise in -1..1: a hand drifts and corrects, it does not swing like a pendulum
+// smooth value noise in -1..1, summed in octaves (fbm) for the hand-held drift
 const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const vnoise = (t, s) => { const i = Math.floor(t), f = t - i, u = f * f * (3 - 2 * f); return lerp(hash(i + s * 71.3), hash(i + 1 + s * 71.3), u) * 2 - 1; };
 const fbm = (t, s) => vnoise(t, s) * 0.62 + vnoise(t * 2.17 + 5.1, s + 13) * 0.28 + vnoise(t * 4.9 + 1.7, s + 29) * 0.1;
@@ -126,8 +126,8 @@ function snow(c, fig, scale, off = -1) {
   const r = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.6); r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, 'rgba(0,0,0,0.8)'); g.fillStyle = r; g.fillRect(0, 0, W, H);
   tex.needsUpdate = true;
 }
-// the dark glass is a mirror: the room faint behind, the kid holding the camcorder up (its red light on), and over the kid's shoulder,
-// small and faint, the eyes and the grin. It has to read as a reflection of something behind you, not a face drawn on the screen
+// reflection in the dark glass: the room faint behind, the kid holding the camcorder up (its red light on), then the eyes and the grin,
+// small and faint, over the kid's right shoulder
 function crt(g, W, H, off) {
   g.save(); g.filter = 'none'; g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = '#07080a'; g.fillRect(0, 0, W, H);
   if (off < 0.05) {   // the picture squeezed into one bright line

@@ -3,7 +3,7 @@
 // Pure Node, no dependencies: every sound is an oscillator and an envelope written straight into a 16-bit stereo WAV.
 // It is 2:19 long and its sections follow the shape of the recording the cut was timed to (intro 0:00-0:08, verse 0:08-0:32, verse 0:32-0:56,
 // bridge 0:56-1:20, verse 1:20-1:48, outro 1:48-2:19), so a licensed track drops into the same cue sheet unchanged.
-// The melody and the chord sequence are written here and quote nothing: they are royalty-free and may ship anywhere.
+// The melody and the chord sequence are written here.
 // Also writes the small original sound effects the cue sheets use: footsteps, breathing, TV snow, a heartbeat, creaks, a door latch, a relay,
 // the camcorder's zoom motor, rewind and handling, a gasp, the set switching off, the camera hitting the floor, one music-box note (the list at the end).
 //   node trailer/gen_music.js            -> trailer/music/placeholder.wav (+ the sfx)
@@ -170,7 +170,7 @@ const SECTIONS = [
 function render() {
   const mix = new Buf(LEN + 2);
   const [vl, vr] = vinyl(LEN + 2); mix.addStereo(vl, vr, 0, 1);
-  const hum = () => (R() - 0.5) * 0.024;   // timing jitter: nobody plays exactly on the grid
+  const hum = () => (R() - 0.5) * 0.024;   // up to 12 ms of timing jitter per chord
   for (const S of SECTIONS) {
     let b = 0;
     for (const [name, beats] of S.chords) {

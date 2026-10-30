@@ -167,7 +167,7 @@ function paint(v) {
 function focus(k, scroll = true) {
   const v = top(); if (!v || !v.items[k]) return;
   v.i = k; paint(v);
-  const el = v.items[k].el; try { el.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
+  const el = v.items[k].el; try { el.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
   if (scroll && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
 }
 function refresh() { for (const v of S.stack) for (const it of v.items || []) show(it.e, it.el); }

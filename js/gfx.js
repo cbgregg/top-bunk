@@ -33,7 +33,7 @@ const GradeShader = {
       vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, sat);
-      // dark-adapted eyes: dim areas lose colour and lean blue-grey, and blacks never quite reach black (the green lights stay green)
+      // dark-adapted eyes: dim areas lose colour and lean blue-grey, and blacks are lifted slightly
       float dark = 1.0 - smoothstep(0.04, 0.36, l);
       float gr = clamp((c.g - max(c.r, c.b)) * 5.0, 0.0, 1.0);                 // the green night lights stay green
       c = mix(c, vec3(l) * vec3(0.5, 0.82, 1.5), 0.72 * night * dark * (1.0 - gr));
@@ -51,7 +51,7 @@ const GradeShader = {
 export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
-    let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* private window */ }
+    let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* ignore */ }
     this.autoQuality = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high';   // phones start lighter
     this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;

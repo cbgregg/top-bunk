@@ -1,63 +1,51 @@
 # Top Bunk: Steam store copy
 
-Everything on this page is pasted into Steamworks by hand (Store Page → Basic Info, → Description, → Supported Languages, → Mature
-Content). Steam's description fields take a BBCode subset (`[h2]`, `[b]`, `[list]`/`[*]`); the "About this game" section below is
-written in that subset so it can be pasted as-is. When the game changes, change this file with it.
-
-Re-check before the page goes live:
-
-- **Endings.** There are three, chosen by how much proof the run has found when it comes down the hall on night ten (`finaleFor` in
-  `js/main.js`): fewer than three pieces, "They never believed you"; three to six, "They saw it. Then it had them."; seven or more,
-  the drive away at dawn, "They believed you". If those thresholds change, change the About text and `press-kit.md` with them.
-- **Proof** turns up on most nights from two to nine. Night one, night ten and most car-dream nights leave none, so the copy says
-  "most nights".
-- **Steam Achievements** are in the build. Tick them in Supported Features once the 64x64 achieved and unachieved icons exist; none
-  have been made yet.
-- **System requirements** are estimates from the render pipeline, not measurements; see that section.
+Paste-ready Steamworks copy. The "About this game" block is in Steam's BBCode subset (`[h2]`, `[b]`, `[list]`/`[*]`), so it pastes
+as-is.
 
 ## Short description
 
-Steam limit: 300 characters. This one is 267.
+Steam limit: 300 characters.
 
-> Your family just moved into a cheap old farmhouse. Something tall lives in the hallway, and it only comes at night. Ten nights, a top bunk, a flashlight and your own held breath. Nobody believes you. A short first-person horror game for keyboard, mouse or controller.
+> Your family just moved into a cheap old farmhouse. Something tall lives at the end of the hall, and it only comes out at night. You've got a top bunk, a flashlight and ten nights to make your parents believe you. A short first-person horror game for keyboard and mouse or controller.
 
 ## About this game (long description, BBCode)
 
 ```
 [b]The rent on the old farmhouse was cheap. Now we know why.[/b]
 
-You are a kid. Your family has just moved into a rented farmhouse at the end of a gravel drive, and the landlord mentioned the last family left in a hurry. You get the top bunk in the back corner room, next to the bathroom. Somebody left a crayon drawing taped to the hallway wall: a tall black shape with huge white eyes and a big smile. It says HE WATCHES.
+You're the kid. Your family just moved into a rented farmhouse at the end of a gravel drive, and the landlord let slip that the last family left in a hurry. You get the top bunk in the back corner room, next to the bathroom. Someone left a crayon drawing taped to the hallway wall: a tall black shape with huge white eyes and a big smile. Under it, in red, it says HE WATCHES.
 
-Then it is night, and you really, really need to pee.
+At 2:47 that first night, the house wakes up.
 
 [h2]Ten nights[/h2]
-Top Bunk is a short first-person horror game played over ten nights in one house. Night one, the house wakes up: doors shut by themselves, the photo in the hall comes off the wall, every cabinet in the kitchen bangs at once, and something walks around your bunk while you hold your breath under the covers. From night two the house is yours to explore, a clock runs toward dawn, and the thing in the hallway is hunting you.
+Top Bunk is a short first-person horror game set over ten nights in one house. On night one, doors shut by themselves, the photo in the hall comes off the wall, every cabinet in the kitchen bangs at once, and something walks around your bunk while you hold your breath under the covers. From night two the whole house is open, a clock runs toward dawn, and the thing in the hallway hunts you.
 
-Every run has a seed, and the seed decides what each night is about. Among them: the phone ringing in the dining room in the small hours, the TV turning itself on with Dad standing in front of it, Mom calling you to the kitchen when Mom is asleep, the power going out with the breaker in the utility room, your bear turning up somewhere it should not be, a night where you cannot move at all, a drive to the store that is not a drive to the store, and a long vigil by candlelight. Survive the night and you get breakfast. Get caught and you do that night again.
+Each run has a seed, and the seed picks what each night is about. The phone rings in the dining room in the middle of the night. The TV switches itself on with Dad standing in front of it. Mom calls you to the kitchen while she's asleep down the hall. The power cuts out and the breaker's in the utility room. Your bear turns up where you didn't leave it. There's a night you can't move, a drive in the family car you have to wake up from, and a long night sitting up with grandpa by candlelight. Make it to dawn and you get breakfast. Get caught and you play the night again.
 
 [h2]Hide. Hold your breath.[/h2]
-It is bigger than you and faster than you. You do not fight it. You run, you break its line of sight, and you hide: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. When it is close enough to hear you, you hold your breath, and the breath meter runs down while it stands there, tilts its head, and waits. Let go too early and it has you. Hold too long and your lungs give out.
+It's bigger and faster than you, and you can't fight it. Break its line of sight and hide: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. When it's close enough to hear you, hold your breath. The meter drains while it stands there with its head tilted, waiting. Let go too early and it has you. Hold on too long and you gasp, and it has you anyway.
 
-You have a flashlight, two legs that get tired, doors you can shut behind you, and a house whose geography you had better learn fast.
+You've got a flashlight and doors you can shut behind you. Sprinting wears you out fast, so learn the house.
 
 [h2]The house[/h2]
-A single-storey farmhouse from the early 2000s: the brown carpet, the floral wallpaper, the white kitchen, the narrow hall of family photos, the box TV, the dining-room wall phone, the utility room with the breaker panel, the yard with the moving truck still parked on the gravel. Every night the house does a little more.
+A single-storey farmhouse from the early 2000s, with brown carpet, a white kitchen, a narrow hall of family photos, a box TV and a phone on the dining-room wall. The breaker panel is out in the utility room, and the moving truck is still parked on the gravel.
 
 [h2]Nobody believes you[/h2]
-Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Most nights the house leaves something behind; find it, and you have something to show them in the morning. Show them enough and they start to listen.
+You tell them at breakfast and they explain it away. The tap was left running. The breaker tripped. You must have dropped the bear in the hall. Most nights the house leaves something behind, and if you find it, you've got something to show them. Show them enough and they start to listen.
 
-There are three endings. Which one you get depends on how much proof you have found by the tenth night, when it finally comes down the hall.
+There are three endings. Which one you get depends on how much proof you've found by the tenth night, when it finally comes down the hall.
 
 [h2]Features[/h2]
 [list]
 [*] A short horror story over ten nights in one house
-[*] Seeded runs: the same seed replays the same ten nights; a new seed shuffles what each night is about
-[*] Hiding spots, a breath meter, a flashlight, stamina, and doors you can close
-[*] Proof to find: most nights leave something behind, and what you find changes breakfast and decides which of three endings you get
-[*] The house gets worse every night: night lights die, the drawing in the hall changes, the clock lies, the TV turns itself on
-[*] Mom and Dad are voiced, with subtitles
-[*] Keyboard and mouse or a game controller, with rumble; the pause and options menus work from any of them
-[*] Graphics presets from Low to Ultra, with an Auto mode that keeps the frame rate up on ordinary laptops
+[*] Seeded runs: the same seed replays the same ten nights, and a new seed shuffles them
+[*] Hiding spots, a breath meter, a flashlight, stamina and doors that shut
+[*] Proof to find: what you turn up changes breakfast and decides which of three endings you get
+[*] The house gets worse each night: night lights die, the drawing in the hall changes, the clock lies
+[*] Every line is subtitled; Mom and Dad are fully voiced on moving day and the first morning
+[*] Keyboard and mouse or a game controller, with rumble; the menus work from either
+[*] Graphics presets from Low to Ultra, plus an Auto mode that holds the frame rate on laptops
 [*] Steam Achievements
 [/list]
 
@@ -66,12 +54,10 @@ There are three endings. Which one you get depends on how much proof you have fo
 
 ## System requirements
 
-The desktop build is the web game inside Electron (Chromium), so what it needs is what Chromium needs to run WebGL 2 at a steady
-frame rate. The OS floor is Electron's: the build ships Electron 45, whose macOS binaries need Ventura or later, and its Linux
-support covers distributions still maintained for free; check it again whenever the Electron version changes. The rest are working
-estimates from the render pipeline (HDR sky, ambient occlusion, bloom, soft shadows on High; none of
-that on Low): check them on real hardware before the page goes live, and raise the GPU line if the Low preset does not hold 30 fps
-on it. Steamworks has one block per OS; the lines are the same except where noted.
+The desktop build is the web game inside Electron 45 (Chromium), so it needs what Chromium needs to run WebGL 2 at a steady frame
+rate. The OS lines are Electron 45's own floor (macOS 13 Ventura or later; Linux distributions that are still maintained). The rest
+are estimates from the render pipeline, not measurements: High adds HDR sky, ambient occlusion, bloom and soft shadows, and Low has
+none of them. Steamworks has one block per OS; the lines are the same except where noted.
 
 ### Minimum
 
@@ -102,7 +88,7 @@ on it. Steamworks has one block per OS; the lines are the same except where note
 - **Jump scares**, with loud sudden sounds (screams, stingers, slams). Headphones are recommended, which makes the loud parts louder.
 - **Flashing lights / photosensitivity**: lights flicker and strobe (night lights, the bathroom light, TV static, white screen flashes
   on scares, a distorted colour "nightmare" effect on one night). Put the photosensitivity line on the store page and keep it on the
-  title screen.
+  title screen. Options → Reduce flashing softens them.
 - Implied violence against the player character (it catches you: it lunges, a scream, a white flash and a cut to black; no injury is
   shown).
 - One ending has it take the parents, on screen but abstract: it takes hold of each of them and pulls them down out of sight, with
@@ -148,9 +134,10 @@ end screens are all confirmed usable from a pad; until then *Partial Controller 
 
 | Language | Interface | Full audio | Subtitles |
 | --- | --- | --- | --- |
-| English | yes | yes | yes |
+| English | yes | no | yes |
 
-No other languages. The voice lines are English only; every voice line is subtitled.
+English only. Every line is subtitled. Moving day and the first morning are fully voiced; from the second morning on, most lines
+play as a murmur under the subtitle, so leave Full audio unticked.
 
 ## Tags
 
@@ -174,7 +161,7 @@ Genre (Basic Info): Indie, Adventure. Steam does not have a Horror genre; the Ho
 
 Steam requires its own Mature Content survey; official ratings are optional but free through the IARC questionnaire in Steamworks
 (gives ESRB, PEGI, USK, ClassInd, ACB and GRAC in one go) and some regions and promotions need them. Answer it from the content list
-above, truthfully:
+above:
 
 - Violence: horror and fear themes; the player character is caught by a monster (implied, cut to black); in one ending the monster
   takes the parents, pulled down out of sight with cracking and chewing sounds and a red flash, without blood, wounds or bodies.
@@ -182,7 +169,11 @@ above, truthfully:
 - Language: mild, infrequent (one or two exclamations).
 - Sex and nudity, drugs, alcohol, gambling, user-generated content, in-game purchases, user interaction, location sharing: none.
 
-Expected outcome is in the Teen / PEGI 16 range because of the horror intensity rather than any explicit content; do not state a
-rating on the page until the questionnaire has returned one. Upload seven screenshots (07, the closet, is too dark at thumbnail size)
-and mark at least four as suitable for all ages: 02 (your room), 03 (the drawing), 06 (breakfast) and 08 (the TV, with a man's back to
-you) have no creature in frame and are the safe choices; 01, 04 and 05 show the thing and can stay mature-only if the review asks.
+Don't put a rating on the page until the questionnaire returns one. Mark at least four screenshots as suitable for all ages: 02 (your
+room), 03 (the drawing), 06 (breakfast) and 07 (the TV, with a man's back to you) have no creature in frame; 01, 04 and 05 show the
+thing and can stay mature-only if the review asks.
+
+## Before the page goes live
+
+- Make the 64×64 achieved and unachieved achievement icons, then tick *Steam Achievements* in Supported Features.
+- Try the system requirements on real hardware, and raise the minimum GPU if the Low preset can't hold 30 fps on it.

@@ -1,7 +1,7 @@
 # Achievements
 
 `achievements.json` lists the game's 26 achievements with the fields the Steamworks form asks for. The
-game's own copy is `ACHIEVEMENTS` in `../js/achievements.js`. Keep the two lists the same.
+game's own copy is `ACHIEVEMENTS` in `../js/achievements.js`; `npm run check` fails when the two differ.
 
 ## Entering them in Steamworks
 
@@ -13,7 +13,7 @@ Each achievement is entered by hand, one form per entry in the file.
    - **Display Name**: `displayName`.
    - **Description**: `description`.
    - **Hidden**: tick it when `hidden` is `true`. Steam keeps the name and description out of sight until it unlocks.
-   - **Icons**: an achieved and an unachieved image. Sizes are in section 5 of `../STEAM.md`.
+   - **Icons**: an achieved and an unachieved image, 64×64 JPG each.
    - Leave the rest at the defaults. `TRY_AGAIN` needs no progress stat: the game counts it itself.
 3. Save, and go on to the next entry.
 4. When they are all in, publish from the **Publish** tab. Steam only uses them once they are published.

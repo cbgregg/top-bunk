@@ -1,7 +1,7 @@
 'use strict';
 // Runs in the page's isolated world before js/main.js, sandboxed (only `electron` is requirable here).
 // window.desktop is everything the game can see of Electron and Steam. All async calls resolve to a
-// boolean and never reject, so game code can fire and forget: `window.desktop?.achieve('FIRST_NIGHT')`.
+// boolean and never reject, so game code can fire and forget: `window.desktop?.achieve('NIGHT_1')`.
 const { contextBridge, ipcRenderer } = require('electron');
 
 const info = ipcRenderer.sendSync('desktop:info') || {};

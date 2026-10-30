@@ -5,10 +5,10 @@ what ships. Nothing in this folder is loaded by the game.
 
 | File | What it is | Where it goes in Steamworks |
 | --- | --- | --- |
-| `description.md` | Short description, "About this game" (BBCode), system requirements, content warnings, AI-generated content disclosure, input, languages, tags, age-rating notes, and a list of claims to re-check before the page goes live | Store Page → Basic Info (name, short description, genre, tags, supported features, languages, the AI-content questions) · Store Page → Description · Store Page → Mature Content · the IARC questionnaire |
+| `description.md` | Short description, "About this game" (BBCode), system requirements, content warnings, AI-generated content disclosure, input, languages, tags, age-rating notes, and what is left to do before the page goes live | Store Page → Basic Info (name, short description, genre, tags, supported features, languages, the AI-content questions) · Store Page → Description · Store Page → Mature Content · the IARC questionnaire |
 | `press-kit.md` | One-paragraph pitch, fact sheet, feature bullets, asset list | Not a Steamworks field: your website / press emails; the pitch and features also feed the Steam page |
 | `shots.js` | Playwright script: drives the live game headless and captures the screenshots | |
-| `screenshots/01…08.png` | Eight 1920×1080 in-game screenshots | Store Page → Graphical Assets → Screenshots: upload all but 07, which is too dark to read as a thumbnail (Steam needs five); mark at least four "suitable for all ages" |
+| `screenshots/01…07.png` | Seven 1920×1080 in-game screenshots | Store Page → Graphical Assets → Screenshots (Steam needs five); mark at least four "suitable for all ages" |
 | `capsules/*.html` | One HTML template per capsule, composed from the screenshots plus the title typography (`capsule.css` holds the shared look, `capsule.js` the ready signal and the `?s=2` zoom) | |
 | `capsules/src/` | Wide (3840×1240) and tall (1000×1400) source renders for the capsules, from `shots.js --extra` | |
 | `render_capsules.js` | Renders every template to `out/` at its exact size | |
@@ -27,19 +27,19 @@ what ships. Nothing in this folder is loaded by the game.
 Rules Steam enforces on the capsules: the logo must be legible at the displayed size, no review quotes, award badges or discount
 text, and the screenshots must be in-game captures with no marketing text or UI mock-ups. The base capsules may show only game
 artwork, the game's name and an official subtitle, so the capsules here carry the title and nothing else; the tagline stays in the
-"About this game" text. The sizes above are the ones this folder produces; Steamworks prints the sizes it currently wants on each upload form,
-and the form wins when they disagree (the `_2x` renders exist for the two capsules Steam has already doubled).
+"About this game" text. The sizes above are the ones this folder produces; Steamworks shows the sizes it wants on each upload form
+(the `_2x` renders exist for the two capsules Steam has doubled).
 
 ## Regenerating
 
-Playwright with Chromium is needed (`npx playwright install chromium` once). Rendering is headless on SwiftShader, so a 1080p frame
-takes tens of seconds to a minute; the whole screenshot set is a ten to twenty minute job on a laptop.
+Playwright with Chromium is needed (`npm install`, then `npx playwright install chromium` once). Rendering is headless on SwiftShader,
+so it needs no GPU.
 
 ```sh
-node store/shots.js                 # the eight screenshots -> store/screenshots/
+node store/shots.js                 # the seven screenshots -> store/screenshots/
 node store/shots.js --extra         # plus the capsule sources -> store/capsules/src/
 node store/shots.js --preview       # fast 960x540 framing pass into a temp folder (prints the path)
-node store/shots.js --only 05,08    # just some of them
+node store/shots.js --only 05,07    # just some of them
 node store/render_capsules.js       # every template -> store/out/
 node store/render_capsules.js --only header,logo --shots /some/other/screenshots
 ```
@@ -57,5 +57,5 @@ electron-builder turns into the Windows `.ico` and the macOS `.icns`.
 
 - The trailer (`trailer/`; Steam wants 1920×1080 H.264 MP4 with a 1920×1080 thumbnail).
 - Achievement icons: a 64×64 JPG pair (achieved and unachieved) for each entry in `steam/achievements.json`. None are made yet.
-- A real developer name, website and press contact: `press-kit.md` and `description.md` carry placeholders where those go.
+- The developer name and press contact in `press-kit.md`.
 - Localised copy: the page is English only, which `description.md` says.

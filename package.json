@@ -23,7 +23,8 @@
   },
   "devDependencies": {
     "electron": "45.1.0",
-    "electron-builder": "26.18.0"
+    "electron-builder": "26.18.0",
+    "playwright": "1.63.0"
   },
   "optionalDependencies": {
     "steamworks.js": "0.4.0"

@@ -1,3 +1,4 @@
+// Retargeting for export.html: maps the Mixamo bones of Xbot.glb onto the Rocketbox Biped skeleton and bakes the clips onto it.
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';

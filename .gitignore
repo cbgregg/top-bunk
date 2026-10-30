@@ -11,5 +11,3 @@ Thumbs.db
 # python tooling
 __pycache__/
 *.pyc
-
-# desktop/steam_appid.txt is deliberately tracked: it carries the Steam App ID the shell starts with.

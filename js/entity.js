@@ -1,4 +1,4 @@
-// The tall one. Black, long-limbed, huge white eyes with big black pupils, and that smile.
+// The thing: a stretched black body, white eyes with black pupils, and the grin texture on the head bone.
 import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
@@ -71,7 +71,7 @@ export class Entity {
     this.lookTarget = null;
     this.root.visible = false;
 
-    // the real body: a black Rocketbox man stretched tall, animated with baked Mixamo clips (the cylinder body stays as the fallback)
+    // the rigged body: a black Rocketbox man stretched tall, animated with baked Mixamo clips (the cylinder body stays as the fallback)
     this.rig = null;
     Promise.all([loadModel('spirit'), loadAnims()]).then(([gltf, clips]) => this.useRig(new Rig(gltf, clips)))
       .catch((e) => console.warn('spirit model failed, keeping the simple body:', e));

@@ -177,7 +177,7 @@ async function main() {
     } finally { if (saved === undefined) delete process.env.SteamAppId; else process.env.SteamAppId = saved; }
   });
   await test('achievement API names are validated', () => {
-    for (const good of ['FIRST_NIGHT', 'ach.night-1', 'A']) assert.ok(steam.ID_RE.test(good), good);
+    for (const good of ['NIGHT_1', 'ach.night-1', 'A']) assert.ok(steam.ID_RE.test(good), good);
     for (const bad of ['', 'has space', 'x'.repeat(129), 'quote"', 'semi;colon']) assert.ok(!steam.ID_RE.test(bad), JSON.stringify(bad));
   });
   await test('no-op bridge when disabled, when the module is missing, and when init throws; logs once', async () => {
@@ -211,15 +211,15 @@ async function main() {
     assert.strictEqual(rec.init, 480);
     assert.strictEqual(rec.overlay, 1);
     assert.strictEqual(b.playerName, 'Tester');
-    assert.strictEqual(b.achieve('FIRST_NIGHT'), true);
-    assert.deepStrictEqual(rec.activated, ['FIRST_NIGHT']);
+    assert.strictEqual(b.achieve('NIGHT_1'), true);
+    assert.deepStrictEqual(rec.activated, ['NIGHT_1']);
     assert.strictEqual(rec.stored, 1, 'stats.store() after a successful activate');
     assert.strictEqual(b.achieve('bad id!'), false);
-    assert.deepStrictEqual(rec.activated, ['FIRST_NIGHT'], 'invalid names never reach Steam');
-    assert.strictEqual(b.isAchieved('FIRST_NIGHT'), true);
+    assert.deepStrictEqual(rec.activated, ['NIGHT_1'], 'invalid names never reach Steam');
+    assert.strictEqual(b.isAchieved('NIGHT_1'), true);
     assert.strictEqual(b.isAchieved('OTHER'), false);
-    assert.strictEqual(b.clearAchievement('FIRST_NIGHT'), true);
-    assert.deepStrictEqual(rec.cleared, ['FIRST_NIGHT']);
+    assert.strictEqual(b.clearAchievement('NIGHT_1'), true);
+    assert.deepStrictEqual(rec.cleared, ['NIGHT_1']);
     assert.strictEqual(rec.stored, 2);
     const rec2 = record();
     const b2 = steam.create({ module: fakeSteam(rec2, { activateOk: false }), appId: 480, overlay: false, log: quiet });
@@ -343,6 +343,13 @@ async function main() {
     for (const f of ['steam/upload.sh', 'steam/upload.ps1', 'steam/README.md']) assert.ok(exists(f), f);
     assert.ok(read('steam/upload.sh').includes('+run_app_build') && read('steam/upload.ps1').includes('+run_app_build'));
     if (process.platform !== 'win32') assert.ok(fs.statSync(path.join(ROOT, 'steam/upload.sh')).mode & 0o111, 'upload.sh has the executable bit');
+  });
+  await test('steam/achievements.json is the same list as ACHIEVEMENTS in js/achievements.js', async () => {
+    // a data: URL loads it as an ES module without a "type" in package.json (it has no imports of its own)
+    const { ACHIEVEMENTS } = await import('data:text/javascript,' + encodeURIComponent(read('js/achievements.js')));
+    const steamList = JSON.parse(read('steam/achievements.json')).map((a) => [a.apiName, a.displayName, a.description, a.hidden]);
+    assert.deepStrictEqual(steamList, ACHIEVEMENTS.map((a) => [a.id, a.name, a.desc, a.hidden]));
+    for (const a of ACHIEVEMENTS) assert.ok(steam.ID_RE.test(a.id), `${a.id} is a valid API name`);
   });
 
   section('.github/workflows/desktop.yml');

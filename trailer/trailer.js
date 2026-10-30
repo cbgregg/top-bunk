@@ -1,4 +1,4 @@
-// TOP BUNK trailer: the shot list and the player that drives the real game through window.__game.
+// TOP BUNK trailer: the shot list and the player that drives the game through window.__game.
 // Loaded by trailer/render.js (headless, frame by frame with a frozen clock) and by trailer/boot.js (live, in a browser at index.html?trailer=1).
 // A shot is { id, t, dur, setup(c), update(c, k) } where c is the context below. The camera is set every frame by the shot (c.cam), then the game's
 // own handheld tremor goes on top, so nothing is ever perfectly still. Text cards, captions and fades are DOM injected at runtime.
@@ -171,7 +171,7 @@ export function attach(game, opts = {}) {
     P.cam.set(pos[0], pos[1], pos[2]); P.yaw = cam.yaw; P.pitch = cam.pitch; P.roll = cam.roll || 0;
     game.cam();   // the game places the camera from P and adds its own tremor and shake, and the thing looks at it
     if (shot.post) shot.post(c);   // (after the game has posed the thing: a shot can still bend a limb for this frame)
-    if (cam.sway) {   // the handheld layer: a phone held by a person, never a tripod
+    if (cam.sway) {   // handheld drift: layered noise on yaw, pitch and roll, plus a slow sine
       const t = c.t, s = cam.sway * 0.007;
       camera.rotation.y += wobble(t * 1.9, 3) * s + Math.sin(t * 0.31) * 0.012;
       camera.rotation.x += wobble(t * 2.3, 4) * s + Math.sin(t * 0.23 + 1) * 0.009;
@@ -223,7 +223,7 @@ export function attach(game, opts = {}) {
       // a real company's badge on the haunted TV has no place in an ad
       if (!plainTv(game.scene)) console.warn('trailer: the TV model had no texture to clean');
       g.reset();
-      try { await document.fonts.load('bold 40px "Gloria Hallelujah"'); await document.fonts.ready; } catch (e) { /* fine */ }
+      try { await document.fonts.load('bold 40px "Gloria Hallelujah"'); await document.fonts.ready; } catch (e) { /* ignore */ }
       // compile every lighting variant now instead of in the middle of a shot
       const rt = game.gfx.composer && game.gfx.composer.renderTarget1;
       try { for (const p of ['title', 'day', 'morning', 'night']) { game.setPhase(p, true); if (rt) game.renderer.setRenderTarget(rt); await game.renderer.compileAsync(game.scene, camera); game.renderer.setRenderTarget(null); } } catch (e) { game.renderer.setRenderTarget(null); }

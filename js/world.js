@@ -23,7 +23,7 @@ export const ROOMS = {
   living: [-3.3, 3.3, -4.5, -0.3],   // front door, picture window
   kitchen: [-1.4, 3.3, -0.3, 3.6],
   dining: [-3.3, -1.4, -0.3, 3.6],
-  entry: [-8.1, -3.3, -3.9, 3.6],    // the utility room (lower wing)
+  utility: [-8.1, -3.3, -3.9, 3.6],  // the lower wing
 };
 
 export function roomAt(x, z) {
@@ -48,19 +48,14 @@ export function buildWorld(scene) {
   const solid = (minX, maxX, minZ, maxZ, extra = {}) => { const c = { minX, maxX, minZ, maxZ, on: true, ...extra }; colliders.push(c); return c; };
 
   const T = {
-    wood: TX.woodFloor(), wall: TX.wallpaper(), kid: TX.kidWallpaper(), plaster: TX.plaster(), tile: TX.tile(),
+    plaster: TX.plaster(), tile: TX.tile(),
     siding: TX.siding(), grass: TX.grass(), dirt: TX.dirt(), shingles: TX.shingles(), barn: TX.barnBoards(),
-    plaid: TX.plaid(), rug: TX.rug(), runner: TX.runner(), mattress: TX.mattress(),
-    drawing0: TX.drawing(0), drawing1: TX.drawing(1), paint0: TX.painting(0), paint1: TX.painting(1), paint2: TX.painting(2), paint3: TX.painting(3), paint4: TX.painting(4),
+    plaid: TX.plaid(), rug: TX.rug(), mattress: TX.mattress(),
+    drawing0: TX.drawing(0), drawing1: TX.drawing(1), painting: TX.painting(),
     floralA: TX.floral('#cdaaa3', '#a4505f', '#6d8461', 41), floralB: TX.floral('#9fb7ab', '#d98c8c', '#496b5c', 52), floralC: TX.floral('#8d5a60', '#d6b0a0', '#4d6a50', 63),
-    borderRose: TX.border('#a4505f', '#6d8461', '#eadfc8'), borderTeal: TX.border('#d98c8c', '#496b5c', '#e4efe8'), borderBlue: TX.border('#5b7fb0', '#c9a24a', '#ece6d4'),
-    winDay: TX.windowTex('day'), winNight: TX.windowTex('night'), winMorning: TX.windowTex('morning'),
   };
   const std = (o) => new THREE.MeshStandardMaterial(o);
   const M = {
-    floor: std({ map: T.wood, roughness: 0.72 }),
-    wall: std({ map: T.wall, roughness: 0.93 }),
-    kid: std({ map: T.kid, roughness: 0.93 }),
     plaster: std({ map: T.plaster, roughness: 0.96 }),
     tile: std({ map: T.tile, roughness: 0.32 }),
     siding: std({ map: T.siding, roughness: 0.86 }),
@@ -72,9 +67,6 @@ export function buildWorld(scene) {
     white: std({ color: 0xd9d3c5, roughness: 0.55 }),
     furn: std({ color: 0x5a3e2c, roughness: 0.65 }),
     darkWood: std({ color: 0x33221a, roughness: 0.6 }),
-    door: std({ color: 0x5f4d3e, roughness: 0.7 }),
-    doorInset: std({ color: 0x4d3d30, roughness: 0.75 }),
-    porcelain: std({ color: 0xe6e4dd, roughness: 0.2 }),
     metal: std({ color: 0x9a9a9a, roughness: 0.3, metalness: 0.85 }),
     black: std({ color: 0x111111, roughness: 0.5 }),
     couch: std({ color: 0x5b4a3a, roughness: 1 }),
@@ -83,7 +75,6 @@ export function buildWorld(scene) {
     plaid: std({ map: T.plaid, roughness: 1 }),
     pillow: std({ color: 0xe8e2d6, roughness: 1 }),
     rug: std({ map: T.rug, roughness: 1 }),
-    runner: std({ map: T.runner, roughness: 1 }),
     concrete: std({ color: 0x77736b, roughness: 1 }),
     truck: std({ color: 0xe8e6e0, roughness: 0.5 }),
     truckCab: std({ color: 0xa1342a, roughness: 0.45 }), garageDoor: std({ color: 0xcfc9b8, roughness: 0.6 }),
@@ -94,34 +85,26 @@ export function buildWorld(scene) {
     silo: std({ color: 0x8c9294, roughness: 0.6, metalness: 0.4 }),
     fence: std({ color: 0x6b5d4c, roughness: 1 }),
     counter: std({ color: 0xb9b2a0, roughness: 0.4 }),
-    cabinet: std({ color: 0x7c8a78, roughness: 0.7 }),
-    fridge: std({ color: 0xd8d3c2, roughness: 0.35 }),
     crt: std({ color: 0x2a2a28, roughness: 0.6 }),
     crtScreen: std({ color: 0x1c2420, roughness: 0.1, metalness: 0.3 }),
     mirror: std({ color: 0x9aa0a4, roughness: 0.08, metalness: 1 }),
     lamp: std({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.6 }),
     // 2002: dark brown carpet everywhere, white doors, plain white cabinets and appliances, oak and brass
     carpet: std({ color: 0x4a3526, roughness: 1 }), lino: std({ color: 0xd6cbae, roughness: 0.45 }), slate: std({ color: 0x5c5a56, roughness: 0.7 }), bathFloor: std({ color: 0xd8bfc2, roughness: 0.3 }),
-    pinkTile: std({ map: T.tile, color: 0xe6b3bd, roughness: 0.25 }), brick: std({ color: 0xa0553f, roughness: 0.95 }), panel: std({ color: 0xc89a64, roughness: 0.7 }), butter: std({ color: 0xe6d28c, roughness: 0.92 }), drywall: std({ color: 0xe6e4de, roughness: 0.95 }),
-    floralA: std({ map: T.floralA, roughness: 0.92 }), floralB: std({ map: T.floralB, roughness: 0.92 }), floralC: std({ map: T.floralC, roughness: 0.92 }), hallpaper: std({ map: T.wall, roughness: 0.92 }),
-    borderRose: std({ map: T.borderRose, roughness: 0.8 }), borderTeal: std({ map: T.borderTeal, roughness: 0.8 }), borderBlue: std({ map: T.borderBlue, roughness: 0.8 }),
+    pinkTile: std({ map: T.tile, color: 0xe6b3bd, roughness: 0.25 }), brick: std({ color: 0xa0553f, roughness: 0.95 }), drywall: std({ color: 0xe6e4de, roughness: 0.95 }),
+    floralB: std({ map: T.floralB, roughness: 0.92 }),
     doorW: std({ color: 0xece8de, roughness: 0.5 }), doorInsetW: std({ color: 0xdcd7ca, roughness: 0.6 }), barnDoor: std({ color: 0xd8d3c4, roughness: 0.8 }),
     cabW: std({ color: 0xe9e6dc, roughness: 0.42 }), cabLine: std({ color: 0xc9c5b8, roughness: 0.6 }), appW: std({ color: 0xf1efe9, roughness: 0.28 }),
     brass: std({ color: 0xc9a14a, roughness: 0.28, metalness: 0.9 }), oak: std({ color: 0x9c6b3c, roughness: 0.55 }), heater: std({ color: 0xe6e2d6, roughness: 0.5 }),
-    steelSink: std({ color: 0xc9cccf, roughness: 0.25, metalness: 1 }), carpetLid: std({ color: 0x8e4a5c, roughness: 1 }),
+    steelSink: std({ color: 0xc9cccf, roughness: 0.25, metalness: 1 }),
     showerCurtain: std({ map: T.floralB, roughness: 0.85, side: THREE.DoubleSide, transparent: true, opacity: 1 }), valance: std({ map: T.floralA, roughness: 0.95, side: THREE.DoubleSide }),
   };
   M.curtain.map = T.floralC; M.curtain.color.set(0xffffff);
-  for (const k of ['pinkTile', 'carpet', 'lino', 'slate', 'bathFloor', 'brick', 'panel', 'butter', 'oak', 'cabW', 'borderRose', 'borderTeal', 'borderBlue']) M[k].userData.worldUV = true;
-  for (const k of ['furn', 'darkWood', 'door', 'doorInset', 'fence', 'concrete', 'plaid', 'mattress', 'pillow', 'roof', 'silo']) M[k].userData.worldUV = true;
-  // real PBR surfaces (they replace the canvas textures as they load)
-  applyPBR(M.floor, 'floor');
-  applyPBR(M.hallpaper, 'wall', { normal: 1.1, keepMap: true });
-  applyPBR(M.kid, 'wall', { normal: 1.1, keepMap: true });
-  for (const k of ['floralA', 'floralB', 'floralC']) applyPBR(M[k], 'wall', { normal: 1.1, keepMap: true });
-  applyPBR(M.butter, 'wall', { tint: 0xe6d28c, normal: 1.0 });
+  for (const k of ['pinkTile', 'carpet', 'lino', 'slate', 'bathFloor', 'brick', 'oak', 'cabW']) M[k].userData.worldUV = true;
+  for (const k of ['furn', 'darkWood', 'fence', 'concrete', 'plaid', 'mattress', 'pillow', 'roof', 'silo']) M[k].userData.worldUV = true;
+  // PBR sets replace the canvas textures as they load
+  applyPBR(M.floralB, 'wall', { normal: 1.1, keepMap: true });
   applyPBR(M.drywall, 'wall', { tint: 0xe4e2dc, normal: 0.7 });
-  applyPBR(M.panel, 'panel', { normal: 1.0 });
   applyPBR(M.carpet, 'carpet', { normal: 1.4 });
   applyPBR(M.lino, 'tile', { tint: 0xd8ccb0, tile: 0.5 });
   applyPBR(M.bathFloor, 'tile', { tint: 0xd8b8bd, tile: 0.3 });
@@ -139,26 +122,18 @@ export function buildWorld(scene) {
   applyPBR(M.fence, 'darkwood', { tint: 0xc8bba8 });
   applyPBR(M.furn, 'pine', { tint: 0x9a7556 });
   applyPBR(M.darkWood, 'darkwood', { tint: 0xa89888 });
-  applyPBR(M.door, 'pine', { tint: 0x7a5e48 });
-  applyPBR(M.doorInset, 'pine', { tint: 0x6a5240 });
   applyPBR(M.plaid, 'plaid', { rough: 1 });
   applyPBR(M.mattress, 'linen', { tint: 0xe8e2d4 });
   applyPBR(M.pillow, 'linen', { tint: 0xf2eee4 });
   applyPBR(M.silo, 'metal', { tint: 0xb8bcc0, anti: true });
   M.gable = std({ map: T.siding, side: THREE.DoubleSide, roughness: 0.86 }); applyPBR(M.gable, 'siding', { tint: 0xe0a468, normal: 1.1 });
-  const winMat = new THREE.MeshBasicMaterial({ map: T.winDay });
 
   const house = new THREE.Group(); scene.add(house);
   const yard = new THREE.Group(); scene.add(yard);
 
-  const WALLMAT = { bed: 'drywall', hall: 'drywall', living: 'drywall', room2: 'drywall', parents: 'drywall', kitchen: 'drywall', dining: 'drywall', entry: 'drywall', bath: 'drywall' };   // one wall finish per room (all of them plain drywall)
-  function wallMatAt(px, pz) {
-    const r = roomAt(px, pz);
-    return r === 'out' ? M.siding : M[WALLMAT[r]] || M.wall;
-  }
+  const wallMatAt = (px, pz) => (roomAt(px, pz) === 'out' ? M.siding : M.drywall);
 
-
-  // stand-in furniture is tagged so it can be hidden when its real model arrives
+  // stand-in furniture is tagged so it can be hidden when its model arrives
   let curTag = null; const tagged = {};
   const tagStart = (k) => { curTag = tagged[k] = tagged[k] || []; }, tagEnd = () => { curTag = null; };
 
@@ -180,7 +155,7 @@ export function buildWorld(scene) {
     return mesh;
   }
 
-  // Box with rounded edges (the fixtures: they catch the light like real ones). Same bounds as box().
+  // Box with rounded edges, for fixtures (the bevel picks up a highlight along each edge). Same bounds as box().
   function rbox(x0, x1, y0, y1, z0, z1, mat, r = 0.02, o = {}) {
     const geo = new RoundedBoxGeometry(x1 - x0, y1 - y0, z1 - z0, 3, Math.min(r, (x1 - x0) / 2.01, (y1 - y0) / 2.01, (z1 - z0) / 2.01));
     geo.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
@@ -188,7 +163,6 @@ export function buildWorld(scene) {
     const m = new THREE.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = true; (o.parent || defParent || house).add(m); return m;
   }
   // ---------- walls ----------
-  const BORDER = {};   // no wallpaper borders: the walls are blank
   const cutsX = [...new Set(Object.values(ROOMS).flatMap((r) => [r[0], r[1]]))], cutsZ = [...new Set(Object.values(ROOMS).flatMap((r) => [r[2], r[3]]))];
   function trims(b, alongX) {
     for (const s of [1, -1]) {
@@ -200,7 +174,6 @@ export function buildWorld(scene) {
         else { const f = s > 0 ? b[1] : b[0]; box(Math.min(f, f + s * th), Math.max(f, f + s * th), y0, y1, b[4], b[5], mat, { uv: mat !== M.trim }); }
       };
       strip(0, 0.11, 0.022);
-      if (BORDER[room] && b[3] > 2.3) strip(2.0, 2.2, 0.008, M[BORDER[room]]);   // wallpaper border near the ceiling
     }
   }
   function casing(alongX, fixed, gp) {
@@ -226,11 +199,9 @@ export function buildWorld(scene) {
       if (alongX) m.position.set(gp.c, 0, fixed + off); else { m.rotation.y = -Math.PI / 2; m.position.set(fixed - off, 0, gp.c); }
       house.add(m); return m;
     };
-    for (const side of [-1, 1]) {   // each half takes its own room's finish
-      const probe = alongX ? roomAt(gp.c, fixed + side * 0.3) : roomAt(fixed + side * 0.3, gp.c);
-      const mat = M[WALLMAT[probe]] || M.wall;
+    for (const side of [-1, 1]) {
       const g = new THREE.ExtrudeGeometry(spandrel, { depth: WT / 2, bevelEnabled: false, curveSegments: 20 });
-      place(g, side < 0 ? -WT / 2 : 0, mat);
+      place(g, side < 0 ? -WT / 2 : 0, M.drywall);
     }
     const bg = new THREE.ExtrudeGeometry(band, { depth: WT + 0.05, bevelEnabled: false, curveSegments: 20 }); bg.translate(0, sp, 0);
     place(bg, -WT / 2 - 0.025, M.white);
@@ -288,7 +259,7 @@ export function buildWorld(scene) {
   wall(-1.4, -0.3, 3.3, -0.3, [{ c: 1.7, w: 1.4, top: 1.85, arch: true }]);   // the middle wall between the living room and the kitchen, with the arch (the dining end is open to the living room)
 
   // floors & ceiling: dark brown carpet through the whole house except the wet rooms
-  const FLOORMAT = { bath: M.bathFloor, kitchen: M.lino, dining: M.lino, entry: M.slate };   // old-school tile in the wet rooms, brown carpet everywhere else
+  const FLOORMAT = { bath: M.bathFloor, kitchen: M.lino, dining: M.lino, utility: M.slate };
   for (const k in ROOMS) { const r = ROOMS[k]; box(r[0], r[1], -0.1, 0, r[2], r[3], FLOORMAT[k] || M.carpet, { cast: false }); }
   box(-8.2, 8.2, H, H + 0.1, -4.6, 3.7, M.plaster);
 
@@ -320,21 +291,14 @@ export function buildWorld(scene) {
 
   // ---------- windows ----------
   const glass = std({ color: 0xffffff, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.14, side: THREE.DoubleSide, envMapIntensity: 1.5 });
-  function windowAt(alongX, fixed, c, insideSign, { sill = 0.85, w = 1.0, h = 1.25, curtains = false, real = false } = {}) {
+  function windowAt(alongX, fixed, c, insideSign, { sill = 0.85, w = 1.0, h = 1.25, curtains = false } = {}) {
     const cy = sill + h / 2;
-    if (real) {   // one pane in the opening: you see the actual yard, and the sun comes through
+    {   // one clear pane in the opening, so the yard shows through and the sun comes in
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(w + 0.02, h + 0.02), glass);
       if (alongX) pane.position.set(c, cy, fixed); else { pane.position.set(fixed, cy, c); pane.rotation.y = Math.PI / 2; }
       pane.userData.noAO = true; pane.renderOrder = 2; house.add(pane);
     }
     for (const side of [insideSign, -insideSign]) {
-      if (!real) {
-        const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), side === insideSign ? winMat : M.glassOut);
-        const off = fixed + side * (WT / 2 + 0.006);
-        if (alongX) { plane.position.set(c, cy, off); if (side < 0) plane.rotation.y = Math.PI; }
-        else { plane.position.set(off, cy, c); plane.rotation.y = side * Math.PI / 2; }
-        house.add(plane);
-      }
       // frame
       const f = fixed + side * (WT / 2 + 0.02), fa = Math.min(fixed + side * WT / 2, f), fb = Math.max(fixed + side * WT / 2, f) + 0.001;
       const fr = (a0, a1, y0, y1) => alongX ? box(a0, a1, y0, y1, fa, fb, M.white, { uv: false }) : box(fa, fb, y0, y1, a0, a1, M.white, { uv: false });
@@ -368,16 +332,16 @@ export function buildWorld(scene) {
       else box(off - 0.015, off + 0.015, sill + h + 0.3, sill + h + 0.33, c - w / 2 - 0.4, c + w / 2 + 0.4, M.darkWood, { uv: false });
     }
   }
-  windowAt(true, -4.5, 6.9, 1, { w: 1.1, curtains: true, real: true });                                   // front: bedroom at the end
-  windowAt(true, -4.5, 4.4, 1, { w: 1.3, curtains: true, real: true });                                   // front: bedroom
-  windowAt(true, -4.5, -0.6, 1, { sill: 0.55, w: 2.4, h: 1.35, curtains: true, real: true });             // front: the picture window
-  windowAt(false, 8.1, -3.5, -1, { w: 1.2, curtains: true, real: true });                                 // end wall: bedroom
-  windowAt(false, 8.1, 2.85, -1, { w: 0.8, curtains: true, real: true });                                 // end wall: YOUR room's only window
-  windowAt(false, -8.1, -1.6, 1, { w: 1.4, real: true });                                                 // utility: two windows on the west end
-  windowAt(false, -8.1, 1.8, 1, { w: 1.4, real: true });
-  windowAt(true, 3.6, 4.2, -1, { sill: 1.45, w: 0.6, h: 0.6, real: true });                               // back: bathroom
-  windowAt(true, 3.6, 1.4, -1, { sill: 1.0, w: 1.8, h: 0.9, curtains: true, real: true });                // back: kitchen, over the sink
-  windowAt(true, 3.6, -2.3, -1, { w: 1.1, curtains: true, real: true });                                  // back: dining
+  windowAt(true, -4.5, 6.9, 1, { w: 1.1, curtains: true });                                   // front: bedroom at the end
+  windowAt(true, -4.5, 4.4, 1, { w: 1.3, curtains: true });                                   // front: bedroom
+  windowAt(true, -4.5, -0.6, 1, { sill: 0.55, w: 2.4, h: 1.35, curtains: true });             // front: the picture window
+  windowAt(false, 8.1, -3.5, -1, { w: 1.2, curtains: true });                                 // end wall: bedroom
+  windowAt(false, 8.1, 2.85, -1, { w: 0.8, curtains: true });                                 // end wall: YOUR room's only window
+  windowAt(false, -8.1, -1.6, 1, { w: 1.4 });                                                 // utility: two windows on the west end
+  windowAt(false, -8.1, 1.8, 1, { w: 1.4 });
+  windowAt(true, 3.6, 4.2, -1, { sill: 1.45, w: 0.6, h: 0.6 });                               // back: bathroom
+  windowAt(true, 3.6, 1.4, -1, { sill: 1.0, w: 1.8, h: 0.9, curtains: true });                // back: kitchen, over the sink
+  windowAt(true, 3.6, -2.3, -1, { w: 1.1, curtains: true });                                  // back: dining
 
   // ---------- doors (white six-panel) ----------
   // the leaf hangs from a hinge at (hx, hz) and extends along dir; closed doors fill the gap, open ones stand against it
@@ -454,10 +418,10 @@ export function buildWorld(scene) {
     const bow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.03), std({ color: 0x9a3b4a, roughness: 0.6 })); bow.position.set(0, -0.19, 0.04); g.add(bow);
   }
   function heater(x0, x1, y, z0, z1) { rbox(x0, x1, y, y + 0.17, z0, z1, M.heater, 0.012, { cast: false }); box(x0, x1, y + 0.1, y + 0.12, z0 - 0.002, z1 + 0.002, M.black, { uv: false, cast: false }); }
-  // a framed picture: tex is a canvas texture, or the name of a real photograph in assets/photos (a painting stands in until it loads)
+  // a framed picture: tex is a canvas texture, or the name of a photograph in assets/photos (a painting stands in until it loads)
   const photoLoader = new THREE.TextureLoader();
   function picture(w, h, tex) {
-    const isPhoto = typeof tex === 'string', mat = std({ map: isPhoto ? T.paint2 : tex, roughness: 0.6 });
+    const isPhoto = typeof tex === 'string', mat = std({ map: isPhoto ? T.painting : tex, roughness: 0.6 });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     if (isPhoto) photoLoader.load(`assets/photos/${tex}.webp`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; mat.map = t; mat.needsUpdate = true;
@@ -546,7 +510,7 @@ export function buildWorld(scene) {
 
   // ---------- hallway (narrow, along the bedroom end; a gallery of family photos) ----------
   {
-    // real photographs (assets/photos: public-domain family pictures and Pacific Northwest landscapes)
+    // photographs (assets/photos: public-domain family pictures and Pacific Northwest landscapes)
     {   // this one is a loose group (it is not merged into the walls) so it can tilt and fall
       const g = new THREE.Group(); const xc = 4.75, y = 1.55, w = 0.44, h = 0.34, zf = -1.5 + WT / 2;
       g.position.set(xc, y + h / 2 + 0.05, zf + 0.03);   // pivots at its top edge
@@ -570,7 +534,7 @@ export function buildWorld(scene) {
   const tape = std({ color: 0xe8e0b8, roughness: 0.6, transparent: true, opacity: 0.8 });
   for (const [dx, dy] of [[-0.2, 0.16], [0.2, 0.16]]) { const t = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.03), tape); t.position.set(5.6 - dx, 1.08 + dy, -0.3 - WT / 2 - 0.006); t.rotation.y = Math.PI; house.add(t); }
 
-  // ---------- bathroom (long and narrow: 60 in tub with a floral curtain at the far end, toilet, pedestal sink; pink tile, wood-panel walls) ----------
+  // ---------- bathroom (long and narrow: 60 in tub with a floral curtain at the far end, toilet, pedestal sink; pink tile wainscot, drywall above) ----------
   const bathSink = new THREE.Vector3(4.5, 0.95, 0.9);
   {
     const porc = new THREE.MeshPhysicalMaterial({ color: 0xe9e7df, roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.06 });
@@ -737,7 +701,7 @@ export function buildWorld(scene) {
     for (const z of [-3.9, -3.4]) rbox(6.0, 6.5, 0.58, 0.68, z - 0.22, z + 0.22, M.pillow, 0.05);
     for (const [z0, z1] of [[-4.36, -4.34], [-3.02, -3.0]]) rbox(6.55, 7.88, 0.46, 0.66, z0, z1, M.floralB, 0.005);   // the quilt hangs over the sides
     rbox(7.86, 7.88, 0.46, 0.66, -4.36, -3.0, M.floralB, 0.005);
-    // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's real rigs lie under it, see sleepers() in main.js)
+    // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's rigs lie under it, see sleepers() in main.js)
     // and breathes. set(false) flattens it: the bed looks slept in. one('dad', false) empties his side.
     bedSleepers = (() => {
       const cl = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -798,7 +762,7 @@ export function buildWorld(scene) {
     for (let i = 0; i < 6; i++) rbox(-5.68 + (i % 2) * 0.25, -5.6 + (i % 2) * 0.25, 1.28 + Math.floor(i / 2) * 0.15, 1.34 + Math.floor(i / 2) * 0.15, -3.73, -3.715, M.black, 0.004);
     solid(-5.85, -5.15, -3.95, -3.55); }
 
-  // ---------- real furniture: each model replaces its stand-in (and collider) as it loads ----------
+  // ---------- furniture: each model replaces its stand-in (and collider) as it loads ----------
   const PI = Math.PI;
   const prop = (name, o, { tag, old = [], box: sb, after } = {}) => place(house, name, {
     ...o, hide: tag ? tagged[tag] || [] : [],
@@ -1154,7 +1118,7 @@ export function buildWorld(scene) {
     });
     trunk.castShadow = cone.castShadow = true; yard.add(trunk, cone);
   }
-  // real trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
+  // trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -21 - pad && x < -12 + pad && z > 8 - pad && z < 18 + pad);   // not on the house, porch path or truck
@@ -1242,7 +1206,7 @@ export function buildWorld(scene) {
 
   return {
     colliders, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
-    hemi, sun, stars, moon, winMat, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
+    hemi, sun, stars, moon, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
     doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
     get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },

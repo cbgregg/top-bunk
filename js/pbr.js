@@ -1,4 +1,4 @@
-// Real PBR materials: colour + normal + packed AO/roughness/metal maps (assets/pbr, made by tools/assets/fetch_pbr.py).
+// PBR materials: colour + normal + packed AO/roughness/metal maps (assets/pbr, made by tools/assets/fetch_pbr.py).
 // The canvas textures stay on the materials until these arrive, so nothing flashes and a missing file just keeps the canvas look.
 import * as THREE from 'three';
 
@@ -43,7 +43,7 @@ export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, f
   if (!t) return;
   const rep = 1 / t, base = `assets/pbr/${name}_`;
   const a = tex(base + 'a.webp', false, rep);
-  if (!keepMap) mat.map = tex(base + 'c.webp', true, rep);   // keepMap: a patterned (wallpaper) colour map stays, the PBR only adds relief
+  if (!keepMap) mat.map = tex(base + 'c.webp', true, rep);   // keepMap: a patterned colour map (the floral quilt) stays, the PBR only adds relief
   mat.normalMap = tex(base + 'n.webp', false, rep); mat.normalScale.set(normal, normal);
   mat.roughnessMap = mat.metalnessMap = mat.aoMap = a;
   mat.roughness = rough; mat.metalness = 1; mat.aoMapIntensity = 1;

@@ -1,4 +1,4 @@
-// Real furniture and plants: Poly Haven models (CC0), compressed to assets/props/*.glb by tools/assets/fetch_models.py.
+// Furniture and plants: Poly Haven models (CC0), compressed to assets/props/*.glb by tools/assets/fetch_models.py.
 // Model front is +Z, units are metres, and each one is placed by its footprint centre with its base on y.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';

@@ -1,4 +1,4 @@
-// The real people: Microsoft Rocketbox characters (assets/models/*.glb, MIT) share one Biped skeleton and one baked
+// Characters: Microsoft Rocketbox models (assets/models/*.glb, MIT) share one Biped skeleton and one baked
 // animation set (assets/models/anims.glb: Mixamo idle/walk/run/etc. retargeted onto that skeleton).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';

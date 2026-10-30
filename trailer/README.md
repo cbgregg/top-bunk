@@ -1,7 +1,7 @@
 # The TOP BUNK trailer
 
-Two cuts, both rendered from the real game. The renderer drives the live three.js scene through `window.__game` frame by frame, on a
-frozen clock, so every run comes out the same.
+Two cuts, both rendered from the game itself. The renderer drives the live three.js scene through `window.__game` frame by frame, on
+a frozen clock, so every run comes out the same.
 
 | Cut | Length | Presets | For |
 |---|---|---|---|
@@ -40,50 +40,33 @@ Other flags: `--quality high|medium|low`, `--res 0.5..1` (render scale), `--shad
 frames kept in the `--scratch` folder), `--resume` (skip frames already on disk), `--no-warp`, `--no-audio`, `--letterbox` (2.39:1 bars,
 landscape only), `--keep-frames`, `--frames jpg` (smaller frame files), `--scratch DIR`, `--out DIR`, `--port N`, and `--shutter N`
 (motion blur: N exposures per frame over a thirtieth of a second, averaged under the overlays; by default each shot sets its own, and
-`--shutter 1` turns it off). Playwright and ffmpeg must be installed (`require('playwright')` must resolve).
+`--shutter 1` turns it off). Needs ffmpeg, and Playwright's Chromium (`npm install`, then `npx playwright install chromium`).
 
 The live preview (`?trailer=1`; add `&aspect=portrait` in a tall window, `&music=...`, `&lb=1`, `&bio=1`, `&cta=web`) plays the same
 shot list in real time with the same cue sheet through WebAudio. It needs a click to start, because of the browser's audio policy.
 
-### How long it takes
+### GPU or CPU
 
-Headless rendering runs on the CPU (Chromium's SwiftShader). At 640x360 a lit night frame takes a few seconds, a daylight interior one
-or two, and a black card next to nothing; a full-size frame costs about three times its 640x360 cost. `social-preview` takes a few
-minutes, `preview` a little over an hour, `social` about two hours and `steam` the better part of a day. The renderer prints its
-average time per frame and an ETA every ten frames.
+Pass `--gpu --headed` (it needs a display, or `xvfb-run`) to render on the graphics card; use them for the full-size presets. Without them,
+Chromium falls back to SwiftShader on the CPU, which is fine for the 12 fps previews and slow for the full-size presets; there,
+`--res 0.5` renders at half size and upscales, and `--quality medium` drops ambient occlusion and MSAA. The renderer prints an ETA
+every ten frames, and `--resume` continues an interrupted render (every frame is still simulated; only the frames already on disk
+are skipped).
 
-On a machine with a GPU, `--gpu --headed` (needs a display, or `xvfb-run`) renders at interactive speed and the whole thing takes
-minutes. Otherwise `--res 0.5` renders at half size and upscales (about four times faster), and `--quality medium` drops ambient
-occlusion and MSAA. `--resume` lets an interrupted render continue: every frame is still simulated, and only the screenshots already
-on disk are skipped.
+## The music
 
-## The music, and the rights
+The landscape cut is timed to a 2:19 song that is not in the repository: intro 0:00-0:08, verse 0:08-0:32, verse 0:32-0:56, bridge
+0:56-1:20, verse 1:20-1:48, outro 1:48-2:19. The shots change on those phrase boundaries. The song warps across the bridge and the last
+verse (low-pass, the record slowing and dropping in pitch, tape wow; `music_plan.json`), cuts to silence at 1:48 for the scare, and
+comes back faint under the title cards. Pass a licensed track with `--music path/to/track.wav` (any format ffmpeg reads).
 
-The landscape cut is timed to the structure of Louis Armstrong's 1967 recording of "What a Wonderful World" (2:19): intro 0:00-0:08,
-verse 0:08-0:32, verse 0:32-0:56, bridge 0:56-1:20, verse 1:20-1:48, outro 1:48-2:19. The shots change on those phrase boundaries. The
-song warps across the bridge and the last verse (low-pass, the record slowing and dropping in pitch, tape wow; `music_plan.json`),
-cuts to silence at 1:48 for the scare, and comes back faint and far away under the title cards.
-
-**Nothing from that recording is in this repository, and nothing may be added without a licence.** Using it needs two separate
-licences:
-
-- a **synchronization licence** for the composition (Thiele/Weiss; the publisher), because the song is put to picture, and
-- a **master use licence** for the recording (the label that owns the Armstrong master).
-
-A cover recording replaces the master licence with the cover's own master (or your own recording) but still needs the sync licence for
-the composition. Streaming platforms' music libraries do not cover a game trailer on Steam. Once licensed, pass the file with
-`--music path/to/recording.wav` (any format ffmpeg reads; it is resampled to 44.1 kHz stereo) and nothing else changes.
-
-Until then the trailer uses `trailer/music/placeholder.wav`, an original 2:19 lullaby (72 bpm, D major, a music box and a
-Rhodes-style electric piano over vinyl crackle) that `gen_music.js` synthesizes from oscillators and envelopes. Its melody and chords
-quote no existing song, so it can ship in the trailer as it is. The same script writes the small original effects the cue sheets use
-(footsteps, breathing, TV snow, a heartbeat, a door latch, wood and hinge creaks, a relay, the camcorder's zoom motor and rewind, a
-gasp, the set switching off, the camera hitting the floor, one music-box note). The other effects and the voice lines come from the
-game's own assets (`assets/sfx`, `assets/audio/vo`; see `CREDITS.md`).
+Without it the trailer uses `trailer/music/placeholder.wav`, an original lullaby of the same length and shape that `gen_music.js`
+synthesizes. The same script writes the small effects the cue sheets use; the other effects and the voice lines come from the game's
+own assets (`assets/sfx`, `assets/audio/vo`; see `CREDITS.md`).
 
 ## Steam trailer specs
 
-From the Steamworks "Trailers" page; check the current numbers before uploading.
+From the Steamworks "Trailers" page.
 
 - MP4, H.264 video, AAC audio (stereo, 44.1 or 48 kHz). The `steam` preset writes exactly that (crf 18, yuv420p, 256 kbps AAC, faststart).
 - 1920x1080, 16:9, 30 fps (29.97 also accepted). Steam re-encodes, so give it a high-bitrate source.

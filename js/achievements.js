@@ -28,7 +28,7 @@ export const ACHIEVEMENTS = [
 const BY_ID = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));
 
 const read = (k) => { try { const v = JSON.parse(localStorage.getItem(k)); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
-const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
 const got = read(KEY), stats = read(STATS);
 const G = {};   // from main.js (bind): F, P, W, RUN, sfx, menu, hunter(), test()
 const off = () => !!(G.test && G.test());   // the test mode (window.__game.start(), used by the trailer and the store shots) and the debug jumps earn nothing
@@ -109,7 +109,7 @@ function pump() {
   if (showing || !queue.length || typeof document === 'undefined') return;
   if (!calm()) { retry = setTimeout(pump, 500); return; }
   const a = queue.shift(), el = card(), d = steam(); showing = true;
-  if (d) { try { d.achieve(a.id); } catch (e) { /* the shell logs its own failures */ } }
+  if (d) { try { d.achieve(a.id); } catch (e) { /* ignore */ } }
   el.innerHTML = `<small>Achievement</small><b>${esc(a.name)}</b><span>${esc(a.desc)}</span>`;
   void el.offsetWidth; el.classList.add('show'); chime();
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => { showing = false; pump(); }, 600); }, 4000);

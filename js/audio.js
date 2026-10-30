@@ -46,7 +46,7 @@ export class Sound {
     const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
     const s = ctx.createGain(); s.gain.value = wet;
     g.connect(p).connect(this.buses[kind] || this.buses.sfx); p.connect(s).connect(this.sends[kind] || this.sends.sfx);
-    setTimeout(() => { try { g.disconnect(); p.disconnect(); s.disconnect(); } catch (e) { /* noop */ } }, (life + 3) * 1000);
+    setTimeout(() => { try { g.disconnect(); p.disconnect(); s.disconnect(); } catch (e) { /* ignore */ } }, (life + 3) * 1000);
     return g;
   }
   env(param, t, a, peak, dur, end = 0.0001) {
@@ -113,7 +113,7 @@ export class Sound {
         const r = await fetch(path); if (!r.ok) return;
         this.buf[id] = await this.ctx.decodeAudioData(await r.arrayBuffer());
         if (this.want[id]) this.applyBed(id);
-      } catch (e) { /* the synth covers it */ }
+      } catch (e) { /* ignore */ }
     };
     const [vo, sfx, music] = await Promise.all([json('assets/audio/manifest.json'), json('assets/sfx/sfx.json'), json('assets/music/tracks.json')]);
     this.kinds = {}; for (const [k, m] of Object.entries(sfx || {})) this.kinds['sfx/' + k] = m.kind;   // (which bus each file plays on)

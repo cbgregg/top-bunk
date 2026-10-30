@@ -369,7 +369,6 @@ export function createNights(env) {
       W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(2.9, -3.2), 3); sub('<i>The TV just turned on in the living room.</i>', 3.5);
       await wait(5); if (!alive(t)) return;
       env.say('dad/lure_a', { muffle: true }); obj('Dad is up. He wants you in the living room');
-      // "Dad" stands in front of the TV with his back to you
       mom.group.visible = true;
       dad.sleeping = false; dad.busy = true; dad.group.rotation.order = 'XYZ'; dad.group.rotation.set(0, 0, 0); dad.group.position.set(2.0, 0, -2.6); dad.group.rotation.y = Math.atan2(2.9 - 2.0, -3.2 + 2.6);   // standing in front of the TV, his back to you
       dad.group.visible = true; dad.lookAt = null; dad.fake = true; W.bedSleepers.one('dad', false); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });   // (and his side of the bed is empty)
@@ -431,7 +430,7 @@ export function createNights(env) {
       const ramp = async (dur, fn) => { const n = Math.max(2, Math.round(dur * 60)); for (let i = 1; i <= n; i++) { fn(i / n); await wait(dur / n); if (!alive(t)) return; } };
       let seen = 0;
       const when = (cond, fn, minM = 0) => (async () => {
-        const m0 = minM + (minM > 0 ? rnd() * 9 : 0);   // the beats never land on the same minute twice (the seed decides)
+        const m0 = minM + (minM > 0 ? rnd() * 9 : 0);   // jitter each timed beat by up to 9 game minutes (seeded)
         await until(t, () => F.clock >= c0 + m0 && !F.script && cond()); if (!alive(t)) return;
         seen++; await fn();
       })();

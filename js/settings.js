@@ -11,10 +11,10 @@ const clean = (k, v) => {
   const r = RANGES[k]; return r ? Math.max(r[0], Math.min(r[1], v)) : v;
 };
 function load() {
-  let s = null; try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* none, or a private window */ }
+  let s = null; try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* ignore */ }
   if (s && typeof s === 'object') for (const k in DEFAULTS) if (k in s) data[k] = clean(k, s[k]);
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* private mode */ } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* ignore */ } }
 function notify(k, v) { for (const fn of subs[k] || []) fn(v, k); for (const fn of subs['*'] || []) fn(v, k); }
 load();
 

@@ -4,8 +4,8 @@
 // options, a day, a night, the trailer hook and a phone-sized touch screen; then the desktop shell's own smoke run if Electron is installed.
 // One PASS / FAIL / SKIP line per check, exit 1 on any FAIL.
 //   node tests/smoke.js [--port N] [--only 0,3,7]
-// Needs Playwright and its Chromium (npm i -g playwright && npx playwright install chromium). WebGL runs on SwiftShader, so apart from the
-// first load every page stops drawing (window.__norender, see js/main.js) and only the game's logic runs.
+// Needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`). The pages use SwiftShader, so after the first load
+// each one stops drawing (window.__norender, see js/main.js) and only the game's logic runs.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -109,7 +109,7 @@ let BASE = '';
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
   const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8];
   if (!chromium) {
-    for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm i -g playwright && npx playwright install chromium)'); });
+    for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
     const server = await startServer();
     BASE = `http://127.0.0.1:${server.address().port}`;

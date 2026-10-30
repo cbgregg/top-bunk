@@ -130,10 +130,8 @@ function smokeEnd(ok, why) {
 async function smoke(w, steam) {
   const t0 = Date.now(), errors = [];
   const tail = () => (errors.length ? `; console errors (${errors.length}): ${errors.slice(0, 4).join(' | ')}` : '');
-  w.webContents.on('console-message', (e, ...legacy) => {   // Electron >= 32 passes details on the event; older builds as positional args
-    const level = typeof e.level === 'string' ? e.level : ['verbose', 'info', 'warning', 'error'][legacy[0]];
-    const message = e.message !== undefined ? e.message : legacy[1];
-    if (level === 'error') errors.push(String(message).replace(/\s+/g, ' ').slice(0, 240));
+  w.webContents.on('console-message', (e) => {
+    if (e.level === 'error') errors.push(String(e.message).replace(/\s+/g, ' ').slice(0, 240));
   });
   w.webContents.on('render-process-gone', (e, d) => smokeEnd(false, `renderer gone: ${d.reason} exit ${d.exitCode}${tail()}`));
   w.webContents.on('did-fail-load', (e, code, desc, url, isMain) => { if (isMain) smokeEnd(false, `load failed ${code} ${desc} ${url}`); });

@@ -2,20 +2,19 @@
 
 ## Pitch
 
-Top Bunk is a short first-person horror game about being a kid in a house that is wrong. Your family has just moved into a cheap
-rented farmhouse, you have the top bunk in the back corner room, and something tall with huge white eyes and a big smile lives at the
-end of the hallway. It only comes at night. Over ten nights the house does a little more each time (doors shut, the phone rings, the
-TV turns itself on, Mom calls you from a kitchen she is not in) and the thing hunts you through the dark, while you run, shut doors,
-hide under the covers or in the closet, and hold your breath until it goes. Every morning you tell your parents. Every morning they
-explain it away, unless you have found something they cannot. How it ends on the last night depends on how much proof you have
-shown them.
+Top Bunk is a short first-person horror game about a kid in a house that's wrong. Your family just moved into a cheap rented
+farmhouse, you've got the top bunk in the back corner room, and something tall with huge white eyes and a big smile lives at the end
+of the hallway. It only comes out at night. Over ten nights the doors start shutting on their own, the phone rings, the TV switches
+itself on, and Mom calls you from the kitchen while she's asleep in bed. The thing hunts you through the dark, and you run, shut
+doors, hide under the covers or in a closet, and hold your breath until it leaves. At breakfast your parents explain it all away
+unless you've found something they can't. How it ends on the last night depends on how much proof you've shown them.
 
 ## Fact sheet
 
 | | |
 | --- | --- |
 | Title | Top Bunk |
-| Developer | *[developer name]* (fill in before publishing) |
+| Developer | *[developer name]* |
 | Website | https://github.com/cbgregg/top-bunk |
 | Platforms | Windows, macOS, Linux (Steam); also runs in a web browser from GitHub Pages |
 | Release date | TBD |
@@ -24,7 +23,7 @@ shown them.
 | Players | 1 |
 | Length | Short: ten nights plus the mornings. A night's clock runs to dawn in about six real minutes, so a full run should take an hour to ninety minutes, more if it catches you |
 | Input | Keyboard and mouse, game controller (with rumble); touch on the web build |
-| Languages | English (interface, voice, subtitles) |
+| Languages | English (interface and subtitles; moving day and the first morning are fully voiced) |
 | Engine | three.js (WebGL 2) in Electron for the desktop build; no engine licence, no middleware |
 | Rating | Not yet rated; horror themes, jump scares, flashing lights, no gore |
 | Press contact | *[email]* |
@@ -40,8 +39,8 @@ shown them.
 - A flashlight, stamina that runs out, doors you can shut, and a house you have to learn in the dark.
 - The house changes. Night lights die, the drawing in the hall looks different, the clock lies, and a photo comes off the wall while
   you are looking at it.
-- Breakfast every morning, voiced and subtitled. Mom and Dad notice what the house leaves behind (the tap left running, the breaker
-  flipped, the bear in the middle of the hall) and would still rather believe it was you.
+- Breakfast after each night you survive, all of it subtitled. Mom and Dad notice what the house leaves behind (the tap left running,
+  the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
 - Proof. Most nights the house leaves something behind, and what you find changes breakfast. How much you have by the tenth night
   decides which of three endings you get.
 - Graphics presets from Low to Ultra. Auto lowers the resolution, then the preset, when the frame rate drops on integrated graphics.
@@ -51,11 +50,11 @@ shown them.
 
 ## Story in one paragraph (spoiler-light)
 
-Moving day: carry your boxes from the truck to the back-corner room. Top bunk is yours, the bottom one is for boxes. The landlord said
-the last family left in a hurry. Night one, the house wakes up around you: doors shut by themselves, something scratches in the
-closet, the photo in the hall comes off the wall, and you never see what is doing it. Breakfast: nobody believes you. From then on
-every night is different and worse, and every morning is the same. On the tenth night it comes down the hall, and whether anyone
-believes you depends on what you found.
+Moving day: carry your boxes from the truck to the back-corner room. The top bunk is yours, the bottom one is for boxes. The landlord
+said the last family left in a hurry. On night one the house wakes up around you: doors shut by themselves, something scratches in
+the closet, the photo in the hall comes off the wall, and you never see what's doing it. Nobody believes you at breakfast. After that
+the thing in the hall starts hunting you, and your parents keep finding reasons not to listen. On the tenth night it comes down the
+hall, and whether anyone believes you depends on what you found.
 
 ## Assets
 
@@ -63,7 +62,7 @@ Everything below is produced from the game itself by the scripts in this folder 
 
 | File | What |
 | --- | --- |
-| `screenshots/01_porch_night.png` … `08_tv_static.png` | Eight 1920×1080 in-game captures, HUD hidden except where the prompt helps |
+| `screenshots/01_porch_night.png` … `07_tv_static.png` | Seven 1920×1080 in-game captures, HUD hidden except where the prompt helps |
 | `out/header_capsule.png` (460×215, and `_2x` 920×430) | Store header |
 | `out/small_capsule.png` (462×174) | Lists and search |
 | `out/main_capsule.png` (616×353, and `_2x` 1232×706) | Front-page feature |

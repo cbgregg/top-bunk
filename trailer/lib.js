@@ -68,7 +68,7 @@ const CSS = `
   -webkit-text-stroke: 0.09em #000; }
 .tr-portrait #tr-cards .line { font-family: 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif; font-weight: 700; color: #fff; letter-spacing: 0; line-height: 1.25; margin-top: 2.2vh;
   -webkit-text-stroke: 0.08em #000; paint-order: stroke fill; }
-/* what it is, smaller, over the call to action: someone who was just scared needs to know it is a game they can play */
+/* the one-line description, smaller, over the call to action */
 .tr-portrait #tr-cards .line .kick { display: block; font-size: 0.6em; color: #d9d3c6; margin-bottom: 0.25em; }
 `;
 
@@ -104,7 +104,7 @@ function dots(g, text, x, y, p, align = 'left', color = '#f1f1e6') {
 function quiltFabric(W, H) {
   const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), r = rng(5150);
   const cell = W * 0.15;
-  // the checks run at a slant and bow with the folds, so it reads as cloth bunched up by a hand, not a printed overlay
+  // slanted gingham, bowed along the folds
   const img = g.createImageData(W, H), d = img.data;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = x * 0.94 + y * 0.34 + Math.sin(y / H * 5.2 + x / W * 1.3) * W * 0.05, v = y * 0.94 - x * 0.34 + Math.sin(x / W * 4.1 + 0.8) * W * 0.06;
