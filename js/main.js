@@ -205,7 +205,7 @@ function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
     p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
     // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
-    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
+    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, spot.yaw ?? Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
     else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
   }
   W.bedSleepers.set(on);
@@ -317,7 +317,7 @@ const BOX_HALF = 0.23, BOX_Z = 0.62;
 function wallAhead(ox, oz, dx, dz, max, skipX, skipZ) {
   let best = max;
   for (const c of W.colliders) {
-    if (!c.on) continue;
+    if (!c.on || !onFloor(c)) continue;
     if (skipX !== undefined && skipX >= c.minX - 0.12 && skipX <= c.maxX + 0.12 && skipZ >= c.minZ - 0.12 && skipZ <= c.maxZ + 0.12) continue;
     let t0 = 0, t1 = best;
     for (const [o, d, lo, hi] of [[ox, dx, c.minX, c.maxX], [oz, dz, c.minZ, c.maxZ]]) {
@@ -426,9 +426,11 @@ function toBunk() { P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.pos.set(BUNK_SEAT.
 function enteredHide() { breathPrev = true; breathLatch = false; if (F.flashOn) { F.flashOn = false; flash.intensity = 0; } }
 
 // ---------- player ----------
+// a collider counts only on the floor you are on: the laundry is under the utility room, and the outside stairs pass both
+const onFloor = (c) => !(P.pos.y + 0.5 < (c.minY ?? -0.3) || P.pos.y > (c.maxY ?? 3));
 function collide() {
   for (const c of W.colliders) {
-    if (!c.on) continue;
+    if (!c.on || !onFloor(c)) continue;
     const cx = clamp(P.pos.x, c.minX, c.maxX), cz = clamp(P.pos.z, c.minZ, c.maxZ);
     const dx = P.pos.x - cx, dz = P.pos.z - cz, d2 = dx * dx + dz * dz;
     if (d2 >= R * R) continue;
@@ -459,6 +461,7 @@ function movePlayer(dt) {
   const a = Math.min(1, dt * 10);
   P.vel.x += (wx * speed - P.vel.x) * a; P.vel.z += (wz * speed - P.vel.z) * a;
   for (let i = 0; i < 3; i++) { P.pos.x += P.vel.x * dt / 3; P.pos.z += P.vel.z * dt / 3; collide(); }
+  P.pos.y += (W.groundAt(P.pos.x, P.pos.z, P.pos.y) - P.pos.y) * Math.min(1, dt * 14);   // (the outside stairs: eased, so the steps don't jolt)
   P.speed = Math.hypot(P.vel.x, P.vel.z);
   const stride = sprint ? 0.95 : 0.66;
   P.stepAcc += P.speed * dt; P.bob += P.speed * dt * (Math.PI / stride);
@@ -466,14 +469,14 @@ function movePlayer(dt) {
   UI.stamina(P.stamina, P.stamina < 0.99);
 }
 function playerStep(sprint) {
-  const room = roomAt(P.pos.x, P.pos.z), vol = sprint ? 0.42 : 0.26;
-  if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' ? 0.3 : 0.15, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'utility' ? 'tile' : 'carpet');
+  const room = roomAt(P.pos.x, P.pos.z, P.pos.y), vol = sprint ? 0.42 : 0.26, hard = ['bath', 'kitchen', 'dining', 'utility', 'stoop', 'laundry', 'garage'].includes(room);
+  if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'laundry' ? 0.3 : 0.15, hard ? 'tile' : 'carpet');
   if (F.echo) echoes.push(gameTime + 0.27 + Math.random() * 0.06);
 }
 function updateCamera(dt) {
   if (P.mode === 'walk') {
     const bobY = Math.sin(P.bob) * 0.035 * Math.min(1, P.speed / 2.5) * bobK;
-    camera.position.set(P.pos.x, EYE + bobY, P.pos.z);
+    camera.position.set(P.pos.x, P.pos.y + EYE + bobY, P.pos.z);
   } else if (P.mode === 'car') { car.cameraWorld(camera.position); P.yaw = clamp(P.yaw, -2.75, 2.75); P.pitch = clamp(P.pitch, -0.85, 0.65); }
   else camera.position.copy(P.cam);
   if (P.mode === 'hide') {

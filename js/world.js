@@ -25,10 +25,29 @@ export const ROOMS = {
   dining: [-3.3, -1.4, -0.3, 3.6],
   utility: [-8.1, -3.3, -3.9, 3.6],  // the lower wing
 };
+// Outside the shell: the back stoop with the cellar stairwell beside it, the detached garage in front of the utility wing, and the
+// laundry under the utility room (its floor is at BASEMENT; roomAt only finds it when y says you are down there).
+export const BASEMENT = -2.4;
+export const PLACES = {
+  stoop: [-7.7, -1.2, 3.6, 5.1],
+  garage: [-14.0, -7.6, -13.6, -7.0],
+  laundry: [-8.1, -3.3, -0.4, 3.75],
+};
+// the outside stairs: from the stoop at x0 they drop BASEMENT over `run` metres going west, then a landing to xEnd
+export const STAIR = { x0: -3.3, run: 3.12, xEnd: -7.4, z0: 3.7, z1: 4.75 };
 
-export function roomAt(x, z) {
-  for (const k in ROOMS) { const r = ROOMS[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; }
+export function roomAt(x, z, y = 0) {
+  const inside = (r) => x > r[0] && x < r[1] && z > r[2] && z < r[3];
+  if (y < -1 && inside(PLACES.laundry)) return 'laundry';
+  for (const k in ROOMS) if (inside(ROOMS[k])) return k;
+  for (const k in PLACES) if (k !== 'laundry' && inside(PLACES[k])) return k;
   return 'out';
+}
+// the floor under (x, z): 0 everywhere except the stairwell and, for somebody already down there, the laundry
+export function groundAt(x, z, y = 0) {
+  if (z > STAIR.z0 && z < STAIR.z1 && x < STAIR.x0 && x > STAIR.xEnd) return BASEMENT * Math.min(1, (STAIR.x0 - x) / STAIR.run);
+  if (y < -1 && x > PLACES.laundry[0] && x < PLACES.laundry[1] && z > PLACES.laundry[2] && z < PLACES.laundry[3]) return BASEMENT;
+  return 0;
 }
 
 // The TV model's texture (assets/props/tv.glb) carries an existing maker's badge, on the front panel and down the side. Each is painted over with
@@ -148,11 +167,21 @@ export function buildWorld(scene) {
   applyPBR(M.pillow, 'linen', { tint: 0xf2eee4 });
   applyPBR(M.silo, 'metal', { tint: 0xb8bcc0, anti: true });
   M.gable = std({ map: T.siding, side: THREE.DoubleSide, roughness: 0.86 }); applyPBR(M.gable, 'siding', { tint: 0xe0a468, normal: 1.1 });
+  // the garage inside (plywood over studs) and the basement (block walls, a stained slab); the basement finishes barely take the sky light
+  M.ply = std({ color: 0xc9a87a, roughness: 0.8 }); M.ply.userData.worldUV = true; applyPBR(M.ply, 'pine', { tint: 0xd2b48c, tile: 1.2 });
+  M.block = std({ color: 0x5c5a55, roughness: 1 }); M.block.userData.worldUV = true; applyPBR(M.block, 'concrete', { tint: 0x66645e, tile: 1.6, normal: 1.3 }); M.block.envMapIntensity = 0.1;
+  M.cellarFloor = std({ color: 0x3a3835, roughness: 1 }); M.cellarFloor.userData.worldUV = true; applyPBR(M.cellarFloor, 'concrete', { tint: 0x45423e, tile: 2.2 }); M.cellarFloor.envMapIntensity = 0.08;
+  M.cellarCeil = std({ color: 0x1f1c19, roughness: 1 }); M.cellarCeil.envMapIntensity = 0.05;
+  M.steel = std({ color: 0x8f969c, roughness: 0.5, metalness: 0.4 });
+  M.pipe = std({ color: 0x6c6a66, roughness: 0.6, metalness: 0.6 });
+  M.tub = std({ color: 0xb9b6a8, roughness: 0.5 });
+  M.water = std({ color: 0x1a1f22, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.85 });
+  M.drip = std({ color: 0xcfe0ea, roughness: 0.1, transparent: true, opacity: 0.7 });
 
   const house = new THREE.Group(); scene.add(house);
   const yard = new THREE.Group(); scene.add(yard);
 
-  const wallMatAt = (px, pz) => (roomAt(px, pz) === 'out' ? M.siding : M.drywall);
+  const wallMatAt = (px, pz) => (ROOMS[roomAt(px, pz)] ? M.drywall : M.siding);   // (the stoop and the garage count as outside)
 
   // stand-in furniture is tagged so it can be hidden when its model arrives
   let curTag = null; const tagged = {};
@@ -189,7 +218,7 @@ export function buildWorld(scene) {
     for (const s of [1, -1]) {
       const cx = (b[0] + b[1]) / 2, cz = (b[4] + b[5]) / 2;
       const room = alongX ? roomAt(cx, cz + s * 0.3) : roomAt(cx + s * 0.3, cz);
-      if (room === 'out') continue;
+      if (!ROOMS[room]) continue;
       const strip = (y0, y1, th, mat = M.trim) => {
         if (alongX) { const f = s > 0 ? b[5] : b[4]; box(b[0], b[1], y0, y1, Math.min(f, f + s * th), Math.max(f, f + s * th), mat, { uv: mat !== M.trim }); }
         else { const f = s > 0 ? b[1] : b[0]; box(Math.min(f, f + s * th), Math.max(f, f + s * th), y0, y1, b[4], b[5], mat, { uv: mat !== M.trim }); }
@@ -199,15 +228,15 @@ export function buildWorld(scene) {
   }
   function casing(alongX, fixed, gp) {
     // The trim sits 1.2 cm proud of the jamb and the lintel: flush faces would z-fight the wall and flicker as you move.
-    const top = gp.top ?? 2.1, t = WT / 2 + 0.025, a = gp.c - gp.w / 2, b = gp.c + gp.w / 2, cw = 0.08, e = 0.012;
+    const top = gp.top ?? 2.1, t = WT / 2 + 0.025, a = gp.c - gp.w / 2, b = gp.c + gp.w / 2, cw = 0.08, e = 0.012, y0 = gp.y0 ?? 0;
     if (alongX) {
-      box(a - cw, a + e, 0, top - e, fixed - t, fixed + t, M.white, { uv: false });
-      box(b - e, b + cw, 0, top - e, fixed - t, fixed + t, M.white, { uv: false });
-      if (!gp.arch) box(a - cw, b + cw, top - e, top + 0.09, fixed - t, fixed + t, M.white, { uv: false });
+      box(a - cw, a + e, y0, y0 + top - e, fixed - t, fixed + t, M.white, { uv: false });
+      box(b - e, b + cw, y0, y0 + top - e, fixed - t, fixed + t, M.white, { uv: false });
+      if (!gp.arch) box(a - cw, b + cw, y0 + top - e, y0 + top + 0.09, fixed - t, fixed + t, M.white, { uv: false });
     } else {
-      box(fixed - t, fixed + t, 0, top - e, a - cw, a + e, M.white, { uv: false });
-      box(fixed - t, fixed + t, 0, top - e, b - e, b + cw, M.white, { uv: false });
-      if (!gp.arch) box(fixed - t, fixed + t, top - e, top + 0.09, a - cw, b + cw, M.white, { uv: false });
+      box(fixed - t, fixed + t, y0, y0 + top - e, a - cw, a + e, M.white, { uv: false });
+      box(fixed - t, fixed + t, y0, y0 + top - e, b - e, b + cw, M.white, { uv: false });
+      if (!gp.arch) box(fixed - t, fixed + t, y0 + top - e, y0 + top + 0.09, a - cw, b + cw, M.white, { uv: false });
     }
   }
   // the arch between kitchen and living room: wall above a half-round opening, with a trim band around it
@@ -253,24 +282,24 @@ export function buildWorld(scene) {
     for (const [s0, s1, y0, y1] of split) {
       const b = alongX ? [s0, s1, y0, y1, fixed - WT / 2, fixed + WT / 2] : [fixed - WT / 2, fixed + WT / 2, y0, y1, s0, s1];
       box(...b, 'room');
-      if (y0 === 0) { solid(b[0], b[1], b[4], b[5], { wall: true }); trims(b, alongX); }
+      if (y0 === 0) { solid(b[0], b[1], b[4], b[5], { wall: true, minY: -0.3, maxY: H }); trims(b, alongX); }   // (the y range: these walls stop nothing in the basement)
     }
     for (const gp of gaps) {
       if (gp.arch) { archFill(alongX, fixed, gp); casing(alongX, fixed, gp); }
       else if (gp.sill === undefined) casing(alongX, fixed, gp);
       else {   // nothing may walk out through a window
         const a = gp.c - gp.w / 2, b = gp.c + gp.w / 2;
-        if (alongX) solid(a, b, fixed - WT / 2, fixed + WT / 2, { wall: true }); else solid(fixed - WT / 2, fixed + WT / 2, a, b, { wall: true });
+        if (alongX) solid(a, b, fixed - WT / 2, fixed + WT / 2, { wall: true, minY: -0.3, maxY: H }); else solid(fixed - WT / 2, fixed + WT / 2, a, b, { wall: true, minY: -0.3, maxY: H });
       }
     }
   }
 
   // exterior shell
-  wall(-3.3, -4.5, 8.1, -4.5, [{ c: 6.9, w: 1.1, sill: 0.85, h: 1.25 }, { c: 4.4, w: 1.3, sill: 0.85, h: 1.25 }, { c: 1.9, w: 1.0 }, { c: -0.6, w: 2.4, sill: 0.55, h: 1.35 }]);
+  wall(-3.3, -4.5, 8.1, -4.5, [{ c: 6.35, w: 1.0, sill: 0.85, h: 1.25 }, { c: 4.4, w: 1.3, sill: 0.85, h: 1.25 }, { c: 1.9, w: 1.0 }, { c: -0.6, w: 2.4, sill: 0.55, h: 1.35 }]);
   wall(-8.1, -3.9, -3.3, -3.9);
   wall(8.1, -4.5, 8.1, 3.6, [{ c: -3.5, w: 1.2, sill: 0.85, h: 1.25 }, { c: 2.85, w: 0.8, sill: 0.85, h: 1.25 }]);
   wall(-8.1, -3.9, -8.1, 3.6, [{ c: -1.6, w: 1.4, sill: 0.85, h: 1.25 }, { c: 1.8, w: 1.4, sill: 0.85, h: 1.25 }]);
-  wall(-8.1, 3.6, 8.1, 3.6, [{ c: 4.2, w: 0.6, sill: 1.45, h: 0.6 }, { c: 1.4, w: 1.8, sill: 1.0, h: 0.9 }, { c: -2.3, w: 1.1, sill: 0.85, h: 1.25 }]);
+  wall(-8.1, 3.6, 8.1, 3.6, [{ c: 4.2, w: 0.6, sill: 1.45, h: 0.6 }, { c: 1.4, w: 1.8, sill: 1.0, h: 0.9 }, { c: -2.3, w: 0.9 }]);   // (the back door at the dining end)
   wall(-3.3, -4.5, -3.3, 3.6, [{ c: 0.45, w: 1.1, top: 2.05 }]);              // living room and dining | utility, with the barn door
   wall(3.3, -4.5, 3.3, -1.5); wall(3.3, -0.3, 3.3, 3.6);                       // (the hall opens into the living room between them)
   wall(3.3, -1.5, 8.1, -1.5, [{ c: 3.9, w: 0.9, top: 2.05 }, { c: 7.5, w: 0.9, top: 2.05 }]);    // hall | the two front bedrooms
@@ -353,7 +382,7 @@ export function buildWorld(scene) {
       else box(off - 0.015, off + 0.015, sill + h + 0.3, sill + h + 0.33, c - w / 2 - 0.4, c + w / 2 + 0.4, M.darkWood, { uv: false });
     }
   }
-  windowAt(true, -4.5, 6.9, 1, { w: 1.1, curtains: true });                                   // front: bedroom at the end
+  windowAt(true, -4.5, 6.35, 1, { w: 1.0 });                                                  // front: bedroom at the end (the dresser sits under it, the closet beside it: no room for curtains)
   windowAt(true, -4.5, 4.4, 1, { w: 1.3, curtains: true });                                   // front: bedroom
   windowAt(true, -4.5, -0.6, 1, { sill: 0.55, w: 2.4, h: 1.35, curtains: true });             // front: the picture window
   windowAt(false, 8.1, -3.5, -1, { w: 1.2, curtains: true });                                 // end wall: bedroom
@@ -361,13 +390,12 @@ export function buildWorld(scene) {
   windowAt(false, -8.1, -1.6, 1, { w: 1.4 });                                                 // utility: two windows on the west end
   windowAt(false, -8.1, 1.8, 1, { w: 1.4 });
   windowAt(true, 3.6, 4.2, -1, { sill: 1.45, w: 0.6, h: 0.6 });                               // back: bathroom
-  windowAt(true, 3.6, 1.4, -1, { sill: 1.0, w: 1.8, h: 0.9, curtains: true });                // back: kitchen, over the sink
-  windowAt(true, 3.6, -2.3, -1, { w: 1.1, curtains: true });                                  // back: dining
+  windowAt(true, 3.6, 1.4, -1, { sill: 1.0, w: 1.8, h: 0.9, curtains: true });                // back: kitchen, over the sink (the dining end has the back door instead of a window)
 
   // ---------- doors (white six-panel) ----------
   // the leaf hangs from a hinge at (hx, hz) and extends along dir; closed doors fill the gap, open ones stand against it
-  function door(hx, hz, dx, dz, { open = false } = {}) {
-    const g = new THREE.Group(); g.position.set(hx, 0, hz); g.rotation.y = Math.atan2(-dz, dx);
+  function door(hx, hz, dx, dz, { y0 = 0 } = {}) {
+    const g = new THREE.Group(); g.position.set(hx, y0, hz); g.rotation.y = Math.atan2(-dz, dx);
     const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.04, 0.04), M.doorW); leaf.position.set(0.45, 1.02, 0); leaf.castShadow = leaf.receiveShadow = true; g.add(leaf);
     for (const s of [-1, 1]) for (const [px, w] of [[0.24, 0.3], [0.64, 0.3]]) for (const [py, h] of [[1.62, 0.42], [1.12, 0.42], [0.4, 0.62]]) {
       const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.008), M.doorW); p.position.set(px, py + 0.1, s * 0.021); g.add(p);
@@ -376,13 +404,15 @@ export function buildWorld(scene) {
     for (const s of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 8), M.brass); k.position.set(0.8, 1.0, s * 0.05); g.add(k); }
     house.add(g); return g;
   }
-  // The four interior doors open and close (E), and the thing opens them too. closed/open = the leaf's direction from its hinge.
+  // The hinged doors open and close (E), and the thing opens them too: the four inside, the back door, the cellar door at the foot of the
+  // outside stairs and the garage's side door. closed/open = the leaf's direction from its hinge. y0: the floor the door stands on.
   const doors = {};
   const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
-  function mkDoor(name, hx, hz, closed, open, col, mid, startOpen) {
-    const g = door(hx, hz, closed[0], closed[1]);
-    const rotC = Math.atan2(-closed[1], closed[0]), rotO = Math.atan2(-open[1], open[0]), c = solid(col[0], col[1], col[2], col[3], { door: name, on: !startOpen });
-    const d = { name, g, a: startOpen ? 1 : 0, target: startOpen ? 1 : 0, rotC, rotO, col: c, mid: new THREE.Vector3(mid[0], 1.0, mid[1]) };
+  function mkDoor(name, hx, hz, closed, open, col, mid, startOpen, y0 = 0) {
+    const g = door(hx, hz, closed[0], closed[1], { y0 });
+    const yr = y0 < -1 ? { minY: y0 - 0.1, maxY: y0 + 2.3 } : {};
+    const rotC = Math.atan2(-closed[1], closed[0]), rotO = Math.atan2(-open[1], open[0]), c = solid(col[0], col[1], col[2], col[3], { door: name, on: !startOpen, ...yr });
+    const d = { name, g, a: startOpen ? 1 : 0, target: startOpen ? 1 : 0, rotC, rotO, col: c, mid: new THREE.Vector3(mid[0], y0 + 1.0, mid[1]) };
     const apply = () => { g.rotation.y = rotC + angDiff(rotC, rotO) * d.a; c.on = d.a < 0.35; };
     d.apply = apply; apply(); doors[name] = d;
   }
@@ -390,9 +420,12 @@ export function buildWorld(scene) {
   mkDoor('parents', 7.05, -1.5, [1, 0], [0, -1], [7.05, 7.95, -1.54, -1.46], [7.5, -1.5], false);
   mkDoor('bath', 3.7, -0.3, [1, 0], [0, 1], [3.7, 4.6, -0.34, -0.26], [4.15, -0.3], true);
   mkDoor('kid', 6.6, -0.3, [1, 0], [0, 1], [6.6, 7.5, -0.34, -0.26], [7.05, -0.3], true);
-  let doorHook = null;
+  mkDoor('back', -2.75, 3.6, [1, 0], [0, -1], [-2.75, -1.85, 3.56, 3.64], [-2.3, 3.6], false);                       // dining room -> the stoop, swings in
+  mkDoor('basement', -7.35, 3.6, [1, 0], [0, -1], [-7.35, -6.45, 3.56, 3.64], [-6.9, 3.6], false, BASEMENT);        // foot of the outside stairs -> the laundry
+  mkDoor('garage', -8.75, -7.06, [1, 0], [0, -1], [-8.75, -7.85, -7.1, -7.02], [-8.3, -7.06], false);                // the garage's side door, facing the house
+  let doorHook = null, fxTick = () => {};
   const setDoor = (name, open, silent = false) => { const d = doors[name]; if (!d || d.target === (open ? 1 : 0)) return; d.target = open ? 1 : 0; if (doorHook && !silent) doorHook(name, open); };
-  const updateDoors = (dt) => { for (const k in doors) { const d = doors[k]; if (d.a === d.target) continue; d.a += Math.sign(d.target - d.a) * Math.min(Math.abs(d.target - d.a), dt * 1.5); d.apply(); } };
+  const updateDoors = (dt) => { for (const k in doors) { const d = doors[k]; if (d.a === d.target) continue; d.a += Math.sign(d.target - d.a) * Math.min(Math.abs(d.target - d.a), dt * 1.5); d.apply(); } fxTick(dt); };   // (the laundry's bulb and drip ride along)
   // the barn door into the utility room (at the dining end): a whitewashed Z-brace leaf on a black rail, slid open along the dining-room wall
   {
     const x = -3.3 + WT / 2 + 0.04;
@@ -692,9 +725,9 @@ export function buildWorld(scene) {
     plate(-0.5, 1.5, -0.21, 0, 0.14, 0x4a6fa8); plate(0.0, 1.5, -0.21, 0, 0.14, 0xa84a5a); plate(2.8, 1.6, -0.21, 0, 0.14, 0x4a8a6a);
   }
   tagStart('dining');
-  box(-3.0, -1.8, 0.7, 0.75, 1.7, 2.9, M.oak, { uv: false });
+  box(-3.0, -1.8, 0.7, 0.75, 1.2, 2.4, M.oak, { uv: false });
   tagEnd();
-  const cDining = solid(-2.95, -1.85, 1.75, 2.85);
+  const cDining = solid(-2.95, -1.85, 1.25, 2.35);
 
   // ---------- utility room (the lower wing): carpet tiles, the brick pillar with steps up to the living room, washer and dryer, black shelves ----------
   {
@@ -710,34 +743,35 @@ export function buildWorld(scene) {
     const mat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.015, 0.6), std({ color: 0x3f5675, roughness: 1 })); mat.position.set(-4.9, 0.008, 0.45); house.add(mat);
   }
 
-  // ---------- the two front bedrooms (doors stay closed): each has a closet on the hall wall and a low bed ----------
+  // ---------- the two front bedrooms (doors stay closed): a closet and a bed in each ----------
   {
-    // the end bedroom: brown wood sliding closet doors
-    rbox(6.1, 6.85, 0, 2.1, -2.15, -1.58, M.oak, 0.01); box(6.46, 6.49, 0.05, 2.05, -2.17, -2.15, M.black, { uv: false });
-    rbox(6.1, 6.85, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
-    solid(6.05, 6.9, -2.2, -1.5);
-    // the parents' double bed: head on the west wall, a nightstand with a lamp, a floral quilt (the passage in front of the door and the closet stays clear)
-    rbox(5.9, 7.9, 0.12, 0.4, -4.38, -2.98, M.oak, 0.02); rbox(5.93, 7.87, 0.4, 0.58, -4.35, -3.01, M.mattress, 0.05);
-    rbox(5.9, 5.98, 0.4, 1.15, -4.38, -2.98, M.oak, 0.02); rbox(7.86, 7.9, 0.4, 0.62, -4.38, -2.98, M.oak, 0.02);
-    for (const z of [-3.9, -3.4]) rbox(6.0, 6.5, 0.58, 0.68, z - 0.22, z + 0.22, M.pillow, 0.05);
-    for (const [z0, z1] of [[-4.36, -4.34], [-3.02, -3.0]]) rbox(6.55, 7.88, 0.46, 0.66, z0, z1, M.floralB, 0.005);   // the quilt hangs over the sides
-    rbox(7.86, 7.88, 0.46, 0.66, -4.36, -3.0, M.floralB, 0.005);
+    // the end bedroom (Mom and Dad's). The bed's head is on the hall wall, where the sliding closet used to stand, so from the door you look
+    // down its length; the brown sliding closet doors are on the front wall beside the window, and the lane from the door to them stays clear.
+    rbox(7.02, 7.9, 0, 2.1, -4.42, -3.85, M.oak, 0.01); box(7.445, 7.475, 0.05, 2.05, -3.87, -3.85, M.black, { uv: false });
+    rbox(7.02, 7.9, 2.1, 2.4, -4.42, -3.85, M.white, 0.01);
+    solid(6.97, 7.95, -4.45, -3.8);
+    // the double bed: a tall headboard against the hall wall, the quilt, two pillows side by side
+    rbox(5.9, 7.0, 0.12, 0.4, -3.72, -1.6, M.oak, 0.02); rbox(5.93, 6.97, 0.4, 0.58, -3.69, -1.63, M.mattress, 0.05);
+    rbox(5.9, 7.0, 0.4, 1.15, -1.66, -1.58, M.oak, 0.02); rbox(5.9, 7.0, 0.4, 0.62, -3.72, -3.68, M.oak, 0.02);
+    for (const x of [6.22, 6.7]) rbox(x - 0.2, x + 0.2, 0.58, 0.68, -2.14, -1.66, M.pillow, 0.05);
+    for (const [x0, x1] of [[5.92, 5.94], [6.96, 6.98]]) rbox(x0, x1, 0.46, 0.66, -3.7, -2.22, M.floralB, 0.005);   // the quilt hangs over the sides
+    rbox(5.92, 6.98, 0.46, 0.66, -3.7, -3.68, M.floralB, 0.005);
     // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's rigs lie under it, see sleepers() in main.js)
     // and breathes. set(false) flattens it: the bed looks slept in. one('dad', false) empties his side.
     bedSleepers = (() => {
       const cl = (v, a, b) => Math.max(a, Math.min(b, v));
       const g = new THREE.Group(); house.add(g);
-      const X0 = 6.55, X1 = 7.88, Z0 = -4.34, Z1 = -3.02, TOP = 0.6;
+      const X0 = 5.92, X1 = 6.98, Z0 = -3.7, Z1 = -2.22, TOP = 0.6;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
       const geo = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, 34, 34); geo.rotateX(-Math.PI / 2); geo.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
       const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n);
       for (let i = 0; i < n; i++) {
         const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z);
         // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
         // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
-        const along = cl((x - X0) / (X1 - X0), 0, 1), h = Math.min(0.31 - along * 0.08, 0.25 + along * 0.6);
+        const along = cl((Z1 - z) / (Z1 - Z0), 0, 1), h = Math.min(0.31 - along * 0.08, 0.25 + along * 0.6);
         // across it, a flat-topped rise the width of a body, so a leg off the centre line is still under it; Dad is broader, and his
-        // plateau stays high out to the wall edge so his far elbow is covered
-        const dm = (z + 3.4) / 0.34, dd = (z + 3.95) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
+        // plateau stays high out to the wall edge so his far elbow is covered (Mom has the door side, Dad the wall side)
+        const dm = (x - 6.68) / 0.34, dd = (x - 6.24) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
         bm[i] = h * 1.10 * Math.exp(-dm * dm * dm * dm * 2); bd[i] = h * 1.22 * Math.exp(-dd6 * 2);
       }
       const quilt = new THREE.Mesh(geo, M.floralB); quilt.castShadow = quilt.receiveShadow = true; g.add(quilt);
@@ -754,13 +788,17 @@ export function buildWorld(scene) {
       fx.update(0);
       return fx;
     })();
-    solid(5.85, 7.95, -4.42, -2.94);
-    rbox(5.9, 6.3, 0, 0.55, -2.92, -2.55, M.oak, 0.015);
+    solid(5.85, 7.05, -3.77, -1.5);
+    // a low dresser under the front window, with the lamp and Mom's things on it
+    rbox(5.9, 6.9, 0, 0.8, -4.4, -3.95, M.oak, 0.015); for (let i = 0; i < 3; i++) rbox(5.95 + i * 0.32, 6.23 + i * 0.32, 0.12, 0.7, -3.95, -3.935, M.oak, 0.006);
+    for (let i = 0; i < 3; i++) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), M.brass); kn.position.set(6.09 + i * 0.32, 0.41, -3.92); house.add(kn); }
     { const lampM = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0.0, roughness: 0.7 });
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.1, 0.65, -2.74); house.add(base);
-      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.1, 0.87, -2.74); house.add(shade); }
-    solid(5.85, 6.35, -2.96, -2.5);
-    parentsBed = { mom: { x: 7.65, y: 0.74, z: -3.4 }, dad: { x: 7.8, y: 0.74, z: -3.95 } };
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.65, 0.9, -4.18); house.add(base);
+      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.65, 1.12, -4.18); house.add(shade); }
+    knick(6.15, 0.8, -4.2, 3, 0.3);
+    solid(5.85, 6.95, -4.45, -3.9);
+    // where the rigs lie (the origin is 1.4 m down the bed from the pillows; yaw turns them to lie along z, head to the hall wall)
+    parentsBed = { mom: { x: 6.68, y: 0.74, z: -3.3, yaw: Math.PI }, dad: { x: 6.24, y: 0.74, z: -3.45, yaw: Math.PI } };
     // the other bedroom: vertical-plank wood closet doors
     rbox(4.45, 5.5, 0, 2.1, -2.15, -1.58, M.oak, 0.01); for (let i = 1; i < 6; i++) box(4.45 + i * 0.175 - 0.006, 4.45 + i * 0.175 + 0.006, 0.05, 2.05, -2.165, -2.15, M.black, { uv: false });
     rbox(4.45, 5.5, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
@@ -777,11 +815,103 @@ export function buildWorld(scene) {
   cardboardBox(-4.4, 0, -3.2, 0.55, 0.45, 0.5, 3, 0.2); cardboardBox(-4.4, 0.45, -3.2, 0.5, 0.4, 0.45, 1, -0.15); cardboardBox(-5.1, 0, -3.3, 0.5, 0.44, 0.5, 2, 0.1); solid(-5.45, -4.05, -3.65, -2.9);   // more boxes in the utility room
   cardboardBox(-5.0, 0, 2.8, 0.6, 0.5, 0.5, 2, 0.2); cardboardBox(-4.95, 0.5, 2.8, 0.5, 0.4, 0.45, 1, -0.1); solid(-5.35, -4.65, 2.45, 3.15);   // in the utility room
 
-  // the breaker box on the utility room's front wall
-  { const steel = std({ color: 0x8f969c, roughness: 0.5, metalness: 0.4 });
-    rbox(-5.75, -5.25, 1.15, 1.75, -3.84, -3.73, steel, 0.01);
-    for (let i = 0; i < 6; i++) rbox(-5.68 + (i % 2) * 0.25, -5.6 + (i % 2) * 0.25, 1.28 + Math.floor(i / 2) * 0.15, 1.34 + Math.floor(i / 2) * 0.15, -3.73, -3.715, M.black, 0.004);
-    solid(-5.85, -5.15, -3.95, -3.55); }
+  // ---------- out the back door: the stoop, the outside cellar stairs beside it, and the laundry under the utility room ----------
+  const B = BASEMENT;
+  let laundry = null;
+  {
+    const bsolid = (a, b, c, d, extra = {}) => solid(a, b, c, d, { minY: B - 0.2, maxY: -0.1, ...extra });   // (only stops you down there)
+    const deep = { minY: B - 0.2, maxY: 3 };                                                                   // (stops you at every height)
+    // the stoop: a slab outside the back door, a bare bulb over the door
+    box(-3.3, -1.3, -0.06, 0.0, 3.72, 5.0, M.concrete, { uv: true });
+    { const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), M.lamp.clone()); b.position.set(-2.3, 2.3, 3.78); house.add(b); }
+    // the stairwell: concrete steps between block walls, a curb with a pipe railing at grass level, a landing at the bottom
+    const { x0, run, xEnd, z0, z1 } = STAIR, steps = 12, tread = run / steps, rise = -B / steps;
+    for (let i = 0; i < steps; i++) box(x0 - tread * (i + 1), x0 - tread * i, B - 0.1, -rise * (i + 1), z0, z1, M.concrete, { uv: true });
+    box(xEnd, x0 - run, B - 0.1, B, z0, z1, M.concrete, { uv: true });
+    box(xEnd - 0.25, x0, B - 0.1, 0.3, z1, z1 + 0.25, M.block, { uv: true }); solid(xEnd - 0.25, x0, z1, z1 + 0.25, deep);
+    box(xEnd - 0.25, xEnd, B - 0.1, 0.3, z0, z1, M.block, { uv: true }); solid(xEnd - 0.25, xEnd, z0 - 0.1, z1 + 0.25, deep);
+    // the house side of the pit is the cellar's wall, carried up to the siding, with the door at the bottom
+    box(-8.1, -7.35, B - 0.1, 0.0, 3.51, 3.70, M.block, { uv: true }); box(-6.45, -3.3, B - 0.1, 0.0, 3.51, 3.70, M.block, { uv: true });
+    box(-7.35, -6.45, B + 2.05, 0.0, 3.51, 3.70, M.block, { uv: true }); casing(true, 3.6, { c: -6.9, w: 0.9, y0: B, top: 2.05 });
+    solid(-8.1, -7.35, 3.51, 3.72, { minY: B - 0.2, maxY: 0 }); solid(-6.45, -3.3, 3.51, 3.72, { minY: B - 0.2, maxY: 0 });
+    const post = (x, z) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.9, 8), M.steel); p.position.set(x, 0.75, z); house.add(p); };
+    for (const x of [x0 - 0.1, x0 - 1.1, x0 - 2.1, xEnd + 0.1]) post(x, z1 + 0.125); post(xEnd - 0.125, z0 + 0.1);
+    box(xEnd - 0.145, x0, 1.17, 1.21, z1 + 0.105, z1 + 0.145, M.steel, { uv: false }); box(xEnd - 0.145, xEnd - 0.105, 1.17, 1.21, z0, z1 + 0.145, M.steel, { uv: false });
+
+    // the laundry: block walls, a stained slab with the sump cut into its far corner, joists overhead. no window: the darkest room in the house
+    for (const [a, b, c, d] of [[-8.1, -4.25, -0.4, 3.6], [-4.25, -3.3, 0.5, 3.6], [-4.25, -3.3, -0.4, -0.24], [-3.5, -3.3, -0.24, 0.5]]) box(a, b, B - 0.1, B, c, d, M.cellarFloor, { cast: false });
+    box(-8.1, -3.3, -0.16, -0.1, -0.4, 3.6, M.cellarCeil, { cast: false });
+    for (let x = -7.6; x < -3.4; x += 0.5) box(x - 0.025, x + 0.025, -0.36, -0.16, -0.32, 3.51, M.darkWood, { uv: false });
+    box(-8.1, -3.3, B - 0.1, -0.1, -0.4, -0.24, M.block, { uv: true }); bsolid(-8.1, -3.3, -0.45, -0.24);
+    box(-8.1, -7.94, B - 0.1, -0.1, -0.24, 3.51, M.block, { uv: true }); bsolid(-8.15, -7.94, -0.4, 3.6);
+    box(-3.46, -3.3, B - 0.1, -0.1, -0.24, 3.51, M.block, { uv: true }); bsolid(-3.46, -3.25, -0.4, 3.6);
+    // washer and dryer against the west wall, the washer nearest the door. the lid lifts and the drum turns (laundry.washer, laundry.drum)
+    const washer = (() => {
+      const X0 = -7.98, X1 = -7.36, Z0 = 1.3, Z1 = 1.95;
+      rbox(X0, X1, B, B + 0.86, Z0, Z1, M.appW, 0.02); rbox(X0, X0 + 0.08, B + 0.86, B + 1.08, Z0 + 0.02, Z1 - 0.02, M.appW, 0.01);
+      for (let i = 0; i < 3; i++) { const k = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 10), M.black); k.rotation.z = Math.PI / 2; k.position.set(X0 + 0.09, B + 1.0, Z0 + 0.14 + i * 0.18); house.add(k); }
+      box(X0 + 0.1, X1 - 0.04, B + 0.84, B + 0.86, Z0 + 0.04, Z1 - 0.04, M.black, { uv: false, cast: false });
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.6, 20, 1, true), M.steelSink); drum.material = M.steelSink.clone(); drum.material.side = THREE.DoubleSide;
+      drum.position.set((X0 + X1) / 2 + 0.04, B + 0.54, (Z0 + Z1) / 2); house.add(drum);
+      const pivot = new THREE.Group(); pivot.position.set(X0 + 0.1, B + 0.87, (Z0 + Z1) / 2); house.add(pivot);
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0 - 0.14, 0.02, Z1 - Z0 - 0.04), M.appW); lid.position.set((X1 - X0 - 0.14) / 2, 0.01, 0); lid.castShadow = true; pivot.add(lid);
+      return { pivot, lid, drum, pos: new THREE.Vector3((X0 + X1) / 2, B + 0.9, (Z0 + Z1) / 2), open(k) { pivot.rotation.z = k * 1.55; }, spinning: false, rate: 9 };
+    })();
+    rbox(-7.98, -7.36, B, B + 0.9, 0.5, 1.15, M.appW, 0.02); rbox(-7.98, -7.9, B + 0.9, B + 1.06, 0.52, 1.13, M.appW, 0.01);
+    { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.03, 24), M.glassOut); w.rotation.z = Math.PI / 2; w.position.set(-7.35, B + 0.5, 0.825); house.add(w); }
+    bsolid(-8.05, -7.3, 0.45, 2.0);
+    // a plastic laundry tub on pipe legs under a tap out of the wall (laundry.sink.set runs the water)
+    const sink = (() => {
+      const X0 = -6.0, X1 = -5.3, Z0 = -0.22, Z1 = 0.38, Y0 = B + 0.56, Y1 = B + 0.92;
+      box(X0, X1, Y0, Y0 + 0.03, Z0, Z1, M.tub, { uv: false }); box(X0, X0 + 0.03, Y0, Y1, Z0, Z1, M.tub, { uv: false }); box(X1 - 0.03, X1, Y0, Y1, Z0, Z1, M.tub, { uv: false });
+      box(X0, X1, Y0, Y1, Z0, Z0 + 0.03, M.tub, { uv: false }); box(X0, X1, Y0, Y1, Z1 - 0.03, Z1, M.tub, { uv: false });
+      for (const x of [X0 + 0.04, X1 - 0.04]) for (const z of [Z0 + 0.04, Z1 - 0.04]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.56, 8), M.pipe); l.position.set(x, B + 0.28, z); house.add(l); }
+      const cx = (X0 + X1) / 2, cyl = (r, h, x, y, z, rx = 0) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 10), M.pipe); m.position.set(x, y, z); m.rotation.x = rx; house.add(m); return m; };
+      cyl(0.016, 0.3, cx, B + 1.12, -0.09, Math.PI / 2); cyl(0.016, 0.1, cx, B + 1.08, 0.06); for (const dx of [-0.08, 0.08]) cyl(0.02, 0.02, cx + dx, B + 1.12, -0.2, Math.PI / 2);
+      const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.009, 0.44, 8), M.drip); stream.position.set(cx, B + 0.81, 0.06); stream.visible = false; house.add(stream);
+      return { stream, on: false, pos: new THREE.Vector3(cx, B + 1.0, 0.06), set(on) { this.on = on; stream.visible = on; } };
+    })();
+    bsolid(-6.05, -5.25, -0.4, 0.43);
+    shelf(-5.1, -4.4, B + 1.5, -0.24, -0.02); knick(-4.75, B + 1.525, -0.13, 3, 0.5);
+    // the sump in the far corner: a square pit with black water in it, the discharge pipe up into the joists, and a drip that never stops
+    for (const [a, b, c, d] of [[-4.25, -4.15, -0.24, 0.5], [-3.6, -3.5, -0.24, 0.5], [-4.15, -3.6, -0.24, -0.14], [-4.15, -3.6, 0.4, 0.5]]) box(a, b, B - 0.5, B + 0.08, c, d, M.block, { uv: true });
+    box(-4.15, -3.6, B - 0.52, B - 0.5, -0.14, 0.4, M.black, { uv: false, cast: false });
+    { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.54), M.water); w.rotation.x = -Math.PI / 2; w.position.set(-3.875, B - 0.15, 0.13); w.renderOrder = 1; house.add(w); }
+    { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, -0.3 - B + 0.4, 10), M.pipe); p.position.set(-3.72, (B - 0.4 - 0.3) / 2, 0.05); house.add(p); }
+    box(-7.9, -3.92, -0.46, -0.4, 0.12, 0.18, M.pipe, { uv: false }); { const e = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 10), M.pipe); e.position.set(-3.95, -0.52, 0.15); house.add(e); }
+    const drip = (() => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), M.drip); m.position.set(-3.95, -0.62, 0.15); m.scale.y = 1.6; house.add(m);
+      return { mesh: m, on: true, t: 0, v: 0, y0: -0.62, y1: B - 0.15, pause: 1.9, wait: 0 };
+    })();
+    bsolid(-4.3, -3.38, -0.4, 0.55);
+    // old boxes along the east wall
+    cardboardBox(-3.75, B, 2.6, 0.55, 0.45, 0.5, 1, 0.1); cardboardBox(-3.78, B + 0.45, 2.62, 0.5, 0.4, 0.45, 2, -0.2); cardboardBox(-4.35, B, 2.95, 0.5, 0.44, 0.5, 0, 0.3); cardboardBox(-3.8, B, 1.75, 0.5, 0.44, 0.5, 3, -0.1);
+    bsolid(-4.7, -3.38, 1.4, 3.3);
+    // the bare bulb on its cord with a pull chain; it swings a little all the time (laundry.bulb.set lights it, .swing is how much it moves)
+    const bulb = (() => {
+      const g = new THREE.Group(); g.position.set(-5.7, -0.16, 1.6); house.add(g);
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.55, 6), M.black); cord.position.y = -0.275; g.add(cord);
+      const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.07, 10), M.brass); socket.position.y = -0.585; g.add(socket);
+      const lampM = M.lamp.clone(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), lampM); b.position.y = -0.665; b.scale.y = 1.3; g.add(b);
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.4, 5), M.steel); chain.position.set(0.03, -0.8, 0); g.add(chain);
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), M.steel); bead.position.set(0.03, -1.0, 0); g.add(bead);
+      const light = new THREE.PointLight(0xffd6a0, 0, 7, 1.8); light.position.y = -0.7; g.add(light);
+      return { group: g, mesh: b, light, on: false, swing: 0.08, t: 0, base: 5, pos: new THREE.Vector3(-5.7, -0.85, 1.6), chain: new THREE.Vector3(-5.67, -1.16, 1.6),
+        set(on) { this.on = on; light.intensity = on ? this.base : 0; lampM.emissiveIntensity = on ? 1.4 : 0; } };
+    })();
+    laundry = { bulb, washer, drum: { mesh: washer.drum, get spinning() { return washer.spinning; }, spin(on) { washer.spinning = on; } }, sink, drip, floor: B, door: doors.basement, bounds: PLACES.laundry,
+      tick(dt) {
+        bulb.t += dt; const a = bulb.swing * Math.sin(bulb.t * 2.1) * (0.7 + 0.3 * Math.sin(bulb.t * 0.37));
+        bulb.group.rotation.z = a; bulb.group.rotation.x = a * 0.4 * Math.cos(bulb.t * 1.3);
+        if (bulb.on) bulb.light.intensity = bulb.base * (0.94 + Math.random() * 0.06);
+        if (washer.spinning) washer.drum.rotation.y += dt * washer.rate;
+        if (drip.on) {   // it falls from the elbow, hits the water, and the next one gathers
+          if (drip.wait > 0) { drip.wait -= dt; if (drip.wait <= 0) { drip.mesh.visible = true; drip.mesh.position.y = drip.y0; drip.v = 0; } }
+          else { drip.v += 9.8 * dt; drip.mesh.position.y -= drip.v * dt; if (drip.mesh.position.y < drip.y1) { drip.mesh.visible = false; drip.wait = drip.pause; } }
+        } else drip.mesh.visible = false;
+      } };
+    fxTick = (dt) => laundry.tick(dt);
+  }
 
   // ---------- furniture: each model replaces its stand-in (and collider) as it loads ----------
   const PI = Math.PI;
@@ -800,12 +930,12 @@ export function buildWorld(scene) {
   prop('clock_wall', { x: 3.21, y: 1.74, z: -3.05, rot: -PI / 2 });
   // kitchen and dining: the round table, chairs, a kettle and a pot on the stove
   {
-    const cx = -2.1, cz = 2.3;
+    const cx = -2.1, cz = 1.8;   // (pulled toward the living room so the back door and its swing stay clear)
     prop('table_round', { x: cx, z: cz, s: 0.77 }, { tag: 'dining', old: [cDining], box: [cx - 0.55, cx + 0.55, cz - 0.55, cz + 0.55] });
     for (const [dx, dz, r] of [[-0.83, 0, PI / 2], [0.83, 0, -PI / 2], [0, -0.9, 0], [0, 0.9, PI]]) chairs.push({ holder: prop('chair', { x: cx + dx, z: cz + dz, rot: r }, { tag: 'dining' }), x: cx + dx, z: cz + dz, rot: r });
     prop('kettle', { x: 2.82, y: 0.96, z: 1.17, rot: 0 });
     prop('pot', { x: 3.02, y: 0.96, z: 1.49, rot: 0 });
-    prop('plant1', { x: -2.9, z: 3.2 }, { box: [-3.15, -2.65, 2.9, 3.45] });
+    prop('plant1', { x: -1.65, z: 3.25 }, { box: [-1.9, -1.4, 3.0, 3.5] });   // in the corner by the pantry, clear of the back door
   }
 
   // ---------- set pieces for the nights: the TV, the wall phone, the bathroom mirror ----------
@@ -905,8 +1035,8 @@ export function buildWorld(scene) {
         const d = decal(1, 0.36, 0.36, m); d.rotation.set(-Math.PI / 2, Math.atan2(-dx, -dz), 0, 'YXZ'); d.position.set(x, 0.006, z); if (i % 2) d.scale.x = -1; g.add(d);
       });
     });
-    // a handprint on the breaker box door
-    kit('HANDPRINT', (g) => { const d = decal(2, 0.3, 0.3, decalMat(0.8)); d.position.set(-5.47, 1.47, -3.708); d.rotation.z = 0.12; g.add(d); });
+    // a handprint on the breaker panel's door, out in the garage
+    kit('HANDPRINT', (g) => { const d = decal(2, 0.3, 0.3, decalMat(0.8)); d.position.set(-9.65, 1.47, -7.238); d.rotation.set(0, Math.PI, 0.12); g.add(d); });
     // crayon on the hall wall under the drawing, and the crayon on the carpet
     kit('DRAWING', (g) => {
       const d = decal(3, 0.5, 0.5, decalMat(0.6)); d.position.set(5.22, 0.52, -0.3 - WT / 2 - 0.003); d.rotation.y = Math.PI; g.add(d);
@@ -1001,7 +1131,10 @@ export function buildWorld(scene) {
 
   // ---------- yard ----------
   M.asphalt = std({ color: 0x2b2b2d, roughness: 0.92 }); M.asphalt.userData.worldUV = true; applyPBR(M.asphalt, 'concrete', { tint: 0x3a3a3c });
-  box(-260, 260, -0.4, -0.02, -260, 260, M.grass, { cast: false, parent: yard });
+  {   // the ground: a thin slab in four pieces around the hole where the cellar stairs go down (thin, so its underside stays above the laundry's ceiling)
+    const { x0, xEnd, z0, z1 } = STAIR, hx0 = xEnd - 0.25, hx1 = x0, hz0 = z0 + 0.02, hz1 = z1 + 0.25;
+    for (const [a, b, c, d] of [[-260, 260, -260, hz0], [-260, 260, hz1, 260], [-260, hx0, hz0, hz1], [hx1, 260, hz0, hz1]]) box(a, b, -0.05, -0.02, c, d, M.grass, { cast: false, parent: yard });
+  }
   box(-6, 8.5, -0.02, -0.008, -29, -6.2, M.dirt, { cast: false, parent: yard });   // the gravel drive up from the road
   box(-260, 260, -0.4, -0.005, -33.5, -27.5, M.asphalt, { cast: false, parent: yard });   // the road along the front of the property
   for (let x = -120; x < 120; x += 6) box(x, x + 3, -0.006, -0.004, -30.6, -30.4, std({ color: 0xc9b24a, roughness: 0.8 }), { uv: false, cast: false, parent: yard });
@@ -1035,25 +1168,77 @@ export function buildWorld(scene) {
   ];
   const dropSpots = [new THREE.Vector3(5.45, 0.55, 3.0), new THREE.Vector3(6.05, 0.55, 3.0), new THREE.Vector3(6.65, 0.55, 3.0)];   // on the bottom bunk
 
-  // the detached two-car garage (brown siding, gray shingles) behind the house on the left: its doors face the house, a side door faces
-  // the concrete apron. An arborvitae hedge runs along the east side. The garage is built in its own frame and GAR moves it into place.
-  const GAR = { x: -4, z: 20 };
+  // the detached two-car garage (brown siding, gray shingles) in front of the utility wing, beside the drive: its two doors face the gravel,
+  // the side door faces the house, and the breaker panel is inside on the stud wall by that door (W.garage, W.breaker).
+  const [GX0, GX1, GZ0, GZ1] = PLACES.garage, GH = 2.7, GT = 0.12;
+  let garage = null, breaker = null;
   {
-    const GG = new THREE.Group(); GG.position.set(GAR.x, 0, GAR.z); yard.add(GG);
-    box(-15.6, -9, 0, 3.0, -10, -3.6, M.siding, { parent: GG });
-    const half = 3.5, rise = 1.3, L = Math.hypot(half, rise), a = Math.atan2(rise, half);
-    for (const s2 of [-1, 1]) {
-      const geo = new THREE.BoxGeometry(7.4, 0.14, L); worldUV(geo);
-      const m = new THREE.Mesh(geo, M.roof); m.castShadow = m.receiveShadow = true; m.position.set(-12.3, 3.0 + rise / 2, -6.8 + s2 * half / 2); m.rotation.x = s2 * a; GG.add(m);
+    defParent = yard;
+    const gw = (x0, x1, y0, y1, z0, z1, inside) => {   // a wall piece: siding outside, the plywood sheathing on the face that looks into the garage
+      const m = [M.siding, M.siding, M.siding, M.siding, M.siding, M.siding]; m[inside] = M.ply;   // (+x, -x, +y, -y, +z, -z)
+      box(x0, x1, y0, y1, z0, z1, m);
+    };
+    gw(GX0, GX1, 0, GH, GZ0, GZ0 + GT, 4);
+    gw(GX0, GX0 + GT, 0, GH, GZ0 + GT, GZ1 - GT, 0);
+    gw(GX0, -8.75, 0, GH, GZ1 - GT, GZ1, 5); gw(-7.85, GX1, 0, GH, GZ1 - GT, GZ1, 5); gw(-8.75, -7.85, 2.1, GH, GZ1 - GT, GZ1, 5); casing(true, GZ1 - GT / 2, { c: -8.3, w: 0.9 });
+    gw(GX1 - GT, GX1, 0, GH, GZ0 + GT, -13.2, 1); gw(GX1 - GT, GX1, 0, GH, -10.5, -10.1, 1); gw(GX1 - GT, GX1, 0, GH, -7.4, GZ1 - GT, 1); gw(GX1 - GT, GX1, 2.3, GH, -13.2, -7.4, 1);
+    for (const [z0, z1] of [[-13.2, -10.5], [-10.1, -7.4]]) {   // the two overhead doors, shut
+      box(GX1 - 0.07, GX1 - 0.04, 0.04, 2.3, z0, z1, M.garageDoor, { uv: false });
+      for (let y = 0.6; y < 2.3; y += 0.56) box(GX1 - 0.04, GX1 - 0.03, y, y + 0.03, z0 + 0.02, z1 - 0.02, M.black, { uv: false });
+      for (let i = 0; i < 4; i++) { const zc = z0 + 0.35 + i * (z1 - z0 - 0.7) / 3; box(GX1 - 0.045, GX1 - 0.03, 1.85, 2.15, zc - 0.22, zc + 0.22, M.glassOut, { uv: false }); }
     }
-    const gshape = new THREE.Shape([new THREE.Vector2(10, 3.0), new THREE.Vector2(-3.6, 3.0), new THREE.Vector2(6.8, 3.0 + rise * 0.93)]);
-    for (const x of [-8.99, -15.61]) { const g = new THREE.ShapeGeometry(gshape); g.rotateY(Math.PI / 2); const m = new THREE.Mesh(g, M.gable); m.position.x = x; GG.add(m); }
-    box(-15.0, -9.6, 0.1, 2.5, -10.03, -10.0, M.garageDoor, { uv: false, parent: GG });
-    for (let y = 0.7; y < 2.5; y += 0.6) box(-15.0, -9.6, y, y + 0.03, -10.06, -10.03, M.black, { uv: false, parent: GG });
-    { const d = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.04, 0.05), M.doorW); d.rotation.y = Math.PI / 2; d.position.set(-8.97, 1.02, -9.0); GG.add(d); }
-    solid(-15.7 + GAR.x, -8.9 + GAR.x, -10.1 + GAR.z, -3.5 + GAR.z);
-    // the concrete apron between the house and the garage
-    box(-13 + GAR.x + 6.6, -6.4, -0.02, 0.012, 3.4, 12, M.concrete, { parent: yard, cast: false });
+    solid(GX0 - 0.05, GX0 + GT, GZ0, GZ1, { wall: true }); solid(GX1 - GT, GX1 + 0.05, GZ0, GZ1, { wall: true }); solid(GX0, GX1, GZ0 - 0.05, GZ0 + GT, { wall: true });
+    solid(GX0, -8.75, GZ1 - GT, GZ1 + 0.05, { wall: true }); solid(-7.85, GX1, GZ1 - GT, GZ1 + 0.05, { wall: true });
+    box(GX0, GX1, -0.1, 0, GZ0, GZ1, M.concrete, { cast: false });
+    box(GX0 - 0.02, GX1 + 0.02, GH, GH + 0.08, GZ0 - 0.02, GZ1 + 0.02, [M.siding, M.siding, M.siding, M.ply, M.siding, M.siding]);   // (laps the wall tops and casts shadow: no line of sun through the ridge)
+    {   // the roof: ridge along x, gable ends toward the drive and the field
+      const half = (GZ1 - GZ0) / 2 + 0.3, rise = 1.3, L = Math.hypot(half, rise), a = Math.atan2(rise, half), zc = (GZ0 + GZ1) / 2, xc = (GX0 + GX1) / 2;
+      for (const s of [-1, 1]) { const geo = new THREE.BoxGeometry(GX1 - GX0 + 0.5, 0.14, L); worldUV(geo); const m = new THREE.Mesh(geo, M.roof); m.castShadow = m.receiveShadow = true; m.position.set(xc, GH + 0.05 + rise / 2, zc + s * half / 2); m.rotation.x = s * a; yard.add(m); }
+      const peak = GH + 0.05 + rise * ((half - 0.3) / half);
+      const shape = new THREE.Shape([new THREE.Vector2(-GZ0, GH - 0.06), new THREE.Vector2(-GZ1, GH - 0.06), new THREE.Vector2(-zc, peak)]);   // (the base overlaps the wall top: no slit of sun under the gable)
+      for (const x of [GX0 + 0.005, GX1 - 0.005]) { const g = new THREE.ShapeGeometry(shape); g.rotateY(Math.PI / 2); const m = new THREE.Mesh(g, M.gable); m.position.x = x; m.castShadow = true; yard.add(m); }
+    }
+    // inside: bare studs over the sheathing on the long walls
+    for (let x = GX0 + GT + 0.3; x < GX1 - GT; x += 0.6) {
+      if (x < -8.8 || x > -7.8) box(x - 0.02, x + 0.02, 0, GH, GZ1 - GT - 0.09, GZ1 - GT, M.furn, { uv: false });
+      box(x - 0.02, x + 0.02, 0, GH, GZ0 + GT, GZ0 + GT + 0.09, M.furn, { uv: false });
+    }
+    // the breaker panel: a gray steel box between two studs by the side door, the breakers on its dead front, a door on a hinge (garage.panel.open)
+    const PX = -9.68, PY = 1.45, PZ = GZ1 - GT - 0.1;
+    rbox(PX - 0.25, PX + 0.25, PY - 0.3, PY + 0.3, PZ + 0.01, GZ1 - GT, M.steel, 0.01);
+    for (let i = 0; i < 8; i++) rbox(PX - 0.14 + (i % 2) * 0.17, PX - 0.06 + (i % 2) * 0.17, PY - 0.17 + Math.floor(i / 2) * 0.1, PY - 0.11 + Math.floor(i / 2) * 0.1, PZ + 0.004, PZ + 0.012, M.black, 0.003);
+    rbox(PX - 0.06, PX + 0.06, PY + 0.17, PY + 0.25, PZ + 0.002, PZ + 0.012, M.black, 0.003);
+    const pDoor = new THREE.Group(); pDoor.position.set(PX - 0.25, PY, PZ); yard.add(pDoor);
+    { const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.012), M.steel); leaf.position.set(0.25, 0, -0.006); leaf.castShadow = true; pDoor.add(leaf);
+      const latch = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.08, 0.01), M.black); latch.position.set(0.46, 0, -0.016); pDoor.add(latch); }
+    breaker = { pos: new THREE.Vector3(PX, PY, PZ), face: new THREE.Vector3(0, 0, -1) };
+    pDoor.updateMatrixWorld(true); pDoor.attach(proof.HANDPRINT.g);   // the handprint is on the door: it swings with it
+    // one bare bulb in the middle of the ceiling (garage.light.set), and a dead one over the side door outside
+    const light = (() => {
+      const lampM = M.lamp.clone(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), lampM); b.position.set(-10.8, GH - 0.14, -10.3); b.scale.y = 1.3; yard.add(b);
+      const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.08, 10), M.white); sock.position.set(-10.8, GH - 0.04, -10.3); yard.add(sock);
+      const pl = new THREE.PointLight(0xffe0b0, 0, 9, 1.7); pl.position.set(-10.8, GH - 0.25, -10.3); scene.add(pl);
+      return { light: pl, mesh: b, on: false, base: 6, pos: b.position.clone(), set(on) { this.on = on; pl.intensity = on ? this.base : 0; lampM.emissiveIntensity = on ? 1.4 : 0; } };
+    })();
+    { const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), M.lamp.clone()); b.position.set(-8.3, 2.3, GZ1 + 0.08); yard.add(b); }
+    // a workbench with a pegboard, a stack of tires, boxes, an oil stain
+    rbox(-13.5, -10.5, 0.82, 0.88, GZ0 + GT + 0.09, GZ0 + GT + 0.69, M.furn, 0.01);
+    for (const x of [-13.45, -10.55]) for (const z of [GZ0 + GT + 0.14, GZ0 + GT + 0.64]) box(x - 0.03, x + 0.03, 0, 0.82, z - 0.03, z + 0.03, M.furn, { uv: false });
+    box(-13.5, -10.5, 1.1, 1.9, GZ0 + GT + 0.09, GZ0 + GT + 0.11, M.ply, { uv: true }); knick(-12.0, 0.88, GZ0 + GT + 0.4, 5, 2.2);
+    solid(-13.55, -10.45, GZ0, GZ0 + GT + 0.75);
+    for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.2, 20), M.tire); t.position.set(-13.3, 0.1 + i * 0.2, -8.0); t.castShadow = true; yard.add(t); }
+    solid(-13.7, -12.9, -8.4, -7.6);
+    cardboardBox(-13.3, 0, -9.2, 0.6, 0.5, 0.5, 2, 0.1, yard); cardboardBox(-13.3, 0.5, -9.2, 0.5, 0.4, 0.45, 0, -0.2, yard); cardboardBox(-13.3, 0, -9.9, 0.5, 0.44, 0.5, 1, 0.3, yard);
+    solid(-13.7, -12.95, -10.2, -8.9);
+    { const stain = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), std({ color: 0x14120f, roughness: 0.4, transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+      stain.rotation.x = -Math.PI / 2; stain.scale.set(1.4, 1, 1); stain.position.set(-11.0, 0.002, -8.9); stain.renderOrder = 1; yard.add(stain); }
+    // the concrete apron out to the gravel, and a walk from the side door to the house
+    box(GX1, -6.0, -0.03, 0.0, GZ0, GZ1, M.concrete, { cast: false, uv: true });
+    box(-8.6, -8.0, -0.03, -0.01, GZ1, -3.95, M.concrete, { cast: false, uv: true });
+    defParent = null;
+    garage = { door: doors.garage, light, panel: { group: pDoor, pos: breaker.pos, isOpen: false, open(k) { pDoor.rotation.y = k * 1.9; this.isOpen = k > 0.5; } }, pos: new THREE.Vector3(-10.8, 0, -10.3), bounds: PLACES.garage };
+  }
+  {   // an arborvitae hedge along the east end of the house
     const hedge = new THREE.InstancedMesh(new THREE.ConeGeometry(0.55, 3.6, 10), M.leaves, 12), m4 = new THREE.Matrix4();
     for (let i = 0; i < 12; i++) { m4.makeTranslation(9.8, 1.8, -5.5 + i * 1.0); hedge.setMatrixAt(i, m4); }
     hedge.castShadow = true; yard.add(hedge); solid(9.2, 10.4, -6, 5.6);
@@ -1142,8 +1327,8 @@ export function buildWorld(scene) {
   // trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -21 - pad && x < -12 + pad && z > 8 - pad && z < 18 + pad);   // not on the house, porch path or truck
-    const trees = [[-14, 7], [-19, -4], [-13, -16], [29, 9], [33, -6], [27, -24], [-12, -22], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2], [6, -8]];   // the last is the cherry tree by the front
+    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5.5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad);   // not on the house, porch path, truck or garage
+    const trees = [[-14, 7], [-19, -4], [-18, -19], [29, 9], [33, -6], [27, -24], [-12, -22], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2], [6, -8]];   // the last is the cherry tree by the front
     const tm = trees.map(([x, z]) => { const k = 1.5 + r() * 1.1; q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k, k)); });
     const near = tm.filter((m) => Math.hypot(m.elements[12], m.elements[14]) < 32);   // only the trees by the house cast shadows (the rest are too far to matter)
     scatter(yard, 'tree_small', near); scatter(yard, 'tree_small', tm.filter((m) => !near.includes(m)), { cast: false });
@@ -1233,5 +1418,6 @@ export function buildWorld(scene) {
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
+    groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry,
   };
 }
