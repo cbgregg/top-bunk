@@ -96,7 +96,33 @@ same script writes the small effects the cue sheets use; the other effects and t
 
 `tools/sing.js` sings a song file the way a 1961 mainframe did: a buzzing glottal pulse through three vowel formant filters, consonants
 as short bursts of noise, every note a little flat with a slow wobble, slurring into the next, over a square-wave organ and a soft bass.
-It has no dependencies and writes a stereo WAV.
+It has no dependencies and writes a stereo WAV. The synthesis lives in `tools/sing_core.js`, which the page below shares.
+
+### The page
+
+`tools/robot-voice.html` is the same singer with knobs: drop a MIDI file and type its words, drop a recording of a voice on its own,
+or open a song file; set the tape speed, pitch, wobble and the two levels (the `1961` and `clean` presets are starting points);
+`Preview` renders in the background and plays it with a waveform you can click to seek; `Export WAV` saves exactly what the command
+line writes for the same settings, `Export song JSON` the song file (what `--out-json` gives). `tools\robot-voice.cmd` serves the
+project and opens it (`node trailer/render.js --serve`, then `http://127.0.0.1:8700/tools/robot-voice.html`); the page also works
+opened straight from disk. It is one file with the core and the demo built in: after a change to `sing_core.js`, run
+`node tools/build_robot_voice.js` to put the new core into it.
+
+A recording goes through a pitch tracker (YIN, 46 ms windows every 10 ms, a median over five frames), then into notes wherever the
+pitch holds a semitone for 60 ms or more, with a repeated note split where the level dips between syllables and each note starting
+at its consonant rather than its vowel. The tempo is the one whose half-beat grid the note starts agree with over the whole take,
+the key is read from how long each pitch class is held, and `snap to` quantizes starts and lengths to a beat, half or quarter beat
+on that grid. The piano roll shows the notes over the pitch curve: click a note to delete it, drag one up or down to move it a
+semitone, type the real tempo if the guess is off. `add chords from the melody` puts a triad under each bar (the key's I, IV, V,
+vi, ii or iii, whichever holds most of what is sung in the bar). On the singer's own voice singing the demo (a vocal-only render,
+no wobble), the tracker gets 59 of 66 notes within a semitone and 60 ms before the snap and 65 of 66 after it, at the right tempo
+and key; the ones it misses are repeated notes with a nasal between them (na-na). This works on an isolated vocal: a stem, a
+cappella, someone humming. It will not pull a singer out of a band.
+
+For a full recording there is `tools/extract_vocals.py` with `tools\extract-vocals.cmd` for Windows: it makes `tools\.venv` on the
+first run, installs demucs and basic-pitch into it (pinned; about 2 GB with torch, which uses the graphics card when it sees one),
+separates the vocals (`song.vocals.wav`) and transcribes them (`song.vocals.mid`) to drop into the page. The separation and the
+transcription are heavy models and make mistakes; the roll is for fixing them.
 
 ```
 node tools/sing.js trailer/music/robot_song.json --out trailer/music/robot_demo.wav --slow 0.97 --wobble 0.6
@@ -128,9 +154,9 @@ demo's words in that form. Rests take no syllable. If the syllable and note coun
 Without a lyrics file, lyric events in the MIDI are used when it has them. `--out-json song.json` also writes what it read as a song
 file, to fix a syllable or a chord by hand and sing again from that.
 
-A synthesized cover does not need the recording's master licence, but the composition is still under copyright, so it still needs a
-synchronisation licence from the song's publishers before it goes in the trailer. Keep the MIDI, the lyrics file and the song file of
-any copyrighted song out of the repository.
+A synthesized cover does not need the recording's master licence, but the composition is still under copyright, and so is a
+transcription of it, so it still needs a synchronisation licence from the song's publishers before it goes in the trailer. Keep the
+MIDI, the recording, the lyrics file and the song file of any copyrighted song out of the repository.
 
 ## Steam trailer specs
 
