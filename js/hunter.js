@@ -20,12 +20,13 @@ export function createHunter(ctx) {
     lastSeen: null, lostT: 0, replan: 0, doorWait: 0, doorName: null,
     sightT: 0, sightDur: 4, seenT: 0, sightOpts: {}, frozen: false, lookT: 0,
     searchList: [], searchWait: 0, searchT: 0, forcePod: null, heard: 0, checks: {},
-    loomT: 0, loomDur: 5, loomPod: null, stepAcc: 0, hb: 0, leaveT: 0, startedAt: 0,
+    murT: 0, loomT: 0, loomDur: 5, loomPod: null, stepAcc: 0, hb: 0, leaveT: 0, startedAt: 0,
   };
   const tmp = new V3(), dirv = new V3();
 
   // ---- sight lines ----
-  function los(ax, az, bx, bz) {
+  function los(ax, az, bx, bz, ay = 0, by = 0) {
+    if (Math.abs(ay - by) > 1.2) return false;   // another floor: the laundry lies under the utility room
     for (const c of W.colliders) {
       if (!c.on || !(c.wall || c.door)) continue;
       let t0 = 0, t1 = 1;
@@ -40,10 +41,11 @@ export function createHunter(ctx) {
     return true;
   }
   const ep = () => E.root.position;
+  const settle = () => { if (W.groundAt) ep().y = W.groundAt(ep().x, ep().z, ep().y); };   // on the stairs and in the laundry it stands on the floor there
   const gap = () => Math.hypot(P.pos.x - ep().x, P.pos.z - ep().z);
-  const sees = (maxD = 14) => !hidden() && gap() < maxD && los(ep().x, ep().z, P.pos.x, P.pos.z);
+  const sees = (maxD = 14) => !hidden() && gap() < maxD && los(ep().x, ep().z, P.pos.x, P.pos.z, ep().y, P.pos.y);
   const hidden = () => ctx.hidden();
-  const playerNode = () => nearestNode(P.pos.x, P.pos.z, (k) => los(P.pos.x, P.pos.z, NODES[k][0], NODES[k][1])) || nearestNode(P.pos.x, P.pos.z);
+  const playerNode = () => nearestNode(P.pos.x, P.pos.z, (k) => los(P.pos.x, P.pos.z, NODES[k][0], NODES[k][1], P.pos.y, NODES[k][2] || 0), P.pos.y) || nearestNode(P.pos.x, P.pos.z, null, P.pos.y);
   const doorClosed = (name) => W.doors[name] && W.doors[name].target === 0;
   // is the player looking toward a point (cos threshold) with nothing in between?
   function looking(x, z, cos = 0.8, y = 1.2) {
@@ -55,13 +57,21 @@ export function createHunter(ctx) {
 
   // ---- placing and moving ----
   function place(node) {
-    const [x, z] = NODES[node]; E.root.position.set(x, 0, z); S.node = node; E.visible = true;
+    const [x, z, y = 0] = NODES[node]; E.root.position.set(x, y, z); S.node = node; E.visible = true;
     E.lookTarget = camera.position; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.3; E.smileScale = 1; E.speed = 1;
   }
   function planTo(node, from = null) {
-    const start = from || S.node || nearestNode(ep().x, ep().z);
+    const start = from || S.node || nearestNode(ep().x, ep().z, null, ep().y);
     const p = navPath(start, node, doorClosed); if (!p) return false;
-    S.path = p; S.pi = p[0] === nearestNode(ep().x, ep().z) && p.length > 1 && Math.hypot(NODES[p[0]][0] - ep().x, NODES[p[0]][1] - ep().z) < 0.2 ? 1 : 0; return true;
+    S.path = p; S.pi = 0;
+    // already between the first two nodes of the new path (a replan while it walks): carry on to the second rather than turning back to the first
+    if (p.length > 1) {
+      const [ax, az] = NODES[p[0]], [bx, bz] = NODES[p[1]], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
+      const t = ((ep().x - ax) * dx + (ep().z - az) * dz) / l2, px = ax + dx * t - ep().x, pz = az + dz * t - ep().z;
+      if (t > 0.02 && t < 1 && Math.hypot(px, pz) < 0.5) S.pi = 1;
+      else if (Math.hypot(ax - ep().x, az - ep().z) < 0.2) S.pi = 1;
+    }
+    return true;
   }
   // walk along S.path at `spd`; returns true on arrival
   function follow(dt, spd) {
@@ -82,6 +92,7 @@ export function createHunter(ctx) {
       if (d <= remaining) { ep().x = tx; ep().z = tz; remaining -= d; S.node = id; S.pi++; moved = true; }
       else { ep().x += dx / d * remaining; ep().z += dz / d * remaining; remaining = 0; moved = true; }
     }
+    settle();
     E.mode = !moved ? 'idle' : spd > 2.6 ? 'run' : 'walk'; E.speed = spd / 3;
     if (moved) {
       S.stepAcc += spd * dt;
@@ -102,7 +113,7 @@ export function createHunter(ctx) {
   // it is simply there, somewhere you can see (or soon will)
   function sight(node, opts = {}) {
     place(node); setState('sight');
-    S.sightT = 0; S.sightDur = opts.dur ?? 4; S.seenT = 0; S.sightOpts = opts; E.tilt = opts.tilt ?? 0.4; S.turned = false; S.stung = false;
+    S.sightT = 0; S.sightDur = opts.dur ?? 4; S.seenT = 0; S.sightOpts = opts; E.tilt = opts.tilt ?? 0.4; S.turned = false; S.stung = false; S.slammed = false;
     if (opts.facing) { E.lookTarget = null; E.faceTowards(opts.facing[0], opts.facing[1], 1); }
     // the sting lands the instant it is in front of you, not when it appears somewhere behind a wall (see update); until then, a small wrongness
     if (opts.stab !== false && inView(ep().x, ep().z, 0.7) && gap() < 18) sting(); else sfx.creak(0.12, ctx.panFor(ep()));
@@ -110,12 +121,12 @@ export function createHunter(ctx) {
   }
   function sting() {
     if (S.stung) return; S.stung = true;
-    sfx.stab(); ctx.flicker && ctx.flicker(0.5); ctx.addShake && ctx.addShake(0.6); F.fear = Math.max(F.fear, 0.85);
+    S.slammed = true; sfx.appear(); ctx.flicker && ctx.flicker(0.5); ctx.addShake && ctx.addShake(0.6); F.fear = Math.max(F.fear, 0.85);
   }
   // the jolt of a hunt: when it comes into view, not when it starts somewhere out of sight
   function huntJolt() {
     if (S.jolted) return; S.jolted = true;
-    sfx.jolt(0.85); ctx.flicker && ctx.flicker(0.6); ctx.addShake && ctx.addShake(0.9);
+    sfx.jolt(0.85); sfx.pianoSlam(1.4); ctx.flicker && ctx.flicker(0.6); ctx.addShake && ctx.addShake(0.9);
   }
   function stalk(node) {
     place(node); setState('stalk'); S.frozen = false; S.lookT = 0; S.replan = 0;
@@ -137,6 +148,7 @@ export function createHunter(ctx) {
     for (let i = 0; i < 2 + (S.level > 4 ? 1 : 0) && near.length; i++) S.searchList.push(near.splice((Math.random() * near.length) | 0, 1)[0]);
     F.chase = false; sfx.bed('music/chase', 0, 1.5); sfx.bed('music/night', 0.35, 2);
     planTo(S.searchList[0]); E.tilt = 0.45;
+    if (hidden() && !S.hinted && ctx.hint) { S.hinted = true; ctx.hint(); }   // the breath meter and the key, the moment it starts looking while you hide
   }
   function pickSpawn(minPath = 7, prefer = null) {
     const pn = playerNode(), c = [];
@@ -156,7 +168,7 @@ export function createHunter(ctx) {
     const pod = ctx.pods[podId]; place(pod.node); E.mode = 'idle';
     E.root.position.x = NODES[pod.node][0]; E.root.position.z = NODES[pod.node][1]; E.faceTowards(pod.look[0], pod.look[1], 1);
     sfx.violins(1, 0.4); sfx.tension(0.05, 1); sfx.whisper(ctx.panFor(ep()), 0.16);
-    F.breathCheck = true; F.grace = 1.3; ctx.hint && ctx.hint();
+    F.breathCheck = true; F.grace = 2.2; if (P.breath < 0.9) P.breath = 0.9; ctx.hint && ctx.hint();   // (it never finds you with the meter already empty)
   }
   function notifyPod(podId) {   // you just got into a hiding place: did it see you do it?
     if ((S.state === 'hunt' || S.state === 'stalk') && gap() < 9 && los(ep().x, ep().z, P.pos.x, P.pos.z)) {
@@ -181,6 +193,11 @@ export function createHunter(ctx) {
       F.fear = Math.max(F.fear, clamp(1 - g / 11, 0, 0.95));
       S.hb -= dt; if (S.hb <= 0) { sfx.heartbeat(clamp(0.3 + (1 - g / 12) * 0.5, 0.3, 0.8)); S.hb = clamp(0.28 + g * 0.05, 0.3, 0.9); }
     }
+    // while it stalks or hunts, a voice you can barely hear, from where it is and louder the nearer it gets
+    if (S.state === 'stalk' || S.state === 'hunt') {
+      S.murT -= dt;
+      if (S.murT <= 0) { S.murT = S.state === 'hunt' ? 1.7 : 2.3; sfx.lurk(ctx.panFor(ep()), clamp(1 - g / 14, 0.03, 1), 1.4); }
+    }
     switch (S.state) {
       case 'sight': {
         S.sightT += dt;
@@ -192,7 +209,7 @@ export function createHunter(ctx) {
         }
         E.faceTowards(P.pos.x, P.pos.z, Math.min(1, dt * 4));
         const seen = inView(ep().x, ep().z, 0.7) && g < 18;
-        if (seen) { if (S.sightOpts.stab !== false) sting(); S.seenT += dt; }
+        if (seen) { if (S.sightOpts.stab !== false) sting(); else if (!S.slammed && S.sightOpts.slam !== false) { S.slammed = true; sfx.pianoSlam(1.6); } S.seenT += dt; }
         if (S.sightOpts.chase && g < (S.sightOpts.chaseDist ?? 4)) { hunt(); break; }
         if ((S.sightOpts.vanishOnLook !== false && S.seenT > (S.sightOpts.lookTime ?? 0.9)) || S.sightT > S.sightDur) {
           if (S.sightOpts.then === 'hunt') hunt(); else vanish();
@@ -275,7 +292,7 @@ export function createHunter(ctx) {
   return {
     S, update, sight, stalk, hunt, vanish, dismiss, notifyPod, loom, pickSpawn, los, looking, playerNode, startSearch, searchFrom, place,
     get state() { return S.state; }, get busy() { return S.state !== 'away'; }, get cool() { return S.cool; },
-    setLevel(n) { S.level = n; }, reset() { vanish(false); S.cool = 0; S.checks = {}; F.chase = false; },
+    setLevel(n) { S.level = n; }, reset() { vanish(false); S.cool = 0; S.checks = {}; S.hinted = false; F.chase = false; },
     gap, sees,
   };
 }

@@ -275,7 +275,7 @@ let BASE = '';
           };
         });
         ok(e.evidence !== null, 'RUN.evidence is not an array');
-        ok(e.total === 10 && e.count === e.evidence, `proof: total ${e.total}, count ${e.count}, RUN.evidence ${e.evidence}`);
+        ok(e.total === 12 && e.count === e.evidence, `proof: total ${e.total}, count ${e.count}, RUN.evidence ${e.evidence}`);
         ok(e.kinds[1].length === 0 && e.kinds[10].length === 0, `nights 1 and 10 should leave no proof: ${JSON.stringify([e.kinds[1], e.kinds[10]])}`);
         const mid = [2, 3, 4, 5, 6, 7, 8, 9].filter((n) => e.kinds[n].length > 0);
         ok(mid.length > 0, 'no night from 2 to 9 can leave proof on this seed');

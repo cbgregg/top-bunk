@@ -1,31 +1,24 @@
-// The thing's face, built in code from the shapes the first version used (a 0.22 m sphere scaled 0.95, 1.2, 0.9, two flattened
-// spheres for eyes, the smile texture on a cylinder), so it is the same face: here the skull runs down into the neck, the eyes sit
-// in shallow sockets, the grin is cut into the head with the teeth inside it, and the skin is the same near-black as the body's.
+// the thing's face, built in code to the shapes of a 0.22 m sphere scaled 0.95, 1.2, 0.9 with two flattened spheres for eyes and a
+// grin on a cylinder: the skull runs down into the neck, the eyes sit in sockets, the grin is cut into the head with the teeth inside
 import * as THREE from 'three';
-import { smile as smileTex } from './textures.js';
 
 // face space: origin at the skull centre, metres, +y up, +z out of the face, +x the face's left
 const RX = 0.209, RY = 0.264, RZ = 0.198;
-// the eyes as the first version had them: flattened spheres standing out of the skull (centre, semi-axes, roll about +z), and the
-// point on each where its pupil rested
+// the eyes as flattened spheres (centre, semi-axes, roll about +z) and the point on each where its pupil rests
 const EYES = [
   { c: [-0.092, 0.075, 0.172], r: [0.0703, 0.10212, 0.03108], roll: 0.32, pupil: [-0.092, 0.075, 0.212] },
   { c: [0.092, 0.063, 0.172], r: [0.075924, 0.11029, 0.033566], roll: -0.32, pupil: [0.092, 0.075, 0.212] },
 ];
-// each eye now covers the patch of skull its sphere hid, inner edge clipped by the skull as it was, as seen from where the player usually
-// is: it turns its head toward the camera, which puts the camera on its axis 0.15 m below the skull centre, VIEW_Z out. The spheres stood out,
-// so up close they looked bigger than a patch on the skull does and far off a little smaller; 1.8 m splits the difference between the
-// bunk and the far end of the hall. Skull points and eyes meet in the plane z = PLANE_Z as seen from there. Up close the upper outer
-// part of each sphere stood out past the edge of the head, which a painted eye cannot, so they are drawn a little larger all round
-// (EYE_GROW): close up they come out nearly the size they were, and far off a little larger, where a pixel or two hardly shows.
-const VIEW_Y = -0.148, VIEW_Z = 1.8, PLANE_Z = 0.172, EYE_GROW = 1.08;
-const PUPIL_K = 1.12, PUPIL_NEAR = 0.08;   // (the pupils a little over the spheres' size: their soft edge eats into them, and the spheres sat nearer)
-// WARM: the colour the teeth light the inside of the mouth with
-const EYE_GLOW = 2.4, GRIN_GLOW = 1.18, WARM = new THREE.Color(1, 0.86, 0.7);
-// the neck: a capsule from inside the skull down into the chest, about as thick as the man's own neck and where his was, filling out a
-// little behind toward the shoulders so the collar can be drawn in to it, and joined to the skull with a small fillet (k round the back,
-// kChin under the chin, tighter there so the round underside of the head still shows)
-const NECK = { a: [-0.12, -0.045], b: [-0.50, -0.13], ra: 0.056, rb: 0.092, k: 0.036, kChin: 0.028, end: -0.46, sx: 1.15 };
+// each eye covers the patch of skull its sphere hides as seen from VIEW (the player 1.8 m off, the head turned to them), eye and skull
+// points meeting in the plane z = PLANE_Z; a patch on the skull reads smaller than a sphere standing off it, so EYE_GROW. Where the
+// skull faces VIEW less than EYE_EDGE (about 20 degrees short of its edge) the outline is cut, so no ring crosses the head's outline
+// from nearby angles either
+const VIEW_Y = -0.148, VIEW_Z = 1.8, PLANE_Z = 0.172, EYE_GROW = 1.08, EYE_EDGE = 0.32;
+const PUPIL_K = 1.075, PUPIL_NEAR = 0.08;   // the pupils a little over the spheres' size, and nearer, as the spheres sat
+const EYE_GLOW = 1.85, GRIN_GLOW = 1.18, WARM = new THREE.Color(1, 0.86, 0.7);   // warm: what the teeth light the mouth with
+// the neck: a capsule from low in the skull down into the chest, thin under the jaw and filling out toward the shoulders, joined to
+// the skull with a small fillet (k round the back, kChin under the chin)
+const NECK = { a: [-0.17, -0.03], b: [-0.50, -0.12], ra: 0.042, rb: 0.085, k: 0.03, kChin: 0.02, end: -0.46, sx: 1.0 };
 
 const ss = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -48,11 +41,10 @@ function sdf(x, y, z, neck) {
   const n = sdNeck(x, y, z), k = lerp(NECK.k, NECK.kChin, ss(-0.06, 0.04, z)), h = Math.max(k - Math.abs(e - n), 0) / k;
   return Math.min(e, n) - h * h * k * 0.25;
 }
-// where the rings are centred: the skull's axis down past the widest grin (so the mouth lines up with or without a neck), then
-// sliding back onto the neck's
+// where the rings are centred: the skull's axis down past the widest grin (so the mouth matches with or without a neck), then the neck's
 const ringZ = (y, neck) => (neck ? lerp(NECK.a[1], NECK.b[1], Math.min(1, Math.max(0, (y - NECK.a[0]) / (NECK.b[0] - NECK.a[0])))) * ss(-0.235, -0.29, y) : 0);
-// distance along the level ray at height y and azimuth a (atan2(x, z)) to the surface: straight off the skull where the neck is
-// too far away to matter, else found on the blended field
+// distance along the level ray at height y and azimuth a (atan2(x, z)) to the surface: off the skull alone where the neck is too far
+// to matter, else marched on the blended field
 function rayR(a, y, neck) {
   const sa = Math.sin(a), ca = Math.cos(a), zc = ringZ(y, neck);
   const A = (sa / RX) ** 2 + (ca / RZ) ** 2, B = 2 * zc * ca / (RZ * RZ), C = (y / RY) ** 2 + (zc / RZ) ** 2 - 1, D = B * B - 4 * A * C;
@@ -71,16 +63,15 @@ function basePoint(a, y, neck, out) {
   const r = rayR(a, y, neck);
   return out.set(r * Math.sin(a), y, ringZ(y, neck) + r * Math.cos(a));
 }
-// a point (face space) within reach outside the neck is drawn in toward the neck's axis, the nearest all the way to just inside
-// it: the thing does this to its shirt round the collar, which would otherwise stand round the neck as a ring. Given its normal n,
-// that turns toward the neck's as far as the point was drawn in, so the drawn-in collar shades as the neck does. It eases off toward the
-// neck's open end, deep in the chest, so the shirt there has no edge where the drawing in stops.
-export function tuckIntoNeck(p, n = null, reach = 0.1, inset = 0.008) {
+// a point (face space) within reach outside the neck is drawn in toward it, the nearest to just inside its surface, and its normal n
+// turned toward the neck's by as much: the shirt collar, which would otherwise stand off the neck as a ring. Eases off toward the
+// neck's open end in the chest
+export function tuckIntoNeck(p, n = null, reach = 0.13, inset = 0.016) {
   if (p.y > -0.12 || p.y < NECK.end || sdf(p.x, p.y, p.z, true) > reach) return false;
   const zc = ringZ(p.y, true), a = Math.atan2(p.x, p.z - zc), R = rayR(a, p.y, true), d = Math.hypot(p.x, p.z - zc) - R;
   if (d <= 0 || d >= reach) return false;
   const t = d / reach, k = ss(NECK.end, NECK.end + 0.07, p.y);
-  const r = R + d - k * (d - d * t * t * t * (4 - 3 * t) + inset * (1 - t));   // (meets the untouched shirt at reach without a crease)
+  const r = R + d - k * (d - d * t * t * t * (4 - 3 * t) + inset * (1 - t));   // meets the untouched shirt at reach without a crease
   p.x = Math.sin(a) * r; p.z = zc + Math.cos(a) * r;
   if (n) n.lerp(baseNormal(p, true, new THREE.Vector3()), (1 - t) * (1 - t) * (3 - 2 * (1 - t)) * k).normalize();
   return true;
@@ -93,11 +84,10 @@ function baseNormal(p, neck, out) {
 }
 
 // ---------- the grin ----------
-// The outline the smile texture had on its cylinder (radius 0.218, 0.93 of that deep, 0.16 m tall centred 0.085 m down, +-1.32 rad),
-// in canvas rows as textures.js draws it (columns 18..1006 of 1024, 256 rows). A wider smile (smileScale above 1) stretches it
-// round the head and taller about its middle, as scaling that cylinder did.
-const G = { r: 0.218, rz: 0.218 * 0.93, th: 1.32, top: -0.005, h: 0.16 * 1.06, mid: -0.085 };   // (6% taller: on the head it no longer hangs out in front of the chin)
-// (the hooked ends climb higher as it widens, so the widest grin still runs up the side of the head)
+// the grin's outline on its cylinder (radius 0.218, 0.93 of that deep, 0.17 m tall centred 0.085 m down, +-1.32 rad), in rows of a
+// 256-row strip over columns 18..1006 of 1024. a wider smile (smileScale above 1) stretches it round the head and taller about its middle
+const G = { r: 0.218, rz: 0.218 * 0.93, th: 1.32, top: -0.005, h: 0.16 * 1.06, mid: -0.085 };
+// the hooked ends climb higher as it widens, so the widest grin still runs up the side of the head
 const grinPx = (t, w = 1) => { const s = Math.sin(t * Math.PI), hk = Math.pow(Math.abs(t - 0.5) * 2, 7) * 18 * (1 + (w - 1) * 1.6); return [22 + s * 78 - hk, 22 + s * 205 - hk]; };
 const wideK = (s) => 1 + (s - 1) * 0.5, tallK = (s) => 1 + (s - 1) * 1.7;
 const azOf = (th, s) => Math.atan2(G.r * Math.sin(th), G.rz * Math.cos(th)) * wideK(s);
@@ -107,33 +97,30 @@ function grinAt(a, s) {
   const t = ((th + G.th) / (2 * G.th) * 1024 - 18) / 988;
   const [p0, p1] = t >= 0 && t <= 1 ? grinPx(t, s) : [4, 4];
   const yt = yOf(p0, s), yb = yOf(p1, s), past = t < 0 ? -t : t > 1 ? t - 1 : 0, lip = 1 - ss(0, 0.035, past);
-  // (f: how far the mouth opens; it stays a little open out to the corners and just past them, so each ends in a dark notch)
+  // f: how far the mouth opens; it stays a little open out to the corners and just past them, so each ends in a dark notch
   return { yt, yb, h: yt - yb, f: Math.max(ss(0.002, 0.03, yt - yb), 0.45 * lip), lip, cheek: 1 - ss(0, 0.3, past) };
 }
-// The grin used to stand out on its cylinder, as much as 4 cm in front of the chin, and as it widened the cylinder spread past the
-// sides of the head. The jaw comes most of the way out to where it was, so it still sits as big and as low on the face, now in the head:
-// how far to push the skull point b out, level from the axis, at smile s. As it widens the cheeks fill out with it, and toward the
-// corners the push eases off over a wide band, above and below as well as past them, so the cheeks swell smoothly out of the round of
-// the head instead of standing off it with an edge. Not round the eyes (eye: how far out from the nearer one, in its radii), where a
-// cheek would stand in front of the socket.
+// how far to push the skull point b out, level from the axis, at smile s: the jaw comes out most of the way to where the grin cylinder
+// stood, easing off over a band above and below the lips and past the corners, and not round the eyes (eye: how far from the nearer
+// one, in its radii). short under the lower lip, so the chin falls back and narrows into the neck
 function muzzle(b, g, s, eye = 9) {
   const a = Math.atan2(b.x, b.z), cx = G.r * (1 + (s - 1) * 0.8), rc = 1 / Math.sqrt((Math.sin(a) / cx) ** 2 + (Math.cos(a) / G.rz) ** 2);
   const side = ss(0.5, 1.3, Math.abs(a)), k = lerp(0.58, 0.8, side) * ss(1.2, 1.6, eye);
-  const above = lerp(0.035, 0.06, side), below = lerp(0.05, 0.075, side);
+  const above = lerp(0.035, 0.06, side), below = lerp(0.03, 0.045, side);
   return Math.max(0, rc - Math.hypot(b.x, b.z)) * k * g.cheek * ss(g.yt + above, g.yt + 0.004, b.y) * ss(g.yb - below, g.yb - 0.01, b.y);
 }
 function pushOut(b, d) { const r = Math.hypot(b.x, b.z); if (r > 1e-6) { b.x += b.x / r * d; b.z += b.z / r * d; } return b; }
-// down one column through the mouth: [y, depth into the head, glow from inside] at the ten points the rows are spun through.
-// The lips open a few millimetres wider than the teeth, so a dark edge of the inside shows round them.
+// down one column through the mouth: [y, depth into the head, glow from inside] at the ten points the rows are splined through.
+// the lips open a few millimetres wider than the teeth, so a dark edge of the inside shows round them
 const LW = 0.01;
 function mouthPath(g, open) {
-  const h = Math.sqrt(g.h * g.h + 1.6e-5), cy = (g.yt + g.yb) / 2, yt = cy + h / 2, yb = cy - h / 2;   // (never quite closed, so no row lands on another)
+  const h = Math.sqrt(g.h * g.h + 1.6e-5), cy = (g.yt + g.yb) / 2, yt = cy + h / 2, yb = cy - h / 2;   // never quite closed, so no row lands on another
   const f = open ? g.f : 0, m = 0.004 * f, rd = open ? 0.0028 * g.lip : 0, e = 0.002 * f, dIn = 0.016 * f, dBk = 0.034 * f, ot = yt + m, ob = yb - m;
   return [[ot + LW, 0, 0], [ot + 0.45 * LW, -rd, 0], [ot, e, 0.2], [yt + 0.5 * m - 0.02 * h, dIn, 0.8], [yt - 0.32 * h, dBk, 0.45],
     [yb + 0.32 * h, dBk, 0.45], [yb - 0.5 * m + 0.02 * h, dIn, 0.8], [ob, e, 0.2], [ob - 0.45 * LW, -rd, 0], [ob - LW, 0, 0]].map((p) => [p[0], p[1], p[2] * f]);
 }
 const SEG = [2, 2, 2, 2, 3, 2, 2, 2, 2];   // rows per stretch of that path (19 in all, after its first point)
-// centripetal Catmull-Rom through the path points (y, depth), so the lip edges come out rounded
+// centripetal catmull-rom through the path points (y, depth), so the lip edges come out rounded
 function spline(P, i, u) {
   const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
   const d = (p, q) => Math.max(1e-6, Math.sqrt(Math.hypot(q[0] - p[0], q[1] - p[1])));
@@ -178,31 +165,29 @@ function facing(p) {
   const nx = p.x / (RX * RX), ny = p.y / (RY * RY), nz = p.z / (RZ * RZ), dx = p.x - VIEW_FROM[0], dy = p.y - VIEW_FROM[1], dz = p.z - VIEW_FROM[2];
   return -(nx * dx + ny * dy + nz * dz) / (Math.hypot(nx, ny, nz) * Math.hypot(dx, dy, dz));
 }
-// each eye's visible outline (how far out from its centre, by angle in its frame): out to where its sphere went behind the skull. The
-// outer tops of the spheres stood well clear of the skull; painted on, they stop short of where it turns away from the view point
-// (further would wrap round the side of the head). That cut, and the corners where the spheres ran into the skull, are then smoothed out
-// round the angle, so each eye is a plain oval, only shorter on the side that turns away.
+// each eye's outline (how far out from its centre, by angle in its frame): out to where its sphere goes behind the skull, grown by
+// EYE_GROW, and cut where the skull turns away from the view point. the cut and the corners where the sphere met the skull are then
+// smoothed round the angle, so each eye is a plain oval, only shorter on the side that turns away
 for (const e of EYES) {
   const p = { x: 0, y: 0, z: 0 };
   const radius = (a, turned) => {
     const ca = Math.cos(a), sa = Math.sin(a);
     const seen = (m) => {
       const [o, d] = viewRay(...eyePlane(e, m * ca, m * sa)), te = enter(o, d, e.c, e.r, e.roll), ts = enter(o, d, SKULL_C, SKULL_R);
-      if (!(te < Infinity && te <= ts)) return false;
-      if (!turned) return true;
+      if (!turned) return te < Infinity && te <= ts;
       if (ts === Infinity) return false;
       p.x = o[0] + d[0] * ts; p.y = o[1] + d[1] * ts; p.z = o[2] + d[2] * ts;
-      return facing(p) > 0.07;
+      return facing(p) > EYE_EDGE;
     };
-    // (walked out from the centre to the first point not seen, then narrowed down: the turn test is not the same all the way out)
+    // walked out from the centre to the first point not seen, then narrowed down
     let lo = 0, hi = 0.025;
-    while (hi < 1.3 && seen(hi)) { lo = hi; hi += 0.025; }
+    while (hi < 1.5 && seen(hi)) { lo = hi; hi += 0.025; }
     for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (seen(m)) lo = m; else hi = m; }
     return lo;
   };
   const full = [], cut = [], raw = [];
-  for (let j = 0; j < NOUT; j++) { const a = j / NOUT * Math.PI * 2; full.push(radius(a, false)); cut.push(radius(a, true) / Math.max(1e-6, full[j])); }
-  // (how much of each radius the cut keeps, worn down by a wide parabola first, so smoothing does not pull the cut back out)
+  for (let j = 0; j < NOUT; j++) { const a = j / NOUT * Math.PI * 2, f = radius(a, false) * EYE_GROW; full.push(f); cut.push(Math.min(1, radius(a, true) / Math.max(1e-6, f))); }
+  // how much of each radius the cut keeps, worn down by a wide parabola first, so smoothing does not pull the cut back out
   for (let j = 0; j < NOUT; j++) {
     let keep = 1;
     for (let i = 0; i < NOUT; i++) { const da = Math.min(Math.abs(i - j), NOUT - Math.abs(i - j)) / NOUT * Math.PI * 2; keep = Math.min(keep, cut[i] + 0.2 * da * da); }
@@ -213,21 +198,20 @@ for (const e of EYES) {
   for (let j = 0; j < NOUT; j++) {
     let s = 0, w = 0;
     for (let i = -W; i <= W; i++) { const k = Math.exp(-0.5 * (i / SIG) ** 2); s += raw[(j + i + NOUT) % NOUT] * k; w += k; }
-    e.out[j] = s / w * EYE_GROW;
+    e.out[j] = s / w;
   }
 }
 const outAt = (e, a) => { const f = ((a / (Math.PI * 2)) % 1 + 1) % 1 * NOUT, i = Math.floor(f) % NOUT; return lerp(e.out[i], e.out[(i + 1) % NOUT], f - Math.floor(f)); };
-// a plane point in the eye's frame, scaled so its visible outline is the unit circle
+// a plane point in the eye's frame, scaled so its outline is the unit circle
 function eyeQ(e, px, py) { const [lx, ly] = eyeLocal(e, px, py), s = outAt(e, Math.atan2(ly, lx)); return [lx / s, ly / s]; }
 // the same for a skull point, pushed outside where the skull turns away from the view point (just past the edge of the head as seen
-// from there it would land back inside the outline); and how far out that is (1 on the outline)
+// from there it would land back inside the outline)
 function eyeQAt(e, p) { const [qx, qy] = eyeQ(e, ...toPlane(p.x, p.y, p.z)), s = 1 + 25 * Math.max(0, 0.05 - facing(p)); return [qx * s, qy * s]; }
 const eyeR = (e, p) => Math.hypot(...eyeQAt(e, p));
 // the pupils at rest, their radii and how far they move, all on the plane
 const PK = (VIEW_Z - PLANE_Z) / (VIEW_Z - EYES[0].pupil[2]), PUPIL_AT = EYES.map((e) => toPlane(...e.pupil));
 const PUPIL_R = [0.05 * PK * PUPIL_K, 0.056 * PK * PUPIL_K], PUPIL_MOVE = [0.022 * PK, 0.04 * PK];
-// and back: the skull point under (qx, qy) of an eye; a ray that misses the skull (only the hidden margin of a disc reaches that
-// far) takes the edge of the skull nearest it
+// and back: the skull point under (qx, qy) of an eye; a ray that misses the skull takes the skull's edge nearest it
 function eyeOnSkull(e, qx, qy, out) {
   const s = outAt(e, Math.atan2(qy, qx)), [o, d] = viewRay(...eyePlane(e, qx * s, qy * s));
   const t = enter(o, d, SKULL_C, SKULL_R);
@@ -240,16 +224,15 @@ function eyeOnSkull(e, qx, qy, out) {
 
 // ---------- the eye sockets ----------
 const SOCKET = 0.024, RIM = 0.0045;
-// how far the skin at (x, y, z) is pushed in (positive) or raised (negative) by the sockets, how much of that it keeps (front), how far
-// it is from the nearer eye in that eye's radii, and where it lies in each eye's frame (for the eyes' light on the skin, worked out per
-// pixel); none of it round the back, which the view point's rays pass through on their way out, and shallower where the skull turns away.
-// The rim round each socket stands up a little more above the eye, as a brow.
+// how far the skin at (x, y, z) is pushed in (positive) or raised (negative) by the sockets, how much of that it keeps (front: none
+// round the back, less where the skull turns away), how far it is from the nearer eye in that eye's radii, and where it lies in each
+// eye's frame (for the shader). the rim round each socket stands up a little more above the eye, as a brow
 function sockets(x, y, z) {
   const p = { x, y, z }, front = ss(0.0, 0.035, z) * sinkK(p), q = [];
   let d = 0, raise = 0, near = 9;
   for (const e of EYES) {
     const [qx, qy] = eyeQAt(e, p), r = Math.hypot(qx, qy);
-    // (the wall starts outside the white: the mesh is coarser than the wall is steep, and a facet cutting across the ring would flatten it)
+    // the wall starts outside the white: a facet cutting across the ring would flatten it
     d += SOCKET * (1 - ss(1.02, 1.16, r));
     raise = Math.max(raise, RIM * Math.exp(-(((r - 1.25) / 0.11) ** 2)) * (1 + 0.25 * Math.max(0, qy / Math.max(r, 1e-6))));
     near = Math.min(near, r);
@@ -257,10 +240,9 @@ function sockets(x, y, z) {
   }
   return [(d - raise) * front, front, front > 0 ? near : 9, q];
 }
-// sockets and eyes sink mostly along the line of sight from the view point, so they keep their outline, tipped toward -n so they
-// still go in near the skull's edge
+// sockets and eyes sink mostly along the line of sight from the view point, so they keep their outline, tipped toward -n near the edge
 function sinkDir(p, n, out) { return out.set(p.x - VIEW_FROM[0], p.y - VIEW_FROM[1], p.z - VIEW_FROM[2]).normalize().addScaledVector(n, -0.3).normalize(); }
-// how much of their depth they keep at p: near the edge of the head, seen from the front, that line runs nearly along the skin
+// how much of their depth they keep at p: near the edge of the head that line runs nearly along the skin
 const sinkK = (p) => ss(0.12, 0.42, facing(p));
 
 // ---------- the head mesh ----------
@@ -308,7 +290,7 @@ function headState(s, neck, withShut) {
     const lo = [], y1 = path[path.length - 1][0];
     if (neck) for (let i = 0; i <= 240; i++) lo.push(basePoint(a, lerp(y1, NECK.end, i / 240), neck, new THREE.Vector3()));
     else { const f1 = Math.asin(Math.max(-1, Math.min(1, y1 / RY))); for (let i = 0; i < 160; i++) lo.push(basePoint(a, i === 0 ? y1 : RY * Math.sin(lerp(f1, -Math.PI / 2, i / 160)), neck, new THREE.Vector3())); }
-    // (the bottom pole is its own vertex, so the cap stops one step short of it)
+    // the bottom pole is its own vertex, so the cap stops one step short of it
     const put = (arr, r, p, mouthDepth) => {
       const [sd, front, eye, q] = sockets(p.x, p.y, p.z), i = 1 + r * NC + c;
       if (sd) sinkDir(p, baseNormal(p, neck, _n), _n);
@@ -342,8 +324,8 @@ function normalsOf(pos, index) {
   for (let i = 0; i < n.length; i += 3) if (!(n[i] * n[i] + n[i + 1] * n[i + 1] + n[i + 2] * n[i + 2] > 0.5)) { n[i] = 0; n[i + 1] = 1; n[i + 2] = 0; }
   return n;
 }
-// the skull (and with neck, the neck down to 0.42 m under the skull centre, open at the bottom), with two morph targets:
-// 0 the widest grin (smileScale 1.6), 1 the mouth shut (no grin)
+// the skull (and with neck, the neck down to 0.46 m under the skull centre, open at the bottom), with two morph targets:
+// 0 the widest grin (smileScale 1.6), 1 the mouth shut
 export function headGeometry({ neck = false } = {}) {
   const base = headState(1, neck, true), wide = headState(1.6, neck, false);
   const index = headIndex(base.rows, neck);
@@ -361,9 +343,8 @@ export function headGeometry({ neck = false } = {}) {
 }
 
 // ---------- the eyes ----------
-// both eyes in one mesh: domed discs a little larger than the glowing part, sunk into the sockets so the socket wall covers their edge.
-// Spokes run out from the centre, with the rings set by how far out they are from the outline (an even step in the eye's own frame
-// squeezes toward the edge of the head), so the edge of the white falls between rings close together all the way round.
+// both eyes in one mesh: domed discs a little larger than the white, sunk into the sockets so the socket wall covers their edge. spokes
+// from the centre, rings set by distance from the outline, so the edge of the white falls between close rings all the way round
 function eyeGeometry() {
   const NA = 96, NR = 20, REND = 1.15, pos = [], eq = [], exy = [], eid = [], idx = [], n = new THREE.Vector3(), p = new THREE.Vector3();
   EYES.forEach((e, k) => {
@@ -372,7 +353,7 @@ function eyeGeometry() {
       eyeOnSkull(e, qx, qy, p);
       const r = eyeR(e, p);
       sinkDir(p, n.set(p.x / (RX * RX), p.y / (RY * RY), p.z / (RZ * RZ)).normalize(), n);
-      // (domed 11 mm; the dark margin dips under the wall, and still a little under the skin where the socket runs out at the side of the head)
+      // domed 11 mm; the dark margin dips under the wall, and a little under the skin where the socket runs out at the side of the head
       const sk = sinkK(p), d = (0.015 - 0.011 * Math.max(0, 1 - r * r)) * sk + Math.min(0.014, 0.12 * Math.max(0, r - 1)) * Math.max(sk, 0.35);
       pos.push(p.x + n.x * d, p.y + n.y * d, p.z + n.z * d); eq.push(...eyeQAt(e, p)); exy.push(...toPlane(p.x, p.y, p.z)); eid.push(k);
     };
@@ -393,13 +374,12 @@ function eyeGeometry() {
   g.setAttribute('eq', new THREE.Float32BufferAttribute(eq, 2));
   g.setAttribute('exy', new THREE.Float32BufferAttribute(exy, 2));
   g.setAttribute('eid', new THREE.Float32BufferAttribute(eid, 1));
-  g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();   // (normals for the ambient occlusion pass, which draws them)
+  g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();   // normals for the ambient occlusion pass
   return g;
 }
 // the glow is the material's colour (trailer/lib.js finds this material by toneMapped === false and scales its colour to switch the
-// eyes off and on). The white is even and ends in a hard edge; the pupil is a dead black disc with a soft edge, which the bloom
-// fills in grey as it did the black spheres the pupils used to be. (Pulled a hair toward the camera in depth, so where the socket runs
-// out at the side of the head and the eye lies on the skin, the skin does not break through it.)
+// eyes off and on). the white is even with a hard edge, the pupil a dead black disc. pulled a hair toward the camera in depth, so
+// where the socket runs out at the side of the head the skin does not break through the eye
 function eyeMaterial() {
   const m = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   m.name = 'creatureEyes'; m.color.setRGB(EYE_GLOW, EYE_GLOW, EYE_GLOW);
@@ -409,8 +389,8 @@ function eyeMaterial() {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 exy, eq; attribute float eid; varying vec2 vExy, vEq; varying float vEid, vDist;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvExy = exy; vEq = eq; vEid = eid;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvDist = length( mvPosition.xyz ) / length( modelViewMatrix[ 0 ].xyz );');
-    // (the pupils were spheres standing 4 cm proud of the skull, so they loomed a little larger up close than the eyes did; they
-    // keep that, sized as they were at 1.1 m. The upper edge of the white is a little darker, under the lip of the socket.)
+    // the pupils loom a little larger up close, as spheres standing proud of the skull did, sized as they were at 1.1 m; the white is
+    // a little darker toward its upper edge, under the lip of the socket
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       uniform vec2 pupils[2]; varying vec2 vExy, vEq; varying float vEid, vDist;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
@@ -419,7 +399,8 @@ function eyeMaterial() {
         float white = 1.0 - smoothstep( 1.0 - ra, 1.0 + ra, r );
         float near = ( 1.0 + ${PUPIL_NEAR} / max( vDist, 0.6 ) ) / ( 1.0 + ${PUPIL_NEAR} / 1.1 );
         vec2 pd = ( vExy - ( vEid < 0.5 ? pupils[ 0 ] : pupils[ 1 ] ) ) / ( vec2( ${PUPIL_R[0]}, ${PUPIL_R[1]} ) * near );
-        float pupil = 1.0 - smoothstep( 0.8, 1.12, length( pd ) );
+        float pr = length( pd ), pa = fwidth( pr ) * 1.2 + 0.015;
+        float pupil = 1.0 - smoothstep( 1.0 - pa, 1.0 + pa, pr );
         float lid = 1.0 - 0.25 * smoothstep( 0.8, 0.99, r ) * smoothstep( 0.2, 0.9, vEq.y / max( r, 1e-4 ) );
         diffuseColor.rgb = white * lid * diffuse * ( 1.0 - pupil ) + ( 1.0 - white ) * vec3( 0.0025 );
       }`);
@@ -428,10 +409,8 @@ function eyeMaterial() {
 }
 
 // ---------- the teeth ----------
-let teethTex = null;
-const teethTexture = () => (teethTex ||= smileTex());
 // a band across the opening, the top row 9 mm inside the lips and the bottom row 4 mm (so the lower lip does not hide it from a camera
-// looking up at it), less toward the corners, where the mouth is shallow; mapped as the texture was
+// looking up at it), less toward the corners, where the mouth is shallow
 function teethState(s, NTC, NTR) {
   const pos = [], v = new THREE.Vector3();
   for (let c = 0; c <= NTC; c++) {
@@ -445,48 +424,65 @@ function teethState(s, NTC, NTR) {
   return pos;
 }
 function teethGeometry() {
-  const NTC = 160, NTR = 10, uv = [], tv = [], idx = [];
-  for (let c = 0; c <= NTC; c++) {
-    const t = c / NTC, [p0, p1] = grinPx(t);
-    for (let r = 0; r <= NTR; r++) { uv.push((18 + 988 * t) / 1024, 1 - lerp(p0, p1, r / NTR) / 256); tv.push(r / NTR); }
-  }
+  const NTC = 160, NTR = 10, tuv = [], idx = [];
+  for (let c = 0; c <= NTC; c++) for (let r = 0; r <= NTR; r++) tuv.push(c / NTC, r / NTR);   // along the grin, top lip to bottom
   const v = (c, r) => c * (NTR + 1) + r;
   for (let c = 0; c < NTC; c++) for (let r = 0; r < NTR; r++) idx.push(v(c, r), v(c, r + 1), v(c + 1, r), v(c + 1, r), v(c, r + 1), v(c + 1, r + 1));
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(teethState(1, NTC, NTR), 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setAttribute('tv', new THREE.Float32BufferAttribute(tv, 1));
+  g.setAttribute('tuv', new THREE.Float32BufferAttribute(tuv, 2));
   g.setIndex(idx); g.computeVertexNormals();
   g.morphAttributes.position = [new THREE.Float32BufferAttribute(teethState(1.6, NTC, NTR), 3)];
   g.computeBoundingSphere();
   return g;
 }
-// lit from inside the mouth: brightest along the gap between the rows, a little dimmer up at the lips, with a faint shadow where the
-// lips meet them. The dark of the texture (the gaps and the line between the rows) is the inside of the mouth seen past the teeth, lit
-// warm by them, so the grin stays one glowing crescent with the teeth drawn in it; filtered like any texture, so thin gaps fade out
-// instead of breaking up.
+// two rows of narrow teeth drawn in the shader, 50 across the grin, the lower row half a tooth over from the upper. each tooth is a
+// little wider or longer than its neighbours, a few of the upper ones long; the tips meet a little past the middle of the mouth,
+// the upper row in front, so there is no line between the rows, only a shadow under the upper tips and the odd dark notch. between
+// the teeth and past their tips the inside of the mouth shows, lit warm by them. dimmer toward the corners and at the lips
 const GAP = WARM.clone().multiplyScalar(0.05);
+const TEETH = `
+  float toothHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+  // the tooth of one row at u (0..1 across the mouth): coverage, shade, and where its tip is (v, 0 at the top lip)
+  vec3 tooth( float u, float v, float row, float dir, float base ) {
+    float c = u * 50.0 + 0.5 * row, i = floor( c ), x = ( c - i ) * 2.0 - 1.0;
+    float h1 = toothHash( vec2( i, row ) ), h2 = toothHash( vec2( i, row + 2.0 ) ), h3 = toothHash( vec2( i, row + 4.0 ) );
+    float tip = base + dir * ( 0.05 * ( h1 - 0.5 ) + 0.09 * step( 0.93, h2 ) * ( 1.0 - row ) ) - dir * 0.045 * x * x;
+    float from = row > 0.5 ? 1.0 : 0.0, along = clamp( ( v - from ) / ( tip - from ), 0.0, 1.0 );
+    float hw = 1.0 - mix( 0.34, 0.06, along ) * ( 0.75 + 0.5 * h3 );
+    float ax = fwidth( x ) * 0.8, av = fwidth( v ) * 0.8, sv = smoothstep( tip - av, tip + av, v );
+    float cov = ( 1.0 - smoothstep( hw - ax, hw + ax, abs( x ) ) ) * ( dir > 0.0 ? 1.0 - sv : sv );
+    float shade = ( 0.78 + 0.22 * sqrt( max( 0.0, 1.0 - x * x / ( hw * hw ) ) ) ) * mix( 0.8, 1.0, smoothstep( 0.0, 0.3, along ) );
+    return vec3( cov, shade, tip );
+  }`;
 function teethMaterial() {
-  const m = new THREE.MeshBasicMaterial({ map: teethTexture(), alphaTest: 0.5, alphaToCoverage: true, toneMapped: false, fog: false, side: THREE.DoubleSide });
+  const m = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false, side: THREE.DoubleSide });
   m.name = 'creatureTeeth'; m.color.setRGB(GRIN_GLOW, GRIN_GLOW, GRIN_GLOW);
   m.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float tv; varying float vTv;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTv = tv;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vTv;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 tuv; varying vec2 vTuv;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTuv = tuv;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\nvarying vec2 vTuv;${TEETH}`)
       .replace('#include <map_fragment>', `#include <map_fragment>
-        diffuseColor.rgb = diffuse * mix( vec3( ${GAP.r.toFixed(3)}, ${GAP.g.toFixed(3)}, ${GAP.b.toFixed(3)} ), vec3( 1.0 ), sampledDiffuseColor.rgb );`)
-      .replace('#include <alphatest_fragment>', `#include <alphatest_fragment>
-        diffuseColor.rgb *= mix( 0.86, 1.0, 1.0 - smoothstep( 0.0, 0.5, abs( vTv - 0.55 ) ) ) * mix( 0.8, 1.0, smoothstep( 0.0, 0.14, min( vTv, 1.0 - vTv ) ) );`);
+      {
+        float u = vTuv.x, v = vTuv.y;
+        vec3 up = tooth( u, v, 0.0, 1.0, 0.565 ), lo = tooth( u, v, 1.0, -1.0, 0.535 );
+        float shadow = 1.0 - 0.45 * ( 1.0 - smoothstep( 0.0, 0.04, v - up.z ) );
+        vec3 inside = vec3( ${GAP.r.toFixed(3)}, ${GAP.g.toFixed(3)}, ${GAP.b.toFixed(3)} );
+        vec3 col = mix( mix( inside, vec3( lo.y * shadow ), lo.x ), vec3( up.y ), up.x );
+        col *= mix( 0.86, 1.0, 1.0 - smoothstep( 0.0, 0.5, abs( v - 0.55 ) ) ) * mix( 0.8, 1.0, smoothstep( 0.0, 0.14, min( v, 1.0 - v ) ) );
+        col *= 1.0 - 0.3 * smoothstep( 0.78, 1.0, abs( u * 2.0 - 1.0 ) );
+        diffuseColor.rgb = diffuse * col;
+      }`);
   };
   return m;
 }
 
 // ---------- the skin ----------
-// Near black, with a little form: a fine grain and a broad mottling in the shading and the roughness (from the mesh's rest position, so
-// it stays put on the moving body), less reflection at facing angles than three's default (on a black surface that sheen is what reads
-// as grey or plastic under the flashlight), and a faint cold rim so the outline comes off a dark room. On the face it also takes the light of
-// its own eyes round the sockets and of the teeth inside the mouth. 'low' gets a plain lambert with the rim and the face light.
+// near black with a little form: grain and a broad mottling in the shading and roughness (from the rest position, so it stays put on
+// the moving body), less sheen at facing angles than three's default (on black that reads as grey plastic under the flashlight), and a
+// faint cold rim so the outline comes off a dark room, weaker on undersides. on the face the skin darkens into the eye sockets and
+// takes the light of the eyes round them and of the teeth inside the mouth. 'low' gets a plain lambert with the rim and the face light
 const SKIN = new THREE.Color(0x060508);
-const RIM_COL = new THREE.Color(0.019, 0.023, 0.036);
+export const RIM_COL = new THREE.Color(0.019, 0.023, 0.036);
 const NOISE = `
   float skinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
   float skinNoise( vec3 x ) {
@@ -500,10 +496,14 @@ const NOISE = `
     vec3 grad = sign( det ) * ( dFdx( h ) * r1 + dFdy( h ) * r2 );
     return normalize( abs( det ) * n - grad );
   }`;
-export function skinMaterial({ low = false, unit = 1, face = null } = {}) {
+// rimFade: [axis, from, to] in rest units; the rim is full where the rest position's coordinate along axis is at from and gone at to
+// (the body fades it out going up into the collar, the face going down the jaw, so the join has none on either side)
+export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null } = {}) {
   const m = low ? new THREE.MeshLambertMaterial({ color: SKIN }) : new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.78, metalness: 0, envMapIntensity: 0.25 });
   m.name = 'creatureSkin';
-  const u = { uUnit: { value: unit }, uRim: { value: RIM_COL }, uEyeLight: { value: face ? face.eyes.material.color : new THREE.Color(0, 0, 0) }, uMouthLight: { value: face ? face.mouthLight : new THREE.Color(0, 0, 0) } };
+  const fade = new THREE.Vector4(0, 0, 0, 1);
+  if (rimFade) { const [axis, from, to] = rimFade, k = -1 / (to - from); fade.set(axis.x * k, axis.y * k, axis.z * k, to / (to - from)); }
+  const u = { uUnit: { value: unit }, uRim: { value: rim }, uRimFade: { value: fade }, uEyeLight: { value: face ? face.eyes.material.color : new THREE.Color(0, 0, 0) }, uMouthLight: { value: face ? face.mouthLight : new THREE.Color(0, 0, 0) } };
   m.customProgramCacheKey = () => 'creatureSkin' + (low ? 'L' : 'S') + (face ? 'F' : 'B');
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
@@ -512,8 +512,16 @@ export function skinMaterial({ low = false, unit = 1, face = null } = {}) {
       .replace('#include <begin_vertex>', `#include <begin_vertex>
       vRest = position * uUnit;${face ? '\nvGlow = glow; vEyeq = eyeq;' : ''}`);
     let f = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform vec3 uRim, uEyeLight, uMouthLight; varying vec3 vRest;${face ? '\nvarying vec2 vGlow; varying vec4 vEyeq;' : ''}
+      uniform vec3 uRim, uEyeLight, uMouthLight; uniform vec4 uRimFade; varying vec3 vRest;${face ? '\nvarying vec2 vGlow; varying vec4 vEyeq;' : ''}
       ${low ? '' : NOISE}`);
+    // skinOcc: the eye sockets, dark against the white and opening out over a fifth of the eye's radius, further under the brow
+    f = f.replace('#include <color_fragment>', `#include <color_fragment>
+      float skinOcc = 1.0, eyeR = 9.0;${face ? `
+      {
+        float r0 = length( vEyeq.xy ), r1 = length( vEyeq.zw ), up = max( ( r0 < r1 ? vEyeq.y : vEyeq.w ) / max( min( r0, r1 ), 1e-4 ), 0.0 );
+        eyeR = min( r0, r1 ); skinOcc = mix( 1.0, smoothstep( 1.0, 1.22 + 0.14 * up, eyeR ), vGlow.x );
+        diffuseColor.rgb *= mix( 0.3, 1.0, skinOcc );
+      }` : ''}`);
     if (!low) {
       f = f.replace('#include <color_fragment>', `#include <color_fragment>
         float grain = skinNoise( vRest * 38.0 ), fine = skinNoise( vRest * 150.0 ), broad = skinNoise( vRest * 7.0 + 3.1 );
@@ -523,16 +531,18 @@ export function skinMaterial({ low = false, unit = 1, face = null } = {}) {
         roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), 0.55, 0.95 );`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         normal = skinBump( - vViewPosition, normal, 0.0011 * grain + 0.00032 * fine * fineK + 0.0025 * broad );`)
-        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', 'vec3( 0.005 )').replaceAll('material.specularF90 = 1.0;', 'material.specularF90 = 0.35;'));
+        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', 'vec3( 0.005 * skinOcc )').replaceAll('material.specularF90 = 1.0;', 'material.specularF90 = 0.35;'));
     }
-    // (the eyes light the skin round them, but not the strip right at the edge of the white, which is the shadowed wall of the socket,
-    // wider under the brow)
+    // the rim: a fresnel, faded along uRimFade and weaker on surfaces that face down, since the light that would catch an edge comes
+    // from above; the eyes light the skin out from the socket's edge
     f = f.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-      totalEmissiveRadiance += uRim * pow( 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 );${face ? `
       {
-        float r0 = length( vEyeq.xy ), r1 = length( vEyeq.zw ), r = min( r0, r1 ), up = max( ( r0 < r1 ? vEyeq.y : vEyeq.w ) / max( r, 1e-4 ), 0.0 );
-        float lit = vGlow.x * smoothstep( 1.01 + 0.02 * up, 1.06 + 0.04 * up, r ) * ( 0.4 * ( 1.0 - smoothstep( 1.05, 1.4, r ) ) + 0.6 * ( 1.0 - smoothstep( 1.05, 2.0, r ) ) );
-        totalEmissiveRadiance += uEyeLight * ( 0.04 * lit * lit ) + uMouthLight * ( 0.08 * vGlow.y );
+        float rimK = smoothstep( 0.0, 1.0, dot( uRimFade.xyz, vRest ) + uRimFade.w ) * mix( 0.45, 1.0, smoothstep( -0.5, 0.4, normal.y ) ) * skinOcc;
+        totalEmissiveRadiance += uRim * rimK * pow( 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 );
+      }${face ? `
+      {
+        float lit = vGlow.x * skinOcc * ( 0.45 * ( 1.0 - smoothstep( 1.1, 1.6, eyeR ) ) + 0.55 * ( 1.0 - smoothstep( 1.1, 2.3, eyeR ) ) );
+        totalEmissiveRadiance += uEyeLight * ( 0.06 * lit * lit ) + uMouthLight * ( 0.08 * vGlow.y );
       }` : ''}`);
     sh.fragmentShader = f;
   };
@@ -541,15 +551,13 @@ export function skinMaterial({ low = false, unit = 1, face = null } = {}) {
 
 // ---------- the face ----------
 // createFace({ skull = true, neck = false, quality = 'high' }) -> THREE.Group
-//   Anchor: the origin is the centre of the skull, +z points out of the face, +y up, +x to the face's left; at scale 1 a unit is a
-//   metre and the head is the thing's own: 0.42 m across, 0.53 m chin to crown, 0.40 m front to back, the eyes' centres 0.075 m above
-//   the origin and 0.17 m in front of it, the grin from 0.005 to 0.165 m below it. On a human head (about 0.16 m across) scale it by
-//   about 0.4 and put the origin where the middle of that head is. With neck it runs on down a neck to 0.42 m below the origin.
+//   origin at the centre of the skull, +z out of the face, +y up, +x to the face's left, a unit a metre: the head 0.42 m across,
+//   0.53 m chin to crown, 0.40 m deep, the eyes' centres 0.075 m above the origin and 0.17 m in front, the grin 0.005 to 0.165 m below.
+//   for a human head (about 0.16 m across) scale by about 0.4. with neck it runs on down to 0.46 m below the origin.
 //   face.eyes: both eyes (scale face.eyes.material.color to dim them); face.smile: the teeth (hide it and the mouth closes over);
-//   face.skull: the head mesh (null without one; face.addSkull() builds it later, face.setSkull swaps in another built from
-//   headGeometry, as the thing does with its skinned one).
+//   face.skull: the head mesh (null without one; face.addSkull() builds it, face.setSkull swaps in another built from headGeometry).
 //   face.update(dt, { target, smile }): pupils toward a world point (or stay put), smile from 1 (rest) to 1.6 (widest).
-//   face.setQuality(q): 'low' gives the skin the cheaper material.
+//   face.setQuality(q): 'low' gives the skin the cheaper material
 export function createFace({ skull = true, neck = false, quality = 'high' } = {}) {
   const face = new THREE.Group();
   face.name = 'creatureFace';
@@ -562,7 +570,7 @@ export function createFace({ skull = true, neck = false, quality = 'high' } = {}
   for (const o of [face.eyes, face.smile]) { o.castShadow = false; o.receiveShadow = false; face.add(o); }
   face.skull = null;
   face.skins = {};
-  face.skinFor = (low) => (face.skins[low ? 'low' : 'high'] ||= skinMaterial({ low, face }));
+  face.skinFor = (low) => (face.skins[low ? 'low' : 'high'] ||= skinMaterial({ low, face, rimFade: [new THREE.Vector3(0, 1, 0), -0.1, -0.25] }));
   face.setSkull = (mesh) => {
     if (face.skull && face.skull !== mesh) { face.skull.removeFromParent(); face.skull.geometry.dispose(); }
     face.skull = mesh;

@@ -160,7 +160,7 @@ function confirmPress() {
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
-initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (P.mode === 'bunk' && !F.cutscene && !F.dead) hideUnderCovers(); } });
+initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (P.mode === 'bunk' && !F.cutscene && !F.dead && gameTime - bunkSince > 0.8) hideUnderCovers(); } });
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
   $('controls').innerHTML = controlsTable().map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
@@ -183,10 +183,9 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // two of the director's night events (director.js): a car goes by out front and its light slides through the windows, and something huge
 // and pale drifts past them
-function carPass() { WF.carPass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); UI.subtitle('<i>Headlights slide across the ceiling.</i>', 3); }
+function carPass() { WF.carPass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); }
 function faceAtWindow() {
   WF.face(); sfx.moving('sfx/face_wail', { gain: 0.8, from: 0.6, to: -0.8, dur: 13 });
-  later(1.6, () => UI.subtitle('<i>Something huge and pale is going past the windows.</i>', 4));
 }
 
 // the green night lights: a steady faint pulse; they stutter and dim when the thing is near
@@ -205,7 +204,7 @@ function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
     p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
     // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
-    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
+    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, spot.yaw ?? Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
     else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
   }
   W.bedSleepers.set(on);
@@ -263,11 +262,16 @@ addI({ obj: mom.head, r: 2.6, label: 'Talk to Mom', when: () => F.phase === 'day
 addI({ obj: dad.head, r: 2.6, label: 'Talk to Dad', when: () => F.phase === 'day' && dad.group.visible, act: talkDad });
 addI({ p: new V3(7.33, 1.3, 3.02), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
 for (const d of Object.values(W.doors)) {   // the interior doors
-  addI({ p: d.mid, r: 1.55, label: () => (d.name === 'parents' ? 'Their door is locked' : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (d.name === 'parents' ? UI.subtitle('<i>Their door is locked. You can hear them breathing through it.</i>', 3.5) : toggleDoor(d)) });
+  addI({ p: d.mid, r: 1.55, label: () => (d.name === 'parents' && F.phase === 'night' && !d.target ? 'Try the handle' : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (d.name === 'parents' && F.phase === 'night' && !d.target ? lockedDoor(d) : toggleDoor(d)) });
 }
 W.setDoorHook((name, open) => { const d = W.doors[name]; const pan = panFor(tmp.set(d.mid.x, 1.2, d.mid.z)); if (open) sfx.doorOpen(pan, 0.35); else sfx.doorClose(pan, 0.5); });
+let lockedAt = -9;
+function lockedDoor(d) {   // the handle will not turn; something on the other side is awake and does not answer
+  sfx.knock(panFor(tmp.set(d.mid.x, 1.2, d.mid.z)), 0.12);
+  if (gameTime - lockedAt > 6) { lockedAt = gameTime; later(1.1, () => { if (F.phase === 'night') say(Math.random() < 0.5 ? 'dad/mutter_a' : 'mom/mutter_a', { muffle: true }); }); }
+}
 function toggleDoor(d) {
-  if (d.target && E.visible && Math.hypot(E.root.position.x - d.mid.x, E.root.position.z - d.mid.z) < 1.2) { UI.subtitle("<i>It won't close.</i>", 2); sfx.creak(0.2, 0); return; }
+  if (d.target && E.visible && Math.hypot(E.root.position.x - d.mid.x, E.root.position.z - d.mid.z) < 1.2) { sfx.creak(0.2, 0); return; }
   if (d.target && Math.hypot(P.pos.x - d.mid.x, P.pos.z - d.mid.z) < 0.55) return;   // not on top of yourself
   W.setDoor(d.name, !d.target);
 }
@@ -317,7 +321,7 @@ const BOX_HALF = 0.23, BOX_Z = 0.62;
 function wallAhead(ox, oz, dx, dz, max, skipX, skipZ) {
   let best = max;
   for (const c of W.colliders) {
-    if (!c.on) continue;
+    if (!c.on || !onFloor(c)) continue;
     if (skipX !== undefined && skipX >= c.minX - 0.12 && skipX <= c.maxX + 0.12 && skipZ >= c.minZ - 0.12 && skipZ <= c.maxZ + 0.12) continue;
     let t0 = 0, t1 = best;
     for (const [o, d, lo, hi] of [[ox, dx, c.minX, c.maxX], [oz, dz, c.minZ, c.maxZ]]) {
@@ -357,7 +361,7 @@ function dropBox() {
   if (F.boxes === 1) UI.subtitle('<i>Top bunk is yours. The bottom one is for boxes.</i>', 4);
 }
 function lookDrawing() {
-  if (F.phase === 'night') UI.subtitle("<i>It's different now. The figure is next to the bed... and the kid is falling.</i>", 5.5);
+  if (F.phase === 'night') { sfx.whisper(0, 0.1); F.fear = Math.max(F.fear, 0.4); }
   else UI.subtitle("<i>The last kid drew this. A tall black shape with huge white eyes and a big smile. \"HE WATCHES.\"</i>", 6);
   sfx.creak(0.12, 0.6, 0.4); achievements.unlock('THE_DRAWING');
 }
@@ -402,7 +406,7 @@ async function climbUp() {
   F.cutscene = false; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.pod = null; P.podYaw = HIDE_YAW;
   if (hiding || F.chase) {
     P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
-  } else P.mode = 'bunk';
+  } else { P.mode = 'bunk'; bunkSince = gameTime; }
 }
 // already up on the bunk when it comes: pull the blanket over your head
 async function hideUnderCovers() {
@@ -422,13 +426,16 @@ async function climbDown() {
   P.pos.set(LADDER_FLOOR.x, 0, LADDER_FLOOR.z); P.vel.set(0, 0, 0);
   P.mode = 'walk'; F.cutscene = false; P.pod = null;
 }
-function toBunk() { P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.yaw = HIDE_YAW + 0.25; P.pitch = -0.18; P.roll = 0; P.pod = null; F.cutscene = false; }
+let bunkSince = -9, coverHold = 0;   // the breath key only pulls the covers up when it is held a moment, and not just after you sit down (putting the bear back must not hide you)
+function toBunk() { bunkSince = gameTime; P.mode = 'bunk'; P.cam.copy(BUNK_SEAT); P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.yaw = HIDE_YAW + 0.25; P.pitch = -0.18; P.roll = 0; P.pod = null; F.cutscene = false; }
 function enteredHide() { breathPrev = true; breathLatch = false; if (F.flashOn) { F.flashOn = false; flash.intensity = 0; } }
 
 // ---------- player ----------
+// a collider counts only on the floor you are on: the laundry is under the utility room, and the outside stairs pass both
+const onFloor = (c) => !(P.pos.y + 0.5 < (c.minY ?? -0.3) || P.pos.y > (c.maxY ?? 3));
 function collide() {
   for (const c of W.colliders) {
-    if (!c.on) continue;
+    if (!c.on || !onFloor(c)) continue;
     const cx = clamp(P.pos.x, c.minX, c.maxX), cz = clamp(P.pos.z, c.minZ, c.maxZ);
     const dx = P.pos.x - cx, dz = P.pos.z - cz, d2 = dx * dx + dz * dz;
     if (d2 >= R * R) continue;
@@ -459,6 +466,7 @@ function movePlayer(dt) {
   const a = Math.min(1, dt * 10);
   P.vel.x += (wx * speed - P.vel.x) * a; P.vel.z += (wz * speed - P.vel.z) * a;
   for (let i = 0; i < 3; i++) { P.pos.x += P.vel.x * dt / 3; P.pos.z += P.vel.z * dt / 3; collide(); }
+  P.pos.y += (W.groundAt(P.pos.x, P.pos.z, P.pos.y) - P.pos.y) * Math.min(1, dt * 14);   // (the outside stairs: eased, so the steps don't jolt)
   P.speed = Math.hypot(P.vel.x, P.vel.z);
   const stride = sprint ? 0.95 : 0.66;
   P.stepAcc += P.speed * dt; P.bob += P.speed * dt * (Math.PI / stride);
@@ -466,14 +474,14 @@ function movePlayer(dt) {
   UI.stamina(P.stamina, P.stamina < 0.99);
 }
 function playerStep(sprint) {
-  const room = roomAt(P.pos.x, P.pos.z), vol = sprint ? 0.42 : 0.26;
-  if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' ? 0.3 : 0.15, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'utility' ? 'tile' : 'carpet');
+  const room = roomAt(P.pos.x, P.pos.z, P.pos.y), vol = sprint ? 0.42 : 0.26, hard = ['bath', 'kitchen', 'dining', 'utility', 'stoop', 'laundry', 'garage'].includes(room);
+  if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'laundry' ? 0.3 : 0.15, hard ? 'tile' : 'carpet');
   if (F.echo) echoes.push(gameTime + 0.27 + Math.random() * 0.06);
 }
 function updateCamera(dt) {
   if (P.mode === 'walk') {
     const bobY = Math.sin(P.bob) * 0.035 * Math.min(1, P.speed / 2.5) * bobK;
-    camera.position.set(P.pos.x, EYE + bobY, P.pos.z);
+    camera.position.set(P.pos.x, P.pos.y + EYE + bobY, P.pos.z);
   } else if (P.mode === 'car') { car.cameraWorld(camera.position); P.yaw = clamp(P.yaw, -2.75, 2.75); P.pitch = clamp(P.pitch, -0.85, 0.65); }
   else camera.position.copy(P.cam);
   if (P.mode === 'hide') {
@@ -495,15 +503,15 @@ function updateCamera(dt) {
 
 // the camera is never perfectly still: breathing, a rolling gait, and a tremor that grows with fear (F.fear, 0..1)
 // baseFov and bobK follow the options menu (field of view; head bob scales the walking gait, not the breathing or the fear tremor)
-let baseFov = settings.get('fov'), fovNow = baseFov, fovOff = 0, bobK = settings.get('headBob') ? 1 : 0;   // fovOff: the nightmare swings the lens
+let baseFov = settings.get('fov'), fovNow = baseFov, fovOff = 0, bobK = +settings.get('headBob');   // fovOff: the nightmare swings the lens
 settings.on('fov', (v) => { fovNow += v - baseFov; baseFov = v; if (started) { camera.fov = fovNow; camera.updateProjectionMatrix(); } });
-settings.on('headBob', (v) => { bobK = v ? 1 : 0; });
+settings.on('headBob', (v) => { bobK = +v; });
 function handheld(dt) {
   const t = gameTime, fear = F.fear, walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0, gait = walk * bobK, k = P.mode === 'cine' ? 0.5 : 1;
   const tr = 1 + fear * 3.2;
-  camera.rotation.x += (Math.sin(t * 1.05) * 0.0035 + Math.sin(t * 0.37) * 0.002 + Math.sin(P.bob) * 0.006 * gait + (Math.sin(t * 7.3) * Math.sin(t * 3.1)) * 0.0025 * fear) * k;
-  camera.rotation.z += (Math.sin(t * 0.71) * 0.004 + Math.sin(t * 0.29 + 1.3) * 0.003 + Math.sin(P.bob * 0.5) * 0.009 * gait + Math.sin(t * 9.1) * 0.003 * fear) * tr * k * 0.6;
-  camera.rotation.y += (Math.sin(t * 0.6) * 0.0022 + Math.sin(t * 0.23 + 2.1) * 0.0026 + Math.sin(P.bob * 0.5) * 0.004 * gait) * tr * k * 0.6;
+  camera.rotation.x += (Math.sin(t * 1.05) * 0.0055 + Math.sin(t * 0.37) * 0.003 + Math.sin(P.bob) * 0.012 * gait + (Math.sin(t * 7.3) * Math.sin(t * 3.1)) * 0.0025 * fear) * k;
+  camera.rotation.z += (Math.sin(t * 0.71) * 0.004 + Math.sin(t * 0.29 + 1.3) * 0.003 + Math.sin(P.bob * 0.5) * 0.017 * gait + Math.sin(t * 9.1) * 0.003 * fear) * tr * k * 0.6;
+  camera.rotation.y += (Math.sin(t * 0.6) * 0.0022 + Math.sin(t * 0.23 + 2.1) * 0.0026 + Math.sin(P.bob * 0.5) * 0.008 * gait) * tr * k * 0.6;
   F.fear = Math.max(0, F.fear - dt * 0.12);
   const want = baseFov + (P.sprinting && walk > 0.5 ? 6 : 0) - F.fear * 5 + (P.mode === 'hide' ? -6 : 0) + fovOff;
   fovNow += (want - fovNow) * Math.min(1, dt * 4);
@@ -565,6 +573,11 @@ function restartStage() {
     F.boxes = 0; F.momReady = false; F.talkedMom = false; dadIdx = 0; endChores();
     for (const p of [mom, dad]) { p.held = false; p.talking = false; p.walking = 0; idle(p); }
   }
+  if (/^n\d+$/.test(F.stage) && RUN.evidence) {   // a night starts over with the proof it started with: what you found on it goes back
+    const n = +F.stage.slice(1), at = RUN.evidenceAt || {};
+    RUN.evidence = RUN.evidence.filter((k) => at[k] !== n); for (const k of Object.keys(at)) if (at[k] === n) delete at[k];
+    saveRun();
+  }
   resetNight();
   playFrom(F.stage, true);
 }
@@ -616,11 +629,12 @@ async function startGame() {
 // ---------- the family at work: Dad carries boxes in from the truck and unpacks them, Mom unpacks the kitchen ----------
 const chore = { run: 0, stop: false, dadHome: false };
 const dressing = [];                                    // everything they set down (cleared when the day restarts)
-const TRUCK_PICK = new V3(2.3, 0.55, -15.2), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(1.9, 0, -6.5), DOOR_IN = new V3(1.9, 0, -3.7), DOOR_OUT = new V3(1.9, 0, -5.4);
+const TRUCK_PICK = new V3(2.35, 0.66, -15.25), TRUCK_BOX = new V3(2.35, 1.82, -15.8), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(1.9, 0, -6.5), DOOR_IN = new V3(1.9, 0, -3.7), DOOR_OUT = new V3(1.9, 0, -5.4);   // (Dad stands on the truck bed, 0.66 up; the next box sits on top of the stack in front of him)
 const LIVING_SPOTS = [new V3(0.85, 0, -3.75), new V3(-0.2, 0, -3.85), new V3(0.35, 0, -2.7)];
 const KITCHEN_BOX = new V3(1.2, 0, 1.4), DAD_HOME = new V3(0.2, 0, 0.6), ARCH = new V3(1.7, 0, -1.0), ARCH_IN = new V3(1.7, 0, 0.3);
-const COUNTER = [[2.8, 0.95, 1.95], [2.8, 0.95, 2.25], [2.8, 0.95, 2.55], [0.0, 0.95, 3.3], [-0.3, 0.95, 3.3], [2.2, 0.95, 3.3]];   // where Mom puts things (the east counter and the back counter)
-const rampY = (x, z) => clamp((-11.4 - z) * 0.18, 0, 0.55) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // (fades out at the ramp's sides: no step up or down)
+// where Mom puts things (the east counter, then the back counter by the corner) and where she stands for each: 0.24 m off the counter's edge, the thing 0.24 m in
+const COUNTER = [[2.8, 0.95, 1.8, 2.32, 1.8], [2.8, 0.95, 2.1, 2.32, 2.1], [2.8, 0.95, 2.4, 2.32, 2.4], [2.8, 0.95, 2.7, 2.32, 2.7], [2.15, 0.95, 3.12, 2.15, 2.64], [2.5, 0.95, 3.12, 2.5, 2.64]];
+const rampY = (x, z) => (z < -14.5 ? 0.66 : clamp((-11.4 - z) * 0.18, 0, 0.58)) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // the ramp, then the bed's floor; fades out at the ramp's sides (no step up or down)
 const stillOn = (run) => run === chore.run;
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
@@ -687,69 +701,108 @@ function makeThing(kind) {
   else { add(new THREE.BoxGeometry(0.16, 0.12, 0.12), mat(0xb98a5a, 0.8), 0, 0.06, 0); }
   return g;
 }
-const wpos = (o) => o.getWorldPosition(new V3());
 const bodyH = (who) => who.group.userData.h || 1.75;
+const bscale = (who) => bodyH(who) / 1.75;              // the distances below are written for a 1.75 m body
+const palmAt = (who, side) => who.rig ? who.palm(side, new V3()) : who.group.localToWorld(new V3(side === 'L' ? 0.25 : -0.25, 0.9, 0.2));
+const facing = (who) => { const y = who.group.rotation.y; return { fwd: new V3(Math.sin(y), 0, Math.cos(y)), left: new V3(Math.cos(y), 0, -Math.sin(y)) }; };
+// how a thing sits in a hand that holds it from above: its origin `down` below the palm (its height), and how far the fingers close on it
+const HOLD = { mug: { down: 0.09, grip: 0.7 }, plates: { down: 0.065, grip: 0.45 }, books: { down: 0.13, grip: 0.5 }, pot: { down: 0.135, grip: 0.55 }, crate: { down: 0.12, grip: 0.5 } };
+const kneeling = { kneel: 1, lean: 1.1 };               // down on one knee over a box on the floor
+const bodyMix = (a, b, k) => ({ lean: lerp(a.lean || 0, b.lean || 0, k), kneel: lerp(a.kneel || 0, b.kneel || 0, k), squat: lerp(a.squat || 0, b.squat || 0, k) });
+const boxTop = (box) => box.position.y + box.geometry.parameters.height / 2;
+// a hand's place on the near rim of a box (s = 1 toward who's left corner, -1 the right); the box stands square to who
+function rim(who, box, s) {
+  const { fwd, left } = facing(who), p = box.geometry.parameters, r = box.position.clone(); r.y = boxTop(box) + 0.01;
+  return r.addScaledVector(fwd, -(p.depth / 2 - 0.03)).addScaledVector(left, s * (p.width / 2 - 0.1));
+}
+const onRim = (who, box, s) => ({ reach: rim(who, box, s), palm: 'down', grip: 0.5 });
+const carryPos = (who) => new V3(0, 1.05 * bscale(who), 0.315 * bscale(who));   // a box against the chest: the elbows stay bent
 
-// pick up a box and carry it; when done, the box is in the arms
-function holdUp(who, box) {
-  const h = bodyH(who); who.group.add(box); box.position.set(0, 0.98 * h / 1.75, 0.42); box.rotation.set(0, 0, 0);
-  who.pose = { hold: box };
-}
-async function setDown(who, box, spot) {
-  const run = chore.run, h = bodyH(who), y0 = box.position.y, z0 = box.position.z;
-  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k;box.position.z = z0 + 0.16 * k; });
+// take the box that sits at `at` (its centre, in the scene) in both hands and bring it to the chest; the hands land on its sides first, then it moves with them
+async function liftBox(who, box, at, lean = 0.25) {
+  const run = chore.run, hw = box.geometry.parameters.width;
+  if (box.parent !== scene) scene.attach(box);
+  box.position.copy(at); box.rotation.set(0, who.group.rotation.y, 0); box.visible = true;
+  who.pose = { hold: box, holdW: hw, lean };
+  await htween(who, 0.5, () => {});
   if (!stillOn(run)) return false;
-  scene.attach(box); box.position.set(spot.x, box.geometry.parameters.height / 2, spot.z); box.rotation.set(0, who.group.rotation.y + 0.15, 0); sfx.thump();
-  W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
-  who.pose = { lean: 0.75, reach: wpos(box).add(new V3(0, 0.25, 0)) };
-  await htween(who, 0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.75 * (1 - k) }; });
-  who.pose = null; return stillOn(run);
+  who.group.attach(box); const p0 = box.position.clone(), p1 = carryPos(who); box.rotation.set(0, 0, 0);
+  await htween(who, 0.8, (k) => { if (!stillOn(run)) return; box.position.lerpVectors(p0, p1, k); who.pose = { hold: box, holdW: hw, lean: lean * (1 - k) }; });
+  if (!stillOn(run)) return false;
+  who.pose = { hold: box, holdW: hw }; sfx.thump(0.4);
+  return true;
 }
-// open a box on the floor and take things out of it; each thing ends up beside it
-async function unpackFloor(who, box, kinds, stand) {
-  const run = chore.run, open = box.userData.open || (box.userData.open = openable(box));
-  if (!(await walkTo(who, [stand]))) return false;
-  await turnToward(who, box.position.x, box.position.z);
-  const top = new V3(box.position.x, box.geometry.parameters.height + 0.02, box.position.z);
-  await htween(who, 0.7, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * k, reach: top }; });
-  await htween(who, 0.6, (k) => { if (stillOn(run)) open(k); });
-  const side = new V3(Math.cos(who.group.rotation.y), 0, -Math.sin(who.group.rotation.y)), fwdv = new V3(Math.sin(who.group.rotation.y), 0, Math.cos(who.group.rotation.y));
-  let i = 0;
-  for (const kind of kinds) {
+// kneel and set the carried box on the floor at spot (straight ahead), the hands sliding up to its top edges as it goes down; who stays kneeling over it
+async function setDown(who, box, spot) {
+  const run = chore.run, hw = box.geometry.parameters.width, p0 = box.position.clone(), end = who.group.worldToLocal(spot.clone()); end.y = box.geometry.parameters.height / 2;
+  await htween(who, 1.3, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, holdW: hw, holdY: lerp(-0.03, 0.12, k), kneel: k, lean: kneeling.lean * k }; box.position.lerpVectors(p0, end, k); });
+  if (!stillOn(run)) return false;
+  scene.attach(box); box.position.set(spot.x, end.y, spot.z); box.rotation.set(0, who.group.rotation.y, 0); sfx.thump();
+  W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
+  who.pose = { ...kneeling, hold: box, holdW: hw, holdY: 0.12 };
+  return true;
+}
+// up from a kneel or a squat, the hands coming off whatever they were on
+async function rise(who, from = kneeling) {
+  const run = chore.run;
+  await htween(who, 0.8, (k) => { if (stillOn(run)) who.pose = bodyMix(from, {}, k); });
+  if (stillOn(run)) who.pose = null;
+}
+// one hand goes into the open box and comes out holding a new thing of this kind, lifted clear of the rim; `other` is the free hand's spec, `body` the lean/kneel
+async function takeOut(who, box, kind, side, other, body) {
+  const run = chore.run, hs = HOLD[kind] || HOLD.crate, { fwd } = facing(who), top = boxTop(box);
+  const inside = box.position.clone().addScaledVector(fwd, -0.04); inside.y = top - 0.06;
+  const over = box.position.clone().addScaledVector(fwd, -0.12); over.y = top + 0.2;
+  const hand = (p, grip) => ({ ...body, ...other, [side]: { reach: p, palm: 'down', grip } });
+  const from = palmAt(who, side);
+  await htween(who, 0.55, (k) => { if (stillOn(run)) who.pose = hand(from.clone().lerp(inside, k), 0.3); });
+  if (!stillOn(run)) return null;
+  const th = makeThing(kind); scene.add(th); dressing.push(th); who.grab(th, side, { down: hs.down });   // (it was in the box; now it is in the hand)
+  await htween(who, 0.45, (k) => { if (stillOn(run)) who.pose = hand(inside.clone().lerp(over, k), hs.grip); });
+  return stillOn(run) ? th : null;
+}
+// the thing in this hand goes down onto `dest` (a point on a floor or a counter) and is let go there, with a short settle; the body eases from body0 to body1 on the way
+async function putDown(who, th, kind, dest, side, other, body0, body1 = body0) {
+  const run = chore.run, hs = HOLD[kind] || HOLD.crate, from = palmAt(who, side), landing = dest.clone(); landing.y += hs.down + 0.01;
+  const hand = (p, body, grip) => ({ ...body, ...other, [side]: { reach: p, palm: 'down', grip } });
+  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; const p = from.clone().lerp(landing, k); p.y += Math.sin(k * Math.PI) * 0.06; who.pose = hand(p, bodyMix(body0, body1, k), hs.grip); });
+  if (!stillOn(run)) return false;
+  scene.attach(th); const p0 = th.position.clone(), q0 = th.quaternion.clone(), q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, who.group.rotation.y + (Math.random() - 0.5) * 0.6, 0));
+  await htween(who, 0.15, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(p0, dest, k); th.quaternion.slerpQuaternions(q0, q1, k); who.pose = hand(landing, body1, hs.grip * (1 - 0.6 * k)); });
+  if (!stillOn(run)) return false;
+  th.position.copy(dest); th.quaternion.copy(q1); sfx.thump(0.3);
+  return true;
+}
+// kneeling over a box on the floor with both hands on its top edges: open it and take the things out one by one, each set down on the floor beside it
+async function unpackFloor(who, box, kinds) {
+  const run = chore.run, open = box.userData.open || (box.userData.open = openable(box)), bs = bscale(who);
+  await htween(who, 0.7, (k) => { if (stillOn(run)) { open(k); who.pose = { ...kneeling, L: onRim(who, box, 1), R: onRim(who, box, -1) }; } });
+  for (let i = 0; i < kinds.length; i++) {
     if (!stillOn(run)) return false;
-    const th = makeThing(kind); scene.add(th); dressing.push(th);
-    const a = top.clone().add(new V3(0, 0.02, 0)), b = box.position.clone().addScaledVector(side, 0.55 + 0.2 * i).addScaledVector(fwdv, -0.1 * i); b.y = 0.0;
-    const c = new V3(), lift = new V3();
-    await htween(who, 0.9, (k) => {
-      if (!stillOn(run)) return;
-      lift.lerpVectors(a, b, k); lift.y = a.y + Math.sin(Math.min(1, k * 1.15) * Math.PI) * 0.35 * (1 - k) + (b.y - a.y) * k + 0.1;
-      th.position.copy(lift); c.copy(lift); c.y += 0.08; who.pose = { lean: 0.8, reach: c.clone() }; th.position.y = lift.y - 0.05;
-    });
-    th.position.copy(b); sfx.thump(0.35);
-    i++;
+    const side = i % 2 ? 'L' : 'R', sg = side === 'L' ? 1 : -1, other = { [side === 'L' ? 'R' : 'L']: onRim(who, box, -sg) };
+    const dest = who.group.localToWorld(new V3(sg * 0.46 * bs, 0, 0.42 * bs)); dest.y = who.group.position.y;
+    const th = await takeOut(who, box, kinds[i], side, other, kneeling);
+    if (!th) return false;
+    if (!(await putDown(who, th, kinds[i], dest, side, other, kneeling, { kneel: 1, lean: 1.3 }))) return false;
   }
-  await htween(who, 0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * (1 - k) }; });
-  who.pose = null; return stillOn(run);
+  await rise(who);
+  return stillOn(run);
 }
 
 async function dadChores() {
   const run = chore.run, g = dad.group.position;
   dad.busy = true;
-  const done = new Set();
   for (let i = 0; stillOn(run) && !chore.stop && i < LIVING_SPOTS.length; i++) {
     const spot = LIVING_SPOTS[i], box = W.cardboardBox(0, 0, 0, 0.46, 0.4, 0.46, i % 4, 0, scene); box.visible = false; dressing.push(box);
     if (!(await walkTo(dad, i === 0 ? [RAMP_FOOT, TRUCK_PICK] : [DOOR_IN, DOOR_OUT, PORCH, RAMP_FOOT, TRUCK_PICK]))) return;   // back out through the front door, never through the wall
     await turnToward(dad, g.x, g.z - 1);
-    const grab = new V3(g.x, 1.1, g.z - 0.7);   // just over the top of a box on the truck bed (0.55 m)
-    await htween(dad, 0.8, (k) => { if (stillOn(run)) dad.pose = { lean: 0.5 * Math.sin(k * Math.PI / 2), reach: grab }; });
-    if (!stillOn(run)) return;
-    holdUp(dad, box); box.visible = true; sfx.thump(0.4);
-    if (!(await walkTo(dad, [new V3(2.3, 0.2, -13.3), RAMP_FOOT, PORCH, DOOR_OUT, DOOR_IN, new V3(spot.x, 0, spot.z + 0.85)], 1.15))) return;
+    if (!(await liftBox(dad, box, TRUCK_BOX))) return;   // the next box, off the top of the stack
+    if (!(await walkTo(dad, [new V3(2.3, 0, -13.3), RAMP_FOOT, PORCH, DOOR_OUT, DOOR_IN, new V3(spot.x, 0, spot.z + 0.8 * bscale(dad))], 1.15))) return;
     await turnToward(dad, spot.x, spot.z);
     if (!(await setDown(dad, box, spot))) return;
-    if (chore.stop) break;
-    const kinds = [['books', 'lamp'], ['plates', 'books'], ['lamp', 'mug']][i % 3];
-    if (!(await unpackFloor(dad, box, kinds, new V3(spot.x + 0.1, 0, spot.z + 0.66)))) return;
+    if (chore.stop) { await rise(dad); break; }   // (this one stays packed: he is wanted in the kitchen)
+    const kinds = [['books', 'mug'], ['plates', 'books'], ['crate', 'books']][i % 3];   // (nothing taller than the box is 0.4 m deep)
+    if (!(await unpackFloor(dad, box, kinds))) return;
     if (chore.stop) break;
   }
   if (!stillOn(run)) return;
@@ -758,45 +811,41 @@ async function dadChores() {
   chore.dadHome = true;
 }
 async function momChores() {
-  const run = chore.run, g = mom.group.position;
+  const run = chore.run;
   mom.busy = true;
-  const box = W.cardboardBox(KITCHEN_BOX.x, 0, KITCHEN_BOX.z, 0.55, 0.42, 0.5, 0, 0.3, scene); dressing.push(box);
+  const bs = bscale(mom), box = W.cardboardBox(KITCHEN_BOX.x, 0, KITCHEN_BOX.z, 0.55, 0.42, 0.5, 0, Math.PI / 2, scene); dressing.push(box);   // (square to her: she comes at it from the west)
   W.colliders.push({ minX: KITCHEN_BOX.x - 0.3, maxX: KITCHEN_BOX.x + 0.3, minZ: KITCHEN_BOX.z - 0.3, maxZ: KITCHEN_BOX.z + 0.3, on: true, dressing: true });
   const open = openable(box); box.userData.open = open;
   const things = ['plates', 'mug', 'pot', 'mug', 'plates', 'mug'];
-  const stand = new V3(KITCHEN_BOX.x - 0.62, 0, KITCHEN_BOX.z);
+  const stand = new V3(KITCHEN_BOX.x - 0.8 * bs, 0, KITCHEN_BOX.z), carry = new V3(-0.2 * bs, 0.95 * bs, 0.3 * bs);   // where she kneels at the box; where a thing rides in her right hand
+  // down on one knee at the box, both hands to its rim
+  const kneelAt = async (dur) => {
+    await turnToward(mom, box.position.x, box.position.z, 0.4);
+    await htween(mom, dur, (k) => { if (stillOn(run)) mom.pose = { ...bodyMix({}, kneeling, k), L: onRim(mom, box, 1), R: onRim(mom, box, -1) }; });
+  };
   if (!(await walkTo(mom, [stand]))) return;
-  await turnToward(mom, box.position.x, box.position.z);
-  const top = new V3(box.position.x, 0.44, box.position.z);
-  await htween(mom, 0.8, (k) => { if (stillOn(run)) mom.pose = { lean: 0.75 * k, reach: top }; });
+  await kneelAt(1.0);
   await htween(mom, 0.6, (k) => { if (stillOn(run)) open(k); });
   for (let i = 0; i < things.length && stillOn(run); i++) {
-    const th = makeThing(things[i]); scene.add(th); dressing.push(th);
-    const [cx, cy, cz] = COUNTER[i], hold = new V3();
-    await htween(mom, 0.9, (k) => { if (!stillOn(run)) return; th.position.set(top.x, 0.44 + 0.3 * k, top.z); hold.copy(th.position).add(new V3(0, 0.08, 0)); mom.pose = { lean: 0.75 * (1 - 0.5 * k), reach: hold.clone() }; });
-    const east = cx > 2.5, sx = east ? cx - 0.65 : cx, sz = east ? cz : cz - 0.9;
-    mom.pose = { reach: null };
-    let walking = true;
-    const follow = (async () => {   // the thing rides in her hands while she walks
-      while (walking && stillOn(run)) {
-        const h = bodyH(mom), fx = Math.sin(mom.group.rotation.y), fz = Math.cos(mom.group.rotation.y);
-        th.position.set(g.x + fx * 0.35, 0.95 * h / 1.75 - 0.12, g.z + fz * 0.35); mom.pose = { reach: th.position.clone().add(new V3(0, 0.05, 0)) };
-        await wait(0.02);
-      }
-    })();
-    const okp = await walkTo(mom, [new V3(sx, 0, sz)], 1.1); walking = false; await follow;
-    if (!okp) return;
+    const [cx, cy, cz, sx, sz] = COUNTER[i], kind = things[i], hs = HOLD[kind];
+    const th = await takeOut(mom, box, kind, 'R', { L: onRim(mom, box, 1) }, kneeling);
+    if (!th) return;
+    // up on her feet with it, then to the counter
+    const from = palmAt(mom, 'R');
+    await htween(mom, 0.8, (k) => { if (stillOn(run)) mom.pose = { ...bodyMix(kneeling, {}, k), R: { reach: from.clone().lerp(mom.group.localToWorld(carry.clone()), k), palm: 'down', grip: hs.grip } }; });
+    if (!stillOn(run)) return;
+    mom.pose = { R: { reachLocal: carry, palm: 'down', grip: hs.grip } };
+    if (!(await walkTo(mom, [new V3(sx, 0, sz)], 1.1))) return;
     await turnToward(mom, cx, cz, 0.4);
-    const c0 = th.position.clone(), c1 = new V3(cx, cy, cz);
-    await htween(mom, 0.7, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(c0, c1, k); mom.pose = { lean: 0.25 * Math.sin(k * Math.PI), reach: th.position.clone().add(new V3(0, 0.05, 0)) }; });
-    sfx.thump(0.3); mom.pose = null;
-    if (i < things.length - 1) { if (!(await walkTo(mom, [stand]))) return; await turnToward(mom, box.position.x, box.position.z, 0.4); }
+    if (!(await putDown(mom, th, kind, new V3(cx, cy, cz), 'R', {}, {}, { lean: 0.3 }))) return;
+    mom.pose = null;
+    if (i < things.length - 1) { if (!(await walkTo(mom, [stand]))) return; await kneelAt(0.8); }
   }
   while (stillOn(run)) {   // wipe the counter until the chores are cancelled
-    const a = new V3(2.6, 0.97, 2.0), t0 = gameTime;
-    if (!(await walkTo(mom, [new V3(2.1, 0, 2.2)]))) return;
-    await turnToward(mom, 2.8, 2.2, 0.4);
-    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, reach: new V3(2.75, 0.97, 2.2 + Math.sin(t * 2.2) * 0.45) }; await wait(0.03); if (t > 30) break; }
+    const t0 = gameTime;
+    if (!(await walkTo(mom, [new V3(2.32, 0, 2.25)]))) return;
+    await turnToward(mom, 2.8, 2.25, 0.4);
+    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, R: { reach: new V3(2.74, 0.96, 2.25 + Math.sin(t * 2.2) * 0.3), palm: 'down', grip: 0.4 } }; await wait(0.03); if (t > 30) break; }
   }
 }
 function startChores() {
@@ -1008,15 +1057,13 @@ async function carDream() {
   mom.group.visible = dad.group.visible = false;
   car.trafficMode = 'cruise'; car.brake = false; car.speed = 8; sfx.engine(1, 0.55); sfx.radio(0.5, 0.45); W.sun.intensity = 1.1; scene.fog.density = 0.034;
   UI.fade(0, 0.15); sfx.violins(0.5, 4); sfx.drone(0.08, 3); F.fear = 0.8;
-  UI.subtitle('<i>The front seats are empty. The wheel is turning by itself.</i>', 5);
   tween(60, (k) => { car.steer = Math.sin(k * 40) * 0.25; }, ease.lin);
   await wait(4);
-  sfx.whisper(0.2, 0.2); UI.subtitle('<i>(the radio, between stations) "…front seat…"</i>', 4);
+  sfx.whisper(0.2, 0.2);
   const t0 = gameTime; let opened = false, climbed = false;
   F.carPrompt = { label: 'Climb into the front seat', act: async () => {
     F.carPrompt = null; F.cutscene = true; const from = car.eye.clone(), to = new V3(0.82, 1.02, 0.42);
     sfx.creak(0.3, 0.3); await tween(1.4, (k) => { car.eye.lerpVectors(from, to, k); P.pitch = lerp(P.pitch, -0.35, k * 0.1); }); car.setSeat('front'); F.cutscene = false; climbed = true; sfx.drone(0.14, 2); F.fear = 1;
-    UI.subtitle("<i>Something is knocking inside the glove box.</i>", 4);
     F.carPrompt = { label: 'Open the glove box', act: async () => {
       F.carPrompt = null; F.cutscene = true; opened = true; sfx.stab();
       await tween(0.7, (k) => car.openGlove(k * 0.95)); sfx.creak(0.5, 0.3); await wait(0.7);
@@ -1040,7 +1087,6 @@ async function carDream() {
   await wait(1.5); sfx.engine(0, 0); sfx.radio(0, 0); sfx.violins(0, 2); await wait(1.5);
   await say('mom/car_e'); UI.flash('rgba(255,255,255,1)', 2.6); await wait(1.2);
   carEnd(); setPhase('night'); toBunk(); UI.fade(0, 0.1); sfx.dread(0.3, 3);
-  UI.subtitle('<i>You wake up in your bunk. Your heart is going like a drum.</i>', 4.5);
   F.cutscene = false; F.script = false; if (nights) { F.clock = Math.max(F.clock, 352); }
 }
 // the last morning: they drive you away from the house, and something stands on the porch
@@ -1056,7 +1102,7 @@ async function carLeaving() {
   P.yaw = Math.PI * 0.95; P.pitch = 0.02;
   E.visible = true; E.mode = 'idle'; E.root.position.set(1.9, 0, -5.6); E.root.rotation.y = Math.PI; E.lookTarget = camera.position; E.tilt = 0.4; E.smileScale = 1.25;
   await tween(7, (k) => { car.speed = lerp(0, 7, ease.inOut(k)); sfx.engine(1, 0.2 + k * 0.4); });
-  await wait(2.5); E.reach = 0.6; UI.subtitle('<i>It stays on the porch. It waves.</i>', 4);
+  await wait(2.5); E.reach = 0.6;
   await wait(5); UI.fade(1, 3); await wait(3.4);
   carEnd(); E.visible = false;
 }
@@ -1070,7 +1116,6 @@ async function finaleScene() {
   if (nights) nights.hunter.dismiss();
   UI.pod(null); UI.blanket(false); P.pod = null; flash.intensity = 0; F.flashOn = false; F.breathCheck = false; F.breathUI = false;
   sfx.violins(0.3, 2); sfx.tension(0.05, 2); sfx.hush(4);
-  UI.subtitle('<i>Everything stops. The whole house is holding its breath.</i>', 4);
   P.mode = 'cine'; const from = camera.position.clone(), y0 = P.yaw, p0 = P.pitch;
   P.cam.copy(from);
   await tween(2.6, (k) => { P.cam.set(lerp(from.x, 6.5, k), lerp(from.y, EYE, k), lerp(from.z, -0.9, k)); P.yaw = lerpAngle(y0, Math.PI / 2, k); P.pitch = lerp(p0, 0.02, k); });
@@ -1082,7 +1127,6 @@ async function finaleScene() {
   sfx.stab(); sfx.violins(1, 0.5); shake = 0.5;
   await wait(3.2);
   // it comes down the hall, slowly
-  UI.subtitle("<i>It's walking toward you.</i>", 3);
   E.mode = 'walk'; E.speed = 0.55; { const x0 = 3.95; let st = 0; await tween(7, (k) => { E.root.position.x = lerp(x0, 5.2, k); st += 0.03; if (st > 1.1) { st = 0; sfx.heavyStep(0.9, panFor(E.root.position)); } shake = Math.max(shake, 0.12 + k * 0.3); }, ease.lin); }
   E.mode = 'idle'; sfx.giggle(panFor(E.root.position)); await wait(1.6);
   await say('you/f_a'); sfx.scream(); UI.flash('rgba(255,255,255,0.55)', 0.4); shake = 1;
@@ -1189,7 +1233,10 @@ function update(dt) {
     nights.tick(dt);
     // from the bunk, the breath key pulls the covers over your head
     const dn = !!keys.Space || input.breath;
-    if (P.mode === 'bunk' && !F.cutscene && dn && !coverPrev) hideUnderCovers();
+    if (P.mode === 'bunk' && !F.cutscene) {
+      coverHold = dn ? coverHold + dt : 0;
+      if (dn && coverHold >= 0.3 && gameTime - bunkSince > 0.8) hideUnderCovers();
+    } else coverHold = 0;
     coverPrev = dn;
   }
 
@@ -1207,7 +1254,9 @@ function update(dt) {
     if (!down && breathPrev && now - breathDownAt < 300) breathLatch = !breathLatch;
     breathPrev = down;
     const holding = down || breathLatch;
-    if (holding) P.breath -= dt / 8.5; else P.breath = Math.min(1, P.breath + dt / 3);
+    // holding only costs breath while it is close enough to hear you, or standing at your hiding place (a full meter outlasts its longest stay)
+    const near = F.breathCheck || (nights && nights.hunter.busy && nights.hunter.state === 'search' && nights.hunter.gap() < 5);
+    if (holding) P.breath -= dt / (F.breathCheck ? 11 : near ? 8.5 : 30); else P.breath = Math.min(1, P.breath + dt / 2.2);
     if (F.breathCheck) {
       if (holding) F.grace = Math.max(F.grace, 0.45); else { F.grace -= dt; if (F.grace <= 0) { sfx.gasp(); caught(); } }
       if (P.breath <= 0) { sfx.gasp(); caught(); }
@@ -1290,7 +1339,7 @@ const vigil = createVigil({
 nights = createNights({
   vigil,
   P, F, W, E, sfx, UI, camera, mom, dad, L, RUN, saveRun, EYE, BUNK_SEAT, HPARAM, finaleScene: () => finaleScene(), carDream: () => carDream(),
-  clamp, lerp, lerpAngle, tween, wait, waitFor, later,
+  clamp, lerp, lerpAngle, tween, wait, waitFor, later, ease, setFovOff: (v) => { fovOff = v; }, pan: (x, z, y = 1.2) => panFor(tmp.set(x, y, z)),
   time: () => gameTime, say, panFor, nlMult, setPhase, resetNight, caught, roomAt, sleepers, toBunk, enteredHide, carPass, faceAtWindow,
   addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); },
   holding: () => !!keys.Space || input.breath || breathLatch,
@@ -1304,7 +1353,7 @@ UI.makeGrain();
 // the title, pause, options and end menus (js/menu.js opens them when the #title / #pause / #end screens show)
 function newRun(seed) {   // New game: a run from moving day on the seed it was given (or a fresh one); a saved run is lost
   store.remove('topbunk.run');
-  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, objDone: {}, briefed: false, skipTold: false, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();
 }

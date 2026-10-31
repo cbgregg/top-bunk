@@ -78,7 +78,7 @@ export const MENUS = {
     { id: 'brightness', type: 'slider', key: 'brightness', label: 'Brightness', min: -1, max: 1, step: 0.1, fmt: (v) => (v ? `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}` : '0'), hint: 'Adjust until the left square is barely visible.' },
     { id: 'calibration', type: 'figure', label: 'Three grey squares on black, for setting the brightness', draw: calibrate },
     { id: 'fov', type: 'slider', key: 'fov', label: 'Field of view', min: 60, max: 100, step: 1, fmt: (v) => `${Math.round(v)}°` },
-    { id: 'headBob', type: 'toggle', key: 'headBob', label: 'Head bob', hint: 'The sway of your steps while you walk.' },
+    { id: 'headBob', type: 'slider', key: 'headBob', label: 'Head bob', min: 0, max: 1.5, step: 0.25, hint: 'The sway of your steps while you walk. Zero holds the camera steady.' },
     { id: 'quality', type: 'choice', key: 'quality', label: 'Graphics', options: [['auto', 'Auto'], ['ultra', 'Ultra'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low']], hint: 'Auto picks a preset for this device and steps down if it runs slowly.' },
     { type: 'heading', label: 'Accessibility' },
     { id: 'subtitles', type: 'toggle', key: 'subtitles', label: 'Subtitles', hint: 'The words of spoken lines. Captions and your own thoughts always show.' },

@@ -6,6 +6,8 @@ const loader = new THREE.TextureLoader();
 const metaP = fetch('assets/pbr/pbr.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const cache = new Map();
 const aniso = 8;
+// the packed roughness (green) of these maps is very low; scale it so floors and wood do not read as wet
+const ROUGH_SCALE = { tile: 7, pine: 2.2, darkwood: 1.5 };
 
 function tex(url, srgb, rep) {
   const key = url + '@' + rep;
@@ -45,8 +47,8 @@ export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, f
   const a = tex(base + 'a.webp', false, rep);
   if (!keepMap) mat.map = tex(base + 'c.webp', true, rep);   // keepMap: a patterned colour map (the floral quilt) stays, the PBR only adds relief
   mat.normalMap = tex(base + 'n.webp', false, rep); mat.normalScale.set(normal, normal);
-  mat.roughnessMap = mat.metalnessMap = mat.aoMap = a;
-  mat.roughness = rough; mat.metalness = 1; mat.aoMapIntensity = 1;
+  mat.roughnessMap = mat.aoMap = a;
+  mat.roughness = rough * (ROUGH_SCALE[name] ?? 1); mat.metalness = name === 'metal' ? 0.85 : 0; mat.metalnessMap = null; mat.aoMapIntensity = 1;   // the blue channel of the packed maps is empty, so metalness is set here instead
   if (flat !== null) { mat.roughnessMap = null; mat.roughness = flat; }   // ignore the map: a constant roughness
   if (!keepMap) mat.color.set(tint ?? 0xffffff);
   if (rotate) for (const t of [mat.map, mat.normalMap, a]) t.rotation = rotate;   // e.g. vertical boards from a horizontal siding texture
