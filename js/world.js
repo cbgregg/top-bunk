@@ -165,6 +165,9 @@ export function buildWorld(scene) {
   applyPBR(M.plaid, 'plaid', { rough: 1 });
   applyPBR(M.mattress, 'linen', { tint: 0xe8e2d4 });
   applyPBR(M.pillow, 'linen', { tint: 0xf2eee4 });
+  // bed linen (warm white, no sheen) and the bunk's comforter: the plaid at a comforter's scale
+  M.bedLinen = std({ color: 0xf6f0e4, roughness: 0.95 }); M.bedLinen.userData.worldUV = true; applyPBR(M.bedLinen, 'linen', { keepMap: true, flat: 0.92 });   // the linen colour map is blue, so only its weave is used
+  M.comforter = std({ map: T.plaid, roughness: 1 }); M.comforter.userData.worldUV = true; applyPBR(M.comforter, 'plaid', { rough: 1, tile: 0.65 });
   applyPBR(M.silo, 'metal', { tint: 0xb8bcc0, anti: true });
   M.gable = std({ map: T.siding, side: THREE.DoubleSide, roughness: 0.86 }); applyPBR(M.gable, 'siding', { tint: 0xe0a468, normal: 1.1 });
   // the garage inside (plywood over studs) and the basement (block walls, a stained slab); the basement finishes barely take the sky light
@@ -213,6 +216,50 @@ export function buildWorld(scene) {
     const m = new THREE.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = true; (o.parent || defParent || house).add(m);
     if (curTag) curTag.push(m);
     return m;
+  }
+  // A comforter lying on a mattress that runs along x, head at x0: a sheet of cloth with a rolled edge at the head, a turned-back band
+  // behind it (double thickness, so the sheet under it shows), soft folds, a rolled edge at the foot, tucked at zWall, and on the zEdge
+  // side hanging `hang` down the mattress with a slow wave. uv is world x and the distance along the cloth, like worldUV.
+  function drape({ x0, x1, zWall, zEdge, top, mat, hang = 0, loft = 0.05, band = 0.25, seed = 0 }) {
+    const NX = 56, NZ = 24, NH = hang > 0 ? 6 : 0, rows = NZ + 1 + NH, dir = Math.sign(zEdge - zWall);
+    const pos = [], uvs = [], idx = [], sm = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+    const height = (x, z) => {
+      const dz = Math.abs(z - zWall), w = Math.abs(zEdge - zWall), head = x - x0, foot = x1 - x;
+      const edge = sm(head / 0.07) * sm(foot / 0.06) * (hang > 0 ? 1 : sm((w - dz) / 0.06));   // rolled edges at the head, the foot, and the side that does not hang
+      let y = loft * edge;
+      y += 0.045 * edge * sm((head - 0.07) / 0.05) * sm((0.07 + band - head) / 0.05);    // the turned-back band
+      const inner = sm(head / 0.12) * sm(foot / 0.1) * sm((w - dz) / 0.1) * sm(dz / 0.06);   // folds stay off the edges
+      y += inner * (0.022 * Math.sin(x * 8.5 + seed) * Math.sin(dz * 4.2 + 0.5 + seed) + 0.012 * Math.sin(x * 19 + dz * 11 + seed * 2) - 0.008 * Math.sin(dz / w * Math.PI));
+      y += 0.004 * (1 - sm(dz / 0.05));                                                 // tucked in at the wall
+      return top + 0.004 + y;
+    };
+    for (let i = 0; i <= NX; i++) {
+      const x = x0 + (x1 - x0) * i / NX;
+      for (let j = 0; j < rows; j++) {
+        if (j <= NZ) { const z = zWall + (zEdge - zWall) * j / NZ; pos.push(x, height(x, z), z); uvs.push(x, z); }
+        else {   // over the edge and down the side
+          const k = j - NZ, d = hang * (k / NH), dd = sm(k / 1.5);
+          const z = zEdge + dir * (0.006 + 0.012 * dd + 0.012 * Math.sin(x * 7 + seed) * sm(d / 0.08));
+          pos.push(x, top + 0.004 + loft * (1 - dd) - d, z); uvs.push(x, zEdge + dir * (0.03 * dd + d));
+        }
+      }
+    }
+    for (let i = 0; i < NX; i++) for (let j = 0; j < rows - 1; j++) {
+      const a = i * rows + j, b = a + rows;
+      if (dir > 0) idx.push(a, a + 1, b, b, a + 1, b + 1); else idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; (defParent || house).add(m);
+    if (curTag) curTag.push(m);
+    return m;
+  }
+  // a pillow: a well-rounded box, turned a touch, in the pillowcase linen
+  function pillow(x0, x1, y0, z0, z1, yaw = 0, h = 0.13, o = {}) {
+    const p = rbox(x0, x1, y0, y0 + h, z0, z1, M.bedLinen, 0.06, o);
+    p.geometry.translate(-(x0 + x1) / 2, 0, -(z0 + z1) / 2); p.geometry.rotateY(yaw); p.geometry.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    return p;
   }
   // ---------- walls ----------
   const cutsX = [...new Set(Object.values(ROOMS).flatMap((r) => [r[0], r[1]]))], cutsZ = [...new Set(Object.values(ROOMS).flatMap((r) => [r[2], r[3]]))];
@@ -558,7 +605,7 @@ export function buildWorld(scene) {
     s(0.11, 0, 0.11, 0); s(0.08, 0, 0.27, 0.01); s(0.03, -0.06, 0.34, 0); s(0.03, 0.06, 0.34, 0); s(0.035, -0.1, 0.06, 0.06); s(0.035, 0.1, 0.06, 0.06);
     const eye = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });
     for (const x of [-0.025, 0.025]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), eye); e.position.set(x, 0.29, 0.08); bear.add(e); }
-    const rest = { pos: new THREE.Vector3(6.83, 0.55, 3.0), rot: 2.7 };
+    const rest = { pos: new THREE.Vector3(6.9, 0.575, 3.0), rot: 2.7 };
     teddy = place(house, 'teddy', { x: rest.pos.x, y: rest.pos.y, z: rest.pos.z, rot: rest.rot, s: 0.02, hide: [bear] });
     teddy.add(bear); teddy.rest = rest; teddy.size = { w: 0.31, h: 0.385, d: 0.245 };
     teddy.reset = () => { teddy.sim = null; teddy.position.copy(rest.pos); teddy.rotation.set(0, rest.rot, 0); teddy.scale.setScalar(1); teddy.visible = true; };
@@ -606,11 +653,13 @@ export function buildWorld(scene) {
     {   // this one is a loose group (it is not merged into the walls) so it can tilt and fall
       const g = new THREE.Group(); const xc = 4.75, y = 1.55, w = 0.44, h = 0.34, zf = -1.5 + WT / 2;
       g.position.set(xc, y + h / 2 + 0.05, zf + 0.03);   // pivots at its top edge
+      g.rotation.order = 'YXZ';   // tip it over first, then turn it about the floor's vertical, so a turned frame still lies flat
       const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.03), M.darkWood); fr.position.set(0, -h / 2 - 0.05, -0.0); g.add(fr);
       const p = picture(w, h, 'family2'); p.position.set(0, -h / 2 - 0.05, 0.017); g.add(p); house.add(g);
       hallFrame = { g, y0: g.position.y, tilt(r) { g.rotation.z = r; }, fallen: false,
-        // k: 0 hanging on the wall, 1 face-down on the floor. It speeds up as it goes (gravity)
-        pose(k) { const e = k * k; g.position.set(xc + 0.25 * e, hallFrame.y0 + (0.06 - hallFrame.y0) * e, zf + 0.03 + 0.32 * e); g.rotation.set((-Math.PI / 2 + 0.1) * e, 0.4 * e, 0.2 * e); },
+        // k: 0 hanging on the wall, 1 flat on the floor, picture up, turned a little. It speeds up as it goes (gravity); the pivot
+        // ends at half the frame's thickness, so the frame rests on the carpet
+        pose(k) { const e = k * k; g.position.set(xc + 0.25 * e, hallFrame.y0 + (0.016 - hallFrame.y0) * e, zf + 0.03 + 0.32 * e); g.rotation.set(-Math.PI / 2 * e, 0.4 * e, 0); },
         fall() { hallFrame.fallen = true; hallFrame.pose(1); },
         reset() { hallFrame.fallen = false; g.position.set(xc, hallFrame.y0, zf + 0.03); g.rotation.set(0, 0, 0); } };
     }
@@ -793,45 +842,74 @@ export function buildWorld(scene) {
     rbox(7.02, 7.9, 0, 2.1, -4.42, -3.85, M.oak, 0.01); box(7.445, 7.475, 0.05, 2.05, -3.87, -3.85, M.black, { uv: false });
     rbox(7.02, 7.9, 2.1, 2.4, -4.42, -3.85, M.white, 0.01);
     solid(6.97, 7.95, -4.45, -3.8);
-    // the double bed: a tall headboard against the hall wall, the quilt, two pillows side by side
-    rbox(5.9, 7.0, 0.12, 0.4, -3.72, -1.6, M.oak, 0.02); rbox(5.93, 6.97, 0.4, 0.58, -3.69, -1.63, M.mattress, 0.05);
-    rbox(5.9, 7.0, 0.4, 1.15, -1.66, -1.58, M.oak, 0.02); rbox(5.9, 7.0, 0.4, 0.62, -3.72, -3.68, M.oak, 0.02);
-    for (const x of [6.22, 6.7]) rbox(x - 0.2, x + 0.2, 0.58, 0.68, -2.14, -1.66, M.pillow, 0.05);
-    for (const [x0, x1] of [[5.92, 5.94], [6.96, 6.98]]) rbox(x0, x1, 0.46, 0.66, -3.7, -2.22, M.floralB, 0.005);   // the quilt hangs over the sides
-    rbox(5.92, 6.98, 0.46, 0.66, -3.7, -3.68, M.floralB, 0.005);
-    // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's rigs lie under it, see sleepers() in main.js)
-    // and breathes. set(false) flattens it: the bed looks slept in. one('dad', false) empties his side.
-    bedSleepers = (() => {
-      const cl = (v, a, b) => Math.max(a, Math.min(b, v));
-      const g = new THREE.Group(); house.add(g);
-      const X0 = 5.92, X1 = 6.98, Z0 = -3.7, Z1 = -2.22, TOP = 0.6;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
-      const geo = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, 34, 34); geo.rotateX(-Math.PI / 2); geo.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
-      const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z);
-        // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
-        // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
-        const along = cl((Z1 - z) / (Z1 - Z0), 0, 1), h = Math.min(0.31 - along * 0.08, 0.25 + along * 0.6);
-        // across it, a flat-topped rise the width of a body, so a leg off the centre line is still under it; Dad is broader, and his
-        // plateau stays high out to the wall edge so his far elbow is covered (Mom has the door side, Dad the wall side)
-        const dm = (x - 6.68) / 0.34, dd = (x - 6.24) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
-        bm[i] = h * 1.10 * Math.exp(-dm * dm * dm * dm * 2); bd[i] = h * 1.22 * Math.exp(-dd6 * 2);
-      }
-      const quilt = new THREE.Mesh(geo, M.floralB); quilt.castShadow = quilt.receiveShadow = true; g.add(quilt);
-      const fx = { group: g, quilt, amount: 1, target: 1, t: 0, side: { mom: 1, dad: 1 },
-        set(on) { fx.target = on ? 1 : 0; fx.side.mom = fx.side.dad = 1; },
-        one(name, on) { fx.side[name] = on ? 1 : 0; },
-        update(dt) {
-          fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5);
-          // breathing only ever lifts the quilt above its resting shape (the resting shape is what clears the bodies)
-          const fm = fx.amount * fx.side.mom * (1 + (0.5 - 0.5 * Math.cos(fx.t * 1.05)) * 0.06), fd = fx.amount * fx.side.dad * (1 + (0.5 - 0.5 * Math.cos(fx.t * 0.86)) * 0.07), flat = 0.05 * (1 - fx.amount);
-          for (let i = 0; i < n; i++) pos.setY(i, TOP + 0.04 + bm[i] * fm + bd[i] * fd + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9));   // rumpled when empty
-          pos.needsUpdate = true; geo.computeVertexNormals();
-        } };
-      fx.update(0);
-      return fx;
-    })();
-    solid(5.85, 7.05, -3.77, -1.5);
+    // the double bed, built as one piece round its own origin (the middle of the frame, on the floor) and turned by yaw: the pillow
+    // end is local +z. parentsBedAt(x, z, yaw) is the only line that places it. A tall headboard, the mattress, two full pillows, the
+    // floral quilt with rolled edges, and the sleepers' quilt (bedSleepers) and sleep spots (parentsBed) come with it.
+    const parentsBedAt = (ox, oz, yaw) => {
+      const bed = new THREE.Group(); bed.position.set(ox, 0, oz); bed.rotation.y = yaw; house.add(bed);
+      const o = { parent: bed }, world = (x, z) => [ox + x * Math.cos(yaw) + z * Math.sin(yaw), oz - x * Math.sin(yaw) + z * Math.cos(yaw)];
+      rbox(-0.55, 0.55, 0.12, 0.4, -1.06, 1.06, M.oak, 0.02, o); rbox(-0.52, 0.52, 0.4, 0.58, -1.03, 1.03, M.mattress, 0.05, o);
+      rbox(-0.55, 0.55, 0.4, 1.15, 1.0, 1.08, M.oak, 0.02, o); rbox(-0.55, 0.55, 0.4, 0.62, -1.06, -1.02, M.oak, 0.02, o);
+      pillow(-0.47, 0.01, 0.58, 0.46, 1.02, 0.05, 0.12, o); pillow(0.01, 0.49, 0.58, 0.46, 1.02, -0.04, 0.12, o);
+      for (const [x0, x1] of [[-0.53, -0.51], [0.51, 0.53]]) rbox(x0, x1, 0.46, 0.66, -1.04, 0.44, M.floralB, 0.005, o);   // the quilt hangs over the sides
+      rbox(-0.53, 0.53, 0.46, 0.66, -1.04, -1.02, M.floralB, 0.005, o);
+      for (const [x0, x1] of [[-0.55, -0.48], [0.48, 0.55]]) rbox(x0, x1, 0.6, 0.675, -1.06, 0.44, M.floralB, 0.035, o);   // and rolls over the edges
+      rbox(-0.55, 0.55, 0.6, 0.675, -1.07, -1.0, M.floralB, 0.035, o);
+      // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's rigs lie under it, see sleepers() in main.js)
+      // and breathes, with soft folds and the top sheet turned back over it at the pillow end. set(false) flattens it: the bed looks
+      // slept in. one('dad', false) empties his side.
+      bedSleepers = (() => {
+        const cl = (v, a, b) => Math.max(a, Math.min(b, v)), sm = (t) => { t = cl(t, 0, 1); return t * t * (3 - 2 * t); };
+        const g = new THREE.Group(); bed.add(g);
+        const X0 = -0.53, X1 = 0.53, Z0 = -1.04, Z1 = 0.44, TOP = 0.6;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
+        // the shape at a point: [Mom's rise, Dad's rise, the folds]
+        const shape = (x, z) => {
+          // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
+          // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
+          // (the last span before the foot drops toward the mattress, so the quilt hangs over the feet instead of ending in the air)
+          const along = cl((Z1 - z) / (Z1 - Z0), 0, 1), h = Math.min(0.29 - along * 0.07, 0.21 + along * 0.7) * (1 - 0.3 * sm((along - 0.9) / 0.1));
+          // across it, a flat-topped rise the width of a body, so a leg off the centre line is still under it; Dad is broader, and his
+          // plateau stays high out to the wall edge so his far elbow is covered (Mom has the door side, Dad the wall side)
+          const dm = (x - 0.23) / 0.34, dd = (x + 0.21) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
+          const edge = sm((x - X0) / 0.08) * sm((X1 - x) / 0.08) * sm((z - Z0) / 0.08) * sm((Z1 - z) / 0.08);   // the folds stay off the edges
+          const f = edge * (0.02 * Math.sin(x * 9 + 0.7) * Math.sin(z * 5.3 + 1.1) + 0.011 * Math.sin(x * 21 + z * 8));
+          return [h * 1.10 * Math.exp(-dm * dm * dm * dm * 2), h * 1.22 * Math.exp(-dd6 * 2), f];
+        };
+        const sheet = (x0, x1, z0, z1, nx, nz, mat, lift) => {
+          const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, nx, nz); geo.rotateX(-Math.PI / 2); geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+          const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n), fo = new Float32Array(n);
+          for (let i = 0; i < n; i++) { const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z); [bm[i], bd[i], fo[i]] = shape(x, z); fo[i] += lift(x, z); }
+          const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; g.add(m);
+          return { mesh: m, geo, pos, n, bm, bd, fo };
+        };
+        const quilt = sheet(X0, X1, Z0, Z1, 34, 34, M.floralB, () => 0);
+        // the turned-back sheet: a band over the quilt's pillow end, thicker along its fold
+        const band = sheet(X0 + 0.02, X1 - 0.02, Z1 - 0.3, Z1 - 0.01, 30, 8, M.bedLinen, (x, z) => 0.012 + 0.014 * sm((z - (Z1 - 0.3)) / 0.08) * sm((Z1 - 0.1 - z) / 0.1));
+        const fx = { group: g, quilt: quilt.mesh, amount: 1, target: 1, t: 0, side: { mom: 1, dad: 1 },
+          set(on) { fx.target = on ? 1 : 0; fx.side.mom = fx.side.dad = 1; },
+          one(name, on) { fx.side[name] = on ? 1 : 0; },
+          update(dt) {
+            fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5);
+            // breathing only ever lifts the quilt above its resting shape (the resting shape is what clears the bodies)
+            const fm = fx.amount * fx.side.mom * (1 + (0.5 - 0.5 * Math.cos(fx.t * 1.05)) * 0.06), fd = fx.amount * fx.side.dad * (1 + (0.5 - 0.5 * Math.cos(fx.t * 0.86)) * 0.07), flat = 0.05 * (1 - fx.amount);
+            for (const s of [quilt, band]) {
+              const { pos, n, bm, bd, fo, geo } = s;
+              // one quilt over two people: the higher rise, and a bridge where both are under it, so it does not dip to the mattress between them
+              for (let i = 0; i < n; i++) { const a = bm[i] * fm, b = bd[i] * fd; pos.setY(i, TOP + 0.04 + fo[i] + Math.max(a, b) + 0.45 * Math.min(a, b) + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9)); }   // rumpled when empty
+              pos.needsUpdate = true; geo.computeVertexNormals();
+            }
+          } };
+        fx.update(0);
+        return fx;
+      })();
+      // where the rigs lie (the origin is 1.4 m down the bed from the pillows; yaw turns them to lie along the bed, head to the headboard)
+      const spot = (x, z) => { const [wx, wz] = world(x, z); return { x: wx, y: 0.74, z: wz, yaw: Math.PI + yaw }; };
+      parentsBed = { mom: spot(0.23, -0.56), dad: spot(-0.21, -0.71) };   // their feet stay inside the footboard
+      const c = [world(-0.6, -1.11), world(0.6, -1.11), world(-0.6, 1.16), world(0.6, 1.16)];
+      solid(Math.min(...c.map((v) => v[0])), Math.max(...c.map((v) => v[0])), Math.min(...c.map((v) => v[1])), Math.max(...c.map((v) => v[1])));
+      return bed;
+    };
+    parentsBedAt(6.45, -2.66, 0);   // head on the hall wall, so from the door you look down its length
     // a low dresser under the front window (a light-wood six-drawer model, 0.655 high, replaces the box), with the lamp and Mom's things on it
     tagStart('pdresser');
     rbox(5.9, 6.9, 0, 0.655, -4.4, -3.95, M.oak, 0.015); for (let i = 0; i < 3; i++) rbox(5.95 + i * 0.32, 6.23 + i * 0.32, 0.1, 0.57, -3.95, -3.935, M.oak, 0.006);
@@ -843,8 +921,6 @@ export function buildWorld(scene) {
     tagEnd();
     knick(6.15, 0.655, -4.2, 3, 0.3);
     solid(5.85, 6.95, -4.45, -3.9);
-    // where the rigs lie (the origin is 1.4 m down the bed from the pillows; yaw turns them to lie along z, head to the hall wall)
-    parentsBed = { mom: { x: 6.68, y: 0.74, z: -3.3, yaw: Math.PI }, dad: { x: 6.24, y: 0.74, z: -3.45, yaw: Math.PI } };
     // the other bedroom: vertical-plank wood closet doors
     rbox(4.45, 5.5, 0, 2.1, -2.15, -1.58, M.oak, 0.01); for (let i = 1; i < 6; i++) box(4.45 + i * 0.175 - 0.006, 4.45 + i * 0.175 + 0.006, 0.05, 2.05, -2.165, -2.15, M.black, { uv: false });
     rbox(4.45, 5.5, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
@@ -989,7 +1065,62 @@ export function buildWorld(scene) {
   prop('armchair', { x: -2.55, z: -4.05, rot: 0 }, { box: [-2.98, -2.12, -4.42, -3.66] });   // front-left corner, clear of the picture window and of the lane through the living room
   prop('cabinet', { x: -0.2, z: -0.7, rot: PI, s: 0.9 }, { box: [-1.14, 0.74, -1.02, -0.38] });   // the china hutch: against the arch wall, to the right of the archway as you face it from the living room
   prop('plant2', { x: 2.85, z: -1.85 }, { box: [2.55, 3.15, -2.15, -1.55] });
-  prop('clock_wall', { x: 3.21, y: 1.74, z: -3.05, rot: -PI / 2 });
+  // the grandfather clock, between the picture window and the front door with its face to the room. once the model is in, its
+  // pendulum (the bob and the rod are islands of their own in the case mesh) is cut out and hung from a pivot so it can swing; it ticks
+  // at each end of the swing, heard by distance from wherever you are. clock.silent stops it dead
+  const clock = (() => {
+    const pos = new THREE.Vector3(1.05, 0, -4.27), c = { pos, pivot: null, t: 0, silent: false, period: 2, amp: 0.075, half: 0 }, dir = new THREE.Vector3();
+    const cut = () => {
+      let mesh = null; c.holder.traverse((o) => { if (o.isMesh && o.material.name === 'ClockCase') mesh = o; });
+      if (!mesh || !mesh.geometry.index) return;
+      c.holder.updateMatrixWorld(true);
+      const geo = mesh.geometry, idx = geo.index.array, pa = geo.attributes.position, n = pa.count;
+      // islands: triangles joined through shared vertices (or the same position, where a seam split them)
+      const par = new Int32Array(n); for (let i = 0; i < n; i++) par[i] = i;
+      const find = (a) => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
+      const uni = (a, b) => { a = find(a); b = find(b); if (a !== b) par[a] = b; };
+      const seen = new Map();
+      for (let i = 0; i < n; i++) { const k = pa.getX(i).toFixed(3) + ',' + pa.getY(i).toFixed(3) + ',' + pa.getZ(i).toFixed(3), j = seen.get(k); if (j === undefined) seen.set(k, i); else uni(i, j); }
+      for (let t = 0; t < idx.length; t += 3) { uni(idx[t], idx[t + 1]); uni(idx[t], idx[t + 2]); }
+      const v = new THREE.Vector3(), boxes = new Map();
+      for (let t = 0; t < idx.length; t += 3) { const r = find(idx[t]); let b = boxes.get(r); if (!b) { b = new THREE.Box3(); boxes.set(r, b); } for (let k = 0; k < 3; k++) b.expandByPoint(mesh.localToWorld(v.fromBufferAttribute(pa, idx[t + k]))); }
+      // the pendulum hangs on the centre line: a disc near the bottom of the case and a thin rod up from it
+      const take = new Set(), size = new THREE.Vector3(), mid = new THREE.Vector3(); let top = 0, zc = 0;
+      for (const [r, b] of boxes) {
+        b.getSize(size); b.getCenter(mid); if (Math.abs(mid.x - pos.x) > 0.015) continue;
+        const bob = size.x > 0.15 && size.x < 0.3 && size.y < 0.3 && mid.y > 0.35 && mid.y < 0.7, rod = size.x < 0.03 && size.y > 0.4 && size.y < 0.8;
+        if (bob || rod) { take.add(r); if (rod) { top = b.max.y; zc = mid.z; } }
+      }
+      if (take.size < 2) return;
+      const keep = [], out = [];
+      for (let t = 0; t < idx.length; t += 3) (take.has(find(idx[t])) ? out : keep).push(idx[t], idx[t + 1], idx[t + 2]);
+      const pg = new THREE.BufferGeometry(), nm = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld), na = geo.attributes.normal, ua = geo.attributes.uv;
+      const P = new Float32Array(out.length * 3), N = new Float32Array(out.length * 3), U = ua ? new Float32Array(out.length * 2) : null;
+      out.forEach((i, k) => {
+        mesh.localToWorld(v.fromBufferAttribute(pa, i)); P[k * 3] = v.x - pos.x; P[k * 3 + 1] = v.y - top; P[k * 3 + 2] = v.z - zc;
+        v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); N[k * 3] = v.x; N[k * 3 + 1] = v.y; N[k * 3 + 2] = v.z;
+        if (U) { U[k * 2] = ua.getX(i); U[k * 2 + 1] = ua.getY(i); }
+      });
+      pg.setAttribute('position', new THREE.BufferAttribute(P, 3)); pg.setAttribute('normal', new THREE.BufferAttribute(N, 3)); if (U) pg.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+      geo.setIndex(keep); geo.computeBoundingSphere();
+      const pend = new THREE.Mesh(pg, mesh.material); pend.castShadow = true;
+      c.pivot = new THREE.Group(); c.pivot.position.set(pos.x, top, zc); c.pivot.add(pend); house.add(c.pivot);
+    };
+    c.holder = prop('grandfather', { x: pos.x, z: pos.z, rot: -PI / 2, s: 0.008 }, { box: [0.8, 1.3, -4.45, -4.05], after: cut });
+    c.tick = (dt, cam, sfx) => {
+      if (c.silent || !c.pivot) return;
+      c.t += dt; const ph = (c.t / c.period) % 1;
+      c.pivot.rotation.z = c.amp * Math.sin(ph * Math.PI * 2);
+      const half = ph < 0.5 ? 0 : 1;
+      if (half === c.half || !sfx || !cam) return;
+      c.half = half;
+      const d = cam.position.distanceTo(pos), g = 0.3 / (1 + d * d * 0.22); if (g < 0.004) return;
+      // left or right of where you are looking
+      dir.set(pos.x - cam.position.x, 0, pos.z - cam.position.z).normalize(); const e = cam.matrixWorld.elements;
+      sfx.clockTick(g, Math.max(-0.8, Math.min(0.8, dir.x * e[0] + dir.z * e[2])), half === 1);
+    };
+    return c;
+  })();
   // kitchen and dining: the round table, chairs, a kettle and a pot on the stove
   {
     const cx = -2.1, cz = 1.8;   // pulled toward the living room so the back door and its swing stay clear
@@ -1000,7 +1131,16 @@ export function buildWorld(scene) {
     prop('plant1', { x: -1.65, z: 3.25 }, { box: [-1.9, -1.4, 3.0, 3.5] });   // in the corner by the pantry, clear of the back door
   }
   // your room: the pine bunk (2.0 long, flush with the back wall, ladder at the foot by the window) and the box TV on its stand
-  prop('bunk', { x: 6.08, z: 2.89, rot: 0, s: 0.115 }, { tag: 'bunk', old: [cBunk], box: [4.98, 7.22, 2.2, 3.55] });
+  // the model's own blankets and pillows are flat slabs: they come off as it loads, and the beds are made below
+  const bunkModel = prop('bunk', { x: 6.08, z: 2.89, rot: 0, s: 0.115 }, { tag: 'bunk', old: [cBunk], box: [4.98, 7.22, 2.2, 3.55], after: () => bunkModel.traverse((o) => { if (o.isMesh && /Blanket|Pillows/.test(o.material.name)) o.visible = false; }) });
+  // both bunks made the same way: a sheet over the mattress (tops at 0.527 and 1.555), the plaid comforter with its turned-back band
+  // under the pillow at the head (the bathroom wall end), tucked at the back wall. The bottom one hangs over the room side; the top
+  // one has the guard rail there, so it rolls under instead
+  for (const [top, hang, seed] of [[0.527, 0.2, 0], [1.555, 0, 2.1]]) {
+    rbox(5.15, 7.02, top - 0.002, top + 0.008, 2.35, 3.435, M.bedLinen, 0.004);
+    drape({ x0: 5.16, x1: 7.02, zWall: 3.44, zEdge: 2.345, top: top + 0.008, mat: M.comforter, hang, band: 0.55, seed });
+    pillow(5.19, 5.64, top + 0.107, 2.5, 3.28, 0.06 - seed * 0.05);
+  }
   const kidTv = prop('tv', { x: 5.33, y: 0.55, z: 0.95, rot: PI / 2 }, { tag: 'kidtv', after: () => plainTv(kidTv) });
   // kitchen appliances (doors face -x), the toilet (tank on the west wall), the washer and dryer in the utility room (doors face +x)
   prop('fridge', { x: 2.845, z: 0.46, rot: -PI / 2, s: 0.98 }, { tag: 'fridge' });
@@ -1231,14 +1371,32 @@ export function buildWorld(scene) {
   const porchBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M.lamp.clone()); porchBulb.position.set(0.9, 2.15, -4.6); house.add(porchBulb);
 
   // ---------- yard ----------
-  M.asphalt = std({ color: 0x2b2b2d, roughness: 0.92 }); M.asphalt.userData.worldUV = true; applyPBR(M.asphalt, 'concrete', { tint: 0x3a3a3c });
-  {   // the ground: a thin slab in four pieces around the hole where the cellar stairs go down (thin, so its underside stays above the laundry's ceiling)
+  // the road surface and its markings, the gravel of the shoulders and the drive, and the ground that goes dark when it rains (weather.js)
+  M.asphalt = std({ color: 0x2b2b2d, roughness: 0.92 }); M.asphalt.userData.worldUV = true; applyPBR(M.asphalt, 'asphalt', { tint: 0xa6a6a4, anti: { scale: 0.025, strength: 0.2 } });
+  M.gravel = std({ color: 0x8a8378, roughness: 1 }); M.gravel.userData.worldUV = true; applyPBR(M.gravel, 'gravel', { tint: 0xa89d8c, anti: true, flat: 0.92 });
+  M.rut = std({ color: 0x7a6a58, roughness: 1 }); M.rut.userData.worldUV = true; applyPBR(M.rut, 'dirt', { tint: 0xa8947c, anti: true, flat: 0.9 });
+  M.grassDry = std({ color: 0xb8a870, roughness: 1 }); M.grassDry.userData.worldUV = true; applyPBR(M.grassDry, 'grass', { tint: 0xc2b07a, anti: true, tile: 2.4, flat: 0.95 });
+  M.paintY = std({ color: 0xb59b3c, roughness: 0.75 }); M.paintW = std({ color: 0xc9c6bb, roughness: 0.75 }); M.tar = std({ color: 0x1c1c1d, roughness: 0.8 });
+  const wetMats = [M.asphalt, M.gravel, M.dirt, M.rut, M.concrete, M.tar, M.paintY, M.paintW];
+  const RZ0 = -33.8, RZ1 = -27.2;   // the road's edges: two 3.3 m lanes, the near one for the +x traffic (traffic.js)
+  {   // the ground: a thin slab in pieces, around the hole where the cellar stairs go down and the ditch across the road (thin, so its underside stays above the laundry's ceiling)
     const { x0, xEnd, z0, z1 } = STAIR, hx0 = xEnd - 0.25, hx1 = x0, hz0 = z0 + 0.02, hz1 = z1 + 0.25;
-    for (const [a, b, c, d] of [[-260, 260, -260, hz0], [-260, 260, hz1, 260], [-260, hx0, hz0, hz1], [hx1, 260, hz0, hz1]]) box(a, b, -0.05, -0.02, c, d, M.grass, { cast: false, parent: yard });
+    for (const [a, b, c, d] of [[-260, 260, -260, -38], [-260, 260, -35.2, hz0], [-260, 260, hz1, 260], [-260, hx0, hz0, hz1], [hx1, 260, hz0, hz1]]) box(a, b, -0.05, -0.02, c, d, M.grass, { cast: false, parent: yard });
   }
   box(-6, 8.5, -0.02, -0.008, -29, -6.2, M.dirt, { cast: false, parent: yard });   // the gravel drive up from the road
-  box(-260, 260, -0.4, -0.005, -33.5, -27.5, M.asphalt, { cast: false, parent: yard });   // the road along the front of the property
-  for (let x = -120; x < 120; x += 6) box(x, x + 3, -0.006, -0.004, -30.6, -30.4, std({ color: 0xc9b24a, roughness: 0.8 }), { uv: false, cast: false, parent: yard });
+  for (const x of [0.3, 2.2]) box(x, x + 0.34, -0.0075, -0.007, -27.6, -7.0, M.rut, { cast: false, parent: yard });   // the ruts the truck and the car wore into it
+  box(-6.6, 9.1, -0.015, -0.009, -29.2, -26.6, M.gravel, { cast: false, parent: yard });   // where the drive fans out onto the shoulder
+  box(-260, 260, -0.4, -0.005, RZ0, RZ1, M.asphalt, { cast: false, parent: yard });   // the road along the front of the property
+  box(-260, 260, -0.03, -0.006, RZ0 - 1.4, RZ0, M.gravel, { cast: false, parent: yard }); box(-260, 260, -0.03, -0.006, RZ1, RZ1 + 1.0, M.gravel, { cast: false, parent: yard });   // gravel shoulders
+  for (let x = -258; x < 258; x += 9) box(x, x + 3, -0.0045, -0.004, -30.55, -30.45, M.paintY, { cast: false, parent: yard });   // the centre line, faded
+  for (const z of [RZ0 + 0.25, RZ1 - 0.35]) box(-260, 260, -0.0045, -0.004, z, z + 0.1, M.paintW, { cast: false, parent: yard });   // the edge lines
+  {   // tar patches over old potholes, and a ditch along the far side of the road (two slopes in the gap left in the ground)
+    const r = TX.rng(909);
+    for (let i = 0; i < 14; i++) { const x = -120 + r() * 240, z = RZ0 + 0.6 + r() * 5.4, w = 0.8 + r() * 2.2, d = 0.5 + r() * 1.2; box(x, x + w, -0.0048, -0.0042, z, z + d, M.tar, { cast: false, parent: yard }); }
+    const L = Math.hypot(1.4, 0.55), a = Math.atan2(0.55, 1.4);
+    for (const s of [-1, 1]) { const geo = new THREE.BoxGeometry(520, 0.06, L); worldUV(geo); const m = new THREE.Mesh(geo, M.grass); m.receiveShadow = true; m.position.set(0, -0.3, -36.6 + s * 0.7); m.rotation.x = -s * a; yard.add(m); }
+    box(-260, 260, -0.62, -0.56, -36.9, -36.3, M.dirt, { cast: false, parent: yard });   // the mud at the bottom
+  }
   // moving truck (parked on the gravel, backed toward the house)
   const TG = new THREE.Group(); TG.position.set(-10.7, 0, 2.5); yard.add(TG);
   // the cargo box is hollow with the back open, so the family can walk up the ramp and carry things out
@@ -1267,7 +1425,7 @@ export function buildWorld(scene) {
     cardboardBox(3.45, 0, -12.7, 0.5, 0.44, 0.5, 3, -0.3, yard),
     cardboardBox(3.3, 0, -11.7, 0.5, 0.44, 0.5, 3, 0.4, yard),
   ];
-  const dropSpots = [new THREE.Vector3(5.45, 0.55, 3.0), new THREE.Vector3(6.05, 0.55, 3.0), new THREE.Vector3(6.65, 0.55, 3.0)];   // on the bottom bunk
+  const dropSpots = [new THREE.Vector3(5.98, 0.575, 3.0), new THREE.Vector3(6.52, 0.575, 3.0), new THREE.Vector3(6.3, 0, 1.95)];   // on the bottom bunk's comforter, past the pillow; the third on the floor in front of it
 
   // the detached two-car garage (brown siding, gray shingles) in front of the utility wing, beside the drive: its two doors face the gravel,
   // the side door faces the house, and the breaker panel is inside on the stud wall by that door (W.garage, W.breaker).
@@ -1364,6 +1522,94 @@ export function buildWorld(scene) {
     posts.count = n; posts.castShadow = true; yard.add(posts);
   }
 
+  // ---------- the end of the drive: the street light, the mailbox, the cans, the sign down the road, the reflector posts ----------
+  // the street light: a wooden pole on the shoulder east of the drive, a steel arm out over the road and a cobra head on the end of it, the old
+  // high-pressure sodium kind that comes up amber and buzzes. It is on the grid, so the blackout takes it too (main.js: streetLight.set).
+  const streetLight = (() => {
+    const PX = 10.4, PZ = -26.3, PH = 8.0, HX = PX, HZ = -29.3, HY = 8.25;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, PH, 10), M.darkWood); pole.position.set(PX, PH / 2, PZ); pole.castShadow = true; yard.add(pole);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, Math.hypot(HZ - PZ, HY - (PH - 0.5)), 8), M.steel); arm.position.set(PX, (PH - 0.5 + HY) / 2, (PZ + HZ) / 2); arm.rotation.x = Math.atan2(HZ - PZ, HY - (PH - 0.5)); arm.castShadow = true; yard.add(arm);
+    const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), M.steel); brace.position.set(PX, PH - 1.1, PZ - 0.8); brace.rotation.x = -0.95; yard.add(brace);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.95), std({ color: 0x5c6066, roughness: 0.5, metalness: 0.5 })); head.position.set(HX, HY, HZ - 0.3); head.castShadow = true; yard.add(head);
+    const lensMat = std({ color: 0xcfb37a, emissive: 0xffb050, emissiveIntensity: 0, roughness: 0.4 });
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), lensMat); lens.scale.set(1.1, 0.7, 1.9); lens.position.set(HX, HY - 0.1, HZ - 0.3); yard.add(lens);
+    const light = new THREE.SpotLight(0xffb45c, 0, 30, 1.0, 0.55, 1.4); light.position.set(HX, HY - 0.12, HZ - 0.3); light.target.position.set(HX - 0.6, 0, HZ + 0.5); scene.add(light, light.target);
+    // the light in the air under it: a soft cone, and a glow on the lens; moths around it
+    const coneMat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, vertexColors: true });
+    const coneGeo = new THREE.ConeGeometry(7.5, HY - 0.2, 24, 6, true), cp = coneGeo.attributes.position, cc = new Float32Array(cp.count * 3);
+    for (let i = 0; i < cp.count; i++) { const k = Math.min(1, Math.max(0, cp.getY(i) / (HY - 0.2) + 0.5)) ** 2.2; cc[i * 3] = cc[i * 3 + 1] = cc[i * 3 + 2] = k; }   // bright at the lamp, gone by the ground (clamped: a negative base would make NaN, and one NaN pixel blacks the whole frame through the bloom)
+    coneGeo.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+    const cone = new THREE.Mesh(coneGeo, coneMat); cone.position.set(HX - 0.3, (HY - 0.2) / 2, HZ); cone.renderOrder = 3; yard.add(cone);
+    const gc = document.createElement('canvas'); gc.width = gc.height = 64; const gg = gc.getContext('2d'), gr = gg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,230,180,1)'); gr.addColorStop(0.2, 'rgba(255,200,120,0.6)'); gr.addColorStop(1, 'rgba(255,160,60,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 64, 64);
+    const glowTex = new THREE.CanvasTexture(gc); glowTex.colorSpace = THREE.SRGBColorSpace;
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0, fog: false })); glow.scale.set(3.2, 3.2, 1); glow.position.set(HX, HY - 0.15, HZ - 0.3); glow.renderOrder = 4; yard.add(glow);
+    const NM = 26, mp = new Float32Array(NM * 3), mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(mp, 3));
+    const moths = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0xffe0b0, size: 0.035, transparent: true, opacity: 0, depthWrite: false })); moths.frustumCulled = false; yard.add(moths);
+    const seeds = Array.from({ length: NM }, (_, i) => ({ a: i * 2.4, r: 0.25 + (i % 5) * 0.12, h: (i % 3) * 0.15, s: 0.8 + (i % 4) * 0.5 }));
+    const ST = { on: false, goal: 0, I: 0, t: 0, stutter: 0, next: 6, base: 650 };
+    return {
+      light, pos: new THREE.Vector3(HX, HY, HZ), lens: lensMat, cone, glow, moths, haze: 0,   // haze: how much the beam shows in the air (the rain, weather.js)
+      set(on) { ST.on = on; ST.goal = on ? 1 : 0; if (!on) { ST.I = 0; this.apply(0); } },
+      apply(k) {
+        light.intensity = ST.base * k; lensMat.emissiveIntensity = 3.2 * k; coneMat.opacity = (0.022 + 0.11 * this.haze) * k; glow.material.opacity = 0.85 * k; moths.material.opacity = 0.8 * k;
+        cone.visible = glow.visible = moths.visible = k > 0.001;
+      },
+      tick(dt, eye, sfx) {
+        ST.t += dt;
+        ST.I += (ST.goal - ST.I) * Math.min(1, dt * 0.9);   // sodium comes up slowly
+        // the arc wavers a little all the time, and now and then the ballast stutters
+        let k = ST.I * (0.94 + 0.04 * Math.sin(ST.t * 31) * Math.sin(ST.t * 4.7) + 0.02 * Math.sin(ST.t * 120));
+        if (ST.stutter > 0) { ST.stutter -= dt; k *= ST.stutter > 0.12 ? 0.35 : 1.25; }
+        else { ST.next -= dt; if (ST.next <= 0) { ST.next = 7 + Math.random() * 22; ST.stutter = 0.16 + Math.random() * 0.1; } }
+        this.apply(k);
+        if (k > 0.01) {
+          for (let i = 0; i < NM; i++) { const s = seeds[i], a = s.a + ST.t * s.s * 2.2, w = Math.sin(ST.t * 5.1 * s.s + i); mp[i * 3] = HX + Math.cos(a) * (s.r + w * 0.08); mp[i * 3 + 1] = HY - 0.35 - s.h + Math.sin(ST.t * 3.3 * s.s + i * 2) * 0.12; mp[i * 3 + 2] = HZ - 0.3 + Math.sin(a) * (s.r + w * 0.08); }
+          mg.attributes.position.needsUpdate = true;
+        }
+        if (sfx) { const d = eye ? Math.hypot(eye.x - HX, eye.z - HZ) : 99; sfx.buzz(k * Math.max(0, 1 - d / 9) ** 2); }
+      },
+    };
+  })();
+  place(yard, 'mailbox', { x: 9.4, z: -26.9, rot: Math.PI, s: 0.33 }); solid(9.15, 9.65, -27.15, -26.65);
+  place(yard, 'trash_can', { x: -7.6, z: -26.3, rot: 0.35 }); solid(-8.4, -6.8, -26.8, -25.8);
+  {   // the speed limit sign a way down the road, for the +x traffic; the reflector posts along the far shoulder
+    const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
+    g.fillStyle = '#e9e6dc'; g.fillRect(0, 0, 128, 160); g.strokeStyle = '#1a1a1a'; g.lineWidth = 5; g.strokeRect(6, 6, 116, 148);
+    g.fillStyle = '#1a1a1a'; g.textAlign = 'center'; g.font = 'bold 22px sans-serif'; g.fillText('SPEED', 64, 38); g.fillText('LIMIT', 64, 64); g.font = 'bold 72px sans-serif'; g.fillText('35', 64, 138);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })); sign.position.set(-46, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.4, 0.06), M.steel); post.position.set(-46.04, 1.2, -26.0); yard.add(post);
+    const n = 13, posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), M.white, n), refl = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), n), mm = new THREE.Matrix4();
+    for (let i = 0; i < n; i++) { const x = -240 + i * 40; mm.makeTranslation(x, 0.55, RZ0 - 0.9); posts.setMatrixAt(i, mm); mm.makeTranslation(x, 0.95, RZ0 - 0.88); refl.setMatrixAt(i, mm); }
+    yard.add(posts, refl);
+  }
+  // puddles on the drive and the road, shown by weather.js once the ground is wet; dry patches in the grass where the summer burnt it
+  const puddles = new THREE.Group(); puddles.visible = false; yard.add(puddles);
+  {
+    const r = TX.rng(313), spots = [[-2.6, -17, 1.6, 0.9], [5.4, -23.5, 1.2, 0.7], [-2.4, -27.8, 2.2, 1.1], [6.5, -12.5, 1.0, 0.8], [14, -29.0, 2.6, 1.0], [-22, -32.2, 3.0, 1.2], [31, -32.6, 2.2, 0.9], [-9.3, -5.2, 1.3, 0.8], [-0.5, -9.6, 1.1, 0.7], [-13.5, -27.6, 1.8, 1.0]];   // clear of the truck
+    for (const [x, z, a, b] of spots) {
+      const m = new THREE.Mesh(new THREE.CircleGeometry(1, 28), std({ color: 0x0a0d12, roughness: 0.04, metalness: 0.05, transparent: true, opacity: 0, depthWrite: false, envMapIntensity: 1.4 }));
+      m.rotation.x = -Math.PI / 2; m.rotation.z = r() * 3; m.scale.set(a, b, 1); m.position.set(x, -0.002, z); m.renderOrder = 2; m.receiveShadow = true; puddles.add(m);
+    }
+    for (let i = 0; i < 14; i++) {
+      const x = -24 + r() * 50, z = -26 + r() * 48, k = 2 + r() * 3.5;
+      if ((x > -11 && x < 12 && z > -8 && z < 7) || (x > -2 && x < 6 && z < -6 && z > -30) || (x > -15 && x < -5 && z > -15 && z < -6)) continue;
+      const geo = new THREE.CircleGeometry(1, 20); geo.rotateX(-Math.PI / 2); geo.scale(k, 1, k * (0.5 + r() * 0.6)); geo.rotateY(r() * 3); geo.translate(x, -0.016, z); worldUV(geo);
+      const m = new THREE.Mesh(geo, M.grassDry); m.receiveShadow = true; yard.add(m);
+    }
+  }
+  // the neighbours' lights, far off across the fields: pinpricks that the fog cannot take, only at night (main.js: farLights.visible)
+  const farLights = new THREE.Group(); farLights.visible = false; scene.add(farLights);
+  {
+    const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(255,225,170,1)'); gr.addColorStop(0.3, 'rgba(255,210,140,0.5)'); gr.addColorStop(1, 'rgba(255,190,100,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    for (const [x, y, z, s] of [[160, 3.2, -118, 2.2], [185, 2.6, -70, 1.6], [-175, 3.0, -100, 2.0], [-150, 9.5, -140, 1.4], [120, 2.4, -190, 1.2]]) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, color: s > 1.5 ? 0xffd9a0 : 0xffc880, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.8 })); sp.scale.set(s, s, 1); sp.position.set(x, y, z); farLights.add(sp);
+    }
+  }
+
   // barn + silo
   box(-30, -18, 0, 6, -38, -26, M.barn, { parent: yard });
   {
@@ -1430,7 +1676,7 @@ export function buildWorld(scene) {
   // trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5.5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad);   // not on the house, porch path, truck or garage
+    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < 10.5 + pad && z > -6.5 - pad && z < 5.5 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -25.6 - pad && z > -38.5 + pad);   // not on the house, porch path, truck, garage, or the road and its ditch
     const trees = [[-14, 7], [-19, -4], [-18, -19], [29, 9], [33, -6], [27, -24], [-12, -22], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2], [6, -8]];   // the last is the cherry tree by the front
     const tm = trees.map(([x, z]) => { const k = 1.5 + r() * 1.1; q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k, k)); });
     const near = tm.filter((m) => Math.hypot(m.elements[12], m.elements[14]) < 32);   // only the trees by the house cast shadows (the rest are too far to matter)
@@ -1448,7 +1694,7 @@ export function buildWorld(scene) {
       for (const list of cells.values()) scatter(yard, name, list, { cast: false });
     };
     grass('grass2', 1500, 5, 36, 1.0, 2.0); grass('grass1', 260, 6, 32, 0.8, 1.4);
-    const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [6, -33, 1.6], [-6, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
+    const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [14, -23.5, 1.6], [-6, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
     scatter(yard, 'rock1', rocks);
     const small = []; for (let i = 0; i < 40; i++) { const x = -20 + r() * 60, z = -35 + r() * 50; if (!ok(x, z, 2)) continue; q.setFromAxisAngle(up, r() * 6.28); const k = 1 + r() * 2.5; small.push(m4.clone().compose(new THREE.Vector3(x, -0.03, z), q, sc.set(k, k, k))); }
     scatter(yard, 'rock2', small);
@@ -1522,5 +1768,6 @@ export function buildWorld(scene) {
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
     groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry, office, spare,
+    streetLight, puddles, wetMats, farLights, clock,
   };
 }

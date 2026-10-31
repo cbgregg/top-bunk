@@ -22,7 +22,7 @@ export class WindowFace {
     // past the bedroom end window, then along the end wall and your side window, round the back corner and along the back wall
     // (past your back window, behind the top bunk), and on past the bathroom and kitchen
     this.path = new THREE.CatmullRomCurve3([new V(9.3, 1.8, -4.8), new V(9.3, 1.8, -3.0), new V(9.3, 1.8, 0.4), new V(9.2, 1.8, 2.5), new V(8.6, 1.8, 4.6), new V(7.0, 1.8, 5.0), new V(5.0, 1.8, 5.1), new V(2.0, 1.8, 5.1), new V(-1.5, 1.8, 5.1), new V(-5.0, 1.8, 5.1), new V(-9.4, 1.8, 3.0)]);
-    this.carPath = new THREE.LineCurve3(new V(40, 0.8, -30), new V(-40, 0.8, -30));   // along the road in front of the house
+    this.carPath = new THREE.LineCurve3(new V(40, 0.75, -32), new V(-40, 0.75, -32));   // the far lane of the road out front (traffic.js drives the car itself)
     this.look = new V(6.6, 1.6, 1.5);
   }
   face() { this.t = 0; this.root.visible = true; }

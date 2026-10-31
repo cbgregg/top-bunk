@@ -12,6 +12,9 @@ import { input, label as L, initInput, controlsTable } from './input.js';
 import { createNights } from './nights.js';
 import { newSeed } from './rng.js';
 import { createCar } from './cars.js';
+import { createTraffic } from './traffic.js';
+import { createWeather } from './weather.js';
+import { weatherFor } from './director.js';
 import { createVigil } from './vigil.js';
 import { settings, flicker } from './settings.js';
 import { menu } from './menu.js';
@@ -62,6 +65,8 @@ const car = createCar(scene);
 const sfx = new Sound();
 for (const b of ['master', 'music', 'sfx', 'voice']) { sfx.setVolume(b, settings.get(b)); settings.on(b, (v) => sfx.setVolume(b, v)); }
 const WF = new WindowFace(scene, W.faceLight, W.carLight);
+const traffic = createTraffic(scene, sfx);
+const weather = createWeather(scene, camera, W, sfx);
 const mom = makePerson({ model: 'mom', height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
 const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
 mom.group.position.set(0.6, 0, 1.6); dad.group.position.set(4.3, 0, -13.4);   // where the day starts them
@@ -85,10 +90,10 @@ addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !e.repeat) toggleL
 const EYE = 1.32, R = 0.28;
 const BUNK_SEAT = new V3(6.03, 2.24, 3.02);
 const BUNK_LIE = new V3(6.13, 1.9, 3.02);
-const LADDER_MID = new V3(7.48, 1.55, 3.02);
-const LADDER_FLOOR = new V3(7.68, 0, 3.02);
+const LADDER_MID = new V3(6.95, 1.55, 2.5);   // the ladder hangs on the room side of the bunk at its foot
+const LADDER_FLOOR = new V3(6.95, 0, 2.2);
 const HIDE_YAW = 0;                         // lying on the top bunk you face the room (toward the front of the house, -z)
-const LADDER_YAW = Math.PI / 2;             // on the ladder you face the bunk (west)
+const LADDER_YAW = Math.PI;                 // on the ladder you face the bunk (the back wall, +z)
 
 // ---------- helpers ----------
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
@@ -188,7 +193,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // two of the director's night events (director.js): a car goes by out front and its light slides through the windows, and something huge
 // and pale drifts past them
-function carPass() { WF.carPass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); }
+function carPass() { WF.carPass(); traffic.pass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); }
 function faceAtWindow() {
   WF.face(); sfx.moving('sfx/face_wail', { gain: 0.8, from: 0.6, to: -0.8, dur: 13 });
 }
@@ -207,7 +212,7 @@ function nlMult(m, flick = true) {
 // Mom and Dad sleep in their bed at night (flat on their backs: the standing model laid down); they are awake and upright otherwise.
 function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
-    p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
+    p.sleeping = on; p.busy = on || p.busy && false; p.pose = null; p.setNight(on);
     // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
     if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, spot.yaw ?? Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
     else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
@@ -240,6 +245,10 @@ function setPhase(p, silent = false) {
   for (const n of W.nightLights) n.light.visible = night;
   W.faceLight.visible = W.carLight.visible = night;
   W.porchLight.intensity = p === 'title' ? 7 : 0; W.porchBulb.material.emissiveIntensity = p === 'title' ? 4 : 0;
+  W.streetLight.set(night && !F.blackout); W.farLights.visible = night;
+  // the weather of the night from the seed; the morning after a wet night the ground is still dark; the title and the day are clear
+  const wx = p === 'night' ? weatherFor(RUN.seed, F.night) : morn && weatherFor(RUN.seed, F.night) !== 'clear' ? 'wet' : 'clear';
+  weather.set(wx); if (silent || p !== 'night') weather.jump();
   W.bathSpot.intensity = 0;
   W.frontDoor.setOpen(day);
   W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
@@ -265,7 +274,7 @@ W.pickups.forEach((b) => addI({ obj: b, r: 2.2, label: 'Pick up the box', when: 
 addI({ obj: W.drawingMesh, r: 2.3, label: 'Look at the drawing', when: () => F.phase !== 'morning' && roomAt(P.pos.x, P.pos.z) === 'hall', act: lookDrawing });
 addI({ obj: mom.head, r: 2.6, label: 'Talk to Mom', when: () => F.phase === 'day' && mom.group.visible, act: talkMom });
 addI({ obj: dad.head, r: 2.6, label: 'Talk to Dad', when: () => F.phase === 'day' && dad.group.visible, act: talkDad });
-addI({ p: new V3(7.33, 1.3, 3.02), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
+addI({ p: new V3(6.95, 1.3, 2.45), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
 for (const d of Object.values(W.doors)) {   // the interior doors
   addI({ p: d.mid, r: 1.55, label: () => (d.name === 'parents' && F.phase === 'night' && !d.target ? 'Try the handle' : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (d.name === 'parents' && F.phase === 'night' && !d.target ? lockedDoor(d) : toggleDoor(d)) });
 }
@@ -389,7 +398,7 @@ function speak(id, { muffle = false, hold = 0.45 } = {}) {
 }
 const say = async (id, o) => { await wait(speak(id, o)); };
 function talkMom() {
-  if (!F.momReady) { talkTo(mom, 'mom/boxes_first'); return; }
+  if (!F.momReady) { talkTo(mom, F.askedMom ? 'mom/boxes_again' : 'mom/boxes_first'); F.askedMom = true; return; }
   if (!F.talkedMom) F.talkedMom = true;
 }
 const dadLines = ['dad/line_1', 'dad/line_2', 'dad/line_3'];
@@ -895,7 +904,7 @@ async function dayScript() {
   F.cutscene = true; P.vel.set(0, 0, 0);
   faceParent(mom);
   UI.objective(null);
-  await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('mom/teeth');
+  await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('dad/leftovers'); await say('mom/teeth');
   UI.fade(1, 2.5); await wait(3);
   F.birds = false; F.cutscene = false; endChores();
   RUN.dayDone = true; saveRun();
@@ -1307,6 +1316,8 @@ function update(dt) {
   W.tick(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt);
   if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
   WF.update(dt); dust.update(dt);
+  { const room = roomAt(P.pos.x, P.pos.z, P.pos.y); weather.update(dt, room !== 'out' && room !== 'stoop', F.phase === 'night' || F.phase === 'title'); }
+  traffic.update(dt, car.group.visible ? 'off' : F.phase); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, sfx);
   E.update(dt, gfx.quality);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
   achievements.tick();
@@ -1325,6 +1336,7 @@ function loop(now) {
     camera.position.set(-6 + Math.sin(titleT * 0.05) * 3, 2.0 + Math.sin(titleT * 0.3) * 0.05, -22 + Math.cos(titleT * 0.05) * 2);
     camera.lookAt(1, 1.6, -4);
     E.update(dt, gfx.quality);
+    weather.update(dt, false, true); traffic.update(dt, 'title'); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, null);
   }
   // the shadow maps are re-rendered only when something can have changed: the sun and moon every third frame (the people move slowly), the
   // bathroom spot only while it is lit, the headlights only while the car passes (see windowface.js)
@@ -1337,7 +1349,7 @@ function loop(now) {
 // the power is out (the vigil): every light in the house goes, and the fog takes the rest
 function powerOut(on) {
   F.blackout = on; nlMult(on ? 0 : 1, false);
-  if (on) { W.hemi.intensity = 0.02; W.sun.intensity = 0; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; scene.fog = new THREE.FogExp2(0x010206, 0.09); }
+  if (on) { W.hemi.intensity = 0.02; W.sun.intensity = 0; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; W.streetLight.set(false); W.farLights.visible = false; scene.fog = new THREE.FogExp2(0x010206, 0.09); }
   else setPhase('night');
 }
 const vigil = createVigil({
@@ -1384,4 +1396,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

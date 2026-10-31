@@ -101,6 +101,8 @@ export function createNights(env) {
     },
     tvBlip() { W.tvFx.set(true); sfx.staticBurst(D.pan(2.9, -3.2), 2.2); later(2.2, () => { if (!tvHeld) W.tvFx.set(false); }); },
     clockGlitch() { F.clockGlitch = env.time() + 7; },
+    // the grandfather clock struck, heard from wherever you are
+    chime(n) { const d = Math.hypot(P.pos.x - W.clock.pos.x, P.pos.z - W.clock.pos.z); sfx.chime(n, 0.32 / (1 + d * d * 0.09), D.pan(W.clock.pos.x, W.clock.pos.z)); },
     drawingChange() { F.drawingLevel = (F.drawingLevel || 0) + 1; sfx.whisper(D.pan(5.6, -0.3), 0.1); },
     // Mom and Dad awake behind their door, in their own voices
     mutter() {
@@ -170,10 +172,13 @@ export function createNights(env) {
     if (F.clockGlitch && env.time() < F.clockGlitch) return pick(() => Math.random(), ['3:33 AM', '3:33 AM', '13:00', '--:--', '6:66 AM']);
     const t = Math.floor(m) % 1440, h = Math.floor(t / 60), mm = t % 60; return `${h % 12 === 0 ? 12 : h % 12}:${String(mm).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
   };
-  let lastMin = -1;
+  let lastMin = -1, lastHr = -1;
   function tick(dt) {   // called every frame by the game while the night is live
     if (!(F.script && F.clock >= DAWN - 1) && !(F.holdDawn && F.clock >= DAWN - 3)) F.clock += dt * (F.clockRateNow || env.clockRate) * (window.__clockMul || 1);   // a scene that is playing holds the dawn back
     const m = Math.floor(F.clock); if (m !== lastMin || F.clockGlitch) { lastMin = m; UI.clock(clockText(F.clock), `night ${F.night}`); }
+    // the grandfather clock: it strikes the hour, and it stops dead while the thing hunts you
+    const hr = Math.floor(F.clock / 60); if (hr !== lastHr) { if (lastHr >= 0 && F.live && !W.clock.silent) D.chime(hr % 12 || 12); lastHr = hr; }
+    W.clock.silent = hunter.state === 'hunt';
     director.update(); hunter.update(dt); proofTick();
     // the breath meter shows whenever something is near enough to hear you
     if (F.live) F.breathUI = F.breathUI || (P.mode === 'hide' && hunter.busy && hunter.gap() < 14 && hunter.state !== 'leave');
@@ -311,7 +316,7 @@ export function createNights(env) {
     env.resetNight(); env.setPhase('night'); env.sfx.dread(Math.min(0.25 + n * 0.07, 0.8), 4);
     const plan = planFor(n); if (env.HPARAM && env.HPARAM.type) plan.type = env.HPARAM.type;   // #type=ring forces a night type for testing
     rnd = plan.r; F.plan = plan; F.typeName = TYPE_NAMES[plan.type];
-    F.clock = plan.clock0; lastMin = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
+    F.clock = plan.clock0; lastMin = -1; lastHr = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
     F.nmDone = false; F.objOk = plan.type === 'poltergeist' || plan.type === 'finale'; hunter.reset(); hunter.setLevel(n + (env.RUN.objDone[n - 1] === false ? 1 : 0)); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
     env.toBunk();
     const dialClock = clockText(F.clock);
