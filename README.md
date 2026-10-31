@@ -53,7 +53,8 @@ Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml
 | `js/director.js` | Which night is which for a seed, and the small events that fill a night |
 | `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, and the graph of the house it walks on |
 | `js/entity.js`, `js/creature.js`, `js/mathx.js` | The thing itself: model, animation, head and eye tracking; its face, built in code; small shared math helpers |
-| `js/world.js` | The early-2000s farmhouse (brown carpet, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights |
+| `js/world.js` | The early-2000s farmhouse (brown carpet, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights, the road out front and the street light at the end of the drive |
+| `js/weather.js`, `js/traffic.js` | Rain, wet ground and lightning on the nights the seed makes wet; the cars that pass on the road, and the one the car-pass scare sends by |
 | `js/people.js`, `js/rig.js` | Mom and Dad, and the skeleton and clips their models share |
 | `js/vigil.js`, `js/nightmares.js`, `js/swim.js`, `js/cars.js`, `js/windowface.js` | The vigil night; the four nightmares and the dream swim they share with it; the car for the dream drive and the drive away; headlights and the face at the window |
 | `js/gfx.js`, `js/pbr.js`, `js/props.js`, `js/textures.js`, `js/dust.js` | Post-processing and quality presets, PBR materials, furniture models, canvas textures (the crayon drawing, the grin, the floral fabric), dust in the air |
@@ -103,13 +104,14 @@ The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.g
 
 ## Graphics
 
-three.js with a post-processing chain: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). Options → Graphics picks Auto, Ultra, High, Medium or Low. Auto starts on High (Medium on phones), lowers the render resolution when frames get slow and raises it again when there is headroom, and steps down a preset only if that is not enough.
+three.js with a post-processing chain: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). Options → Graphics picks Auto, Ultra, High, Medium or Low. High renders at 1.25x the screen's pixels with 4x MSAA, Ultra at 2x (4K on a 1080p monitor, scaled down). Auto starts on High (Medium on phones), lowers the render resolution when frames get slow and raises it again when there is headroom, steps down a preset only if that is not enough, and steps up to Ultra on a card with plenty of headroom.
 
 | Part | Source |
 |---|---|
 | Surfaces: floors, walls, siding, roof, grass, tile | PBR materials from Poly Haven and ambientCG (CC0), packed by `tools/assets/fetch_pbr.py` into `assets/pbr/` |
 | Sky and ambient light | Poly Haven HDRIs (CC0), `tools/assets/fetch_sky.py` into `assets/sky/` |
 | Furniture, plants, a tree, rocks, grass | Poly Haven models (CC0), compressed by `tools/assets/fetch_models.py` into `assets/props/` |
+| Fixtures, appliances, the bunk, the cars on the road, the mailbox and the cans | Sketchfab models (CC BY 4.0, each listed in `CREDITS.md`), fetched and compressed by `tools/assets/fetch_sketchfab.py` into `assets/props/` |
 | Photographs in the frames | Public domain, from Wikimedia Commons, `tools/assets/fetch_photos.py` into `assets/photos/` |
 | Kitchen, bathroom, windows, house | Built in code (`js/world.js`) |
 

@@ -40,7 +40,8 @@ node trailer/render.js --preset steam --music path/to/licensed.wav   # a license
 node trailer/render.js --serve                              # serve the repo; open http://127.0.0.1:8700/index.html?trailer=1 for a live play-through
 ```
 
-Other flags: `--quality high|medium|low`, `--res 0.5..1` (render scale), `--shadow 1024`, `--every N` / `--range A-B` (partial renders,
+Other flags: `--quality ultra|high|medium|low`, `--res 0.5..1` (render scale), `--ss N` (pixels drawn per output pixel each way; 2 by
+default for the full-size presets on a GPU, so the 1080p cut is drawn at 4K and scaled down), `--shadow 1024`, `--every N` / `--range A-B` (partial renders,
 frames kept in the `--scratch` folder), `--resume` (skip frames already on disk), `--no-warp`, `--no-audio`, `--letterbox` (2.39:1 bars,
 landscape only), `--keep-frames`, `--frames jpg` (smaller frame files), `--scratch DIR`, `--out DIR`, `--port N`, and `--shutter N`
 (motion blur: N exposures per frame over a thirtieth of a second, averaged under the overlays; by default each shot sets its own, and
