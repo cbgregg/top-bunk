@@ -26,10 +26,14 @@
 "vo/dad/mutter_b",
 "vo/dad/n2_a",
 "vo/dad/n3_a",
+"vo/dad/phone_a",
 "vo/dad/t_blackout",
 "vo/dad/t_quiet",
 "vo/dad/t_ring",
 "vo/dad/t_static",
+"vo/dad/talk_a",
+"vo/dad/talk_b",
+"vo/dad/talk_c",
 "vo/dad/welcome",
 "vo/gramps/v_a",
 "vo/gramps/v_b",
@@ -72,6 +76,9 @@
 "vo/mom/t_parents",
 "vo/mom/t_teddy",
 "vo/mom/t_thirst",
+"vo/mom/talk_a",
+"vo/mom/talk_b",
+"vo/mom/talk_c",
 "vo/mom/teeth"
 ]
 }

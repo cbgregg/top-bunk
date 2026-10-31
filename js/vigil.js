@@ -126,7 +126,6 @@ export function createVigil(env) {
     const r = setup();
     on = true; t = 0; r.g.visible = true; r.set.visible = true; r.spot.intensity = 0; turnK = 0; setFace('man');
     env.powerOut(true); F.noFlash = true; sfx.drone(0, 3); sfx.tension(0, 3);
-    UI.subtitle('<i>The power went out. The fridge stopped in the middle of a hum. Nobody says a word.</i>', 4.5);
     r.spot.intensity = 26;
     await env.wait(4); if (!on) return;
     await until(() => gpState !== 'loading' && P.pos.x < 4.6 && Math.hypot(P.pos.x - SEAT.x, P.pos.z - SEAT.z) < TRIGGER && P.mode === 'walk' && !F.cutscene);
@@ -172,7 +171,7 @@ export function createVigil(env) {
       P.roll = Math.sin(k * 15) * 0.5 * (1 - k * 0.5); P.pitch = -1.15 + Math.sin(k * 11) * 0.3; P.yaw = yaw0 + Math.sin(k * 9) * 0.12;
       env.setFovOff(-34 + Math.sin(k * 13) * 34);
       const i = Math.min(DREAM.length - 1, Math.floor(k * DREAM.length));
-      if (i !== shown) { shown = i; UI.subtitle(DREAM[i], 1.8); sfx.whisper(Math.sin(i * 2.1), 0.14 + i * 0.01); }
+      if (i !== shown) { shown = i; sfx.whisper(Math.sin(i * 2.1), 0.14 + i * 0.01); }
       if (i === 3) sfx.pianoSlam();
     }, env.ease.lin);
     if (!on) return;
@@ -182,7 +181,6 @@ export function createVigil(env) {
     UI.fade(1, 0.6); await env.wait(0.8); if (!on) return;
     env.toBunk(); P.roll = 0; P.pitch = -0.18; r.set.visible = false; r.candleLight.intensity = 0; r.flame.visible = false; r.spot.intensity = 0;
     UI.fade(0, 2.5); await env.wait(2.2);
-    UI.subtitle('<i>You wake up in your bunk. Your heart is going like a drum. The house is still dark.</i>', 5);
     F.cutscene = false; F.script = false;
   }
 

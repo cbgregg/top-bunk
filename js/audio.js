@@ -88,10 +88,11 @@ export class Sound {
     for (const [f, ty] of [[46.25, 'sawtooth'], [46.9, 'sawtooth'], [69.3, 'sine'], [92.5, 'triangle']]) { const o = ctx.createOscillator(); o.type = ty; o.frequency.value = f; o.connect(df); o.start(); }
     const dl = ctx.createOscillator(); dl.frequency.value = 0.05; const dg = ctx.createGain(); dg.gain.value = 90; dl.connect(dg).connect(df.frequency); dl.start();
     df.connect(this.droneGain).connect(this.buses.sfx);
-    // high tension whine
+    // tension: a low, slow swell (no high tones: a pair of sines close together beats like a ringing in the ears)
     this.tensionGain = ctx.createGain(); this.tensionGain.gain.value = 0;
-    const tw = ctx.createOscillator(); tw.type = 'sine'; tw.frequency.value = 1760; const tw2 = ctx.createOscillator(); tw2.type = 'sine'; tw2.frequency.value = 1767;
-    tw.connect(this.tensionGain); tw2.connect(this.tensionGain); tw.start(); tw2.start();
+    const tw = ctx.createOscillator(); tw.type = 'sine'; tw.frequency.value = 58; const tw2 = ctx.createOscillator(); tw2.type = 'triangle'; tw2.frequency.value = 87.3;
+    const tl = ctx.createBiquadFilter(); tl.type = 'lowpass'; tl.frequency.value = 220;
+    tw.connect(tl); tw2.connect(tl); tl.connect(this.tensionGain); tw.start(); tw2.start();
     this.tensionGain.connect(this.buses.sfx);
     // fridge/house hum
     this.humGain = ctx.createGain(); this.humGain.gain.value = 0;
@@ -101,7 +102,7 @@ export class Sound {
   set(param, v, time = 1.5) { if (!this.ctx) return; const p = param; p.cancelScheduledValues(this.now); p.setTargetAtTime(v, this.now, time / 3); }
   wind(v, t) { this.ctx && this.set(this.windGain.gain, v, t); }
   drone(v, t) { if (!this.ctx) return; this.set(this.droneGain.gain, v, t); this.bed('sfx/night_brown_noise', v * 40, t); }
-  tension(v, t) { if (!this.ctx) return; this.set(this.tensionGain.gain, v, t); this.bed('sfx/waterphone', v * 40, t); }
+  tension(v, t) { if (!this.ctx) return; this.set(this.tensionGain.gain, v * 2.2, t); }
   hum(v, t) { this.ctx && this.set(this.humGain.gain, v, t); }
 
   // ---- recorded files ----
@@ -240,12 +241,15 @@ export class Sound {
     this.noiseHit({ dur: 0.5, type: 'highpass', f: 3000, gain: 0.25 * gain, pan, wet: 0.3 });
   }
   // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it
-  pianoSlam() {
+  pianoSlam(k = 1) {
     if (!this.ctx) return;
-    for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16, attack: 0.002, wet: 0.45 });
-    for (const f of [40, 46]) this.tone({ type: 'sawtooth', f, f2: f * 0.5, dur: 1.4, gain: 0.22, wet: 0.3 });
-    this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1, attack: 0.001, wet: 0.35 });
+    for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16 * k, attack: 0.002, wet: 0.45 });
+    for (const f of [40, 46]) this.tone({ type: 'sawtooth', f, f2: f * 0.5, dur: 1.4, gain: 0.22 * k, wet: 0.3 });
+    this.tone({ type: 'sine', f: 36.7, f2: 30, dur: 2.2, gain: 0.5 * k, attack: 0.002, wet: 0.2 });   // the low note under the cluster
+    this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1 * k, attack: 0.001, wet: 0.35 });
   }
+  // the thing is suddenly there: the low piano note and the strings under it
+  appear(k = 1) { this.pianoSlam(1.5 * k); this.stab(); }
   // ---- the horror layer: screaming violins (Insidious), a low dread bed, and the small paranormal knocks ----
   // violins(v): 0 silences them, 1 is the full storm. A looping recording, or a synthesized stand-in: detuned sawtooth "violins" with frantic vibrato.
   violins(v, t = 1.5) {
@@ -298,7 +302,7 @@ export class Sound {
   // a person muttering: voiced syllables through two formants. Stands in for the recorded lines until a line has its own file; returns the mouth envelope.
   mumble(voice = 'mom', dur = 2, { muffle = false, gain = 0.55, pan = 0 } = {}) {
     if (!this.ctx) return null;
-    const ctx = this.ctx, t0 = this.now, f0 = voice === 'dad' ? 104 : voice === 'you' ? 250 : 198, n = Math.max(2, Math.round(dur * 4.4));
+    const ctx = this.ctx, t0 = this.now, f0 = voice === 'lurker' ? 74 : voice === 'dad' ? 104 : voice === 'you' ? 250 : 198, n = Math.max(2, Math.round(dur * 4.4));
     const o = ctx.createOscillator(); o.type = 'sawtooth';
     const out = ctx.createGain(); out.gain.value = 0;
     const mk = (f, q) => { const b = ctx.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q; return b; };
@@ -317,6 +321,8 @@ export class Sound {
     o.start(t0); o.stop(t0 + dur + 0.1);
     return env;
   }
+  // a voice just out of sight: very quiet, low and unintelligible; near01 is how close it is (0 far, 1 beside you)
+  lurk(pan = 0, near01 = 0.3, dur = 1.6) { return this.mumble('lurker', dur, { muffle: true, gain: 0.05 + 0.2 * near01 * near01, pan }); }
   faucet(dur = 3, pan = 0) {
     if (!this.ctx) return; const t = this.now;
     this.noiseHit({ dur, type: 'bandpass', f: 2400, q: 0.7, gain: 0.28, pan, wet: 0.2, attack: 0.3 });

@@ -405,5 +405,40 @@
   "voice": "gramps",
   "say": "[low, wet, not quite his voice] Look at me, Bud. Look at me. Don't you know who I am?",
   "html": "<b>Grandpa:</b> Look at me, Bud. Look at me. Don't you know who I am?"
+ },
+ "dad/talk_a": {
+  "voice": "dad",
+  "say": "[muffled through a wall, low and tired] It was the pipes again. I checked. There's nothing in the house.",
+  "html": "<b>Dad:</b> <i>(through the wall)</i> It was the pipes again. I checked. There's nothing in the house."
+ },
+ "mom/talk_a": {
+  "voice": "mom",
+  "say": "[muffled through a wall, whispering] Then why is it standing outside the door every night?",
+  "html": "<b>Mom:</b> <i>(through the wall)</i> Then why is it standing outside the door every night?"
+ },
+ "mom/talk_b": {
+  "voice": "mom",
+  "say": "[muffled through a wall, a tight whisper] He keeps drawing it. Did you see what he drew?",
+  "html": "<b>Mom:</b> <i>(through the wall)</i> He keeps drawing it. Did you see what he drew?"
+ },
+ "dad/talk_b": {
+  "voice": "dad",
+  "say": "[muffled through a wall, slow, worried] Kids draw things. Come back to bed. Please.",
+  "html": "<b>Dad:</b> <i>(through the wall)</i> Kids draw things. Come back to bed. Please."
+ },
+ "dad/talk_c": {
+  "voice": "dad",
+  "say": "[muffled through a wall, hushed] Don't look at the window. Just keep your eyes shut.",
+  "html": "<b>Dad:</b> <i>(through the wall)</i> Don't look at the window. Just keep your eyes shut."
+ },
+ "mom/talk_c": {
+  "voice": "mom",
+  "say": "[muffled through a wall, barely a breath] Somebody just walked past our door.",
+  "html": "<b>Mom:</b> <i>(through the wall)</i> Somebody just walked past our door."
+ },
+ "dad/phone_a": {
+  "voice": "dad",
+  "say": "[muffled, low, flat, like he is talking on the phone] Yeah. He's asleep. They're all asleep. Come in through the back.",
+  "html": "<b>Dad:</b> <i>(through the wall)</i> Yeah. He's asleep. They're all asleep. Come in through the back."
  }
 }
