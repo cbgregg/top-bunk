@@ -1,62 +1,62 @@
 {
  "dad/welcome": {
   "voice": "dad",
-  "say": "There he is. Three boxes in the truck with your name on them, big marker, can't miss them. End of the hall, bud. Go.",
+  "say": "There he is. Okay... three boxes in the truck, they've got your name on 'em. Big marker, you can't miss 'em. End of the hall, bud... go.",
   "html": "<b>Dad:</b> There he is. Three boxes in the truck with your name on 'em, big marker, can't miss 'em. End of the hall, bud. Go."
  },
  "dad/line_1": {
   "voice": "dad",
-  "say": "Hey. If you find the one with the coffee maker in it, you're officially my favorite kid.",
+  "say": "Hey. Uh... if you find the one with the coffee maker in it? You're officially my favorite kid.",
   "html": "<b>Dad:</b> Hey. If you find the one with the coffee maker in it, you're officially my favorite kid."
  },
  "dad/line_2": {
   "voice": "dad",
-  "say": "Truck's got to be back at the rental place by six or they charge us a whole other day. So, you know. Light a fire under it.",
+  "say": "Truck's gotta be back at the rental place by six, or they, uh... they charge us a whole other day. So, you know. Light a fire under it.",
   "html": "<b>Dad:</b> Truck's gotta be back at the rental place by six or they charge us a whole other day. So, you know. Light a fire under it."
  },
  "dad/line_3": {
   "voice": "dad",
-  "say": "Guy next door's got a dog the size of a pony. Don't go petting it till we've met it. Oh, and the bunk's already up in your room. Came with the place.",
+  "say": "Guy next door's got a dog the size of a pony. Don't go petting it till we've met it, okay? Oh... and the bunk's already up in your room. Came with the place.",
   "html": "<b>Dad:</b> Guy next door's got a dog the size of a pony. Don't go petting it till we've met it. Oh, and the bunk's already up in your room. Came with the place."
  },
  "dad/mom_looking": {
   "voice": "dad",
-  "say": "That's the last of yours. Go find your mom, she's in the kitchen swearing at boxes. Don't tell her I said swearing.",
+  "say": "That's the last of yours. Go find your mom... she's in the kitchen swearing at boxes. Don't tell her I said swearing.",
   "html": "<b>Dad:</b> That's the last of yours. Go find your mom, she's in the kitchen swearing at boxes. Don't tell her I said swearing."
  },
  "mom/boxes_first": {
   "voice": "mom",
-  "say": "Not yet, sweetheart, I'm hunting for the kettle. Boxes first, and then you can show me your room.",
+  "say": "Not yet, sweetheart... I'm hunting for the kettle. Boxes first, okay? Then you can show me your room.",
   "html": "<b>Mom:</b> Not yet, sweetheart, I'm hunting for the kettle. Boxes first, and then you can show me your room."
  },
  "mom/boxes_again": {
   "voice": "mom",
-  "say": "I can hear you not carrying boxes. Go on. Three. Then you've got me all evening.",
+  "say": "Hm. I can hear you not carrying boxes. Go on... three. Then you've got me all evening.",
   "html": "<b>Mom:</b> I can hear you not carrying boxes. Go on. Three. Then you've got me all evening."
  },
  "mom/helper": {
   "voice": "mom",
-  "say": "There's my helper. All three? Look at you. Okay. We'll find your sheets tomorrow, tonight it's the sleeping bag.",
+  "say": "There's my helper. All three? Look at you... okay. Um, we'll find your sheets tomorrow. Tonight it's the sleeping bag.",
   "html": "<b>Mom:</b> There's my helper. All three? Look at you. Okay. We'll find your sheets tomorrow, tonight it's the sleeping bag."
  },
  "mom/landlord": {
   "voice": "mom",
-  "say": "You know what the landlord told me? Don't worry about the noises, the house just talks. Like that's a selling point.",
+  "say": "You know what the landlord told me? Oh, don't worry about the noises... the house just talks. Like that's a selling point.",
   "html": "<b>Mom:</b> You know what the landlord told me? \"Don't worry about the noises, the house just talks.\" Like that's a selling point."
  },
  "dad/cheap": {
   "voice": "dad",
-  "say": "[quiet] Eleven hundred a month, it can sing for all I care. We'll make it nice. Give it a week.",
+  "say": "[quiet] ...Eleven hundred a month. It can sing, for all I care. ... We'll make it nice. Give it a week.",
   "html": "<b>Dad:</b> ...Eleven hundred a month, it can sing for all I care. We'll make it nice. Give it a week."
  },
  "dad/leftovers": {
   "voice": "dad",
-  "say": "People before us left half their stuff in the back room. A crib, a lamp, a whole box of Christmas lights. Never came back for any of it.",
+  "say": "People before us left half their stuff in the back room. A crib... a lamp. Whole box of Christmas lights. Never came back for any of it.",
   "html": "<b>Dad:</b> People before us left half their stuff in the back room. A crib, a lamp, a whole box of Christmas lights. Never came back for any of it."
  },
  "mom/teeth": {
   "voice": "mom",
-  "say": "Teeth, then bed, mister. The school bus is Monday at ten past seven and we are not starting this town late. Come here. Love you. Go.",
+  "say": "Okay. Teeth, then bed, mister. School bus is Monday, ten past seven... and we are not starting this town late. ... C'mere. Love you. Go.",
   "html": "<b>Mom:</b> Teeth, then bed, mister. The school bus is Monday at ten past seven and we are not starting this town late. Come here. Love you. Go."
  },
  "you/m1_a": {
@@ -65,7 +65,7 @@
  },
  "mom/m1_a": {
   "voice": "mom",
-  "say": "Oh, honey. First night in a new house, everything creaks, and it all looks wrong in the dark. Nobody was in the hall. I promise.",
+  "say": "Oh, honey... first night in a new house. Everything creaks, and it all looks wrong in the dark. Nobody was in the hall. I promise.",
   "html": "<b>Mom:</b> Oh, honey. First night in a new house, everything creaks, and it all looks wrong in the dark. Nobody was in the hall. I promise."
  },
  "you/m1_b": {
@@ -74,12 +74,12 @@
  },
  "dad/m1_a": {
   "voice": "dad",
-  "say": "This thing has two buttons and neither one of them makes coffee. Bud, it was the furnace kicking on. Scared me too. Eat up.",
+  "say": "This thing's got two buttons and, uh... neither one of 'em makes coffee. Bud. It was the furnace kicking on. Scared me too. Eat up.",
   "html": "<b>Dad:</b> This thing has two buttons and neither one of 'em makes coffee. Bud, it was the furnace kicking on. Scared me too. Eat up."
  },
  "mom/m1_b": {
   "voice": "mom",
-  "say": "[quiet] Tell you what. Tonight you leave your door open and the hall light stays on. Deal? Now eat, I found the good cereal.",
+  "say": "[quiet] Tell you what. Tonight you leave your door open, and the hall light stays on. Deal? ... Now eat. I found the good cereal.",
   "html": "<b>Mom:</b> Tell you what. Tonight you leave your door open and the hall light stays on. Deal? Now eat, I found the good cereal."
  },
  "dad/n2_a": {
