@@ -1,0 +1,6 @@
+# The sound: a tired mainframe singing to itself, a little more unsteady than the default but still on the notes; warm, not bright.
+# Targets the search can use (one per line, named as in tools/sing_measure.js):
+wobbleIndex: 0.8
+meanAbsCents: 12
+legatoGapMs: 25
+centroidHz: 450

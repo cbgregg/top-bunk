@@ -85,6 +85,23 @@
   .preset:hover { color: var(--ink); border-color: var(--dim); }
   .preset.on { color: var(--ink); border-color: var(--ink); }
   .transport { margin-top: 26px; }
+  details.adv { margin-top: 22px; border: 1px solid var(--line); padding: 0 16px 12px; }
+  details.adv summary { font-family: 'Special Elite', monospace; letter-spacing: 4px; color: var(--dim); font-size: 14px; padding: 12px 0; cursor: pointer; list-style: none; }
+  details.adv summary::-webkit-details-marker { display: none; }
+  details.adv summary::before { content: '▸ '; color: var(--faint); }
+  details.adv[open] summary::before { content: '▾ '; }
+  details.adv summary small { font-family: 'Courier Prime', monospace; letter-spacing: 0; color: var(--faint); margin-left: 10px; }
+  .advbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .plist { display: flex; gap: 6px; flex-wrap: wrap; margin-right: auto; }
+  .plist .preset { font-size: 12px; padding: 5px 10px; }
+  .pg h3 { font-family: 'Special Elite', monospace; font-weight: 400; letter-spacing: 3px; font-size: 13px; color: var(--dim); margin: 14px 0 6px; text-transform: uppercase; }
+  .pg .row { display: grid; grid-template-columns: 150px 1fr 76px 22px; gap: 6px 10px; align-items: center; font-size: 13px; }
+  .pg .row label { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pg .row.changed label { color: var(--amber); }
+  .pg .row input[type=number] { width: 76px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 3px 6px; font: 12.5px 'Courier Prime', monospace; }
+  .pg .row .reset { color: var(--faint); cursor: pointer; text-align: center; }
+  .pg .row .reset:hover { color: var(--ink); }
+  .pg .row input[type=range] { height: 18px; }
   canvas.wave { width: 100%; height: 96px; display: block; background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
   .bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
   button { font-size: 15px; letter-spacing: 3px; padding: 11px 22px; color: var(--ink); background: transparent; border: 1px solid rgba(233,226,208,0.5); cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; }
@@ -160,12 +177,23 @@
       <button class="preset" data-preset="clean">CLEAN</button>
     </div>
     <div class="knobs">
-      <label for="slow">tape speed</label><input type="range" id="slow" min="0.8" max="1.1" step="0.005" value="0.97"><span class="v" id="slow_v">0.970</span>
-      <label for="pitch">pitch</label><input type="range" id="pitch" min="-12" max="12" step="1" value="0"><span class="v" id="pitch_v">0 st</span>
-      <label for="wobble">wobble</label><input type="range" id="wobble" min="0" max="1" step="0.01" value="0.6"><span class="v" id="wobble_v">0.60</span>
-      <label for="voice">voice</label><input type="range" id="voice" min="0" max="2" step="0.05" value="1"><span class="v" id="voice_v">1.00</span>
-      <label for="band">band</label><input type="range" id="band" min="0" max="2" step="0.05" value="1"><span class="v" id="band_v">1.00</span>
+      <label for="slow">tape speed</label><input type="range" id="slow" min="0.5" max="1.5" step="0.005" value="0.97"><span class="v" id="slow_v">0.970</span>
+      <label for="pitch">pitch</label><input type="range" id="pitch" min="-24" max="24" step="1" value="0"><span class="v" id="pitch_v">0 st</span>
+      <label for="wobble">wobble</label><input type="range" id="wobble" min="0" max="2" step="0.01" value="0.6"><span class="v" id="wobble_v">0.60</span>
+      <label for="voice">voice</label><input type="range" id="voice" min="0" max="3" step="0.05" value="1"><span class="v" id="voice_v">1.00</span>
+      <label for="band">band</label><input type="range" id="band" min="0" max="3" step="0.05" value="1"><span class="v" id="band_v">1.00</span>
     </div>
+    <details class="adv" id="adv">
+      <summary>ADVANCED <small>every number in the synth</small></summary>
+      <div class="advbar">
+        <span class="plist" id="plist"></span>
+        <button class="small" id="pimport">IMPORT</button><button class="small" id="pexport">EXPORT</button><button class="small" id="pdefaults">DEFAULTS</button>
+        <input type="file" id="pfile" accept=".json" hidden>
+        <span class="status" id="pstatus"></span>
+      </div>
+      <div id="advgroups"></div>
+      <div class="help">A preset is a starting point: it resets everything else. Export writes the keys that differ from the defaults, the shape <code>tools/sing.js --params</code> reads and <code>tools/tune/</code> writes; import takes the same file. Every key is described in <code>tools/voice-params.md</code>.</div>
+    </details>
     <div class="transport">
       <h2>Preview</h2>
       <canvas class="wave" id="wave" width="1200" height="192"></canvas>
@@ -951,14 +979,125 @@ class Biquad {
   hp(f, q = 0.7) { const w = 2 * Math.PI * f / SR, a = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + a; this.b0 = (1 + c) / 2 / a0; this.b1 = -(1 + c) / a0; this.b2 = this.b0; this.a1 = -2 * c / a0; this.a2 = (1 - a) / a0; return this; }
   lp(f, q = 0.7) { const w = 2 * Math.PI * f / SR, a = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + a; this.b0 = (1 - c) / 2 / a0; this.b1 = (1 - c) / a0; this.b2 = this.b0; this.a1 = -2 * c / a0; this.a2 = (1 - a) / a0; return this; }
   bp(f, q = 1) { const w = 2 * Math.PI * f / SR, a = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + a; this.b0 = a / a0; this.b1 = 0; this.b2 = -a / a0; this.a1 = -2 * c / a0; this.a2 = (1 - a) / a0; return this; }
+  // a high shelf: gain in dB above f
+  hs(f, db) { const A = Math.pow(10, db / 40), w = 2 * Math.PI * f / SR, c = Math.cos(w), s = Math.sin(w), b = Math.sqrt(A) * s * Math.SQRT2 / 2 * 2, a0 = (A + 1) - (A - 1) * c + b; this.b0 = A * ((A + 1) + (A - 1) * c + b) / a0; this.b1 = -2 * A * ((A - 1) + (A + 1) * c) / a0; this.b2 = A * ((A + 1) + (A - 1) * c - b) / a0; this.a1 = 2 * ((A - 1) - (A + 1) * c) / a0; this.a2 = ((A + 1) - (A - 1) * c - b) / a0; return this; }
   run(x) { const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2; this.x2 = this.x1; this.x1 = x; this.y2 = this.y1; this.y1 = y; return y; }
 }
 let seed = 1234;
 const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 - 0.5; };
 
+// ---------- the parameters ----------
+// Every number that shapes the sound, with its range. The defaults are the sound the singer always had; the command line's old
+// flags map onto them (--slow tape.speed, --pitch voice.transpose, --wobble voice.wobble, --voice mix.voice, --band mix.band).
+// A stage whose default is off (0) is skipped entirely, so the default render is the same samples as before it existed.
+const PARAM_SPECS = [
+  // voice
+  { key: 'voice.transpose', def: 0, min: -24, max: 24, step: 1, unit: 'st', doc: 'everything moved by this many semitones before singing' },
+  { key: 'voice.flatCents', def: -14, min: -60, max: 30, step: 1, unit: 'cents', doc: 'how flat every note is sung; old vocoders sat a touch under' },
+  { key: 'voice.vibratoRate', def: 5.4, min: 2, max: 9, step: 0.1, unit: 'Hz', doc: 'vibrato speed' },
+  { key: 'voice.vibratoDepth', def: 18, min: 0, max: 80, step: 1, unit: 'cents', doc: 'vibrato depth, before wobble scales it' },
+  { key: 'voice.vibratoOnsetMs', def: 0, min: 0, max: 800, step: 10, unit: 'ms', doc: 'vibrato fades in over this long after a note starts (0: from the start)' },
+  { key: 'voice.wobble', def: 0.5, min: 0, max: 2, step: 0.01, unit: '', doc: 'scales vibrato and drift together: 0 steady, 1 unsteady, 2 falling apart' },
+  { key: 'voice.driftDepth', def: 60, min: 0, max: 200, step: 1, unit: 'cents', doc: 'how far the slow random drift can pull the pitch' },
+  { key: 'voice.driftStep', def: 0.002, min: 0, max: 0.02, step: 0.0005, unit: '', doc: 'the random walk step per sample; bigger drifts faster' },
+  { key: 'voice.driftDecay', def: 0.9995, min: 0.99, max: 0.99999, step: 0.00001, unit: '', doc: 'how the drift forgets: closer to 1 wanders longer' },
+  { key: 'voice.glideMs', def: 70, min: 0, max: 400, step: 5, unit: 'ms', doc: 'portamento into a note from the one before it' },
+  { key: 'voice.scoopCents', def: -40, min: -300, max: 100, step: 5, unit: 'cents', doc: 'where a note after a breath starts, relative to its pitch' },
+  { key: 'voice.attackMs', def: 20, min: 1, max: 300, step: 1, unit: 'ms', doc: 'the vowel comes in over this long' },
+  { key: 'voice.releaseMs', def: 50, min: 1, max: 500, step: 1, unit: 'ms', doc: 'the vowel lets go over this long when the note is not tied on' },
+  { key: 'voice.detached', def: 0, min: 0, max: 1, step: 1, unit: '', doc: '1: every note releases, none slurs into the next' },
+  { key: 'voice.breath', def: 0.08, min: 0, max: 0.6, step: 0.01, unit: '', doc: 'aspiration noise under the vowel: breathiness' },
+  { key: 'voice.formantShift', def: 1, min: 0.6, max: 1.6, step: 0.01, unit: 'x', doc: 'vocal tract length: under 1 is bigger (deeper), over 1 smaller (childlike)' },
+  { key: 'voice.bandwidthScale', def: 1, min: 0.4, max: 3, step: 0.05, unit: 'x', doc: 'formant bandwidths: narrow rings, wide mumbles' },
+  { key: 'voice.brightness', def: 0, min: -12, max: 12, step: 0.5, unit: 'dB', doc: 'a shelf on the voice above 2.5 kHz' },
+  { key: 'voice.consonantLevel', def: 1, min: 0, max: 3, step: 0.05, unit: 'x', doc: 'how loud the consonants are' },
+  { key: 'voice.consonantLength', def: 1, min: 0.3, max: 3, step: 0.05, unit: 'x', doc: 'how long the consonants last' },
+  { key: 'voice.nasal', def: 1, min: 0, max: 3, step: 0.05, unit: 'x', doc: 'the level of m, n and ng' },
+  { key: 'voice.openQuotient', def: 0.4, min: 0.2, max: 0.7, step: 0.01, unit: '', doc: 'the glottal pulse: the opening part of the cycle' },
+  { key: 'voice.closingPhase', def: 0.16, min: 0.05, max: 0.3, step: 0.01, unit: '', doc: 'the glottal pulse: the sharp closing part; shorter buzzes harder' },
+  { key: 'voice.vowelGlideMs', def: 40, min: 0, max: 300, step: 5, unit: 'ms', doc: 'the mouth moves from the last shape to the new vowel over this long' },
+  { key: 'voice.voices', def: 1, min: 1, max: 5, step: 1, unit: '', doc: 'copies of the voice sung together, each a little off (a choir of one)' },
+  { key: 'voice.chorusCents', def: 10, min: 0, max: 60, step: 1, unit: 'cents', doc: 'how far apart the copies sit in pitch' },
+  { key: 'voice.chorusMs', def: 22, min: 0, max: 120, step: 1, unit: 'ms', doc: 'how far apart the copies sit in time' },
+  // tape
+  { key: 'tape.speed', def: 1, min: 0.5, max: 1.5, step: 0.005, unit: 'x', doc: 'playback speed: below 1 slows and drops the pitch together' },
+  { key: 'tape.wowDepth', def: 0, min: 0, max: 100, step: 1, unit: 'cents', doc: 'slow speed waver' },
+  { key: 'tape.wowRate', def: 0.5, min: 0.05, max: 3, step: 0.05, unit: 'Hz', doc: 'how fast the wow goes' },
+  { key: 'tape.flutterDepth', def: 0, min: 0, max: 40, step: 0.5, unit: 'cents', doc: 'fast speed waver' },
+  { key: 'tape.flutterRate', def: 8, min: 3, max: 30, step: 0.5, unit: 'Hz', doc: 'how fast the flutter goes' },
+  { key: 'tape.hiss', def: 0, min: 0, max: 0.1, step: 0.001, unit: '', doc: 'tape hiss level' },
+  { key: 'tape.drive', def: 0, min: 0, max: 3, step: 0.05, unit: '', doc: 'saturation before the limiter' },
+  { key: 'tape.lowCut', def: 0, min: 0, max: 1000, step: 10, unit: 'Hz', doc: 'nothing below this (0: off)' },
+  { key: 'tape.highCut', def: 0, min: 0, max: 16000, step: 100, unit: 'Hz', doc: 'nothing above this (0: off)' },
+  // lo-fi
+  { key: 'lofi.crushHz', def: 0, min: 0, max: 22050, step: 50, unit: 'Hz', doc: 'sample-rate crush: hold each sample for 44100 / this (0: off)' },
+  { key: 'lofi.bits', def: 0, min: 0, max: 16, step: 1, unit: 'bits', doc: 'bit depth (0: off)' },
+  { key: 'lofi.ringMod', def: 0, min: 0, max: 1, step: 0.01, unit: '', doc: 'ring modulation amount, the 1961 vocoder flavour' },
+  { key: 'lofi.ringHz', def: 110, min: 20, max: 2000, step: 1, unit: 'Hz', doc: 'the ring modulator carrier' },
+  // band
+  { key: 'band.squareLevel', def: 0.5, min: 0, max: 1.5, step: 0.05, unit: '', doc: 'the organ square wave' },
+  { key: 'band.pulseWidth', def: 0.5, min: 0.05, max: 0.95, step: 0.01, unit: '', doc: 'the square wave duty: 0.5 is square, else a pulse' },
+  { key: 'band.triLevel', def: 0.7, min: 0, max: 1.5, step: 0.05, unit: '', doc: 'the detuned triangle under the square' },
+  { key: 'band.detune', def: 1.003, min: 1, max: 1.03, step: 0.001, unit: 'x', doc: 'the triangle sits this much sharp of the square' },
+  { key: 'band.organLevel', def: 0.22, min: 0, max: 1, step: 0.01, unit: '', doc: 'organ level' },
+  { key: 'band.organLpHz', def: 1800, min: 300, max: 8000, step: 50, unit: 'Hz', doc: 'the organ low-pass' },
+  { key: 'band.bassLevel', def: 0.35, min: 0, max: 1.5, step: 0.01, unit: '', doc: 'bass level' },
+  { key: 'band.bassOctave', def: -1, min: -2, max: 1, step: 1, unit: 'oct', doc: 'the bass plays the chord root this many octaves from the lowest note' },
+  { key: 'band.voicing', def: 0, min: 0, max: 1, step: 1, unit: '', doc: '0 close, 1 open: the middle note of a triad goes up an octave' },
+  { key: 'band.attackMs', def: 30, min: 1, max: 500, step: 1, unit: 'ms', doc: 'each chord comes in over this long' },
+  { key: 'band.releaseMs', def: 80, min: 1, max: 1000, step: 1, unit: 'ms', doc: 'each chord lets go over this long' },
+  { key: 'band.width', def: 0, min: 0, max: 1, step: 0.05, unit: '', doc: 'the chord notes spread across the stereo field by this much' },
+  { key: 'band.drums', def: 0, min: 0, max: 1, step: 1, unit: '', doc: '1: brushes on each beat, a swish on the first of the bar' },
+  { key: 'band.drumLevel', def: 0.2, min: 0, max: 1, step: 0.01, unit: '', doc: 'the brushes level' },
+  { key: 'band.beatsPerBar', def: 4, min: 2, max: 7, step: 1, unit: '', doc: 'for the drums' },
+  // mix
+  { key: 'mix.voice', def: 1, min: 0, max: 3, step: 0.05, unit: 'x', doc: 'voice level' },
+  { key: 'mix.band', def: 1, min: 0, max: 3, step: 0.05, unit: 'x', doc: 'band level' },
+  { key: 'mix.bandBalance', def: 0.55, min: 0.05, max: 2, step: 0.01, unit: '', doc: 'the band against the voice by loudness, before the two levels' },
+  { key: 'mix.slapbackMs', def: 90, min: 0, max: 400, step: 1, unit: 'ms', doc: 'the one early reflection the singer always had' },
+  { key: 'mix.slapbackLevel', def: 0.18, min: 0, max: 0.8, step: 0.01, unit: '', doc: 'its level' },
+  { key: 'mix.roomLevel', def: 0, min: 0, max: 1, step: 0.01, unit: '', doc: 'a room: level of the reverb (0: off)' },
+  { key: 'mix.roomSize', def: 0.5, min: 0.1, max: 1, step: 0.01, unit: '', doc: 'the room: 0.1 a closet, 1 a hall' },
+  { key: 'mix.roomPredelayMs', def: 20, min: 0, max: 200, step: 1, unit: 'ms', doc: 'the room: time before the reverb starts' },
+  { key: 'mix.roomDamping', def: 0.5, min: 0, max: 1, step: 0.01, unit: '', doc: 'the room: how fast the highs die' },
+  { key: 'mix.width', def: 0, min: 0, max: 1, step: 0.05, unit: '', doc: 'stereo width of the whole thing (0: the old near-mono)' },
+  { key: 'mix.rightGain', def: 0.96, min: 0.5, max: 1, step: 0.01, unit: 'x', doc: 'the right channel a shade under the left, as it always was' },
+  { key: 'mix.limiterDrive', def: 1.3, min: 0.5, max: 4, step: 0.05, unit: '', doc: 'how hard the output pushes the soft limiter' },
+  { key: 'mix.ceiling', def: 0.95, min: 0.3, max: 1, step: 0.01, unit: '', doc: 'the limiter ceiling' },
+  { key: 'mix.master', def: 1, min: 0, max: 3, step: 0.05, unit: 'x', doc: 'master gain before the limiter' },
+  { key: 'mix.sampleRate', def: 44100, min: 8000, max: 48000, step: 100, unit: 'Hz', doc: 'the WAV sample rate (resampled at the end when not 44100)' },
+];
+const DEFAULT_PARAMS = (() => { const P = {}; for (const s of PARAM_SPECS) { const [g, k] = s.key.split('.'); (P[g] ||= {})[k] = s.def; } return P; })();
+const PARAM_GROUPS = ['voice', 'tape', 'lofi', 'band', 'mix'];
+const specOf = (key) => PARAM_SPECS.find((s) => s.key === key);
+// defaults under a partial set (one or two levels deep), with unknown keys dropped and values clamped to their range
+function mergeParams(...parts) {
+  const P = JSON.parse(JSON.stringify(DEFAULT_PARAMS));
+  for (const part of parts) {
+    if (!part) continue;
+    for (const g of Object.keys(part)) {
+      if (!P[g] || typeof part[g] !== 'object') continue;
+      for (const k of Object.keys(part[g])) { const s = specOf(`${g}.${k}`); if (!s) continue; const v = +part[g][k]; if (Number.isFinite(v)) P[g][k] = Math.max(s.min, Math.min(s.max, v)); }
+    }
+  }
+  return P;
+}
+// "voice.vibratoDepth=12" onto a set, in place
+function setParam(P, key, value) { const [g, k] = key.split('.'); const s = specOf(key); if (!s) throw new Error('no such parameter: ' + key); P[g][k] = Math.max(s.min, Math.min(s.max, +value)); return P; }
+// only what differs from the defaults
+function diffParams(P) { const out = {}; for (const s of PARAM_SPECS) { const [g, k] = s.key.split('.'); if (P[g] && P[g][k] !== s.def) (out[g] ||= {})[k] = P[g][k]; } return out; }
+// a few named starting points
+const PRESETS = {
+  '1961': { tape: { speed: 0.97 }, voice: { wobble: 0.6 } },
+  clean: { voice: { wobble: 0 } },
+  'drunk tape': { tape: { speed: 0.94, wowDepth: 30, wowRate: 0.35, flutterDepth: 6, flutterRate: 7, hiss: 0.012, drive: 0.5, highCut: 6500 }, voice: { wobble: 0.9, glideMs: 140 } },
+  telephone: { tape: { lowCut: 300, highCut: 3400, drive: 0.8, hiss: 0.006 }, lofi: { bits: 10 }, mix: { band: 0.5, slapbackLevel: 0.05 } },
+  'choir of one': { voice: { voices: 3, chorusCents: 12, chorusMs: 25, wobble: 0.4 }, mix: { width: 0.6, roomLevel: 0.25, roomSize: 0.7 } },
+  vocoder: { lofi: { ringMod: 0.7, ringHz: 110, crushHz: 11025, bits: 8 }, voice: { wobble: 0.2, breath: 0.02, bandwidthScale: 0.7 }, tape: { highCut: 5000 } },
+};
+
 // the glottal source: the slope of a Rosenberg pulse, a slow opening and a sharp closure, which is what makes it buzz
-function glottal(phase) {
-  const tp = 0.4, tn = 0.16;
+function glottal(phase, tp, tn) {
   if (phase < tp) return Math.sin(Math.PI * phase / tp) * (tn / tp);   // scaled so the pulse has no dc
   if (phase < tp + tn) return -Math.sin(Math.PI * (phase - tp) / (2 * tn));
   return 0;
@@ -966,11 +1105,14 @@ function glottal(phase) {
 
 // ---------- the voice ----------
 // the timeline first: each sung note becomes [consonant bursts][vowel glide][consonant bursts], legato into the next note
-function renderVoice(voice, notes, wobble, progress) {
+function renderVoice(voice, notes, V, progress, centsOffset = 0) {
   const res = [new Reson(), new Reson(), new Reson(), new Reson()];
   const asp = new Biquad().bp(2000, 0.5);
+  const tp = V.openQuotient, tn = V.closingPhase;
   let t0 = 0, phase = 0, lastF = [500, 1500, 2500], vib = 0, drift = 0, lastF0 = 0;
   const seg = (a, b, k) => a + (b - a) * k;
+  const glideN = V.glideMs / 1000 * SR, attackN = V.attackMs / 1000 * SR, releaseN = V.releaseMs / 1000 * SR, mouthN = V.vowelGlideMs / 1000 * SR, onsetN = V.vibratoOnsetMs / 1000 * SR;
+  const flat = Math.pow(2, V.flatCents / 1200), scoop = Math.pow(2, V.scoopCents / 1200), off = centsOffset ? Math.pow(2, centsOffset / 1200) : 1;
   for (let ni = 0; ni < notes.length; ni++) {
     const n = notes[ni], p = parse(n.syl), next = notes[ni + 1];
     const start = Math.floor(t0 * SR), end = Math.floor((t0 + n.dur) * SR);
@@ -978,55 +1120,56 @@ function renderVoice(voice, notes, wobble, progress) {
     if (progress && (ni & 3) === 0) progress(ni / notes.length);
     if (n.m == null) { lastF = [500, 1500, 2500]; lastF0 = 0; continue; }
     // the vowel owns the middle of the note; onset consonants take the front, coda consonants the tail
-    const onsetDur = Math.min(n.dur * 0.3, p.onset.reduce((a, c) => a + CONS[c].dur, 0));
-    const codaDur = Math.min(n.dur * 0.25, p.coda.reduce((a, c) => a + CONS[c].dur, 0));
+    const onsetDur = Math.min(n.dur * 0.3, p.onset.reduce((a, c) => a + CONS[c].dur * V.consonantLength, 0));
+    const codaDur = Math.min(n.dur * 0.25, p.coda.reduce((a, c) => a + CONS[c].dur * V.consonantLength, 0));
     const vStart = start + Math.floor(onsetDur * SR), vEnd = end - Math.floor(codaDur * SR);
-    const f0 = hz(n.m) * Math.pow(2, -14 / 1200);   // a touch flat, the way the old vocoders sang
+    const f0 = hz(n.m) * flat * off;   // a touch flat, the way the old vocoders sang
     const vowelF = p.vowel.map((v) => VOWELS[v] || VOWELS.ah);
-    const legato = !!next && next.m != null && p.coda.length === 0;
+    const legato = !V.detached && !!next && next.m != null && p.coda.length === 0;
     // onset consonants
     let c0 = start;
-    for (const c of p.onset) { const d = Math.floor(CONS[c].dur * SR); consonant(voice, c, c0, Math.min(c0 + d, vStart), f0, lastF); c0 += d; }
+    for (const c of p.onset) { const d = Math.floor(CONS[c].dur * V.consonantLength * SR); consonant(voice, c, c0, Math.min(c0 + d, vStart), f0, lastF, V); c0 += d; }
     // the vowel
     for (let i = vStart; i < vEnd; i++) {
       const k = (i - vStart) / Math.max(1, vEnd - vStart);
       const at = k * (vowelF.length - 1), j = Math.min(vowelF.length - 2, Math.floor(at)), kk = vowelF.length > 1 ? at - j : 0;
       const target = vowelF.length > 1 ? vowelF[j].map((f, x) => seg(f, vowelF[j + 1][x], kk)) : vowelF[0];
       // glide in from the last mouth shape over the first 40 ms
-      const gi = Math.min(1, (i - vStart) / (0.04 * SR));
+      const gi = mouthN > 0 ? Math.min(1, (i - vStart) / mouthN) : 1;
       const F = target.map((f, x) => seg(lastF[x], f, gi));
       if (i === vEnd - 1) lastF = target.slice();
       // pitch: slow vibrato plus a random walk, scaled by wobble
-      vib += 2 * Math.PI * 5.4 / SR; drift += rnd() * 0.002; drift *= 0.9995;
+      vib += 2 * Math.PI * V.vibratoRate / SR; drift += rnd() * V.driftStep; drift *= V.driftDecay;
       // slur in from the previous note over 70 ms, or scoop up from below after a breath
-      const gl = Math.min(1, (i - vStart) / (0.07 * SR));
-      const from = lastF0 || f0 * Math.pow(2, -40 / 1200);
-      const cents = wobble * (18 * Math.sin(vib) + 60 * drift);
+      const gl = glideN > 0 ? Math.min(1, (i - vStart) / glideN) : 1;
+      const from = lastF0 || f0 * scoop;
+      const vibAmt = onsetN > 0 ? Math.min(1, (i - vStart) / onsetN) : 1;
+      const cents = V.wobble * (V.vibratoDepth * Math.sin(vib) * vibAmt + V.driftDepth * drift);
       const f = seg(from, f0, gl) * Math.pow(2, cents / 1200);
       phase += f / SR; if (phase >= 1) phase -= 1;
-      const dsrc = glottal(phase);   // the formants carve the buzz into a vowel
-      const breath = asp.run(rnd()) * 0.08;
+      const dsrc = glottal(phase, tp, tn);   // the formants carve the buzz into a vowel
+      const breath = asp.run(rnd()) * V.breath;
       let y = 0;
-      for (let x = 0; x < 3; x++) { res[x].set(F[x], BW[x]); y += res[x].run(dsrc) * (x === 0 ? 1 : x === 1 ? 0.85 : 0.5); }
-      res[3].set(3300, BW[3]); y += res[3].run(dsrc) * 0.2;
+      for (let x = 0; x < 3; x++) { res[x].set(F[x] * V.formantShift, BW[x] * V.bandwidthScale); y += res[x].run(dsrc) * (x === 0 ? 1 : x === 1 ? 0.85 : 0.5); }
+      res[3].set(3300 * V.formantShift, BW[3] * V.bandwidthScale); y += res[3].run(dsrc) * 0.2;
       y += breath;
       // envelope: fast in, held, and a short release unless the next note is tied straight on
-      const a = Math.min(1, (i - vStart) / (0.02 * SR)), r = legato ? 1 : Math.min(1, (vEnd - i) / (0.05 * SR));
+      const a = Math.min(1, (i - vStart) / attackN), r = legato ? 1 : Math.min(1, (vEnd - i) / releaseN);
       voice[i] += y * a * r * 0.9;
     }
     lastF0 = legato ? f0 : 0;
     // coda consonants
     let c1 = vEnd;
-    for (const c of p.coda) { const d = Math.floor(CONS[c].dur * SR); consonant(voice, c, c1, Math.min(c1 + d, end), f0, lastF); c1 += d; }
+    for (const c of p.coda) { const d = Math.floor(CONS[c].dur * V.consonantLength * SR); consonant(voice, c, c1, Math.min(c1 + d, end), f0, lastF, V); c1 += d; }
   }
 }
 
-function consonant(voice, c, s, e, f0, mouth) {
+function consonant(voice, c, s, e, f0, mouth, V) {
   const spec = CONS[c]; if (!spec || e <= s) return;
   const filt = spec.hp ? new Biquad().hp(spec.hp, 0.7) : new Biquad().bp(spec.bp, spec.q || 1);
   const len = e - s;
   if (spec.k === 'noise' || spec.k === 'burst') {
-    const amp = spec.k === 'burst' ? 1.2 : spec.soft ? 0.4 : 0.75;
+    const amp = (spec.k === 'burst' ? 1.2 : spec.soft ? 0.4 : 0.75) * V.consonantLevel;
     let phase = 0;
     for (let i = s; i < e; i++) {
       const k = (i - s) / len;
@@ -1038,56 +1181,94 @@ function consonant(voice, c, s, e, f0, mouth) {
   } else {   // nasal or glide: the voice keeps humming through a different mouth shape
     const res = [new Reson(), new Reson(), new Reson()];
     let phase = 0;
+    const level = spec.k === 'nasal' ? 0.45 * V.nasal : 0.7 * V.consonantLevel;
     for (let i = s; i < e; i++) {
       const k = (i - s) / len, F = spec.f.map((f, x) => mouth[x] + (f - mouth[x]) * Math.sin(Math.PI * k));
       phase += f0 / SR; if (phase >= 1) phase -= 1;
-      const src = glottal(phase);
+      const src = glottal(phase, V.openQuotient, V.closingPhase);
       let y = 0;
-      for (let x = 0; x < 3; x++) { res[x].set(F[x], BW[x] * (spec.k === 'nasal' ? 1.6 : 1)); y += res[x].run(src) * (x === 0 ? 1 : 0.4); }
-      voice[i] += y * (spec.k === 'nasal' ? 0.45 : 0.7);
+      for (let x = 0; x < 3; x++) { res[x].set(F[x] * V.formantShift, BW[x] * V.bandwidthScale * (spec.k === 'nasal' ? 1.6 : 1)); y += res[x].run(src) * (x === 0 ? 1 : 0.4); }
+      voice[i] += y * level;
     }
   }
 }
 
 // ---------- the band: a small organ and a soft bass ----------
-function renderBand(band, song, beat, pitch, progress) {
+function renderBand(band, bandR, song, beat, pitch, B, progress) {
   let t0 = 0;
-  const lp = new Biquad().lp(1800, 0.6), blp = new Biquad().lp(300, 0.7);
+  const lp = new Biquad().lp(B.organLpHz, 0.6), blp = new Biquad().lp(300, 0.7);
   const chords = song.chords || [];
+  const attackN = B.attackMs / 1000 * SR, releaseN = B.releaseMs / 1000 * SR;
   chords.forEach((ch, ci) => {
     const dur = ch.beats * beat, s = Math.floor(t0 * SR), e = Math.floor((t0 + dur) * SR); t0 += dur;
     if (progress && (ci & 7) === 0) progress(ci / chords.length);
-    const ms = ch.notes.map((n) => midi(n, pitch)).filter((m) => m != null); if (!ms.length) return;
+    let ms = ch.notes.map((n) => midi(n, pitch)).filter((m) => m != null); if (!ms.length) return;
+    if (B.voicing && ms.length >= 3) { ms = ms.slice().sort((a, b) => a - b); ms[1] += 12; }
     const ph = ms.map(() => 0), ph2 = ms.map(() => 0);
-    const bass = hz(Math.min(...ms) - 12); let bp = 0;
+    const pans = ms.map((m, j) => (ms.length > 1 ? (j / (ms.length - 1) - 0.5) * 2 * B.width : 0));
+    const bass = hz(Math.min(...ms) + 12 * B.bassOctave); let bp = 0;
     for (let i = s; i < e; i++) {
-      const k = (i - s) / (e - s), env = Math.min(1, (i - s) / (0.03 * SR)) * Math.min(1, (e - i) / (0.08 * SR));
-      let y = 0;
+      const k = (i - s) / (e - s), env = Math.min(1, (i - s) / attackN) * Math.min(1, (e - i) / releaseN);
+      let y = 0, yr = 0;
       for (let j = 0; j < ms.length; j++) {
         const f = hz(ms[j]);
         ph[j] += f / SR; if (ph[j] >= 1) ph[j] -= 1;
-        ph2[j] += f * 1.003 / SR; if (ph2[j] >= 1) ph2[j] -= 1;
-        y += (ph[j] < 0.5 ? 1 : -1) * 0.5 + (1 - 4 * Math.abs(ph2[j] - 0.5)) * 0.7;   // square and a slightly detuned triangle
+        ph2[j] += f * B.detune / SR; if (ph2[j] >= 1) ph2[j] -= 1;
+        const v = (ph[j] < B.pulseWidth ? 1 : -1) * B.squareLevel + (1 - 4 * Math.abs(ph2[j] - 0.5)) * B.triLevel;   // square and a slightly detuned triangle
+        y += v;
+        if (bandR) yr += v * pans[j];   // the side signal, when the chord is spread
       }
-      y = lp.run(y / ms.length) * 0.22 * env;
+      y = lp.run(y / ms.length) * B.organLevel * env;
       bp += bass / SR; if (bp >= 1) bp -= 1;
-      y += blp.run(1 - 4 * Math.abs(bp - 0.5)) * 0.35 * env * (0.6 + 0.4 * Math.max(0, 1 - k * 2));
+      y += blp.run(1 - 4 * Math.abs(bp - 0.5)) * B.bassLevel * env * (0.6 + 0.4 * Math.max(0, 1 - k * 2));
       band[i] += y;
+      if (bandR) bandR[i] += yr / ms.length * B.organLevel * env;
     }
   });
 }
 
+// brushes: a soft swish of noise on every beat, longer on the first of the bar
+function renderDrums(drums, song, beat, B) {
+  const total = (song.chords || []).reduce((a, c) => a + c.beats * beat, 0), hp = new Biquad().hp(1800, 0.7);
+  const n = Math.floor(total / beat);
+  for (let b = 0; b < n; b++) {
+    const s = Math.floor(b * beat * SR), len = Math.floor((b % B.beatsPerBar === 0 ? 0.22 : 0.09) * SR);
+    for (let i = 0; i < len && s + i < drums.length; i++) { const k = i / len; drums[s + i] += hp.run(rnd() * 2) * Math.sin(Math.PI * k) * Math.exp(-k * 2.5) * B.drumLevel; }
+  }
+}
+
+// a cut of the song between two moments in seconds (by its own beats, before the tape speed), for a quick listen
+function sliceSong(song, from = 0, to = Infinity) {
+  const beat = 60 / (song.bpm || 96), cut = (list) => {
+    const out = []; let t = 0;
+    for (const e of list) {
+      const s = t, en = t + e.beats * beat; t = en;
+      const a = Math.max(s, from), b = Math.min(en, to);
+      if (b - a <= 1e-6) continue;
+      out.push({ ...e, beats: +((b - a) / beat).toFixed(4) });
+    }
+    return out;
+  };
+  return { ...song, voice: cut(song.voice), chords: cut(song.chords || []) };
+}
+
 // ---------- the whole thing ----------
-// render(song, options) -> a mono Float64Array at SR, after the tape speed and the room, before the limiter (see toStereo / encodeWav).
-//   slow    tape speed; below 1 slows and drops the pitch together (0.97 = the dying-computer feel)
-//   pitch   transpose everything N semitones before singing
-//   wobble  0..1, how unsteady the pitch is
-//   voice / band   the two levels (the band sits a few dB under the voice at 1)
-//   progress(k, stage)   0..1 as it goes, stage 'voice' or 'band'
-// The same song and options always give the same samples.
-function render(song, { slow = 1, pitch = 0, wobble = 0.5, voice: voiceLevel = 1, band: bandLevel = 1, progress = null } = {}) {
+// render(song, options) -> a mono Float64Array at SR, after the tape and the room, before the limiter (see toStereo / encodeWav),
+// or with .right set when the mix is stereo (band spread, chorus, width). Options: the old flags (slow, pitch, wobble, voice, band),
+// params (a partial parameter set over the defaults, see PARAM_SPECS), progress(k, stage). Same song and options, same samples.
+function resolveParams({ slow, pitch, wobble, voice, band, params } = {}) {
+  const P = mergeParams(params);
+  if (slow != null && slow !== 1) P.tape.speed = slow;
+  if (pitch != null && pitch !== 0) P.voice.transpose = pitch;
+  if (wobble != null && wobble !== 0.5) P.voice.wobble = wobble;
+  if (voice != null && voice !== 1) P.mix.voice = voice;
+  if (band != null && band !== 1) P.mix.band = band;
+  return P;
+}
+function render(song, opts = {}) {
+  const P = resolveParams(opts), V = P.voice, B = P.band, T = P.tape, L = P.lofi, M = P.mix, progress = opts.progress || null;
   seed = 1234;
-  const beat = 60 / (song.bpm || 96);
+  const beat = 60 / (song.bpm || 96), pitch = V.transpose;
   const notes = [];
   for (const n of song.voice) {
     const syl = n.syl || 'ah', m = midi(n.note, pitch), dur = n.beats * beat;
@@ -1100,50 +1281,105 @@ function render(song, { slow = 1, pitch = 0, wobble = 0.5, voice: voiceLevel = 1
   const total = Math.max(totalV, totalC) + 1.5;
   const N = Math.ceil(total * SR);
   const voice = new Float64Array(N), band = new Float64Array(N);
-  renderVoice(voice, notes, wobble, progress && ((k) => progress(k * 0.8, 'voice')));
-  renderBand(band, song, beat, pitch, progress && ((k) => progress(0.8 + k * 0.2, 'band')));
+  const stereo = B.width > 0 || V.voices > 1 || M.width > 0;
+  const voiceR = stereo ? new Float64Array(N) : null, bandR = B.width > 0 ? new Float64Array(N) : null;
+  if (V.voices <= 1) renderVoice(voice, notes, V, progress && ((k) => progress(k * 0.8, 'voice')));
+  else {   // a choir of one: each copy a little off in pitch and time, spread left to right
+    const copies = V.voices;
+    for (let c = 0; c < copies; c++) {
+      const tmp = new Float64Array(N), spread = copies > 1 ? (c / (copies - 1) - 0.5) * 2 : 0;
+      seed = 1234 + c * 7919;
+      renderVoice(tmp, notes, V, progress && ((k) => progress((c + k) / copies * 0.8, 'voice')), spread * V.chorusCents);
+      const shift = Math.round(spread * V.chorusMs / 1000 * SR), gl = 0.5 - spread * 0.4, gr = 0.5 + spread * 0.4;
+      for (let i = 0; i < N; i++) { const v = tmp[i - shift] || 0; voice[i] += v * gl / copies * 1.6; voiceR[i] += v * gr / copies * 1.6; }
+    }
+  }
+  renderBand(band, bandR, song, beat, pitch, B, progress && ((k) => progress(0.8 + k * 0.2, 'band')));
+  if (B.drums) renderDrums(band, song, beat, B);
+  if (V.brightness) { const sh = new Biquad().hs(2500, V.brightness); for (let i = 0; i < N; i++) voice[i] = sh.run(voice[i]); if (voiceR && V.voices > 1) { const sh2 = new Biquad().hs(2500, V.brightness); for (let i = 0; i < N; i++) voiceR[i] = sh2.run(voiceR[i]); } }
   // the voice is normalised to its peak; the band is set by loudness, about 5 dB under it
-  let mix = new Float64Array(N);
+  let mix = new Float64Array(N), mixR = stereo ? new Float64Array(N) : null;
   let pk = 0, sv = 0, sb = 0;
   for (let i = 0; i < N; i++) { pk = Math.max(pk, Math.abs(voice[i])); sv += voice[i] * voice[i]; sb += band[i] * band[i]; }
   const vg = pk > 0 ? 0.6 / pk : 1;
-  const bg = sb > 0 && sv > 0 ? Math.sqrt(sv / sb) * vg * 0.55 : 1;
-  for (let i = 0; i < N; i++) mix[i] = voice[i] * vg * voiceLevel + band[i] * bg * bandLevel;
-  if (slow !== 1) {   // resample: slower playback drops the pitch with it
-    const M = Math.floor(N / slow), out = new Float64Array(M);
-    for (let i = 0; i < M; i++) { const p = i * slow, j = Math.floor(p), k = p - j; out[i] = (mix[j] || 0) * (1 - k) + (mix[j + 1] || 0) * k; }
-    mix = out;
-  }
-  // a little room: a short slapback
-  const d = Math.floor(0.09 * SR);
-  for (let i = d; i < mix.length; i++) mix[i] += mix[i - d] * 0.18;
+  const bg = sb > 0 && sv > 0 ? Math.sqrt(sv / sb) * vg * M.bandBalance : 1;
+  for (let i = 0; i < N; i++) mix[i] = voice[i] * vg * M.voice + band[i] * bg * M.band;
+  if (mixR) for (let i = 0; i < N; i++) mixR[i] = (voiceR && V.voices > 1 ? voiceR[i] : voice[i]) * vg * M.voice + (band[i] + (bandR ? bandR[i] : 0)) * bg * M.band;
+  const post = (x) => {
+    if (T.speed !== 1) {   // resample: slower playback drops the pitch with it
+      const Mn = Math.floor(x.length / T.speed), out = new Float64Array(Mn);
+      for (let i = 0; i < Mn; i++) { const p = i * T.speed, j = Math.floor(p), k = p - j; out[i] = (x[j] || 0) * (1 - k) + (x[j + 1] || 0) * k; }
+      x = out;
+    }
+    if (T.wowDepth > 0 || T.flutterDepth > 0) {   // the speed wavers: read the tape through a moving delay
+      const out = new Float64Array(x.length), maxDev = 0.03 * SR; let ph1 = 0, ph2 = 0;
+      for (let i = 0; i < x.length; i++) {
+        ph1 += 2 * Math.PI * T.wowRate / SR; ph2 += 2 * Math.PI * T.flutterRate / SR;
+        const cents = T.wowDepth * Math.sin(ph1) + T.flutterDepth * Math.sin(ph2);   // a speed change is a slowly moving delay
+        const d = Math.max(-maxDev, Math.min(maxDev, -cents / 1200 * SR * 0.02)), p = i + d, j = Math.floor(p), k = p - j;
+        out[i] = (x[j] || 0) * (1 - k) + (x[j + 1] || 0) * k;
+      }
+      x = out;
+    }
+    if (T.hiss > 0) { const f = new Biquad().hp(3000, 0.5); for (let i = 0; i < x.length; i++) x[i] += f.run(rnd() * 2) * T.hiss; }
+    if (T.drive > 0) { const g = 1 + T.drive * 3; for (let i = 0; i < x.length; i++) x[i] = Math.tanh(x[i] * g) / Math.tanh(g * 0.6) * 0.6; }
+    if (T.lowCut > 0) { const f = new Biquad().hp(T.lowCut, 0.7); for (let i = 0; i < x.length; i++) x[i] = f.run(x[i]); }
+    if (T.highCut > 0 && T.highCut < SR / 2) { const f = new Biquad().lp(T.highCut, 0.7); for (let i = 0; i < x.length; i++) x[i] = f.run(x[i]); }
+    if (L.ringMod > 0) { let ph = 0; for (let i = 0; i < x.length; i++) { ph += 2 * Math.PI * L.ringHz / SR; x[i] = x[i] * (1 - L.ringMod) + x[i] * Math.sin(ph) * L.ringMod; } }
+    if (L.crushHz > 0 && L.crushHz < SR) { const hold = SR / L.crushHz; let acc = 0, last = 0; for (let i = 0; i < x.length; i++) { acc += 1; if (acc >= hold) { acc -= hold; last = x[i]; } x[i] = last; } }
+    if (L.bits > 0 && L.bits < 24) { const q = Math.pow(2, L.bits - 1); for (let i = 0; i < x.length; i++) x[i] = Math.round(x[i] * q) / q; }
+    // a little room: a short slapback
+    const d = Math.floor(M.slapbackMs / 1000 * SR);
+    if (d > 0 && M.slapbackLevel > 0) for (let i = d; i < x.length; i++) x[i] += x[i - d] * M.slapbackLevel;
+    if (M.roomLevel > 0) {   // four combs and a damped feedback, the plainest room there is
+      const pre = Math.floor(M.roomPredelayMs / 1000 * SR), taps = [29.7, 37.1, 41.1, 43.7].map((ms) => Math.floor(ms * (0.5 + M.roomSize * 1.5) / 1000 * SR)), fb = 0.6 + M.roomSize * 0.3;
+      const bufs = taps.map((t) => new Float64Array(t)), lows = taps.map(() => 0), damp = M.roomDamping * 0.5;
+      const out = new Float64Array(x.length);
+      for (let i = 0; i < x.length; i++) {
+        const inp = i >= pre ? x[i - pre] : 0; let y = 0;
+        for (let c = 0; c < 4; c++) { const b = bufs[c], p = i % taps[c], v = b[p]; lows[c] += (v - lows[c]) * (1 - damp); b[p] = inp + lows[c] * fb; y += v; }
+        out[i] = x[i] + y * 0.25 * M.roomLevel;
+      }
+      x = out;
+    }
+    if (M.master !== 1) for (let i = 0; i < x.length; i++) x[i] *= M.master;
+    return x;
+  };
+  mix = post(mix);
+  if (mixR) { seed = 4321; mixR = post(mixR); }
+  if (M.width > 0 && !mixR) { mixR = new Float64Array(mix.length); const d = Math.floor(0.012 * SR); for (let i = 0; i < mix.length; i++) mixR[i] = mix[i] * (1 - M.width * 0.5) + (mix[i - d] || 0) * M.width * 0.5; }
+  if (M.sampleRate !== SR) { mix = resampleTo(mix, SR, M.sampleRate); if (mixR) mixR = resampleTo(mixR, SR, M.sampleRate); }
+  mix.sampleRate = M.sampleRate; mix.right = mixR; mix.params = P;
   if (progress) progress(1, 'done');
   return mix;
 }
+function resampleTo(x, from, to) { const n = Math.floor(x.length * to / from), out = new Float64Array(n), r = from / to; for (let i = 0; i < n; i++) { const p = i * r, j = Math.floor(p), k = p - j; out[i] = (x[j] || 0) * (1 - k) + (x[j + 1] || 0) * k; } return out; }
 
 // the soft limiter, and the right channel a shade under the left
-const limit = (v) => Math.max(-1, Math.min(1, Math.tanh(v * 1.3) * 0.95));
+const limit = (v, drive = 1.3, ceiling = 0.95) => Math.max(-1, Math.min(1, Math.tanh(v * drive) * ceiling));
 function toStereo(mix) {
-  const L = new Float32Array(mix.length), R = new Float32Array(mix.length);
-  for (let i = 0; i < mix.length; i++) { const v = limit(mix[i]); L[i] = v; R[i] = v * 0.96; }
+  const M = (mix.params || DEFAULT_PARAMS).mix, L = new Float32Array(mix.length), R = new Float32Array(mix.length);
+  for (let i = 0; i < mix.length; i++) { L[i] = limit(mix[i], M.limiterDrive, M.ceiling); R[i] = mix.right ? limit(mix.right[i], M.limiterDrive, M.ceiling) : L[i] * M.rightGain; }
   return [L, R];
 }
 
 // 16-bit stereo WAV
 function encodeWav(mix) {
+  const M = (mix.params || DEFAULT_PARAMS).mix, sr = mix.sampleRate || SR;
   const out = new Uint8Array(44 + mix.length * 4), dv = new DataView(out.buffer);
   const tag = (p, s) => { for (let i = 0; i < 4; i++) out[p + i] = s.charCodeAt(i); };
   tag(0, 'RIFF'); dv.setUint32(4, 36 + mix.length * 4, true); tag(8, 'WAVE'); tag(12, 'fmt '); dv.setUint32(16, 16, true);
-  dv.setUint16(20, 1, true); dv.setUint16(22, 2, true); dv.setUint32(24, SR, true); dv.setUint32(28, SR * 4, true); dv.setUint16(32, 4, true); dv.setUint16(34, 16, true);
+  dv.setUint16(20, 1, true); dv.setUint16(22, 2, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr * 4, true); dv.setUint16(32, 4, true); dv.setUint16(34, 16, true);
   tag(36, 'data'); dv.setUint32(40, mix.length * 4, true);
   for (let i = 0, p = 44; i < mix.length; i++, p += 4) {
-    const s = limit(mix[i]) * 32767;
-    dv.setInt16(p, s | 0, true); dv.setInt16(p + 2, (s * 0.96) | 0, true);
+    const s = limit(mix[i], M.limiterDrive, M.ceiling) * 32767;
+    const r = mix.right ? limit(mix.right[i], M.limiterDrive, M.ceiling) * 32767 : s * M.rightGain;
+    dv.setInt16(p, s | 0, true); dv.setInt16(p + 2, r | 0, true);
   }
   return out;
 }
 
-return { SR, midi, nameOf, parse, readMidi, scoreParts, parseLyrics, applyLyrics, midiInfo, songFromMidi, songText, toTrackerRate, trackPitch, notesFromPitch, estimateTempo, gridOffset, detectKey, chordsFromMelody, songFromNotes, notesFromVoice, trimLongNotes, syllabify, wordsToLines, alignWords, render, toStereo, encodeWav };
+return { SR, midi, nameOf, VOWELS, parse, readMidi, scoreParts, parseLyrics, applyLyrics, midiInfo, songFromMidi, songText, toTrackerRate, trackPitch, notesFromPitch, estimateTempo, gridOffset, detectKey, chordsFromMelody, songFromNotes, notesFromVoice, trimLongNotes, syllabify, wordsToLines, alignWords, PARAM_SPECS, DEFAULT_PARAMS, PARAM_GROUPS, specOf, mergeParams, setParam, diffParams, PRESETS, sliceSong, resolveParams, render, toStereo, encodeWav };
 })();
 <!-- core:end -->
 </script>
@@ -1158,11 +1394,12 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
   const C = SingCore;
   const state = { name: '', source: null, midi: null, audio: null, notes: null, band: null, f0: null, times: null, duration: 0, midiLog: null, song: null, lyricsFromFile: false, mix: null, L: null, R: null, renderedWith: null, busy: false };
   const KNOBS = ['slow', 'pitch', 'wobble', 'voice', 'band'];
-  const PRESETS = { 1961: { slow: 0.97, pitch: 0, wobble: 0.6, voice: 1, band: 1 }, clean: { slow: 1, pitch: 0, wobble: 0, voice: 1, band: 1 } };
+  const KNOB_KEY = { slow: 'tape.speed', pitch: 'voice.transpose', wobble: 'voice.wobble', voice: 'mix.voice', band: 'mix.band' };
   const fmt = { slow: (v) => v.toFixed(3), pitch: (v) => (v > 0 ? '+' : '') + v + ' st', wobble: (v) => v.toFixed(2), voice: (v) => v.toFixed(2), band: (v) => v.toFixed(2) };
+  state.params = C.mergeParams(C.PRESETS['1961']);
   const QUANT = [0, 1, 2, 4], QUANT_NAMES = ['off', 'beat', '½ beat', '¼ beat'];
-  const opts = () => Object.fromEntries(KNOBS.map((k) => [k, +$(k).value]));
-  const sameOpts = (a, b) => a && b && KNOBS.every((k) => a[k] === b[k]) && a.songKey === b.songKey;
+  const opts = () => ({ params: JSON.parse(JSON.stringify(state.params)) });
+  const sameOpts = (a, b) => a && b && JSON.stringify(a.params) === JSON.stringify(b.params) && a.songKey === b.songKey;
   const log = (lines) => { $('log').textContent = lines.join('\n'); };
   const status = (s, cls = '') => { $('status').textContent = s; $('status').className = 'status ' + cls; };
   const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -1179,7 +1416,8 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
         } else {
           const mix = SingCore.render(d.song, { ...d.opts, progress: (k, stage) => postMessage({ progress: k, stage }) });
           const [L, R] = SingCore.toStereo(mix);
-          postMessage({ done: true, mix, L, R }, [mix.buffer, L.buffer, R.buffer]);
+          const right = mix.right || null;
+          postMessage({ done: true, mix, L, R, right, sampleRate: mix.sampleRate, params: mix.params }, [mix.buffer, L.buffer, R.buffer].concat(right ? [right.buffer] : []));
         }
       } catch (err) { postMessage({ error: String(err && err.message || err) }); }
     };`;
@@ -1423,19 +1661,42 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     dragging = null; rebuildNotes();
   });
 
-  // ---------- the knobs ----------
-  for (const k of KNOBS) {
-    const el = $(k);
-    el.addEventListener('input', () => { $(k + '_v').textContent = fmt[k](+el.value); document.querySelectorAll('.preset').forEach((b) => b.classList.remove('on')); markStale(); });
-  }
-  document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => {
-    const p = PRESETS[b.dataset.preset];
-    for (const k of KNOBS) { $(k).value = p[k]; $(k + '_v').textContent = fmt[k](p[k]); }
-    document.querySelectorAll('.preset').forEach((x) => x.classList.toggle('on', x === b));
+  // ---------- the knobs: the five simple ones and the advanced panel are views on one parameter set ----------
+  const getP = (key) => { const [g, k] = key.split('.'); return state.params[g][k]; };
+  const setP = (key, v) => { C.setParam(state.params, key, v); };
+  function showParams() {
+    for (const k of KNOBS) { const v = getP(KNOB_KEY[k]); $(k).value = v; $(k + '_v').textContent = fmt[k](v); }
+    for (const sp of C.PARAM_SPECS) { const row = $('p_' + sp.key.replace('.', '_')); if (!row) continue; const v = getP(sp.key); row.querySelector('input[type=range]').value = v; row.querySelector('input[type=number]').value = v; row.classList.toggle('changed', v !== sp.def); }
+    const name = Object.keys(C.PRESETS).find((n) => JSON.stringify(C.mergeParams(C.PRESETS[n])) === JSON.stringify(state.params));
+    document.querySelectorAll('.preset').forEach((b) => b.classList.toggle('on', b.dataset.preset === name));
     markStale();
-  }));
+  }
+  for (const k of KNOBS) $(k).addEventListener('input', () => { setP(KNOB_KEY[k], +$(k).value); showParams(); });
+  function applyPreset(name) { state.params = C.mergeParams(C.PRESETS[name]); showParams(); $('pstatus').textContent = `preset: ${name}`; }
+  // the panel, from the parameter table
+  const groups = $('advgroups'), titles = { voice: 'voice', tape: 'tape', lofi: 'lo-fi', band: 'band', mix: 'mix' };
+  for (const g of C.PARAM_GROUPS) {
+    const box = document.createElement('div'); box.className = 'pg'; box.innerHTML = `<h3>${titles[g]}</h3>`;
+    for (const sp of C.PARAM_SPECS.filter((s) => s.key.startsWith(g + '.'))) {
+      const k = sp.key.split('.')[1], row = document.createElement('div'); row.className = 'row'; row.id = 'p_' + sp.key.replace('.', '_'); row.title = sp.doc;
+      row.innerHTML = `<label for="${row.id}_r">${k}${sp.unit ? ' <span style="color: var(--faint)">' + sp.unit + '</span>' : ''}</label><input type="range" id="${row.id}_r" min="${sp.min}" max="${sp.max}" step="${sp.step}" value="${sp.def}"><input type="number" min="${sp.min}" max="${sp.max}" step="${sp.step}" value="${sp.def}"><span class="reset" title="back to ${sp.def}">×</span>`;
+      const r = row.querySelector('input[type=range]'), n = row.querySelector('input[type=number]');
+      r.addEventListener('input', () => { setP(sp.key, +r.value); showParams(); });
+      n.addEventListener('change', () => { setP(sp.key, +n.value); showParams(); });
+      row.querySelector('.reset').addEventListener('click', () => { setP(sp.key, sp.def); showParams(); });
+      box.appendChild(row);
+    }
+    groups.appendChild(box);
+  }
+  $('plist').innerHTML = Object.keys(C.PRESETS).map((n) => `<button class="preset" data-preset="${n}">${n.toUpperCase()}</button>`).join('');
+  document.querySelectorAll('.preset').forEach((b) => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+  $('pdefaults').addEventListener('click', () => { state.params = C.mergeParams(); showParams(); $('pstatus').textContent = 'defaults'; });
+  $('pexport').addEventListener('click', () => { const d = C.diffParams(state.params); download(new TextEncoder().encode(JSON.stringify(d, null, 2) + '\n'), (state.name || 'voice') + '.params.json', 'application/json'); $('pstatus').textContent = `${Object.values(d).reduce((a, g) => a + Object.keys(g).length, 0)} keys exported`; });
+  $('pimport').addEventListener('click', () => $('pfile').click());
+  $('pfile').addEventListener('change', async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const j = JSON.parse(await f.text()); state.params = C.mergeParams(j); showParams(); const d = C.diffParams(state.params); $('pstatus').textContent = `${f.name}: ${Object.values(d).reduce((a, g) => a + Object.keys(g).length, 0)} keys over the defaults`; } catch (err) { $('pstatus').textContent = 'not a parameter file: ' + err.message; } });
   function markStale() { if (state.song && state.mix && !sameOpts(state.renderedWith, { ...opts(), songKey: songKey() })) status('settings changed: preview again'); }
   const songKey = () => (state.song ? JSON.stringify(state.song) : '');
+  showParams();
 
   // ---------- rendering ----------
   async function ensureRender() {
@@ -1447,9 +1708,10 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     $('prog').style.width = '0%'; status('singing…', 'busy');
     try {
       const r = await inWorker({ kind: 'render', song: state.song, opts: opts() }, [], (k, stage) => { $('prog').style.width = (k * 100).toFixed(1) + '%'; status(stage === 'band' ? 'the band…' : stage === 'done' ? 'mixing…' : 'singing…', 'busy'); });
+      r.mix.right = r.right; r.mix.sampleRate = r.sampleRate; r.mix.params = r.params;
       state.mix = r.mix; state.L = r.L; state.R = r.R; state.renderedWith = want;
       buffer = null; peaks = null; drawWave();
-      status(`${mmss(r.mix.length / C.SR)} rendered`);
+      status(`${mmss(r.mix.length / (r.mix.sampleRate || C.SR))} rendered`);
       $('play').disabled = false;
       return true;
     } catch (err) { status(err.message, 'err'); return false; }
@@ -1461,7 +1723,7 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
   let ctx = null, src = null, buffer = null, startedAt = 0, offset = 0, playing = false, raf = 0;
   function getBuffer() {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (!buffer) { buffer = ctx.createBuffer(2, state.L.length, C.SR); buffer.copyToChannel(state.L, 0); buffer.copyToChannel(state.R, 1); }
+    if (!buffer) { buffer = ctx.createBuffer(2, state.L.length, state.mix.sampleRate || C.SR); buffer.copyToChannel(state.L, 0); buffer.copyToChannel(state.R, 1); }
     return buffer;
   }
   function startPlay(at) {
@@ -1481,10 +1743,11 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     playing = false; $('play').textContent = '▶'; cancelAnimationFrame(raf); drawWave();
   }
   const position = () => (playing && buffer ? Math.min(buffer.duration, offset + ctx.currentTime - startedAt) : offset);
-  function tick() { drawWave(); $('time').textContent = `${mmss(position())} / ${mmss(state.mix ? state.mix.length / C.SR : 0)}`; if (playing) raf = requestAnimationFrame(tick); }
+  const mixSecs = () => (state.mix ? state.mix.length / (state.mix.sampleRate || C.SR) : 0);
+  function tick() { drawWave(); $('time').textContent = `${mmss(position())} / ${mmss(mixSecs())}`; if (playing) raf = requestAnimationFrame(tick); }
   $('play').addEventListener('click', () => { if (playing) stopPlay(); else startPlay(offset); });
   document.addEventListener('keydown', (e) => { if (e.code === 'Space' && !/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName) && state.L) { e.preventDefault(); playing ? stopPlay() : startPlay(offset); } });
-  $('wave').addEventListener('click', (e) => { if (!state.mix) return; const r = e.currentTarget.getBoundingClientRect(); const at = (e.clientX - r.left) / r.width * state.mix.length / C.SR; if (playing) startPlay(at); else { offset = at; tick(); } });
+  $('wave').addEventListener('click', (e) => { if (!state.mix) return; const r = e.currentTarget.getBoundingClientRect(); const at = (e.clientX - r.left) / r.width * mixSecs(); if (playing) startPlay(at); else { offset = at; tick(); } });
 
   // the waveform: the peak of each column, and the playhead over it
   const wave = $('wave'), g = wave.getContext('2d');
@@ -1498,7 +1761,7 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
       const per = state.mix.length / W;
       for (let x = 0; x < W; x++) { let m = 0; const a = Math.floor(x * per), b = Math.floor((x + 1) * per); for (let i = a; i < b; i += 4) { const v = Math.abs(state.mix[i]); if (v > m) m = v; } peaks[x] = Math.min(1, Math.tanh(m * 1.3) * 0.95); }
     }
-    const px = position() / (state.mix.length / C.SR) * W;
+    const px = position() / mixSecs() * W;
     for (let x = 0; x < W; x++) { const h = Math.max(1, peaks[x] * (H - 10)); g.fillStyle = x < px ? '#e0a33a' : '#a59d8b'; g.fillRect(x, (H - h) / 2, 1, h); }
     g.fillStyle = '#e9e2d0'; g.fillRect(Math.round(px), 0, 2, H);
   }
@@ -1513,7 +1776,7 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
   $('wav').addEventListener('click', async () => { if (await ensureRender()) { download(C.encodeWav(state.mix), state.name + '.wav', 'audio/wav'); status(`${state.name}.wav saved`); } });
   $('json').addEventListener('click', () => { if (state.song) { const s = { ...state.song, title: state.song.title || state.name }; download(new TextEncoder().encode(C.songText(s)), state.name + '.json', 'application/json'); status(`${state.name}.json saved`); } });
 
-  window.robotVoice = { state, opts, ensureRender, loadFile, position: () => position(), playing: () => playing };   // for tests
+  window.robotVoice = { state, opts, ensureRender, loadFile, applyPreset, showParams, position: () => position(), playing: () => playing };   // for tests
 })();
 </script>
 </body>

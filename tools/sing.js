@@ -6,6 +6,7 @@
 //   node tools/sing.js song.json --out out.wav [--slow 0.97] [--pitch -1] [--wobble 0.5] [--voice 1] [--band 0.8]
 //   node tools/sing.js --midi song.mid --lyrics words.txt --out out.wav [--melody-track N] [--chord-track N,N] [--out-json song.json]
 //   node tools/sing.js --midi song.mid --words words.txt --out out.wav [--phrase-rest 0.4] [--trim 4] [--guess-chords]
+//   node tools/sing.js song.json --out out.wav --preset "drunk tape" --params mine.json --set voice.vibratoDepth=12 --from 10 --to 25
 //
 // song.json: { bpm, key, voice: [{ note: 'C4' | 60 | null, beats, syl: 'dai' }], chords: [{ beats, notes: ['C3','E3','G3'] }] }
 //   syl is spelled ('win', 'dow') or, with spaces, given as sounds ('d o u'): consonants s z sh ch j f v th dh h t d k g p b m n ng l r w y,
@@ -27,8 +28,12 @@
 //   --pitch N    transpose everything N semitones before singing
 //   --wobble W   0..1, how unsteady the pitch is (default 0.5)
 //   --voice V    voice level, --band V organ and bass level (both default 1; the band sits a few dB under the voice)
+//   --preset NAME        a named starting point (1961, clean, drunk tape, telephone, choir of one, vocoder)
+//   --params file.json   a parameter set (partial; it goes over the defaults and the preset), see tools/voice-params.md
+//   --set key=value      one parameter, repeatable (voice.vibratoDepth=12); --dump-params prints the set in use as JSON and stops
+//   --from S --to S      sing only this stretch of the song, in seconds of the song's own time (before the tape speed)
 import fs from 'node:fs';
-import { SR, songFromMidi, songFromNotes, notesFromVoice, trimLongNotes, songText, render, encodeWav } from './sing_core.js';
+import { SR, songFromMidi, songFromNotes, notesFromVoice, trimLongNotes, songText, render, encodeWav, sliceSong, mergeParams, setParam, resolveParams, PRESETS } from './sing_core.js';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; };
@@ -37,6 +42,11 @@ const MIDI = opt('--midi', null), LYRICS = opt('--lyrics', null), WORDS = opt('-
 const TRIM = +opt('--trim', 0) || 0, GUESS = args.includes('--guess-chords'), REST = +opt('--phrase-rest', 0.4) || 0.4;
 if (!songFile && !MIDI) { console.error('usage: node tools/sing.js song.json --out out.wav\n       node tools/sing.js --midi song.mid --lyrics words.txt --out out.wav'); process.exit(1); }
 const OUT = opt('--out', 'song.wav');
+// the parameter set: defaults, then the preset, then the file, then every --set, then the old flags on top
+let params = mergeParams(opt('--preset', null) ? PRESETS[opt('--preset', null)] || (() => { console.error(`no preset "${opt('--preset', null)}"; have: ${Object.keys(PRESETS).join(', ')}`); process.exit(2); })() : null, opt('--params', null) ? JSON.parse(fs.readFileSync(opt('--params', null), 'utf8')) : null);
+for (let i = 0; i < args.length; i++) if (args[i] === '--set' && args[i + 1]) { const [k, v] = args[++i].split('='); setParam(params, k, v); }
+const flags = { slow: +opt('--slow', 1), pitch: +opt('--pitch', 0), wobble: +opt('--wobble', 0.5), voice: +opt('--voice', 1), band: +opt('--band', 1) };
+if (args.includes('--dump-params')) { console.log(JSON.stringify(resolveParams({ ...flags, params }), null, 2)); process.exit(0); }
 const tracks = (k) => (opt(k, '') + '').split(',').map((x) => +x).filter((x) => x > 0);
 
 let song = MIDI
@@ -52,6 +62,7 @@ if (OUT_JSON) {
   fs.writeFileSync(OUT_JSON, songText(song));
   console.error(`${OUT_JSON}: ${song.voice.length} voice entries, ${(song.chords || []).length} chord blocks`);
 }
-const mix = render(song, { slow: +opt('--slow', 1), pitch: +opt('--pitch', 0), wobble: +opt('--wobble', 0.5), voice: +opt('--voice', 1), band: +opt('--band', 1) });
+if (opt('--from', null) != null || opt('--to', null) != null) song = sliceSong(song, +opt('--from', 0) || 0, opt('--to', null) != null ? +opt('--to', 0) : Infinity);
+const mix = render(song, { ...flags, params });
 fs.writeFileSync(OUT, encodeWav(mix));
 console.log(`${OUT}: ${(mix.length / SR).toFixed(1)} s, ${song.voice.length} notes`);

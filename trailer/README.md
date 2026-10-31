@@ -178,6 +178,14 @@ phrase, laid on the melody the way the page does (`--phrase-rest B` sets the res
 past N beats; `--guess-chords` adds a chord per bar from the melody. `--out-json song.json` also writes what it read as a song
 file, to fix a syllable or a chord by hand and sing again from that.
 
+Every number in the synth is a parameter (`tools/voice-params.md`: 70 of them in five groups, voice, tape, lo-fi, band and mix,
+each with its range, default and meaning). `--preset NAME` (1961, clean, drunk tape, telephone, choir of one, vocoder),
+`--params file.json` (a partial set over the defaults), `--set key=value` and `--dump-params` on the command line; in the page the
+same set is the `advanced` fold-out, with the presets, import and export of the same JSON. The defaults are the sound the singer
+always had, to the sample. `tools/sing_measure.js` measures a render against its song (loudness, pitch accuracy, formants, wobble,
+gaps, balance, a spectrogram PNG with the notes drawn over the tracked pitch), and `tools/tune/` is a loop that renders an excerpt,
+measures it and adjusts the set toward a goal; its README has the commands.
+
 A synthesized cover does not need the recording's master licence, but the composition is still under copyright, and so is a
 transcription of it, so it still needs a synchronisation licence from the song's publishers before it goes in the trailer. Keep the
 MIDI, the recording, the lyrics file and the song file of any copyrighted song out of the repository.

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "voice-tuner": {
+      "description": "Proposes the next parameter set for the robot singer from a goal and the measurements so far",
+      "mode": "primary",
+      "temperature": 0.3,
+      "tools": { "write": false, "edit": false, "bash": false },
+      "prompt": "You tune a formant-synthesis robot singer. Read tools/voice-params.md for every parameter, its range and what it does. The user message holds a GOAL, the CURRENT PARAMETERS (what differs from the defaults), a HISTORY of rounds with the metrics each produced (from tools/sing_measure.js: pitch accuracy in cents, onset and legato gaps in ms, wobbleIndex / vibratoCents / driftCents for unsteadiness, nhr for breathiness, centroidHz and tiltDbPerOct for brightness, loudnessLufs, bandVoiceDb, stereoWidthDb, formantDevPct) and the path of a spectrogram of the last render. Decide which few parameters to move, and how far, so the next render is closer to the goal; stay inside the ranges; do not undo a move that helped. Answer with one JSON object only, the keys you change in the shape {\"voice\":{},\"tape\":{},\"lofi\":{},\"band\":{},\"mix\":{}}, no prose, no code fences."
+    }
+  },
+  "command": {
+    "tune-voice": {
+      "description": "Run the tuning loop on the demo song with the voice-tuner agent",
+      "template": "node tools/tune/tune.js --song trailer/music/robot_song.json --goal tools/tune/goal.txt --out /tmp/tune --preset 1961 --iters 6 --from 10 --to 30 --llm \"opencode run --agent voice-tuner\""
+    }
+  }
+}
