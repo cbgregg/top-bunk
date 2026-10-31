@@ -146,7 +146,7 @@ function midiParts(mid, toSec) {
   mid.tracks.forEach((ev, ti) => {
     const nameEv = ev.find((e) => e.meta === 0x03);
     const name = nameEv ? text(nameEv.data) : '';
-    const open = new Map(), byCh = new Map(), lyrics = [];
+    const open = new Map(), byCh = new Map(), lyrics = [], program = new Map();
     let last = 0;
     const close = (key, tick) => {
       const s = open.get(key); if (s == null) return; open.delete(key);
@@ -157,8 +157,9 @@ function midiParts(mid, toSec) {
     };
     for (const e of ev) {
       last = Math.max(last, e.tick);
-      if (e.meta === 0x05) { lyrics.push({ tick: e.tick, text: text(e.data) }); continue; }
+      if (e.meta === 0x05 || e.meta === 0x01) { const t = text(e.data); if (t && !/^[@%]/.test(t)) lyrics.push({ tick: e.tick, text: t }); continue; }   // lyric and text events (karaoke files use text)
       if (e.kind == null || e.ch === 9) continue;   // channel 10 is drums
+      if (e.kind === 0xc0) { if (!program.has(e.ch)) program.set(e.ch, e.d1); continue; }
       const key = e.ch * 128 + e.d1;
       if (e.kind === 0x90 && e.d2 > 0) { close(key, e.tick); open.set(key, e.tick); }
       else if (e.kind === 0x80 || e.kind === 0x90) close(key, e.tick);
@@ -166,17 +167,59 @@ function midiParts(mid, toSec) {
     for (const key of [...open.keys()]) close(key, last);
     for (const [ch, notes] of byCh) {
       notes.sort((a, b) => a.s - b.s || b.m - a.m);
-      let overlaps = 0, sum = 0;
+      let overlaps = 0, sum = 0, withLyric = 0;
       for (let i = 1; i < notes.length; i++) if (notes[i].s < notes[i - 1].e - 1e-3) overlaps++;
       for (const n of notes) sum += n.m;
       for (const l of lyrics) {   // a lyric belongs to the note that starts nearest it, within an eighth of a beat
         let best = null; for (const n of notes) if (Math.abs(n.tick - l.tick) <= mid.ppq / 8 && (!best || Math.abs(n.tick - l.tick) < Math.abs(best.tick - l.tick))) best = n;
-        if (best && l.text && !best.lyric) best.lyric = l.text;
+        if (best && l.text && !best.lyric) { best.lyric = l.text; withLyric++; }
       }
-      parts.push({ track: ti + 1, ch: ch + 1, name, notes, overlaps, mean: sum / notes.length });
+      parts.push({ track: ti + 1, ch: ch + 1, name, program: program.has(ch) ? program.get(ch) : null, notes, overlaps, lyrics: withLyric, mean: sum / notes.length });
     }
   });
   return parts;
+}
+
+// which part sings: a score per part from everything a file gives away, highest wins. Returns the parts with score and reasons
+// filled in, best first. bl: the beat length in seconds.
+const LEADY = /vocal|voice|\bvoc|vox|sing|lead|melod|\bmel\b|tune|words|lyric|chorus|verse/i, BANDY = /bass|drum|perc|\bpad|string|chord|accomp|rhythm|piano|guitar|\blh\b|left|harmony|backing|organ|synth\s*pad|arp/i;
+export function scoreParts(parts, bl) {
+  const songEnd = Math.max(...parts.flatMap((pt) => pt.notes.map((n) => n.e)));
+  for (const pt of parts) {
+    const ns = pt.notes, why = [];
+    let score = 0;
+    const add = (v, w) => { if (v) { score += v; why.push(`${w} ${v > 0 ? '+' : ''}${+v.toFixed(1)}`); } };
+    if (pt.name) { if (LEADY.test(pt.name)) add(3, 'name'); if (BANDY.test(pt.name)) add(-3, 'name'); }
+    if (pt.lyrics) add(pt.lyrics >= 0.3 * ns.length ? 5 : 2, 'lyrics');
+    const p = pt.program;
+    if (p != null) {
+      if (p >= 52 && p <= 54) add(2.5, 'voice program'); else if (p >= 80 && p <= 87) add(2, 'lead program'); else if (p >= 64 && p <= 79) add(1, 'wind program');
+      else if (p >= 32 && p <= 39) add(-3, 'bass program'); else if (p >= 88 && p <= 95) add(-2, 'pad program'); else if (p <= 7 || (p >= 24 && p <= 31) || (p >= 48 && p <= 51)) add(-1, 'program');
+    }
+    // monophony: time with two notes sounding, past an eighth of a beat of legato, against the time the part sounds at all
+    let sounding = 0, poly = 0, end = 0;
+    for (const n of ns) { if (n.s > end) { sounding += n.e - n.s; } else { if (end - n.s > bl / 8) poly += Math.min(end, n.e) - n.s; sounding += Math.max(0, n.e - end); } end = Math.max(end, n.e); }
+    pt.mono = sounding ? Math.max(0, 1 - poly / sounding) : 1;
+    add(Math.max(-3, Math.min(2, 2 * (pt.mono - 0.6) / 0.4)), 'mono');
+    // a human range: most notes between G2 and C6, the middle of the line around C4-A4
+    const ms = ns.map((n) => n.m).sort((a, b) => a - b), med = ms[ms.length >> 1];
+    pt.median = med;
+    const outside = ms.filter((m) => m < 43 || m > 84).length / ms.length;
+    add(-3 * outside, 'out of range');
+    add(med >= 57 && med <= 72 ? 2 : Math.max(-2, 2 - 0.75 * Math.ceil((med < 57 ? 57 - med : med - 72) / 3)), 'centre');
+    const span = ms[Math.floor(ms.length * 0.95)] - ms[Math.floor(ms.length * 0.05)];
+    if (span > 30) add(-1, 'span');
+    // a tune, not a run of sixteenths and not one long pad
+    const perSec = ns.length / Math.max(1e-6, sounding), avgLen = sounding / ns.length / bl;
+    if (perSec > 8) add(-2, 'runs'); else if (perSec < 0.3) add(-1, 'sparse'); else add(1, 'pace');
+    if (avgLen > 4) add(-2, 'held');
+    // sings across most of the song
+    const cover = sounding / songEnd;
+    if (cover >= 0.5) add(1, 'coverage'); else if (cover < 0.2) add(-2, 'coverage');
+    pt.coverage = cover;
+    pt.score = score; pt.why = why;
+  }
+  return [...parts].sort((a, b) => b.score - a.score || b.notes.length - a.notes.length);
 }
 
 // a lyrics text as a list of syllables: separated by spaces and hyphens, "_" holds the last syllable over the next note, "-" on its
@@ -228,15 +271,15 @@ export function applyLyrics(voice, lyrics, log = () => {}) {
   return words;
 }
 
-// the parts of a MIDI file, for choosing tracks: [{ track, ch, name, notes, overlaps, mean }]
+// the parts of a MIDI file, for choosing tracks: [{ track, ch, name, program, notes, overlaps, lyrics, mean }]
 export function midiInfo(bytes, name) {
   const mid = readMidi(bytes, name);
   const { toSec, bpm, changes } = tempoMap(mid);
   return { mid, bpm, changes, parts: midiParts(mid, toSec).filter((pt) => pt.notes.length) };
 }
 
-// a song from a MIDI file and its words. The melody is the track with the highest average pitch that never plays two notes at
-// once (or melodyTrack, numbered from 1 in file order); every other pitched track is the band, grouped into a chord per beat
+// a song from a MIDI file and its words. The melody is the track that carries lyric events, else the part scoreParts() ranks
+// first (or melodyTrack, numbered from 1 in file order); every other pitched track is the band, grouped into a chord per beat
 // (or chordTracks). Tempo changes are kept. Notes left without a syllable sing "la"; without lyrics, lyric events in the MIDI are used.
 // log gets one line per thing found.
 export function songFromMidi(bytes, { name = 'the file', lyrics = null, melodyTrack = 0, chordTracks = [], log = () => {} } = {}) {
@@ -244,20 +287,21 @@ export function songFromMidi(bytes, { name = 'the file', lyrics = null, melodyTr
   const bl = 60 / bpm;
   if (!parts.length) throw new Error(name + ' has no notes');
   log(`${name}: type ${mid.format}, ${mid.tracks.length} track${mid.tracks.length === 1 ? '' : 's'}, ${bpm.toFixed(1)} bpm${changes > 1 ? ` (${changes} tempo changes)` : ''}`);
-  for (const pt of parts) log(`  track ${pt.track}${pt.name ? ` "${pt.name}"` : ''} ch ${pt.ch}: ${pt.notes.length} notes, mean ${nameOf(Math.round(pt.mean))}${pt.overlaps ? `, ${pt.overlaps} overlapping` : ''}`);
-  // the melody: a chosen track, or the highest monophonic part
+  const ranked = scoreParts(parts, bl);
+  const lyricParts = parts.filter((pt) => pt.lyrics >= Math.max(3, 0.3 * pt.notes.length));
+  // the melody: a chosen track, else the track that carries the words, else the best score
   let melody;
   if (melodyTrack) {
     const onTrack = parts.filter((pt) => pt.track === melodyTrack);
     if (!onTrack.length) throw new Error(`melody track ${melodyTrack}: that track has no notes`);
     melody = onTrack.reduce((a, b) => (b.notes.length > a.notes.length ? b : a));
-  } else {
-    const mono = parts.filter((pt) => !pt.overlaps && pt.notes.length >= 4);
-    const pool = mono.length ? mono : parts;
-    melody = pool.reduce((a, b) => (b.overlaps / b.notes.length < a.overlaps / a.notes.length - 0.05 || (Math.abs(b.overlaps / b.notes.length - a.overlaps / a.notes.length) <= 0.05 && b.mean > a.mean) ? b : a));
-  }
+  } else if (lyricParts.length) melody = lyricParts.reduce((a, b) => (b.lyrics > a.lyrics ? b : a));
+  else melody = ranked[0];
+  const pad = (v, n) => String(v).padStart(n);
+  log(`  ${'track'.padEnd(26)}${pad('prog', 5)}${pad('notes', 6)}${pad('mono', 6)}${pad('mid', 5)}${pad('words', 7)}${pad('score', 7)}`);
+  for (const pt of ranked) log(`  ${(`${pt === melody ? '> ' : '  '}${pt.track}${pt.name ? ` "${pt.name.slice(0, 14)}"` : ''} ch ${pt.ch}`).padEnd(26)}${pad(pt.program ?? '-', 5)}${pad(pt.notes.length, 6)}${pad(Math.round(pt.mono * 100) + '%', 6)}${pad(nameOf(pt.median), 5)}${pad(pt.lyrics ? 'yes' : '-', 7)}${pad(pt.score.toFixed(1), 7)}   ${pt.why.join(', ')}`);
   const bandParts = parts.filter((pt) => pt !== melody && (chordTracks.length ? chordTracks.includes(pt.track) : true));
-  log(`  melody: track ${melody.track} ch ${melody.ch}; band: ${bandParts.length ? bandParts.map((pt) => `track ${pt.track} ch ${pt.ch}`).join(', ') : 'none'}`);
+  log(`  melody: track ${melody.track}${melody.name ? ` "${melody.name}"` : ''} ch ${melody.ch}${melodyTrack ? ' (chosen)' : lyricParts.length ? ' (it carries the words)' : ' (best score)'}; band: ${bandParts.length ? bandParts.map((pt) => `track ${pt.track} ch ${pt.ch}`).join(', ') : 'none'}`);
 
   // the melody as one line: of notes starting together keep the highest, and cut each note at the next one's start
   const mel = [];
@@ -294,7 +338,7 @@ export function songFromMidi(bytes, { name = 'the file', lyrics = null, melodyTr
   for (const v of voice) v.beats = +v.beats.toFixed(4);
   const title = (mid.tracks[0] || []).find((e) => e.meta === 0x03);
   const song = { title: title ? text(title.data) : undefined, bpm: +bpm.toFixed(3), voice, chords };
-  return { song, melody: melody.track, band: bandParts.map((pt) => pt.track), words };
+  return { song, melody: melody.track, band: bandParts.map((pt) => pt.track), words, ranked: ranked.map((pt) => ({ track: pt.track, ch: pt.ch, name: pt.name, program: pt.program, notes: pt.notes.length, mono: pt.mono, median: pt.median, lyrics: pt.lyrics, score: pt.score, why: pt.why })) };
 }
 
 // the song as a song file (note names, one entry per line), to edit by hand and sing again

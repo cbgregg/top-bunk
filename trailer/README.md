@@ -145,9 +145,14 @@ node tools/sing.js --midi song.mid --lyrics words.txt --out trailer/music/robot_
 node trailer/render.js --preset steam --music trailer/music/robot_song.wav
 ```
 
-The MIDI reader is built in (type 0 and 1, tempo changes kept). It takes the melody from the track with the highest average pitch that
-never plays two notes at once, and the band from every other pitched track, one chord per beat; channel 10 drums are skipped. It prints
-the tracks it found and its choice, which `--melody-track N` and `--chord-track N,N` (track numbers from 1, in file order) override. The
+The MIDI reader is built in (type 0 and 1, tempo changes kept). The track that carries lyric or text events is the melody; without
+one, every part is scored on its name (vocal, voice, lead, melody... against bass, drum, pad, strings, piano, guitar...), its
+General MIDI program (voice and lead sounds up, bass and pads down), how monophonic it is (legato overlaps under an eighth of a beat
+are ignored, so a real vocal line is not disqualified by them), whether it sits in a human range with its middle around C4-A4,
+whether it moves like a tune (not sixteenth runs, not one held pad) and whether it sings across most of the song; the highest score
+sings and its overlapping notes are cut at the next onset. The band is every other pitched track, one chord per beat; channel 10
+drums are skipped. The printout is the score table with the reasons, and `--melody-track N` / `--chord-track N,N` (track numbers
+from 1, in file order) override it; the page has the same choice as a dropdown above the table. The
 lyrics file is plain text, one syllable per melody note in order, separated by spaces and hyphens, with `_` to hold the last syllable
 over the next note, `[dh uh]` for a syllable given as sounds and `#` for comments; `trailer/music/robot_lyrics_example.txt` is the
 demo's words in that form. Rests take no syllable. If the syllable and note counts differ it says so, and notes left over sing "la".

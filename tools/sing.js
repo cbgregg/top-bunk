@@ -35,6 +35,7 @@ const tracks = (k) => (opt(k, '') + '').split(',').map((x) => +x).filter((x) => 
 const song = MIDI
   ? songFromMidi(fs.readFileSync(MIDI), { name: MIDI, lyrics: LYRICS ? fs.readFileSync(LYRICS, 'utf8') : null, melodyTrack: tracks('--melody-track')[0] || 0, chordTracks: tracks('--chord-track'), log: (s) => console.error(s) }).song
   : JSON.parse(fs.readFileSync(songFile, 'utf8'));
+if (MIDI) console.error('  (another track sings with --melody-track N; --chord-track N,N picks the band)');
 if (OUT_JSON) {
   fs.writeFileSync(OUT_JSON, songText(song));
   console.error(`${OUT_JSON}: ${song.voice.length} voice entries, ${(song.chords || []).length} chord blocks`);
