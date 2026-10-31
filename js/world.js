@@ -1176,7 +1176,7 @@ export function buildWorld(scene) {
     defParent = yard;
     const gw = (x0, x1, y0, y1, z0, z1, inside) => {   // a wall piece: siding outside, the plywood sheathing on the face that looks into the garage
       const m = [M.siding, M.siding, M.siding, M.siding, M.siding, M.siding]; m[inside] = M.ply;   // (+x, -x, +y, -y, +z, -z)
-      box(x0, x1, y0, y1, z0, z1, m);
+      box(x0, x1, y0, y1 === GH ? GH + 0.04 : y1, z0, z1, m);   // (a wall that reaches the ceiling runs up into it rather than meeting it edge to edge)
     };
     gw(GX0, GX1, 0, GH, GZ0, GZ0 + GT, 4);
     gw(GX0, GX0 + GT, 0, GH, GZ0 + GT, GZ1 - GT, 0);
