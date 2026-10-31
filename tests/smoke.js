@@ -2,8 +2,10 @@
 'use strict';
 // `npm test`: the whole game in headless Chromium with the network cut off (only this machine answers), walked through the title and its
 // options, a day, a night, the trailer hook and a phone-sized touch screen; then the desktop shell's own smoke run if Electron is installed.
-// One PASS / FAIL / SKIP line per check, exit 1 on any FAIL.
-//   node tests/smoke.js [--port N] [--only 0,3,7]
+// Further checks drive the game as a player would, with a faked gamepad, typed keys and the debug jumps (#night4&type=hunted, #night10&proof=4 ...):
+// title to pause, getting caught, the three endings, a night survived and Continue, the vigil, each nightmare, the breaker, the doors, brightness, a typed seed.
+// One PASS / FAIL / SKIP line per check, exit 1 on any FAIL; --only picks checks.
+//   node tests/smoke.js [--port N] [--only 0,3,7 | --only load,gamepad]
 // Needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`). The pages use SwiftShader, so after the first load
 // each one stops drawing (window.__norender, see js/main.js) and only the game's logic runs.
 const http = require('http');
@@ -17,11 +19,15 @@ const ROOT = path.join(__dirname, '..');
 const ARGV = process.argv.slice(2);
 const opt = (name, def) => { const i = ARGV.indexOf(name); return i >= 0 && ARGV[i + 1] !== undefined ? ARGV[i + 1] : def; };
 const PORT = +opt('--port', process.env.SMOKE_PORT || 0);
-const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map(Number)) : null;
+// the checks by name, so --only takes either 10 or gamepad
+const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19 };
+const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map((t) => (t in NAMES ? NAMES[t] : Number(t)))) : null;
+if (ONLY && [...ONLY].some(Number.isNaN)) { console.error('--only takes check numbers or names: ' + Object.keys(NAMES).join(', ')); process.exit(2); }
 const want = (...ns) => !ONLY || ns.some((n) => ONLY.has(n));
 const LOCAL = new Set(['127.0.0.1', 'localhost']);
 const FAMILIES = ['Special Elite', 'Courier Prime', 'Permanent Marker', 'Gloria Hallelujah'];
 const IGNORE = [/Ignored attempt to cancel a touchstart event/];   // chromium's touch emulation says this on its own
+const GAME_WARNINGS = /\b(nightmare|night type|grandpa model) failed/;   // the game catches these and warns instead of throwing
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- results ----------
@@ -69,7 +75,11 @@ async function newContext(browser, opts = {}) {
 function watch(page, ctx) {
   const w = { errors: [], console: [], failed: [], bad: [], requests: 0, ctx };
   page.on('pageerror', (e) => w.errors.push(String((e && e.stack) || e).split('\n').slice(0, 2).join(' / ')));
-  page.on('console', (m) => { if (m.type() === 'error' && !IGNORE.some((re) => re.test(m.text()))) w.console.push(m.text()); });
+  page.on('console', (m) => {
+    const text = m.text();
+    if (m.type() === 'error' && !IGNORE.some((re) => re.test(text))) w.console.push(text);
+    else if (m.type() === 'warning' && GAME_WARNINGS.test(text)) w.console.push(text);
+  });
   page.on('request', () => { w.requests++; });
   page.on('requestfailed', (r) => w.failed.push(`${r.url()} (${(r.failure() && r.failure().errorText) || 'failed'})`));
   page.on('response', (r) => { if (r.status() >= 400) w.bad.push(`${r.status()} ${r.url()}`); });
@@ -77,9 +87,16 @@ function watch(page, ctx) {
 }
 const problems = (w) => [...w.errors.map((s) => `page error: ${s}`), ...w.console.map((s) => `console error: ${s}`), ...w.failed.map((s) => `request failed: ${s}`), ...w.bad.map((s) => `HTTP ${s}`), ...w.ctx.blocked.map((s) => `tried the network: ${s}`)];
 const clean = (w) => { const p = problems(w); ok(p.length === 0, `${p.length} problem(s): ${p.slice(0, 3).join(' | ')}`); };
-async function openGame(ctx, url, { render = false } = {}) {
+// a gamepad that is always connected: the game reads window.__pad.buttons[i].pressed on each frame
+const PAD = () => {
+  window.__pad = { connected: true, id: 'smoke pad', index: 0, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+  navigator.getGamepads = () => [window.__pad];
+};
+async function openGame(ctx, url, { render = false, clock = 0, pad = false } = {}) {
   const page = await ctx.newPage(), w = watch(page, ctx), t0 = Date.now();
   if (!render) await page.addInitScript(() => { window.__norender = true; });
+  if (clock) await page.addInitScript((m) => { window.__clockMul = m; }, clock);   // the night's clock runs m times faster
+  if (pad) await page.addInitScript(PAD);
   await page.goto(BASE + url, { waitUntil: 'load', timeout: 180e3 });
   await page.waitForFunction(() => window.__game && document.getElementById('loading').classList.contains('done'), null, { timeout: 180e3, polling: 250 });
   return { page, w, readyIn: (Date.now() - t0) / 1000 };
@@ -91,6 +108,34 @@ async function playFor(page, s, ms = 240e3) {
   await until(page, (t) => window.__game.gameTime >= t, t0 + s, ms);
   return t0;
 }
+
+// a night from its debug jump, started and live; no drawing and no shader warm-up
+async function nightPage(ctx, hash, opts = {}) {
+  const A = await openGame(ctx, '/index.html' + hash, opts), n = hash.match(/night(\d+)/)[1];
+  await A.page.evaluate(() => { const g = window.__game; g.renderer.compileAsync = async () => {}; g.startGame(); });
+  await until(A.page, (n) => window.__game.F.stage === 'n' + n && window.__game.F.live, n, 240e3);
+  return A;
+}
+// out of the bunk by its own prompt (E), onto the floor
+async function climbDown(page) {
+  await until(page, () => { const g = window.__game; return g.P.mode === 'bunk' && !g.F.cutscene && !g.F.script; }, null, 60e3);
+  await page.keyboard.press('KeyE');
+  await until(page, () => { const g = window.__game; return g.P.mode === 'walk' && !g.F.cutscene; }, null, 60e3);
+}
+// the player at (x, z), at height y, looking at (tx, tz)
+const stand = (page, x, z, tx, tz, y = 0) => page.evaluate(([x, z, tx, tz, y]) => {
+  const g = window.__game; g.P.pos.set(x, y, z); g.P.vel.set(0, 0, 0);
+  if (tx !== undefined) { g.P.yaw = Math.atan2(-(tx - x), -(tz - z)); g.P.pitch = 0; }
+}, [x, z, tx, tz, y]);
+const hold = async (page, key, ms) => { await page.keyboard.down(key); await sleep(ms); await page.keyboard.up(key); };
+const tap = async (page, i) => {   // a press of gamepad button i
+  await page.evaluate((i) => { window.__pad.buttons[i].pressed = true; }, i); await sleep(150);
+  await page.evaluate((i) => { window.__pad.buttons[i].pressed = false; }, i); await sleep(150);
+};
+const prompt = (page) => page.evaluate(() => document.getElementById('prompt').textContent.replace(/\s+/g, ' ').trim());
+const roomAt = (page, x, z, y) => page.evaluate(async ([x, z, y]) => (await import('/js/world.js')).roomAt(x, z, y), [x, z, y]);
+// each of these checks gets a browser context of its own, so saves and settings never leak from one to the next
+async function alone(browser, fn, opts) { const c = await newContext(browser, opts); try { return await fn(c); } finally { await c.close(); } }
 
 let BASE = '';
 (async () => {
@@ -107,7 +152,7 @@ let BASE = '';
 
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
-  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8];
+  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
   if (!chromium) {
     for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
@@ -201,7 +246,7 @@ let BASE = '';
     await check(4, 'day', async () => {
       const { page, w } = await openGame(ctx, '/index.html');
       ok(await page.evaluate(() => window.__game.RUN.night === 1), 'expected a fresh run at night 1');
-      await page.evaluate(() => { window.__game.startGame(); });   // (resolves only when the game ends: not awaited)
+      await page.evaluate(() => { window.__game.startGame(); });   // resolves only when the game ends: not awaited
       await until(page, () => window.__game.F.stage === 'day' && window.__game.F.phase === 'day', null, 240e3);
       const t0 = await playFor(page, 5);
       const s = await page.evaluate(() => { const g = window.__game; return { t: g.gameTime, mode: g.P.mode, obj: document.getElementById('objective').textContent, x: g.P.pos.x, z: g.P.pos.z, fov: g.camera.fov, set: g.settings.get('fov') }; });
@@ -262,7 +307,7 @@ let BASE = '';
 
       await check(6, 'evidence', async () => {
         if (!C && want(5)) throw new Error('the night page did not load');
-        const { page, w } = C || await openGame(ctx, '/index.html#night');   // (run on its own: the proof API is there before the night starts)
+        const { page, w } = C || await openGame(ctx, '/index.html#night');   // run on its own: the proof API is there before the night starts
         const e = await page.evaluate(() => {
           const g = window.__game, pr = g.nights.proof, kinds = {};
           for (let n = 1; n <= 10; n++) kinds[n] = pr.kindsFor(g.nights.plan(n));
@@ -295,12 +340,13 @@ let BASE = '';
     await check(7, 'trailer', async () => {
       const page = await ctx.newPage(), w = watch(page, ctx);
       await page.addInitScript(() => { window.__norender = true; });
-      await page.route('**/trailer/music/**', (route) => route.fulfill({ status: 200, contentType: 'audio/wav', body: '' }));   // (the soundtrack is not under test and not in git: an empty file and boot.js plays on silent)
+      // the soundtrack is not under test and not in git: an empty file and boot.js plays on silent
+      await page.route('**/trailer/music/**', (route) => route.fulfill({ status: 200, contentType: 'audio/wav', body: '' }));
       await page.goto(BASE + '/index.html?trailer=1', { waitUntil: 'load', timeout: 180e3 });
       await until(page, () => window.__game && document.getElementById('loading').classList.contains('done'), null, 180e3);
       // boot.js's player runs each shot from the game's render call: keep the call, drop the drawing
       await page.evaluate(() => { const g = window.__game; g.renderer.render = () => {}; g.renderer.compileAsync = async () => {}; window.__norender = false; });
-      const go = page.getByText(/click to play/i);   // (boot.js's start overlay: it shows once the player is attached)
+      const go = page.getByText(/click to play/i);   // boot.js's start overlay: it shows once the player is attached
       await go.waitFor({ timeout: 180e3 });
       const s = await page.evaluate(async () => {
         const m = await import('./trailer/trailer.js');
@@ -376,13 +422,289 @@ let BASE = '';
         const [, , px, py] = b.on.find(([id]) => id === 't-pause');
         await page.touchscreen.tap(px, py);
         await until(page, () => !document.getElementById('pause').classList.contains('hidden'), null, 10e3);
-        await sleep(600);   // (a tap that resumed straight away would show here)
+        await sleep(600);   // a tap that resumed straight away would show here
         const pz = await page.evaluate(() => { const vh = innerHeight, items = [...document.querySelectorAll('#pause-menu .mi')]; return { paused: !document.getElementById('pause').classList.contains('hidden'), n: items.length, fit: items.every((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= vh + 1; }) }; });
         ok(pz.paused && pz.n >= 5 && pz.fit, `pause on a phone: ${JSON.stringify(pz)}`);
         clean(w);
         return `844x390 touch: ${t.items.length} title entries on screen (${Math.min(...t.items.map(([, , h]) => h))} px or taller), "Tap to begin"; New game then Start by tap starts the day; USE, RUN, LIGHT and II on screen; II pauses and the ${pz.n}-entry pause menu fits`;
       } finally { await pctx.close(); }
     });
+
+    // ---------- 10: a gamepad through the title, options, start and pause ----------
+    await check(10, 'gamepad', () => alone(browser, async (c) => {
+      const { page, w } = await openGame(c, '/index.html', { pad: true });
+      await page.evaluate(() => { window.__game.renderer.compileAsync = async () => {}; });
+      const ms = () => page.evaluate(() => window.__game.menu.state);
+      await tap(page, 13);   // d-pad down
+      let m = await ms();
+      ok(m.open.join() === 'title' && m.focus === 'options', `down on the title: ${JSON.stringify(m)}`);
+      ok(await page.evaluate(() => document.body.dataset.scheme) === 'pad', 'the pad did not become the input scheme');
+      await tap(page, 0);   // A
+      m = await ms();
+      ok(m.open.join() === 'title,options', `A on Options: ${JSON.stringify(m)}`);
+      await tap(page, 13);
+      ok((await ms()).focus === 'music', `down inside Options: ${JSON.stringify(await ms())}`);
+      await tap(page, 1);   // B
+      m = await ms();
+      ok(m.open.join() === 'title' && m.focus === 'options', `B out of Options: ${JSON.stringify(m)}`);
+      await tap(page, 12);   // up
+      await tap(page, 0);
+      m = await ms();
+      ok(m.open.join() === 'title,newgame' && m.focus === 'start', `A on New game: ${JSON.stringify(m)}`);
+      await tap(page, 0);   // Start of the new game panel
+      await until(page, () => window.__game.F.stage === 'day' && window.__game.F.phase === 'day', null, 240e3);
+      const t0 = await playFor(page, 1, 60e3);
+      ok(await page.evaluate(() => document.getElementById('title').classList.contains('hidden')), 'the title is still up');
+      await tap(page, 9);   // Start pauses
+      m = await ms();
+      const p = await page.evaluate(() => ({ shown: !document.getElementById('pause').classList.contains('hidden'), t: window.__game.gameTime, info: document.getElementById('pauseinfo').textContent }));
+      ok(p.shown && m.open.join() === 'pause' && m.focus === 'resume', `pause by Start: ${JSON.stringify([p, m])}`);
+      await sleep(800);
+      ok(await page.evaluate((t) => window.__game.gameTime - t, p.t) === 0, 'the game clock ran while paused');
+      await tap(page, 13); await tap(page, 12);   // down and up inside the pause menu
+      await tap(page, 0);   // A on Resume
+      const r = await page.evaluate(() => ({ hidden: document.getElementById('pause').classList.contains('hidden'), open: window.__game.menu.state.open }));
+      ok(r.hidden && r.open.length === 0, `A on Resume: ${JSON.stringify(r)}`);
+      await playFor(page, 0.5, 30e3);
+      clean(w);
+      return `title, options, pause and resume by pad (${p.info.replace(/\s+/g, ' ')})`;
+    }), 300e3);
+
+    // ---------- 11: getting caught, and Try again by pad ----------
+    await check(11, 'death and Try again', () => alone(browser, async (c) => {
+      const { page, w } = await nightPage(c, '#night2&type=hunted', { pad: true });
+      await page.evaluate(() => { window.__game.nights.director.stop(); });
+      // caught the way a failed breath check catches you: hiding, a check on, and the breath not held
+      await page.evaluate(() => { const g = window.__game; g.P.mode = 'hide'; g.F.breathCheck = true; g.F.grace = 0; });
+      await until(page, () => !document.getElementById('death').classList.contains('hidden'), null, 60e3);
+      const d = await page.evaluate(() => { const g = window.__game; return { dead: g.F.dead, live: g.F.live, deaths: g.RUN.deaths, stage: g.F.stage, h: document.querySelector('#death h2').textContent, b: document.getElementById('retry').textContent }; });
+      ok(d.dead && !d.live && d.deaths === 1 && d.b === 'Try again', `death screen: ${JSON.stringify(d)}`);
+      await tap(page, 0);   // A
+      await until(page, () => document.getElementById('death').classList.contains('hidden') && !window.__game.F.dead && window.__game.F.live && window.__game.F.stage === 'n2', null, 120e3);
+      const a = await page.evaluate(() => { const g = window.__game; return { stage: g.F.stage, mode: g.P.mode, night: g.F.night, deaths: g.RUN.deaths }; });
+      ok(a.stage === 'n2' && a.night === 2 && a.mode === 'bunk' && a.deaths === 1, `after Try again: ${JSON.stringify(a)}`);
+      await playFor(page, 1, 60e3);
+      clean(w);
+      return `caught screen "${d.h}", then night 2 again (deaths ${a.deaths})`;
+    }), 300e3);
+
+    // ---------- 12: the three end screens, by the finale path with proof 0, 4 and 8 ----------
+    await check(12, 'endings', () => alone(browser, async (c) => {
+      const want = { 0: ['They never believed you.', 'proof 0 / 12'], 4: ['They saw it.', 'proof 4 / 12'], 8: ['They believed you.', 'proof 8 / 12'] };
+      const runs = [];   // one after the other: pages side by side starve each other of frames
+      for (const proof of Object.keys(want)) {
+        const { page, w } = await openGame(c, `/index.html#night10&proof=${proof}`, { clock: 30 });   // not faster: the night's clock must not step past dawn before the finale starts
+        await page.evaluate(() => { const g = window.__game; g.renderer.compileAsync = async () => {}; g.startGame(); });
+        await until(page, () => window.__game.F.stage === 'n10' && window.__game.F.live, null, 240e3);
+        await page.evaluate(() => { window.__game.nights.director.stop(); });   // nothing hunts you before the end: the finale is what is under test
+        try { await until(page, () => !document.getElementById('end').classList.contains('hidden'), null, 200e3); } catch (err) {
+          const st = await page.evaluate(() => { const g = window.__game; return { stage: g.F.stage, clock: Math.round(g.F.clock), mode: g.P.mode, live: g.F.live, script: g.F.script, cut: g.F.cutscene, over: g.F.over, dead: g.F.dead, death: !document.getElementById('death').classList.contains('hidden'), seed: g.RUN.seed }; }).catch(() => null);
+          throw new Error(`proof ${proof}: no end screen after 200 s: ${JSON.stringify(st)} ${w.errors.concat(w.console).slice(0, 2).join(' | ')}`);
+        }
+        const e = await page.evaluate(() => ({ title: document.getElementById('endtitle').textContent, info: document.getElementById('endinfo').textContent, red: document.getElementById('endtitle').classList.contains('red'), menu: [...document.querySelectorAll('#end-menu .mi .ml')].map((x) => x.textContent), run: localStorage.getItem('topbunk.run'), mode: window.__game.F.over }));
+        clean(w); await page.close();
+        runs.push([proof, e]);
+      }
+      for (const [proof, e] of runs) {
+        ok(e.title === want[proof][0], `proof ${proof}: end title "${e.title}", expected "${want[proof][0]}"`);
+        ok(e.info.includes(want[proof][1]), `proof ${proof}: end info "${e.info}"`);
+        ok(e.red === (proof !== '8') && e.menu.join('|') === 'Play again|Main menu' && e.run === null && e.mode, `proof ${proof}: ${JSON.stringify(e)}`);
+      }
+      return runs.map(([proof, e]) => `proof ${proof} -> "${e.title}"`).join('; ') + '; each with Play again / Main menu, the saved run cleared, no errors';
+    }), 420e3);
+
+    // ---------- 13: a night survived to dawn, then Continue after a reload ----------
+    await check(13, 'dawn and Continue', () => alone(browser, async (c) => {
+      const page = await c.newPage(), w = watch(page, c);
+      await page.addInitScript(() => {
+        window.__norender = true; window.__clockMul = 300;
+        if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('topbunk.run', JSON.stringify({ seed: 'SMKE-0001', night: 1, deaths: 0, dayDone: true, started: 1, evidence: [], evidenceAt: {}, objDone: {} })); }   // a run that has done moving day
+      });
+      const load = async () => {
+        await page.goto(BASE + '/index.html', { waitUntil: 'load', timeout: 180e3 });
+        await until(page, () => window.__game && document.getElementById('loading').classList.contains('done'), null, 180e3);
+        await page.evaluate(() => { window.__game.renderer.compileAsync = async () => {}; });
+        return page.evaluate(() => ({ items: [...document.querySelectorAll('#title-menu .mi .ml')].map((e) => e.textContent), info: document.getElementById('runinfo').textContent }));
+      };
+      let t = await load();
+      ok(t.items[0] === 'Continue · Night 1' && /night 1 of 10.*SMKE-0001/.test(t.info), `title before: ${JSON.stringify(t)}`);
+      await page.click('#title-menu [data-entry="continue"]');
+      await until(page, () => window.__game.F.stage === 'n1' && window.__game.F.live, null, 240e3);
+      await until(page, () => window.__game.RUN.night === 2, null, 240e3);
+      const d = await page.evaluate(() => ({ ach: Object.keys(JSON.parse(localStorage.getItem('topbunk.achievements') || '{}')), run: JSON.parse(localStorage.getItem('topbunk.run')), night: window.__game.RUN.night }));
+      ok(d.run.night === 2 && d.run.seed === 'SMKE-0001', `saved run after dawn: ${JSON.stringify(d.run)}`);
+      ok(d.ach.includes('NIGHT_1') && d.ach.includes('FIRST_TRY'), `achievements after dawn: ${JSON.stringify(d.ach)}`);
+      t = await load();
+      ok(t.items[0] === 'Continue · Night 2' && /night 2 of 10.*SMKE-0001/.test(t.info), `title after the reload: ${JSON.stringify(t)}`);
+      await page.click('#title-menu [data-entry="continue"]');
+      await until(page, () => window.__game.F.stage === 'n2', null, 240e3);
+      const n = await page.evaluate(() => ({ night: window.__game.F.night, type: window.__game.F.typeName, seed: window.__game.RUN.seed }));
+      ok(n.night === 2 && n.seed === 'SMKE-0001', `Continue: ${JSON.stringify(n)}`);
+      clean(w);
+      return `dawn saves night 2; Continue after a reload plays it (${n.type}, seed ${n.seed})`;
+    }), 420e3);
+
+    // ---------- 14: the vigil, with grandpa's rig loaded ----------
+    await check(14, 'vigil', () => alone(browser, async (c) => {
+      const { page, w } = await nightPage(c, '#night5&type=vigil');
+      const model = [];
+      page.on('response', (r) => { if (/grandpa\.glb/.test(r.url())) model.push(r.status()); });
+      await climbDown(page);
+      await until(page, () => { let n = 0; window.__game.scene.traverse((o) => { if (o.isSkinnedMesh && o.material && o.material.name === 'm004_head') n++; }); return n > 0 && window.__game.F.blackout; }, null, 90e3);
+      const g = await page.evaluate(() => {
+        let head = null; window.__game.scene.traverse((o) => { if (o.isSkinnedMesh && o.material && o.material.name === 'm004_head') head = o; });
+        const p = head.getWorldPosition(head.position.clone());
+        return { bones: head.skeleton.bones.length, names: [/head/i, /spine/i, /eye/i].filter((re) => head.skeleton.bones.some((b) => re.test(b.name))).length, x: p.x, z: p.z, type: window.__game.F.typeName };
+      });
+      ok(g.type === 'The Vigil' && g.bones > 20 && g.names === 3, `grandpa's rig: ${JSON.stringify(g)}`);
+      ok(Math.hypot(g.x - 3.5, g.z + 0.65) < 0.5, `grandpa is not in the chair: ${JSON.stringify(g)}`);
+      await stand(page, 4.3, -0.7, 3.5, -0.65);   // at the end of the hall, the way the vigil waits for you
+      await until(page, () => window.__game.P.mode === 'cine', null, 60e3);
+      await until(page, () => { const g = window.__game; return g.P.mode === 'bunk' && !g.F.cutscene && !g.F.script; }, null, 150e3);
+      const e = await page.evaluate(() => { const g = window.__game; return { ok: g.F.objOk, dead: g.F.dead, body: document.body.classList.contains('nightmare'), blackout: g.F.blackout }; });
+      ok(e.ok && !e.dead && !e.body, `after the vigil: ${JSON.stringify(e)}`);
+      ok(model.length === 0 || model.every((s) => s === 200), `grandpa.glb answered ${model}`);
+      clean(w);
+      return `vigil plays through to the bunk (grandpa rig: ${g.bones} bones)`;
+    }), 360e3);
+
+    // ---------- 15: each nightmare, driven through its own trigger ----------
+    await check(15, 'nightmares', () => alone(browser, async (c) => {
+      const { page, w } = await nightPage(c, '#night5&type=hunted');
+      await page.evaluate(() => { window.__game.nights.director.stop(); });
+      const begin = async (kind) => {
+        await climbDown(page);
+        await page.evaluate((k) => { const g = window.__game; g.F.nmDone = false; window.__nmDone = false; g.nights.D.nightmare(k).then(() => { window.__nmDone = true; }); }, kind);
+        await sleep(500);
+      };
+      const finish = async (kind) => {
+        const t0 = Date.now();
+        await until(page, () => window.__nmDone, null, 120e3);
+        const e = await page.evaluate(() => { const g = window.__game; return { mode: g.P.mode, script: g.F.script, cut: g.F.cutscene, body: document.body.classList.contains('nightmare'), dead: g.F.dead, live: g.F.live }; });
+        ok(e.mode === 'bunk' && !e.script && !e.cut && !e.body && !e.dead && e.live, `${kind} ended in a bad state: ${JSON.stringify(e)}`);
+        return ((Date.now() - t0) / 1000).toFixed(0);
+      };
+      const times = {};
+      await begin('shadow');   // it stands in the darkest corner of the living room: go up to it
+      const sp = await page.evaluate(() => { let r = null; window.__game.W.house.children.forEach((o) => { if (o.userData && o.userData.mat && o.visible) r = [o.position.x, o.position.z]; }); return r; });
+      ok(sp, 'no shadow figure in the living room');
+      await stand(page, sp[0] - 0.6, sp[1] + 0.2); times.shadow = await finish('shadow');
+      await begin('hall');   // the hall turns you round three times, the fourth it ends
+      for (let i = 0; i < 4; i++) { await stand(page, 3.8, -0.9); await sleep(900); }
+      times.hall = await finish('hall');
+      await begin('basement');   // down in the laundry
+      await stand(page, -7.0, 0.5, undefined, undefined, -2.4); times.basement = await finish('basement');
+      await begin('mirror');   // at the bathroom mirror, then moving
+      await stand(page, 4.2, 0.9); await sleep(500); await hold(page, 'KeyS', 1500); times.mirror = await finish('mirror');
+      clean(w);
+      return `all four end awake in the bunk (${Object.entries(times).map(([k, v]) => `${k} ${v} s`).join(', ')})`;
+    }), 420e3);
+
+    // ---------- 16: the garage breaker objective ----------
+    await check(16, 'garage breaker', () => alone(browser, async (c) => {
+      const { page, w } = await nightPage(c, '#night3&type=blackout', { clock: 6 });
+      await climbDown(page);
+      await until(page, () => /breaker/.test(document.getElementById('objective').textContent), null, 150e3);
+      const o = await page.evaluate(() => { const g = window.__game; return { shown: document.getElementById('objective').classList.contains('show'), blackout: g.F.blackout, ok: g.F.objOk, text: document.getElementById('objective').textContent }; });
+      ok(o.shown && o.blackout && !o.ok, `the blackout objective: ${JSON.stringify(o)}`);
+      ok(/detached garage/.test(o.text), `objective text "${o.text}"`);
+      await stand(page, -9.68, -8.0, -9.68, -7.1);   // inside the garage, facing the panel by the side door
+      await sleep(500);
+      ok((await prompt(page)) === 'E Flip the breaker', `prompt "${await prompt(page)}"`);
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.F.objOk, null, 30e3);
+      await until(page, () => !window.__game.F.blackout, null, 10e3);
+      await sleep(3200);
+      const a = await page.evaluate(() => { const g = window.__game; return { shown: document.getElementById('objective').classList.contains('show'), blackout: g.F.blackout, ok: g.F.objOk, hunter: g.nights.hunter.state }; });
+      ok(a.ok && !a.blackout && !a.shown, `after the breaker: ${JSON.stringify(a)}`);
+      clean(w);
+      return `the breaker brings the lights back (hunter ${a.hunter})`;
+    }), 300e3);
+
+    // ---------- 17: the back door, the basement door and the parents' door ----------
+    await check(17, 'doors', () => alone(browser, async (c) => {
+      const { page, w } = await nightPage(c, '#night3&type=hunted');
+      await page.evaluate(() => { window.__game.nights.director.stop(); });
+      await climbDown(page);
+      const door = (n) => page.evaluate((n) => { const d = window.__game.W.doors[n]; return { target: d.target, a: d.a, on: d.col.on }; }, n);
+      // the parents' door is locked at night: the handle does not turn, and you cannot walk through it
+      await stand(page, 7.5, -0.9, 7.5, -1.5); await sleep(400);
+      ok((await prompt(page)) === 'E Try the handle', `parents' door prompt "${await prompt(page)}"`);
+      await page.keyboard.press('KeyE'); await sleep(500);
+      await hold(page, 'KeyW', 2500);
+      let d = await door('parents'), z = await page.evaluate(() => window.__game.P.pos.z);
+      ok(d.target === 0 && d.a === 0 && d.on && z > -1.4, `the parents' door at night: ${JSON.stringify(d)}, z ${z}`);
+      // the back door opens, and you walk out through it onto the stoop
+      await stand(page, -2.3, 3.0, -2.3, 3.6); await sleep(400);
+      ok((await prompt(page)) === 'E Open the door', `back door prompt "${await prompt(page)}"`);
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.W.doors.back.a === 1, null, 10e3);
+      d = await door('back'); ok(d.target === 1 && !d.on, `back door: ${JSON.stringify(d)}`);
+      await hold(page, 'KeyW', 1800);
+      z = await page.evaluate(() => window.__game.P.pos.z);
+      ok(z > 4.2, `walking through the open back door reached only z ${z.toFixed(2)}`);
+      // from the stoop west down the outside stairs to the foot, then the basement door
+      await stand(page, -2.3, 5.0, -4.3, 4.2);
+      await hold(page, 'KeyW', 3600);
+      const f = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y }));
+      ok(f.y < -2.2 && f.x < -6.5, `the outside stairs: ${JSON.stringify(f)}`);
+      await page.evaluate(() => { window.__game.P.yaw = 0; window.__game.P.pitch = 0; }); await sleep(500);
+      ok((await prompt(page)) === 'E Open the door', `basement door prompt "${await prompt(page)}"`);
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.W.doors.basement.a === 1, null, 10e3);
+      await hold(page, 'KeyW', 1800);
+      const p = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y, z: window.__game.P.pos.z }));
+      const room = await roomAt(page, p.x, p.z, p.y);
+      ok(room === 'laundry' && p.z < 3.3, `through the basement door: ${JSON.stringify(p)} in ${room}`);
+      clean(w);
+      return `parents' door stays shut; back door to z ${z.toFixed(1)}, stairs down to y ${f.y.toFixed(1)}, into the ${room}`;
+    }), 300e3);
+
+    // ---------- 18: brightness changes the exposure ----------
+    await check(18, 'brightness', () => alone(browser, async (c) => {
+      const { page, w } = await openGame(c, '/index.html');
+      const exposure = () => page.evaluate(() => window.__game.renderer.toneMappingExposure);
+      const e0 = await exposure();
+      await page.click('#title-menu [data-entry="options"]');
+      await until(page, () => !document.getElementById('menu').classList.contains('hidden'), null, 10e3);
+      const arrow = (dir) => page.click(`#menu [data-entry="brightness"] .ma[aria-label="${dir}"]`);
+      for (let i = 0; i < 5; i++) await arrow('More');
+      const up = await page.evaluate(() => window.__game.settings.get('brightness')), e1 = await exposure();
+      ok(Math.abs(up - 0.5) < 0.01 && Math.abs(e1 / e0 - 2 ** up) < 0.01, `brightness ${up}: exposure ${e0} -> ${e1}, expected x${(2 ** up).toFixed(3)}`);
+      for (let i = 0; i < 10; i++) await arrow('Less');
+      const down = await page.evaluate(() => window.__game.settings.get('brightness')), e2 = await exposure();
+      ok(Math.abs(down + 0.5) < 0.01 && Math.abs(e2 / e0 - 2 ** down) < 0.01 && e2 < e0 && e0 < e1, `brightness ${down}: exposure ${e2}`);
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('topbunk.settings') || '{}').brightness);
+      ok(Math.abs(stored - down) < 0.01, `topbunk.settings.brightness is ${stored}`);
+      await page.reload({ waitUntil: 'load', timeout: 180e3 });
+      await until(page, () => window.__game && document.getElementById('loading').classList.contains('done'), null, 180e3);
+      const e3 = await exposure();
+      ok(Math.abs(e3 - e2) < 0.01, `after a reload exposure is ${e3}, expected ${e2}`);
+      clean(w);
+      return `exposure ${e0.toFixed(2)} -> ${e1.toFixed(2)} up, ${e2.toFixed(2)} down; ${e3.toFixed(2)} after a reload`;
+    }), 240e3);
+
+    // ---------- 19: a typed seed starts a run ----------
+    await check(19, 'typed seed', () => alone(browser, async (c) => {
+      const { page, w } = await openGame(c, '/index.html');
+      await page.evaluate(() => { window.__game.renderer.compileAsync = async () => {}; });
+      await page.click('#title-menu [data-entry="new"]');
+      await until(page, () => window.__game.menu.state.open.join() === 'title,newgame', null, 10e3);
+      const field = '#menu [data-entry="seed"] input';
+      await page.click(field); await page.fill(field, 'k7qx29md');
+      const typed = await page.inputValue(field);
+      ok(typed === 'K7QX-29MD', `the seed field shows "${typed}"`);
+      await page.click('#menu [data-entry="start"]');
+      await until(page, () => window.__game.F.stage === 'day', null, 240e3);
+      const r = await page.evaluate(() => { window.__game.setPause(true); const g = window.__game; return { seed: g.RUN.seed, info: document.getElementById('pauseinfo').textContent, plan: [2, 3, 4].map((n) => g.nights.plan(n).type) }; });
+      ok(r.seed === 'K7QX-29MD' && r.info.includes('K7QX-29MD'), `the run is on seed ${r.seed}; pause says "${r.info}"`);
+      // the same seed plans the same nights, in a page of its own
+      const o = await openGame(c, '/index.html#seed=K7QX-29MD&night=2');
+      const again = await o.page.evaluate(() => [2, 3, 4].map((n) => window.__game.nights.plan(n).type));
+      ok(again.join() === r.plan.join(), `seed K7QX-29MD plans ${r.plan} here and ${again} again`);
+      clean(w); clean(o.w);
+      return `typed seed ${typed} replays as ${r.seed}, nights 2-4: ${r.plan.join(', ')}`;
+    }), 300e3);
 
     await browser.close();
     server.close();

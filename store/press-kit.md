@@ -23,7 +23,7 @@ unless you've found something they can't. How it ends on the last night depends 
 | Players | 1 |
 | Length | Short: ten nights plus the mornings. A night's clock runs to dawn in about six real minutes, so a full run should take an hour to ninety minutes, more if it catches you |
 | Input | Keyboard and mouse; game controller with rumble (partial support: not every screen has been checked on a pad); touch on the web build |
-| Languages | English: interface and subtitles. Only some lines are voiced: Mom and Dad on moving day and for most of the first two mornings. The rest of their lines, and grandpa's, are subtitles over a murmur, and the kid's are text only |
+| Languages | English: interface and subtitles. Mom, Dad and grandpa are voiced; the kid's lines and the proof scene at breakfast are text only |
 | Engine | three.js (WebGL 2) in Electron for the desktop build; no engine licence, no middleware |
 | Rating | Not yet rated; horror themes, jump scares, flashing lights, no gore |
 | Press contact | *[email]* |
@@ -32,8 +32,9 @@ unless you've found something they can't. How it ends on the last night depends 
 
 - Ten nights in one house. Night one is a haunting with nothing to see. From night two the house is open, a clock runs toward dawn,
   and the thing is hunting you. Night ten is the end.
-- Seeded runs. The seed decides what each night is about and in what order: the phone, the TV, the mimic, the blackout, the missing
-  bear, the paralysis, the drive, the vigil. The same seed replays the same ten nights.
+- Seeded runs. The seed decides what each night is about and in what order: the phone, the TV, the mimic, the blackout (the breaker box
+  is in the detached garage), the missing bear, the paralysis, the drive, the vigil. Each night gives you something to do (get a drink,
+  answer the phone, switch off the TV, shut the doors, find the bear). Type a seed in to play the same ten nights again.
 - Hiding: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. A breath meter
   runs down while it stands there and waits.
 - A flashlight, stamina that runs out, doors you can shut, and a house you have to learn in the dark.
@@ -41,9 +42,11 @@ unless you've found something they can't. How it ends on the last night depends 
   you are looking at it.
 - Breakfast after each night you survive, all of it subtitled. Mom and Dad notice what the house leaves behind (the tap left running,
   the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
-- Proof. Most nights the house leaves something behind, and what you find changes breakfast. How much you have by the tenth night
+- Four nightmares (the shadow, the mirror, the hall, the basement): at most one a night, and each leaves something behind.
+- The house: a back door, stairs down to a basement laundry room, a detached garage, Mom and Dad's room at the end of the hall.
+- Proof. A dozen kinds of thing a night can leave behind, and what you find changes breakfast. How much you have by the tenth night
   decides which of three endings you get.
-- Graphics presets from Low to Ultra. Auto lowers the resolution, then the preset, when the frame rate drops.
+- Graphics presets from Low to Ultra, and a brightness slider. Auto lowers the resolution, then the preset, when the frame rate drops.
 - Keyboard and mouse or a controller, and the on-screen prompts follow whichever you used last. Controller support is partial for
   now: not every screen has been played through on a pad.
 - Steam Achievements.
@@ -62,7 +65,7 @@ Everything below is produced from the game itself by the scripts in this folder 
 
 | File | What |
 | --- | --- |
-| `screenshots/01_porch_night.png` … `07_tv_static.png` | Seven 1920×1080 in-game captures, HUD hidden except where the prompt helps |
+| `screenshots/01_porch_night.png` … `08_garage_breaker.png` | Eight 1920×1080 in-game captures, HUD hidden except where the prompt helps |
 | `out/header_capsule.png` (460×215, and `_2x` 920×430) | Store header |
 | `out/small_capsule.png` (462×174) | Lists and search |
 | `out/main_capsule.png` (616×353, and `_2x` 1232×706) | Front-page feature |

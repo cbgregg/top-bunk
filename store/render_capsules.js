@@ -11,7 +11,7 @@
 // missing local font shows up as a fallback face. `icon` is the desktop app's icon (desktop/build/icon.png, which electron-builder
 // turns into the .ico and .icns), not a Steam asset.
 const { chromium } = require('playwright');
-const http = require('http');
+const { serve } = require('./lib');
 const fs = require('fs');
 const path = require('path');
 
@@ -42,19 +42,6 @@ const CAPSULES = [
   { name: 'icon', file: 'community_icon.html', w: 184, h: 184, scale: 1024 / 184, dir: path.join(ROOT, 'desktop', 'build') },
 ];
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.json': 'application/json' };
-function serve(port) {
-  return new Promise((res) => {
-    const s = http.createServer((q, r) => {
-      const url = decodeURIComponent(q.url.split('?')[0].split('#')[0]);
-      let f = path.join(ROOT, url);
-      if (SHOTS && url.startsWith('/store/screenshots/')) f = path.join(SHOTS, url.slice('/store/screenshots/'.length));
-      if (SRC && url.startsWith('/store/capsules/src/')) f = path.join(SRC, url.slice('/store/capsules/src/'.length));
-      if (!f.startsWith(ROOT) && !(SHOTS && f.startsWith(SHOTS)) && !(SRC && f.startsWith(SRC))) { r.writeHead(403); r.end(); return; }
-      fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); } });
-    }).listen(port, '127.0.0.1', () => res(s));
-  });
-}
 
 // a .ico that wraps the 32x32 PNG as-is (Windows has read PNG-compressed icons since Vista; it is what electron-builder and Steam accept)
 function icoFromPng(png) {
@@ -71,10 +58,10 @@ const pngSize = (buf) => [buf.readUInt32BE(16), buf.readUInt32BE(20)];
   if (!list.length) { console.error('no capsule matches', ONLY); process.exit(1); }
   if (!fs.existsSync(path.join(ROOT, 'css', 'fonts.css'))) console.log('warning: css/fonts.css is missing, the title will render in a fallback face');
   fs.mkdirSync(OUT, { recursive: true });
-  const srv = await serve(PORT);
+  const srv = await serve(PORT, { root: ROOT, mounts: { '/store/screenshots/': SHOTS, '/store/capsules/src/': SRC } });
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ deviceScaleFactor: 1 });
-  await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());   // (local only: no Google Fonts, no anything)
+  await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());   // local only: no Google Fonts, no anything
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message));
   const missing = new Set();

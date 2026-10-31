@@ -123,9 +123,9 @@ function quiltFabric(W, H) {
 }
 // the slit the kid holds open to film through: the blanket hangs in a wavy edge across the top, the ridge over the chest crosses below it,
 // and the two meet in a point on the left. Neither edge is smooth: cloth folds and bunches. lift raises the ridge (the chest breathing)
-const slitTop = (x, W, H) => H * (0.215 + 0.022 * Math.sin(x / W * 5.1 + 1.2) + 0.011 * Math.sin(x / W * 13 + 0.4) + 0.03 * Math.exp(-((((x / W) - 0.86) / 0.06) ** 2)));   // (a fold hangs lower on the right)
-const slitBot = (x, W, H, o) => H * (0.5 + 0.02 * Math.sin(x / W * 6.3 + 0.5) + 0.01 * Math.sin(x / W * 15 + 1.7) - (o.lift || 0));
-const SLIT_TIP = [0.12, 0.39];
+const slitTop = (x, W, H) => H * (0.30 + 0.022 * Math.sin(x / W * 5.1 + 1.2) + 0.011 * Math.sin(x / W * 13 + 0.4) + 0.03 * Math.exp(-((((x / W) - 0.86) / 0.06) ** 2)));   // a fold hangs lower on the right
+const slitBot = (x, W, H, o) => H * (0.58 + 0.02 * Math.sin(x / W * 6.3 + 0.5) + 0.01 * Math.sin(x / W * 15 + 1.7) - (o.lift || 0));
+const SLIT_TIP = [0.12, 0.45];
 function quiltGap(g, W, H, o) {
   const x0 = W * SLIT_TIP[0], y0 = H * SLIT_TIP[1], x1 = W * 0.3, step = W * 0.015;
   g.beginPath(); g.moveTo(x0, y0);
@@ -137,7 +137,7 @@ function quiltGap(g, W, H, o) {
 }
 // loose fibres standing off both edges of the slit, lit by the glow coming through it (fixed per position, so they ride with the cloth)
 function fringe(g, W, H, o, glow) {
-  const r = rng(808), n = 150;
+  const r = rng(808), n = 24;
   g.save(); g.lineCap = 'round'; g.filter = `blur(${(W * 0.0018).toFixed(2)}px)`;
   for (let i = 0; i < n; i++) {
     const top = i % 2 === 0, x = W * (0.16 + r() * 0.9), y = top ? slitTop(x, W, H) : slitBot(x, W, H, o);
@@ -155,16 +155,16 @@ function drawQuilt(cv, o) {
   const t = cv._tmp.getContext('2d'), glow = o.glow ?? 1, v = (k) => Math.round(k * (0.55 + 0.45 * glow));
   t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, W, H); t.drawImage(cv._fab, 0, 0);
   // the cloth is right against the lens, so it is out of focus and nearly black: only the weave nearest the slit catches the glow
-  const lg = t.createRadialGradient(W * 0.6, H * 0.36, W * 0.12, W * 0.6, H * 0.38, W * 0.72);
-  lg.addColorStop(0, `rgb(${v(120)},${v(124)},${v(140)})`); lg.addColorStop(0.35, `rgb(${v(52)},${v(54)},${v(64)})`); lg.addColorStop(1, 'rgb(8,8,11)');
+  const lg = t.createRadialGradient(W * 0.6, H * 0.46, W * 0.12, W * 0.6, H * 0.5, W * 0.85);
+  lg.addColorStop(0, `rgb(${v(120)},${v(124)},${v(140)})`); lg.addColorStop(0.35, `rgb(${v(52)},${v(54)},${v(64)})`); lg.addColorStop(1, `rgb(${v(16)},${v(24)},${v(21)})`);
   t.globalCompositeOperation = 'multiply'; t.fillStyle = lg; t.fillRect(0, 0, W, H);
   t.globalCompositeOperation = 'destination-out'; quiltGap(t, W, H, o); t.fill();
   t.globalCompositeOperation = 'source-over';
   g.clearRect(0, 0, W, H);
-  g.save(); g.filter = `blur(${(W * 0.009).toFixed(1)}px)`; g.drawImage(cv._tmp, 0, 0); g.restore();
+  g.save(); g.filter = `blur(${(W * 0.013).toFixed(1)}px)`; g.drawImage(cv._tmp, 0, 0); g.restore();
   // the very edge of the cloth: a thin lit rim, then the fibres off it
   g.save(); g.beginPath(); g.rect(0, 0, W, H); quiltGap(g, W, H, o); g.clip('evenodd');
-  g.filter = `blur(${(W * 0.004).toFixed(1)}px)`; g.strokeStyle = `rgba(175,185,215,${0.42 * glow})`; g.lineWidth = W * 0.007; quiltGap(g, W, H, o); g.stroke();
+  g.filter = `blur(${(W * 0.008).toFixed(1)}px)`; g.strokeStyle = `rgba(175,185,215,${0.26 * glow})`; g.lineWidth = W * 0.009; quiltGap(g, W, H, o); g.stroke();
   g.restore();
   fringe(g, W, H, o, glow);
 }
@@ -179,7 +179,7 @@ function kidTitle(cv, text, W, upTo = Infinity, portrait = false) {
   let x = (cv.width - total) / 2;
   [...text].forEach((ch, i) => {
     if (ch !== ' ') {
-      const dy = (r() - 0.5) * S * 0.12, rot = (r() - 0.5) * 0.3;   // (drawn or not, so the skips below come out the same as letters appear)
+      const dy = (r() - 0.5) * S * 0.12, rot = (r() - 0.5) * 0.3;   // drawn or not, so the skips below come out the same as letters appear
       if (i >= upTo) { x += adv[i]; return; }
       g.save(); g.translate(x + adv[i] / 2, cv.height * 0.52 + dy); g.rotate(rot);
       g.fillStyle = '#c8261c'; g.globalAlpha = 0.9; g.textAlign = 'center'; g.fillText(ch, 0, 0);
@@ -262,7 +262,7 @@ function overlayApi(portrait) {
     },
     // the camcorder's on-screen text: {rec, blink, counter: '0:31:12', stamp: 'OCT 20 2004\n3:12:40 AM', zoom: 'x2.0', rew, search, tracking}
     // only the date and time on a story take (it is what tells the ten nights); REC and the counter where the recording itself matters
-    // (kept clear of the platform's own buttons and text: nothing above 12% or below 75% of the height)
+    // kept clear of the platform's own buttons and text: nothing above 12% or below 75% of the height
     camcorder: (o) => {
       if (!o) { cam.style.display = 'none'; return; }
       cam.style.display = 'block';

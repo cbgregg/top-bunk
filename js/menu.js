@@ -126,7 +126,7 @@ function keep() {   // where borrowed elements wait while their menu is closed (
   return S.keep;
 }
 const rescue = (el) => { for (const n of [...el.querySelectorAll('[data-adopted]'), ...[...el.children].filter((c) => c.id)]) keep().appendChild(n); };
-const stop = (el) => { for (const t of ['click', 'pointerdown']) el.addEventListener(t, (e) => e.stopPropagation()); };   // (a click on a menu is not a click on its screen)
+const stop = (el) => { for (const t of ['click', 'pointerdown']) el.addEventListener(t, (e) => e.stopPropagation()); };   // a click on a menu is not a click on its screen
 function overlay() {
   if (!S.overlay) {
     S.overlay = $('menu') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'menu', className: 'screen hidden' }));
@@ -168,7 +168,7 @@ function codeNav(it, a) {
     const n = SEED_CHARS.length, i = SEED_CHARS.indexOf(chars[at]), d = a === 'menuUp' ? 1 : -1;
     const ch = SEED_CHARS[i < 0 ? (d > 0 ? 0 : n - 1) : (i + d + n) % n];
     it.e.set(chars.slice(0, at) + ch + chars.slice(at + 1)); f.value = it.e.get(); pick(f, at);
-  } else if (a === 'menuConfirm') { f.blur(); focus(top().i + 1); }   // (done: on to Start)
+  } else if (a === 'menuConfirm') { f.blur(); focus(top().i + 1); }   // done: on to Start
   else if (a === 'menuBack') f.blur();
   else return false;
   return true;
@@ -250,7 +250,7 @@ function open(id) {
     build(top()); focus(0, false);
     return;
   }
-  const p = PANELS[id]; if (!p || !S.stack.length) return;   // (a panel opens over the title or the pause menu)
+  const p = PANELS[id]; if (!p || !S.stack.length) return;   // a panel opens over the title or the pause menu
   S.stack.push({ id, list: p.list || id, back: !p.noBack, i: p.focus || 0, def: p });
   renderPanel(top());
 }
@@ -287,7 +287,7 @@ function ask({ title, text, yes = 'OK', no = 'Cancel', action }) {
 
 // ---------- input ----------
 function move(v, d) {
-  if (v.items.length <= 1 && v.body && !v.body.hidden && v.body.scrollHeight > v.body.clientHeight) { v.body.scrollBy({ top: d * 90 }); return; }   // (credits: up / down scroll the text)
+  if (v.items.length <= 1 && v.body && !v.body.hidden && v.body.scrollHeight > v.body.clientHeight) { v.body.scrollBy({ top: d * 90 }); return; }   // credits: up / down scroll the text
   const n = v.items.length; if (n) focus((v.i + d + n) % n);
 }
 // one menu action, from the keyboard, the controller (input.onMenu) or a test: menuUp menuDown menuLeft menuRight menuConfirm menuBack
@@ -306,7 +306,7 @@ const KEYMAP = { ArrowUp: 'menuUp', KeyW: 'menuUp', ArrowDown: 'menuDown', KeyS:
 const fresh = new Set();   // keys pressed while a menu is up: only these may auto-repeat (W or Space held from the game must not scroll or click)
 function onKey(e) {
   if (e.ctrlKey || e.altKey || e.metaKey) return;
-  if (!active()) { if (e.code === 'Escape' && !e.repeat && H.canPause && H.canPause()) H.pause(); return; }   // (Esc pauses even when the browser refused the mouse)
+  if (!active()) { if (e.code === 'Escape' && !e.repeat && H.canPause && H.canPause()) H.pause(); return; }   // Esc pauses even when the browser refused the mouse
   if (editing()) {   // typing in a code field: every key types, except these; and none of them reaches the game (E, F, Space, the arrows)
     e.stopPropagation();
     const k = { Enter: 'menuConfirm', NumpadEnter: 'menuConfirm', Escape: 'menuBack' }[e.code];
@@ -338,7 +338,7 @@ function init(hooks = {}) {
   overlay();
   for (const id of ROOTS) if ($(id)) stop(rootNav(id));
   addEventListener('keydown', onKey, true);
-  addEventListener('keyup', (e) => { fresh.delete(e.code); if (active() && (e.code === 'Space' || e.code === 'Enter')) e.preventDefault(); }, true);   // (no second click from a focused button)
+  addEventListener('keyup', (e) => { fresh.delete(e.code); if (active() && (e.code === 'Space' || e.code === 'Enter')) e.preventDefault(); }, true);   // no second click from a focused button
   addEventListener('blur', () => fresh.clear());
   document.addEventListener('focusin', (e) => { const v = top(); if (!v || !v.items) return; const k = v.items.findIndex((it) => it.el === e.target || it.el.contains(e.target)); if (k >= 0 && k !== v.i) { v.i = k; paint(v); } });
   for (const id of ROOTS) watch(id);

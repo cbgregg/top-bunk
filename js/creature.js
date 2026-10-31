@@ -1,27 +1,27 @@
-// the thing's face, built in code to the shapes of a 0.22 m sphere scaled 0.95, 1.2, 0.9 with two flattened spheres for eyes and a
-// grin on a cylinder: the skull runs down into the neck, the eyes sit in sockets, the grin is cut into the head with the teeth inside
+// the thing's face, built in code: a signed-distance skull that runs down into the neck, ring eyes that sit in sockets, and a grin cut
+// into the head with the teeth inside
 import * as THREE from 'three';
+import { lerp, smoothstep as ss } from './mathx.js';
 
 // face space: origin at the skull centre, metres, +y up, +z out of the face, +x the face's left
-const RX = 0.209, RY = 0.264, RZ = 0.198;
-// the eyes as flattened spheres (centre, semi-axes, roll about +z) and the point on each where its pupil rests
+// the skull's semi-axes
+export const RX = 0.209, RY = 0.264, RZ = 0.198;
+// the eyes as flattened ellipsoids (centre, semi-axes, roll about +z) and the point on each where its pupil rests. the left is a
+// little taller and lower than the right, so the face is not quite symmetrical
 const EYES = [
-  { c: [-0.092, 0.075, 0.172], r: [0.0703, 0.10212, 0.03108], roll: 0.32, pupil: [-0.092, 0.075, 0.212] },
-  { c: [0.092, 0.063, 0.172], r: [0.075924, 0.11029, 0.033566], roll: -0.32, pupil: [0.092, 0.075, 0.212] },
+  { c: [-0.092, 0.075, 0.172], r: [0.07, 0.102, 0.031], roll: 0.32, pupil: [-0.092, 0.075, 0.212] },
+  { c: [0.092, 0.063, 0.172], r: [0.076, 0.11, 0.034], roll: -0.32, pupil: [0.092, 0.075, 0.212] },
 ];
-// each eye covers the patch of skull its sphere hides as seen from VIEW (the player 1.8 m off, the head turned to them), eye and skull
-// points meeting in the plane z = PLANE_Z; a patch on the skull reads smaller than a sphere standing off it, so EYE_GROW. Where the
-// skull faces VIEW less than EYE_EDGE (about 20 degrees short of its edge) the outline is cut, so no ring crosses the head's outline
-// from nearby angles either
+// each eye covers the patch of skull its ellipsoid hides as seen from the viewpoint (VIEW_Y, VIEW_Z: the player 1.8 m off, the head
+// turned to them), eye and skull points meeting in the plane z = PLANE_Z. the patch is grown by EYE_GROW so it reads as large as the
+// eye itself. where the skull faces the viewpoint less than EYE_EDGE (about 20 degrees short of its edge) the outline is cut, so no
+// ring crosses the head's outline from nearby angles either
 const VIEW_Y = -0.148, VIEW_Z = 1.8, PLANE_Z = 0.172, EYE_GROW = 1.08, EYE_EDGE = 0.32;
-const PUPIL_K = 1.075, PUPIL_NEAR = 0.08;   // the pupils a little over the spheres' size, and nearer, as the spheres sat
+const PUPIL_K = 1.075, PUPIL_NEAR = 0.08;   // pupil size over the eye's, and how much larger it looms up close
 const EYE_GLOW = 1.85, GRIN_GLOW = 1.18, WARM = new THREE.Color(1, 0.86, 0.7);   // warm: what the teeth light the mouth with
 // the neck: a capsule from low in the skull down into the chest, thin under the jaw and filling out toward the shoulders, joined to
 // the skull with a small fillet (k round the back, kChin under the chin)
 const NECK = { a: [-0.17, -0.03], b: [-0.50, -0.12], ra: 0.042, rb: 0.085, k: 0.03, kChin: 0.02, end: -0.46, sx: 1.0 };
-
-const ss = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
-const lerp = (a, b, t) => a + (b - a) * t;
 
 // ---------- the skull and neck as a distance field ----------
 function sdSkull(x, y, z) {
@@ -147,7 +147,7 @@ function enter(o, d, c, r, roll = 0) {
   return D < 0 ? Infinity : (-B - Math.sqrt(D)) / (2 * A);
 }
 const SKULL_C = [0, 0, 0], SKULL_R = [RX, RY, RZ];
-// a plane point in an eye's own frame, scaled by its semi-axes (the old sphere's outline is the unit circle)
+// a plane point in an eye's own frame, scaled by its semi-axes (the eye's outline is the unit circle)
 function eyeLocal(e, px, py) {
   const dx = px - e.c[0], dy = py - e.c[1], c = Math.cos(e.roll), s = Math.sin(e.roll);
   return [(dx * c + dy * s) / e.r[0], (-dx * s + dy * c) / e.r[1]];
@@ -389,8 +389,8 @@ function eyeMaterial() {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 exy, eq; attribute float eid; varying vec2 vExy, vEq; varying float vEid, vDist;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvExy = exy; vEq = eq; vEid = eid;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvDist = length( mvPosition.xyz ) / length( modelViewMatrix[ 0 ].xyz );');
-    // the pupils loom a little larger up close, as spheres standing proud of the skull did, sized as they were at 1.1 m; the white is
-    // a little darker toward its upper edge, under the lip of the socket
+    // the pupils loom a little larger up close, in proportion to their size at 1.1 m; the white is a little darker toward its upper
+    // edge, under the lip of the socket
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       uniform vec2 pupils[2]; varying vec2 vExy, vEq; varying float vEid, vDist;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
@@ -497,7 +497,7 @@ const NOISE = `
     return normalize( abs( det ) * n - grad );
   }`;
 // rimFade: [axis, from, to] in rest units; the rim is full where the rest position's coordinate along axis is at from and gone at to
-// (the body fades it out going up into the collar, the face going down the jaw, so the join has none on either side)
+// the body fades it out going up into the collar, the face going down the jaw, so the join has none on either side
 export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null } = {}) {
   const m = low ? new THREE.MeshLambertMaterial({ color: SKIN }) : new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.78, metalness: 0, envMapIntensity: 0.25 });
   m.name = 'creatureSkin';

@@ -52,17 +52,17 @@ Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml
 | `js/nights.js` | The nights: clock, hiding places, proof, and what each kind of night does |
 | `js/director.js` | Which night is which for a seed, and the small events that fill a night |
 | `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, and the graph of the house it walks on |
-| `js/entity.js` | The thing itself: model, animation, head and eye tracking |
+| `js/entity.js`, `js/creature.js`, `js/mathx.js` | The thing itself: model, animation, head and eye tracking; its face, built in code; small shared math helpers |
 | `js/world.js` | The early-2000s farmhouse (brown carpet, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights |
 | `js/people.js`, `js/rig.js` | Mom and Dad, and the skeleton and clips their models share |
-| `js/vigil.js`, `js/cars.js`, `js/windowface.js` | The vigil night; the car for the dream drive and the drive away; headlights and the face at the window |
+| `js/vigil.js`, `js/nightmares.js`, `js/swim.js`, `js/cars.js`, `js/windowface.js` | The vigil night; the four nightmares and the dream swim they share with it; the car for the dream drive and the drive away; headlights and the face at the window |
 | `js/gfx.js`, `js/pbr.js`, `js/props.js`, `js/textures.js`, `js/dust.js` | Post-processing and quality presets, PBR materials, furniture models, canvas textures (the crayon drawing, the grin, the floral fabric), dust in the air |
 | `js/audio.js` | Synthesized sound, with the recorded files layered on top |
 | `js/input.js`, `js/menu.js`, `js/settings.js`, `js/ui.js` | Controller and touch input, the menus, saved options, HUD helpers |
 | `js/achievements.js`, `js/rng.js` | Achievements; seeded random numbers |
 | `desktop/` | The Electron shell for the desktop build |
 | `steam/`, `store/`, `trailer/` | SteamPipe upload config, store page art and copy, the trailer renderer (each has a README) |
-| `tools/` | The scripts that made the files in `assets/` |
+| `tools/` | The scripts that made the files in `assets/` (`cd tools && npm install` first for the model slimming) |
 
 ## Dev shortcuts
 

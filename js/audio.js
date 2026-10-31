@@ -3,6 +3,9 @@
 // Every source goes through one of three buses (music, sfx, voice) on its way to the master, each with its own reverb send so its
 // volume covers its share of the reverb too. Synthesized sounds are sfx; a file's bus comes from its id (vo/ and music/) or its sfx.json kind.
 export const BUSES = ['music', 'sfx', 'voice'];
+// how hard the piano slam hits: a glimpse, a jolt, a full scare. appear() adds APPEAR_BOOST on top
+export const SLAM = { hit: 1, jolt: 1.4, full: 1.6 };
+const APPEAR_BOOST = 1.5;
 export class Sound {
   constructor() { this.ctx = null; this.level = 0.85; this.vol = { music: 1, sfx: 1, voice: 1 }; }
 
@@ -117,7 +120,7 @@ export class Sound {
       } catch (e) { /* ignore */ }
     };
     const [vo, sfx, music] = await Promise.all([json('assets/audio/manifest.json'), json('assets/sfx/sfx.json'), json('assets/music/tracks.json')]);
-    this.kinds = {}; for (const [k, m] of Object.entries(sfx || {})) this.kinds['sfx/' + k] = m.kind;   // (which bus each file plays on)
+    this.kinds = {}; for (const [k, m] of Object.entries(sfx || {})) this.kinds['sfx/' + k] = m.kind;   // which bus each file plays on
     const first = [];
     for (const f of (vo && vo.files) || []) first.push(load(f, `assets/audio/${f}.mp3`));
     for (const [k, m] of Object.entries(sfx || {})) first.push(load('sfx/' + k, m.file));
@@ -240,7 +243,7 @@ export class Sound {
     this.tone({ type: 'triangle', f: 210, f2: 120, dur: 0.14, gain: 0.7 * gain, pan, wet: 0.15 });
     this.noiseHit({ dur: 0.5, type: 'highpass', f: 3000, gain: 0.25 * gain, pan, wet: 0.3 });
   }
-  // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it
+  // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it (trailer/gen_music.js renders the same notes)
   pianoSlam(k = 1) {
     if (!this.ctx) return;
     for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16 * k, attack: 0.002, wet: 0.45 });
@@ -249,7 +252,7 @@ export class Sound {
     this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1 * k, attack: 0.001, wet: 0.35 });
   }
   // the thing is suddenly there: the low piano note and the strings under it
-  appear(k = 1) { this.pianoSlam(1.5 * k); this.stab(); }
+  appear(k = 1) { this.pianoSlam(APPEAR_BOOST * k); this.stab(); }
   // ---- the horror layer: screaming violins (Insidious), a low dread bed, and the small paranormal knocks ----
   // violins(v): 0 silences them, 1 is the full storm. A looping recording, or a synthesized stand-in: detuned sawtooth "violins" with frantic vibrato.
   violins(v, t = 1.5) {
@@ -309,7 +312,7 @@ export class Sound {
     const a = mk(650, 5), b = mk(1250, 7), g1 = ctx.createGain(), g2 = ctx.createGain(); g1.gain.value = 1; g2.gain.value = 0.6;
     o.connect(a).connect(g1).connect(out); o.connect(b).connect(g2).connect(out);
     let dest = out; if (muffle) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600; out.connect(lp); dest = lp; }
-    dest.connect(this.bus(gain * (muffle ? 0.7 : 1), pan, muffle ? 0.2 : 0.12, dur, 'voice'));   // (it stands in for a voice line, so the voice volume covers it)
+    dest.connect(this.bus(gain * (muffle ? 0.7 : 1), pan, muffle ? 0.2 : 0.12, dur, 'voice'));   // it stands in for a voice line, so the voice volume covers it
     const env = new Float32Array(Math.ceil(dur * 30) + 2);
     for (let i = 0; i < n; i++) {
       const ts = t0 + (i / n) * dur, te = ts + (dur / n) * 0.8, fall = 1 - (i / n) * 0.18, pitch = f0 * fall * (0.92 + Math.random() * 0.18), peak = 0.45 + Math.random() * 0.45;
@@ -352,7 +355,7 @@ export class Sound {
   flush(pan = 0) { if (!this.ctx) return; this.noiseHit({ dur: 2.6, type: 'bandpass', f: 800, f2: 2200, q: 0.6, gain: 0.3, pan, wet: 0.3, attack: 0.4 }); }
 
   // Silence before a scare makes it land: the whole mix ducks, and a jolt then hits well above everything else (the compressor keeps it from clipping).
-  // (both move the master relative to the player's master volume, this.level)
+  // both move the master relative to the player's master volume, this.level
   hush(sec = 3) {
     if (!this.ctx) return; const g = this.master.gain, t = this.now, L = this.level;
     g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(L * 0.165, t + 0.5); g.setValueAtTime(L * 0.165, t + sec - 0.1); g.linearRampToValueAtTime(L, t + sec + 0.4);

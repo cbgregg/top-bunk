@@ -3,7 +3,7 @@
 //
 // The context D that events run against is built in nights.js:
 //   D.r()  seeded random 0..1        D.P / D.F / D.W / D.E / D.sfx / D.UI / D.camera / D.hunter
-//   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)     D.sub(html, dur)
+//   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)
 //   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerRoom()  D.onBunk()
 //   D.calm() (nothing hunting you, no scene with an objective going)        D.seesKidWindow()               D.carPass() / D.faceAtWindow()
 //   D.fired(id)                      told after each event has run (some events leave proof behind, see nights.js)
@@ -89,7 +89,7 @@ const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
 // of those falls short, as does one where no night draws some proof event. A missing kind's event goes on the night with the most room left
 // under eventsFor(), or, with no room anywhere, in place of an event the run's proof does not depend on. Never on the vigil (it stops the
 // events) or the drive (it ends the night).
-const MIN_PROOF = 9, FILL_BY = 300;   // (5:00 AM: an event any later leaves little of the night to find its proof in)
+const MIN_PROOF = 9, FILL_BY = 300;   // 5:00 AM: an event any later leaves little of the night to find its proof in
 let topUp = { seed: null, fills: null };
 function proofTopUp(seed) {
   if (topUp.seed === seed) return topUp.fills;
@@ -117,7 +117,7 @@ const kindsLeft = (plans) => {
 };
 // { n, id, t } adds event id at minute t of night n, { n, id, i } puts it in place of that night's event i
 function fillFor(plans, k, have, r) {
-  const ids = sourceEvents(k).sort((a, b) => (EVENTS[a].ok ? 1 : 0) - (EVENTS[b].ok ? 1 : 0));   // (one with no condition is sure to run)
+  const ids = sourceEvents(k).sort((a, b) => (EVENTS[a].ok ? 1 : 0) - (EVENTS[b].ok ? 1 : 0));   // one with no condition is sure to run
   for (const id of ids) {
     const nights = shuffle(r, plans.filter((p) => p.type !== 'vigil' && p.type !== 'car' && p.n >= (EVENTS[id].minN || 1))).sort((a, b) => roomLeft(b) - roomLeft(a));
     for (const p of nights) {
@@ -251,7 +251,7 @@ export function createDirector(D) {
         if (def.alone && c - lastAt < def.alone) continue;
         if (!def.alone && (c - lastAt < 2.5 || (D.hunter.busy && !def.safe))) continue;
         ev.done = true; lastAt = c; if (def.alone) holdUntil = c + def.alone;
-        try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // (no proof for an event that never happened)
+        try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // no proof for an event that never happened
       }
     },
   };

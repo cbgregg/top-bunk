@@ -17,7 +17,8 @@ export const SHOTS = T([
     update(c, k) { c.cam.pos = mix3([-3.2, 1.45, -14.5], [-1.2, 1.35, -10.8], ease.inOut(k)); c.cam.look = [1.7, 1.75, -4.6]; c.cam.fov = 48; } },
   // VERSE 1: moving day. boxes, the drawing, the bunk, breakfast. The song is clean.
   { id: 'boxes', dur: 6,
-    setup(c) { c.g.phase('day'); c.g.person('mom', { x: 0.6, z: 1.6, yaw: -Math.PI / 2 }); c.g.person('dad', { x: 1.35, z: -13.6, yaw: Math.PI }); },   // (Mom is in the kitchen: the family only animates while she is on screen)
+    // Mom is in the kitchen: the family only animates while she is on screen
+    setup(c) { c.g.phase('day'); c.g.person('mom', { x: 0.6, z: 1.6, yaw: -Math.PI / 2 }); c.g.person('dad', { x: 1.35, z: -13.6, yaw: Math.PI }); },
     update(c, k) { c.cam.pos = mix3([4.0, 0.85, -9.3], [3.5, 0.8, -9.9], ease.inOut(k)); c.cam.look = [2.35, 0.45, -12.6]; c.cam.fov = 46; } },
   { id: 'drawing', dur: 6,
     setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.drawingMat.map = c.W.T.drawing0; c.W.drawingMat.needsUpdate = true; },
@@ -60,11 +61,13 @@ export const SHOTS = T([
     update(c, k) { c.cam.pos = mix3([5.95, 0.78, -0.55], [5.65, 0.62, -0.7], ease.inOut(k)); c.cam.look = [4.98, 0.08, -1.08]; c.cam.fov = 50; c.g.fear(0.25); } },
   { id: 'window_face', dur: 6,
     setup(c) { c.g.night({ lights: 1 }); c.g.windowFace(0.23); c.P.pos.set(6.03, 0, 3.02); },
-    update(c, k) { c.WF.t = 0.23 + 0.08 * k; c.cam.pos = [6.3, 2.14, 2.95]; c.cam.look = [8.1, 1.78, 2.85]; c.cam.fov = 50; c.g.fear(0.4); } },   // (the face is driven by hand: it slides into the window and hangs there)
+    // the face is driven by hand: it slides into the window and hangs there
+    update(c, k) { c.WF.t = 0.23 + 0.08 * k; c.cam.pos = [6.3, 2.14, 2.95]; c.cam.look = [8.1, 1.78, 2.85]; c.cam.fov = 50; c.g.fear(0.4); } },
   // the game's hiding camera sits inside the closet body (the leaves are solid, the slats are the overlay), so this one stands a hand's width
   // outside the leaves, as store screenshot 07 does, and keeps the thing's head between the slats while it comes in
   { id: 'closet', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.UI.pod('louvers'); c.g.flashlight(true); c.P.pos.set(5.95, 0, 0.52); c.g.thing({ x: 7.45, z: 2.2, face: [6.1, 1.45], mode: 'walk', speed: 0.2, tilt: 0.25, look: false }); c.walkFrom = [7.45, 0, 2.2]; c.walkTo = [6.1, 0, 1.45]; c.head = new V3(); },   // (your torch is on in there: it is what lights its face through the slats)
+    // your torch is on in there: it is what lights its face through the slats
+    setup(c) { c.g.night({ lights: 1 }); c.UI.pod('louvers'); c.g.flashlight(true); c.P.pos.set(5.95, 0, 0.52); c.g.thing({ x: 7.45, z: 2.2, face: [6.1, 1.45], mode: 'walk', speed: 0.2, tilt: 0.25, look: false }); c.walkFrom = [7.45, 0, 2.2]; c.walkTo = [6.1, 0, 1.45]; c.head = new V3(); },
     update(c, k) {
       const w = clamp((k - 0.08) / 0.6, 0, 1), p = mix3(c.walkFrom, c.walkTo, w); c.E.root.position.copy(p);
       if (w < 1) { c.E.mode = 'walk'; c.E.faceTowards(c.walkTo[0], c.walkTo[2], 1); c.E.lookTarget = null; }
@@ -90,7 +93,7 @@ export const SHOTS = T([
       c.E.headWorld(c.head);
       c.cam.pos = [c.head.x + lerp(0.95, 0.7, ease.inOut(k)), c.head.y - 0.08, c.head.z + 0.05]; c.cam.look = [c.head.x, c.head.y + 0.02, c.head.z]; c.cam.fov = 36; c.g.fear(1);
     } },
-  { id: 'chase', dur: 8, teaser: 2.5,   // (the ten-second teaser: the run, the cut, the scare and the first of the title)
+  { id: 'chase', dur: 8, teaser: 2.5,   // the ten-second teaser: the run, the cut, the scare and the first of the title
     setup(c) {
       c.g.night({ lights: 0.4, spot: BATH_I * 0.5, flicker: true }); c.g.door('kid', true);
       // the route: from the living room into the hall, down it, through your door and up to the foot of the bunk. The thing runs the same route behind you.
@@ -170,7 +173,7 @@ export function attach(game, opts = {}) {
     if (cam.look) { const a = aim(pos, cam.look); cam.yaw = a.yaw; cam.pitch = a.pitch; }
     P.cam.set(pos[0], pos[1], pos[2]); P.yaw = cam.yaw; P.pitch = cam.pitch; P.roll = cam.roll || 0;
     game.cam();   // the game places the camera from P and adds its own tremor and shake, and the thing looks at it
-    if (shot.post) shot.post(c);   // (after the game has posed the thing: a shot can still bend a limb for this frame)
+    if (shot.post) shot.post(c);   // after the game has posed the thing: a shot can still bend a limb for this frame
     if (cam.sway) {   // handheld drift: layered noise on yaw, pitch and roll, plus a slow sine
       const t = c.t, s = cam.sway * 0.007;
       camera.rotation.y += wobble(t * 1.9, 3) * s + Math.sin(t * 0.31) * 0.012;
@@ -184,7 +187,8 @@ export function attach(game, opts = {}) {
     if (shot.fadeIn && st < shot.fadeIn) blk = Math.max(blk, 1 - st / shot.fadeIn);
     if (shot.fadeOut && st > dur - shot.fadeOut) blk = Math.max(blk, (st - (dur - shot.fadeOut)) / shot.fadeOut);
     ui.black(blk); ui.hideFade();
-    if (!c.subframe) ui.grain((c.rnd() * 14 - 7).toFixed(1), (c.rnd() * 14 - 7).toFixed(1), portrait ? 1 : 0.55);   // (grain is per frame, not per exposure; overlaid in portrait, so it needs the full strength)
+    // grain is per frame, not per exposure; overlaid in portrait, so it needs the full strength
+    if (!c.subframe) ui.grain((c.rnd() * 14 - 7).toFixed(1), (c.rnd() * 14 - 7).toFixed(1), portrait ? 1 : 0.55);
     if (portrait) ui.camcorder(shot.camcorder === false ? null : shot.osd ? shot.osd(c) : shot.black ? null : { stamp: shot.stamp || '', blink: Math.floor(c.t * 2) % 2 === 0 });
   }
   game.gfx.render = (dt) => { if (pending) { apply(); pending = false; } origRender(dt); };
@@ -195,7 +199,7 @@ export function attach(game, opts = {}) {
     const shot = c.shot, stepMs = gap * 1000, n = Math.max(1, Math.ceil(stepMs / 45)), subMs = stepMs / n, draw = capture && !shot.noRender;
     for (let s = 0; s < n; s++) { window.__norender = !draw || s < n - 1; window.__pump(subMs); }
     window.__norender = false;
-    if (pending) { apply(); pending = false; }   // (nothing was drawn: a black card, or a frame nobody will look at)
+    if (pending) { apply(); pending = false; }   // nothing was drawn: a black card, or a frame nobody will look at
     return { t, shot: shot.id, finished };
   }
 
@@ -236,7 +240,7 @@ export function attach(game, opts = {}) {
     // under the overlays; opts.shutter = N forces N everywhere, otherwise each shot's own `shutter` (a number, or a function of the shot time)
     frame(i, capture = true) {
       const t0 = i / fps, s0 = select(t0), want = typeof opts.shutter === 'number' ? opts.shutter : typeof s0.shutter === 'function' ? s0.shutter(t0 - s0.t) : s0.shutter || 1;
-      const n = !capture || s0.noRender ? 1 : Math.max(1, Math.min(8, Math.round(want))), shut = Math.min(1 / fps, 1 / 30, s0.t + s0.dur - t0 - 1e-6);   // (never past the cut)
+      const n = !capture || s0.noRender ? 1 : Math.max(1, Math.min(8, Math.round(want))), shut = Math.min(1 / fps, 1 / 30, s0.t + s0.dur - t0 - 1e-6);   // never past the cut
       ui.acc.clear();
       let r;
       for (let e = 0; e < n; e++) {

@@ -77,7 +77,7 @@ export function createNights(env) {
   // ---------- helpers every event can use (see director.js) ----------
   const D = {
     r: () => rnd(), P, F, W, E, sfx, UI, camera, hunter,
-    now: env.time, wait, waitFor, later, say: env.say, sub: (h, d = 3) => UI.subtitle(h, d),
+    now: env.time, wait, waitFor, later, say: env.say,
     shake: (v) => env.addShake(v),
     node: (id) => ({ x: NODES[id][0], z: NODES[id][1] }),
     playerRoom: () => env.roomAt(P.pos.x, P.pos.z),
@@ -172,7 +172,7 @@ export function createNights(env) {
   };
   let lastMin = -1;
   function tick(dt) {   // called every frame by the game while the night is live
-    if (!(F.script && F.clock >= DAWN - 1) && !(F.holdDawn && F.clock >= DAWN - 3)) F.clock += dt * (F.clockRateNow || env.clockRate) * (window.__clockMul || 1);   // (a scene that is playing holds the dawn back)
+    if (!(F.script && F.clock >= DAWN - 1) && !(F.holdDawn && F.clock >= DAWN - 3)) F.clock += dt * (F.clockRateNow || env.clockRate) * (window.__clockMul || 1);   // a scene that is playing holds the dawn back
     const m = Math.floor(F.clock); if (m !== lastMin || F.clockGlitch) { lastMin = m; UI.clock(clockText(F.clock), `night ${F.night}`); }
     director.update(); hunter.update(dt); proofTick();
     // the breath meter shows whenever something is near enough to hear you
@@ -309,10 +309,10 @@ export function createNights(env) {
     const t = ++tok;
     F.stage = 'n' + n; F.night = n;
     env.resetNight(); env.setPhase('night'); env.sfx.dread(Math.min(0.25 + n * 0.07, 0.8), 4);
-    const plan = planFor(n); if (env.HPARAM && env.HPARAM.type) plan.type = env.HPARAM.type;   // (#type=ring forces a night type for testing)
+    const plan = planFor(n); if (env.HPARAM && env.HPARAM.type) plan.type = env.HPARAM.type;   // #type=ring forces a night type for testing
     rnd = plan.r; F.plan = plan; F.typeName = TYPE_NAMES[plan.type];
     F.clock = plan.clock0; lastMin = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
-    F.nmDone = false; F.objOk = plan.type === 'poltergeist' || plan.type === 'finale'; hunter.reset(); hunter.setLevel(n + ((env.RUN.objDone || {})[n - 1] === false ? 1 : 0)); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
+    F.nmDone = false; F.objOk = plan.type === 'poltergeist' || plan.type === 'finale'; hunter.reset(); hunter.setLevel(n + (env.RUN.objDone[n - 1] === false ? 1 : 0)); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
     env.toBunk();
     const dialClock = clockText(F.clock);
     UI.card(dialClock, `Night ${n}`, 4.5);
@@ -328,16 +328,16 @@ export function createNights(env) {
   }
 
   // tonight's objective, kept in the run: skipping it (RUN.objDone[n] false) makes the next night's hunter one level harder
-  const objDone = () => (env.RUN.objDone || (env.RUN.objDone = {}));
+  const completeObjective = () => { F.objOk = true; };
   async function briefing(n, t) {
     const R = env.RUN;
     await wait(11); if (!alive(t) || F.script || F.cutscene) return;
     if (n === 2 && !R.briefed) { R.briefed = true; env.saveRun(); UI.hint('Find proof of what is in the house. Get to six. Hide and hold your breath when it comes.', 9); return; }
-    if (objDone()[n - 1] === false && !R.skipTold) { R.skipTold = true; env.saveRun(); UI.hint('You skipped what it wanted last night. It is closer tonight.', 8); }
+    if (env.RUN.objDone[n - 1] === false && !R.skipTold) { R.skipTold = true; env.saveRun(); UI.hint('You skipped what it wanted last night. It is closer tonight.', 8); }
   }
 
   async function dawn(n) {
-    objDone()[n] = !!F.objOk;
+    env.RUN.objDone[n] = !!F.objOk;
     F.live = false; F.script = true; director.stop(); tok++;
     env.vigil.stop(); hunter.dismiss(); sfx.violins(0, 3); sfx.tension(0, 2); sfx.drone(0.04, 4); UI.objective(null); UI.hint(null); W.tvFx.set(false); W.phone.setRinging(false);
     proofSync(); pr.kinds = [];
@@ -352,7 +352,6 @@ export function createNights(env) {
   }
 
   // ---------- what each kind of night is about ----------
-  const sub = (h, d = 4) => UI.subtitle(h, d);
   const obj = (t) => UI.objective(t);
   const until = (t, fn) => waitFor(() => !alive(t) || fn());
   const atClock = (t, m) => until(t, () => F.clock >= m);
@@ -369,7 +368,7 @@ export function createNights(env) {
       proofFire('thirst');
       obj('Go back to bed'); sfx.tension(0.04, 2); F.fear = Math.max(F.fear, 0.5);
       if (!hunter.busy) { const node = spawnFar(); hunter.stalk(node); }
-      await until(t, () => P.mode === 'bunk' || P.mode === 'hide'); obj(null); F.objOk = true;
+      await until(t, () => P.mode === 'bunk' || P.mode === 'hide'); obj(null); completeObjective();
     },
     // the wall phone rings in the dining room
     async ring(plan, t) {
@@ -377,10 +376,10 @@ export function createNights(env) {
       W.phone.setRinging(true); let rings = 0, answered = false, ringT = 0;
       obj('The phone is ringing. Get it before it wakes them');
       const it = env.addI({ p: W.phone.pos.clone(), r: 1.8, label: 'Pick up the phone', when: () => alive(t) && W.phone.ringing && P.mode === 'walk', act: async () => {
-        answered = true; F.objOk = true; F.script = true; W.phone.setRinging(false); W.phone.pickUp(); sfx.click(); obj(null);
+        answered = true; completeObjective(); F.script = true; W.phone.setRinging(false); W.phone.pickUp(); sfx.click(); obj(null);
         await wait(1.2); sfx.breath(true, 0.6); await wait(4.2);
         sfx.whisper(0, 0.24); await wait(2.4);
-        sfx.staticBurst(0, 1.4); await wait(1.5); await wait(2);
+        sfx.staticBurst(0, 1.4); await wait(3.5);
         W.phone.hangUp(); sfx.click(); F.script = false;
         if (alive(t)) proofFire('ring');
         if (!hunter.busy) hunter.stalk(hunter.pickSpawn(7) || 'archN');
@@ -397,9 +396,9 @@ export function createNights(env) {
       env.say('dad/lure_a', { muffle: true }); obj("The TV's on and Dad is up. Turn it off");
       mom.group.visible = true;
       dad.sleeping = false; dad.busy = true; dad.group.rotation.order = 'XYZ'; dad.group.rotation.set(0, 0, 0); dad.group.position.set(2.0, 0, -2.6); dad.group.rotation.y = Math.atan2(2.9 - 2.0, -3.2 + 2.6);   // standing in front of the TV, his back to you
-      dad.group.visible = true; dad.lookAt = null; dad.fake = true; W.bedSleepers.one('dad', false); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });   // (and his side of the bed is empty)
+      dad.group.visible = true; dad.lookAt = null; dad.fake = true; W.bedSleepers.one('dad', false); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });   // and his side of the bed is empty
       let revealed = false, saidB = false; const t0 = env.time();
-      const off = env.addI({ p: new V3(2.9, 1.0, -3.2), r: 1.7, label: 'Turn the TV off', when: () => alive(t) && !revealed && W.tvFx.on && P.mode === 'walk', act: () => { F.objOk = true; revealed = true; } });
+      const off = env.addI({ p: new V3(2.9, 1.0, -3.2), r: 1.7, label: 'Turn the TV off', when: () => alive(t) && !revealed && W.tvFx.on && P.mode === 'walk', act: () => { completeObjective(); revealed = true; } });
       while (alive(t) && !revealed && env.time() - t0 < 95) {
         const d = Math.hypot(P.pos.x - 2.0, P.pos.z + 2.6);
         if (!saidB && d < 6.5 && hunter.los(P.pos.x, P.pos.z, 2.0, -2.6)) { saidB = true; env.say('dad/lure_b'); }
@@ -443,7 +442,7 @@ export function createNights(env) {
       obj('Find the breaker in the detached garage <span>(your flashlight: ' + env.lightLabel() + ')</span>');
       let fixed = false;
       const it = env.addI({ p: new V3(-9.68, 1.45, -7.1), r: 1.7, label: 'Flip the breaker', when: () => alive(t) && !fixed && P.mode === 'walk', act: async () => {
-        F.script = true; sfx.click(); await wait(0.5); sfx.thump(); fixed = true; F.objOk = true; D.blackout(false); obj(null); await wait(2.5); F.script = false;
+        F.script = true; sfx.click(); await wait(0.5); sfx.thump(); fixed = true; completeObjective(); D.blackout(false); obj(null); await wait(2.5); F.script = false;
         hunter.hunt(hunter.pickSpawn(7) || 'livC');
       } });
       await until(t, () => fixed); env.removeI(it);
@@ -508,7 +507,7 @@ export function createNights(env) {
       when(() => room() === 'hall' && Math.hypot(P.pos.x - 7.3, P.pos.z + 0.9) < 2.8, async () => {
         W.setDoor('parents', true); await wait(1.2); env.say('mom/mutter_b', { muffle: true }); F.fear = Math.max(F.fear, 0.6);
       }, 30);
-      when(() => room() === 'hall' && Math.hypot(P.pos.x - 5.6, P.pos.z + 0.4) < 2.2, async () => { D.drawingChange(); }, 30);
+      when(() => room() === 'hall' && Math.hypot(P.pos.x - 5.6, P.pos.z + 0.4) < 2.2, () => D.drawingChange(), 30);
       // ---- the crescendo: it goes quiet, then everything happens at once and you have to be under the covers ----
       await until(t, () => F.clock >= c0 + 135 || (seen >= 6 && F.clock >= c0 + 75)); if (!alive(t)) return;
       await until(t, () => !F.script); if (!alive(t)) return;
@@ -539,16 +538,16 @@ export function createNights(env) {
       if (!alive(t)) return; F.holdDawn = false; F.clock = DAWN;
     },
     // the power is out, one candle in the hall, and grandpa in a chair at the far end of it
-    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)).then(() => { if (alive(t)) { achievements.unlock('GRANDPA'); proofFire('vigil'); F.objOk = true; } }); },
+    vigil(plan, t) { director.stop(); return env.vigil.run(plan, (fn) => until(t, fn)).then(() => { if (alive(t)) { achievements.unlock('GRANDPA'); proofFire('vigil'); completeObjective(); } }); },
     // you fall asleep and dream a drive to the store
     async car(plan, t) {
       await atClock(t, plan.clock0 + 10); if (!alive(t)) return;
       if (P.mode === 'walk' && !hidden()) { obj('Go back to bed'); await until(t, () => P.mode === 'bunk' || P.mode === 'hide' || F.clock > plan.clock0 + 70); obj(null); if (!alive(t)) return; }
       await until(t, () => !F.script && !F.cutscene); if (!alive(t)) return;
       if (P.mode === 'walk') env.toBunk();
-      await env.carDream(); if (alive(t)) { F.objOk = true; achievements.unlock('GLOVE_BOX'); }   // (opening it gets you caught)
+      await env.carDream(); if (alive(t)) { completeObjective(); achievements.unlock('GLOVE_BOX'); }   // opening it gets you caught
     },
-    async hunted(plan, t) { await atClock(t, plan.clock0 + 8); if (!alive(t)) return; obj('Stay alive until six'); await wait(7); if (alive(t)) obj(null); await atClock(t, 354); if (alive(t)) F.objOk = true; },
+    async hunted(plan, t) { await atClock(t, plan.clock0 + 8); if (!alive(t)) return; obj('Stay alive until six'); await wait(7); if (alive(t)) obj(null); await atClock(t, 354); if (alive(t)) completeObjective(); },
     // some doors are open that were shut: close them all
     async quiet(plan, t) {
       await atClock(t, plan.clock0 + 10); if (!alive(t)) return;
@@ -556,12 +555,12 @@ export function createNights(env) {
       for (const d of names) W.setDoor(d, true);
       sfx.creak(0.2, D.pan(4.2, -1.0)); obj('Every door in the hall is open. Shut them');
       const shut = () => names.every((d) => W.doors[d].target === 0);
-      (async () => { await until(t, () => shut() && P.mode === 'walk'); if (alive(t)) { obj(null); F.objOk = true; } })();
+      (async () => { await until(t, () => shut() && P.mode === 'walk'); if (alive(t)) { obj(null); completeObjective(); } })();
       for (let i = 0; i < 9 && alive(t); i++) { await wait(14); if (!alive(t)) return; sfx.heartbeat(0.25 + i * 0.05); F.fear = Math.max(F.fear, 0.15 + i * 0.05); }
     },
     // sleep paralysis: you wake and cannot move, and it is standing at the foot of the bunk
     async paralysis(plan, t) {
-      F.objOk = true;
+      completeObjective();
       await atClock(t, plan.clock0 + 6); if (!alive(t)) return;
       if (P.mode === 'walk' || hunter.busy) return;   // you are already up: it does not happen tonight
       F.script = true; F.cutscene = true;
@@ -579,25 +578,23 @@ export function createNights(env) {
       await atClock(t, plan.clock0 + 12); if (!alive(t)) return;
       const spots = [[5.6, 0.02, -0.9, 'in the hall'], [0.05, 0.98, 3.2, 'on the kitchen counter'], [7.0, 0.02, -2.0, "in Mom and Dad's room"], [-2.6, 0.5, -2.4, 'on the couch'], [4.45, 0.02, 1.6, 'on the bathroom floor']];
       const s = pick(rnd, spots); W.moveTeddy(s[0], s[1], s[2]); let got = false; obj('My bear is gone. Find it');
-      // (reach is measured from your eyes, so the prompt point stays at least 0.75 m up or a bear on the floor would be out of it)
+      // reach is measured from your eyes, so the prompt point stays at least 0.75 m up or a bear on the floor would be out of it
       const it = env.addI({ p: new V3(s[0], Math.max(s[1] + 0.15, 0.75), s[2]), r: 1.4, label: 'Pick up the bear', when: () => alive(t) && !got && P.mode === 'walk', act: () => { got = true; W.teddy.visible = false; sfx.thump(); } });
       await until(t, () => got); env.removeI(it); if (!alive(t)) return;
       proofFire('teddy', s);
       obj('Put it back on the bunk'); sfx.tension(0.05, 2); await wait(3);
       if (!hunter.busy) hunter.stalk(spawnFar());
-      await until(t, () => P.mode === 'bunk' || P.mode === 'hide'); W.teddy.setDown(6.83, 0.55, 3.0); sfx.thump(); obj(null); F.objOk = true;
+      await until(t, () => P.mode === 'bunk' || P.mode === 'hide'); W.teddy.setDown(6.83, 0.55, 3.0); sfx.thump(); obj(null); completeObjective();
     },
     // something is in your parents' room
     async parents(plan, t) {
       await atClock(t, plan.clock0 + 30); if (!alive(t)) return;
       W.setDoor('parents', true); sfx.creak(0.3, D.pan(7.5, -1.5)); obj('Check on Mom and Dad');
-      let seen = false;
       await until(t, () => env.roomAt(P.pos.x, P.pos.z) === 'parents' || (Math.hypot(P.pos.x - 7.5, P.pos.z + 1.7) < 1.3 && hunter.los(P.pos.x, P.pos.z, 7.0, -3.2)));
-      if (!alive(t)) return; obj(null); F.objOk = true;
+      if (!alive(t)) return; obj(null); completeObjective();
       F.script = true; sfx.tension(0.06, 1); await wait(0.8);
       hunter.sight('pBed', { dur: 14, facing: [7.4, -3.4], turnDist: 2.4, chase: true, stab: false });
-      F.script = false; seen = true;
-      void seen;
+      F.script = false;
     },
   };
 

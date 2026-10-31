@@ -21,7 +21,7 @@ At 2:47 that first night, the house wakes up.
 [h2]Ten nights[/h2]
 Top Bunk is a short first-person horror game set over ten nights in one house. On night one, doors shut by themselves, the photo in the hall comes off the wall, every cabinet in the kitchen bangs at once, and something walks around your bunk while you hold your breath under the covers. From night two the whole house is open, a clock runs toward dawn, and the thing in the hallway hunts you.
 
-Each run has a seed, and the seed picks what each night is about. The phone rings in the dining room in the middle of the night. The TV switches itself on with Dad standing in front of it. Mom calls you to the kitchen while she's asleep down the hall. The power cuts out and the breaker's in the utility room. Your bear turns up where you didn't leave it. There's a night you can't move, a drive in the family car you have to wake up from, and a long night sitting up with grandpa by candlelight. Make it to dawn and you get breakfast. Get caught and you play the night again.
+Each run has a seed, and the seed picks what each night is about. The phone rings in the dining room in the middle of the night. The TV switches itself on with Dad standing in front of it. Mom calls you to the kitchen while she's asleep down the hall. The power cuts out and the breaker box is out in the detached garage, past the gravel and the dark yard. Your bear turns up where you didn't leave it. There's a night you can't move, a drive in the family car you have to wake up from, and a long night sitting up with grandpa by candlelight. Make it to dawn and you get breakfast. Some nights you fall into a nightmare instead (the shadow, the mirror, the hall, the basement) and wake up with something left behind. Get caught and you play the night again.
 
 [h2]Hide. Hold your breath.[/h2]
 It's bigger and faster than you, and you can't fight it. Break its line of sight and hide: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. When it's close enough to hear you, hold your breath. The meter drains while it stands there with its head tilted, waiting. Let go too early and it has you. Hold on too long and you gasp, and it has you anyway.
@@ -29,7 +29,7 @@ It's bigger and faster than you, and you can't fight it. Break its line of sight
 You've got a flashlight and doors you can shut behind you. Sprinting wears you out fast, so learn the house.
 
 [h2]The house[/h2]
-A single-storey farmhouse from the early 2000s, with brown carpet, a white kitchen, a narrow hall of family photos, a box TV and a phone on the dining-room wall. The breaker panel is out in the utility room, and the moving truck is still parked on the gravel.
+A single-storey farmhouse from the early 2000s, with brown carpet, a white kitchen, a narrow hall of family photos, a box TV and a phone on the dining-room wall. The utility wing has a back door onto a stoop, and beside it the stairs down to a basement laundry room. The breaker panel is out in the detached garage, and the moving truck is still parked on the gravel.
 
 [h2]Nobody believes you[/h2]
 You tell them at breakfast and they explain it away. The tap was left running. The breaker tripped. You must have dropped the bear in the hall. Most nights the house leaves something behind, and if you find it, you've got something to show them. Show them enough and they start to listen.
@@ -41,9 +41,11 @@ There are three endings. Which one you get depends on how much proof you've foun
 [*] A short horror story over ten nights in one house
 [*] Seeded runs: the same seed replays the same ten nights, and a new seed shuffles them
 [*] Hiding spots, a breath meter, a flashlight, stamina and doors that shut
-[*] Proof to find: what you turn up changes breakfast and decides which of three endings you get
+[*] A dozen kinds of proof to find, from scratches to a handprint on the breaker box: what you turn up changes breakfast and decides which of three endings you get
+[*] Four nightmares that pull you under and leave something behind
 [*] The house gets worse each night: night lights die, the drawing in the hall changes, the clock lies
-[*] Every line is subtitled. Mom and Dad are voiced on moving day and for most of the first two mornings; after that their lines are subtitles over a murmur
+[*] Every line is subtitled, and Mom, Dad and grandpa are voiced throughout. The kid is text only
+[*] A brightness option and a seed you can type in to replay a run
 [*] Keyboard and mouse, or a game controller with rumble
 [*] Graphics presets from Low to Ultra, plus an Auto mode that lowers the resolution, then the preset, when the frame rate drops
 [*] Steam Achievements
@@ -145,13 +147,11 @@ icons exist.
 | --- | --- | --- | --- |
 | English | yes | no | yes |
 
-English only. Every line is subtitled, but only some are voiced. The game has 83 scripted lines (78 in `assets/audio/lines.json` and
-five in the proof scene at breakfast, written into `js/main.js`), and 16 of them have a recording: everything Mom and Dad say on
-moving day and on the first morning, and most of the second morning. The other 67 aren't recorded. Mom's, Dad's and grandpa's lines
-from `lines.json` play as a wordless murmur under the subtitle; the kid's lines and the proof scene are text only. (The four other
-recordings in `assets/audio/vo/`, Mom and Dad through the wall, are only used by the trailer.)
+English only. Every line is subtitled. `assets/audio/lines.json` holds every line, and `assets/audio/manifest.json` lists the ones that have
+a recording: every line Mom, Dad and grandpa speak. The kid's lines are text only,
+as are the lines of the proof scene at breakfast (what you tell them, and their answers), which are written into the game code.
 
-Leave *Full audio* unticked. It would take a recording of every line Mom, Dad and grandpa have, the proof scene included.
+Leave *Full audio* unticked: the kid and the proof scene are not voiced.
 
 ## Tags
 

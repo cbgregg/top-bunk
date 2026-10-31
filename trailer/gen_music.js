@@ -322,6 +322,15 @@ function gasp() {   // a kid's sharp intake of breath, close to the mic
   for (let i = 0; i < n; i++) { const t = i / SR, e = Math.min(1, t / 0.025) * Math.exp(-Math.max(0, t - 0.06) * 9); out[i] = (a[i] + c[i] * 0.6 + Math.sin(2 * Math.PI * (310 + 60 * t) * t) * 0.08 * Math.exp(-t * 12)) * e; }
   return monoNorm(out, 0.8);
 }
+function pianoSlam() {   // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it (mirrors Sound.pianoSlam in js/audio.js: keep the notes in step)
+  const sec = 2.4, n = Math.ceil(sec * SR), out = new Float64Array(n);
+  for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) {
+    for (let i = 0; i < n; i++) { const t = i / SR, tri = 2 / Math.PI * Math.asin(Math.sin(2 * Math.PI * f * t)); out[i] += tri * 0.16 * Math.min(1, t / 0.002) * Math.exp(-t * 1.6); }
+  }
+  for (let i = 0; i < n; i++) { const t = i / SR; out[i] += Math.sin(2 * Math.PI * 36.7 * t * (1 - 0.1 * t)) * 0.5 * Math.exp(-t * 2.2); }
+  const nz = onePoleLP(noise(n), 900); for (let i = 0; i < n; i++) { const t = i / SR; out[i] += nz[i] * 1.1 * Math.exp(-t * 12); }
+  return monoNorm(room(out, 0.3, 1.2), 0.9);
+}
 function panicBreath(sec) {   // running, scared: quick ragged breaths with a voice in the out-breath
   const b = new Buf(sec + 1); let t = 0, k = 0;
   while (t < sec) {
@@ -417,4 +426,5 @@ writeWav(path.join(OUT, 'heart_ticks.wav'), ...heartTicks(4, 0.56));
 writeWav(path.join(OUT, 'crt_off.wav'), ...crtOff());
 writeWav(path.join(OUT, 'cam_impact.wav'), ...camImpact());
 writeWav(path.join(OUT, 'cam_handling.wav'), ...handling());
+writeWav(path.join(OUT, 'piano_slam.wav'), ...pianoSlam());
 writeWav(path.join(OUT, 'box_note.wav'), ...boxNote());

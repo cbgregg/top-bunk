@@ -8,7 +8,7 @@ what ships. Nothing in this folder is loaded by the game.
 | `description.md` | Short description, "About this game" (BBCode), system requirements, content warnings, AI-generated content disclosure, input, languages, tags, age-rating notes, and what is left to do before the page goes live | Store Page → Basic Info (name, short description, genre, tags, supported features, languages, the AI-content questions) · Store Page → Description · Store Page → Mature Content · the IARC questionnaire |
 | `press-kit.md` | One-paragraph pitch, fact sheet, feature bullets, asset list | Not a Steamworks field: your website / press emails; the pitch and features also feed the Steam page |
 | `shots.js` | Playwright script: drives the live game headless and captures the screenshots | |
-| `screenshots/01…07.png` | Seven 1920×1080 in-game screenshots | Store Page → Graphical Assets → Screenshots (Steam needs five); mark at least four "suitable for all ages" |
+| `screenshots/01…08.png` | Eight 1920×1080 in-game screenshots | Store Page → Graphical Assets → Screenshots (Steam needs five); mark at least four "suitable for all ages" |
 | `capsules/*.html` | One HTML template per capsule, composed from the screenshots plus the title typography (`capsule.css` holds the shared look, `capsule.js` the ready signal and the `?s=2` zoom) | |
 | `capsules/src/` | Wide (3840×1240) and tall (1000×1400) source renders for the capsules, from `shots.js --extra` | |
 | `render_capsules.js` | Renders every template to `out/` at its exact size | |
@@ -36,7 +36,7 @@ Playwright with Chromium is needed (`npm install`, then `npx playwright install 
 so it needs no GPU.
 
 ```sh
-node store/shots.js                 # the seven screenshots -> store/screenshots/
+node store/shots.js                 # the eight screenshots -> store/screenshots/
 node store/shots.js --extra         # plus the capsule sources -> store/capsules/src/
 node store/shots.js --preview       # fast 960x540 framing pass into a temp folder (prints the path)
 node store/shots.js --only 05,07    # just some of them

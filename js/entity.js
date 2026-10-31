@@ -1,19 +1,16 @@
-// The thing: a stretched black body with the face from creature.js on its head bone (one skull running down into the neck, white
-// ring eyes with black pupils that follow the player, the grin cut into the head).
+// the thing: a stretched black body with the face from creature.js on its head bone (one skull running down into the neck, white
+// ring eyes with black pupils that follow the player, the grin cut into the head)
 import * as THREE from 'three';
-import { createFace, headGeometry, skinMaterial, tuckIntoNeck, RIM_COL } from './creature.js';
+import { createFace, headGeometry, skinMaterial, tuckIntoNeck, RIM_COL, RX, RY, RZ } from './creature.js';
+import { smoothstep as ss, lerp, hash } from './mathx.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
 
 const _v = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
 const BODY_RIM = RIM_COL.clone().multiplyScalar(2.6);   // stronger on the body, so the arms come off the dark
-// the graphics preset lives in gfx, which main.js does not hand to the thing; it is looked up as the thing is drawn
-const preset = () => (typeof window !== 'undefined' && window.__game && window.__game.gfx && window.__game.gfx.quality) === 'low' ? 'low' : 'high';
-const ss = THREE.MathUtils.smoothstep;
-const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
-// Skin weights for the skull-and-neck mesh on the body's skeleton. The skull moves with the head bone alone. Down the neck the
+// skin weights for the skull-and-neck mesh on the body's skeleton. the skull moves with the head bone alone. down the neck the
 // weights run from the body's own (copied from the nearest vertices of its shirt, so the neck's foot moves with the shoulders it
 // sits in) through the neck bone to the head, so a turn of the head twists the neck instead of shearing it at a seam.
 function skinWeights(geo, body, refVerts, bind, head, neck) {
@@ -34,8 +31,8 @@ function skinWeights(geo, body, refVerts, bind, head, neck) {
   for (let i = 0; i < n; i++) {
     v.fromBufferAttribute(pos, i);
     // t: 0 where the neck goes into the shoulders, 1 on the skull (and right under the jaw, which turns with it)
-    const sk = (v.x / 0.209) ** 2 + (v.y / 0.264) ** 2 + (v.z / 0.198) ** 2;
-    const t = Math.max(ss(v.y, -0.33, -0.17), ss(-sk, -1.32, -1.02));
+    const sk = (v.x / RX) ** 2 + (v.y / RY) ** 2 + (v.z / RZ) ** 2;
+    const t = Math.max(ss(-0.33, -0.17, v.y), ss(-1.32, -1.02, -sk));
     const w = new Map(), add = (b, x) => w.set(b, (w.get(b) || 0) + x);
     if (t < 1) {
       let tot = 0; const ref = new Map();
@@ -88,9 +85,9 @@ export class Entity {
     // neck + head: head is the face group (its origin the skull centre), smile its teeth; it gets its skull when first drawn
     // without the rigged body, so a normal start never builds one it throws away
     const neck = cyl(0.04, 0.05, 0.24); neck.position.y = 1.0; this.torso.add(neck);
-    this.face = this.head = createFace({ skull: false });
+    this.head = createFace({ skull: false });
     this.head.position.y = 1.2; this.head.rotation.order = 'YXZ'; this.torso.add(this.head);
-    this.smile = this.face.smile;
+    this.smile = this.head.smile;
 
     // state
     this.t = 0; this.phase = 0; this.mode = 'idle'; this.speed = 0;
@@ -107,8 +104,7 @@ export class Entity {
   useRig(rig) {
     const K = 1.43;                                   // a 1.82 m man -> about 2.6 m
     rig.setHeight(1.82 * K);
-    // the man's own head and his hair cards go (hidden as meshes: blacking out every material used to bring the cards back as
-    // dark blobs inside the skull), the rest of him takes the skin
+    // the man's own head and his hair cards are hidden as meshes, the rest of him takes the skin
     let body = null; const refVerts = new Set();
     rig.root.traverse((o) => {
       if (!o.isSkinnedMesh) return;
@@ -147,7 +143,7 @@ export class Entity {
     const head = new THREE.SkinnedMesh(geo);
     head.name = 'creatureHead'; head.frustumCulled = false;
     body.parent.add(head); head.bind(skel, bind);
-    this.face.setSkull(head);
+    this.head.setSkull(head);
     this.body.visible = false;
     rig.play('idle', { fade: 0, speed: 0.3 });
     this.rig = rig;
@@ -162,7 +158,7 @@ export class Entity {
     const cylSkin = pick(this.skins, {});
     for (const o of this.cyls) o.material = cylSkin;
     if (this.rig) { const m = pick(this.skins.rig, this.rigSkin); for (const o of this.rigMeshes) o.material = m; }
-    this.face.setQuality(q);
+    this.head.setQuality(q);
   }
 
   get visible() { return this.root.visible; }
@@ -199,23 +195,23 @@ export class Entity {
       }
     }
     r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 6 });
-    // now and then, while it stands, it cocks its head: quick over, held a moment, eased back. At most once per 11 s, timed from the
+    // now and then, while it stands, it cocks its head: quick over, held a moment, eased back. at most once per 11 s, timed from the
     // clock alone so a replay matches (after the look, which would straighten it out)
     const n = Math.floor(t / 11), u = t - n * 11 - 3 - 6 * hash(n);
     if (n > 0 && u > 0 && u < 0.9 && this.mode === 'idle' && this.reach < 0.2) {
-      const k = (u < 0.08 ? ss(u, 0, 0.08) : 1 - ss(u, 0.3, 0.9)) * (hash(n + 0.5) < 0.5 ? -1 : 1);
+      const k = (u < 0.08 ? ss(0, 0.08, u) : 1 - ss(0.3, 0.9, u)) * (hash(n + 0.5) < 0.5 ? -1 : 1);
       r.bend(['Head'], [1], [0, 0, 1], 0.08 * k);
       r.bend(['Neck'], [1], [0, 1, 0], 0.03 * k);
     }
-    this.face.update(dt, { target: this.lookTarget, smile: this.smileScale });
+    this.head.update(dt, { target: this.lookTarget, smile: this.smileScale });
   }
 
-  update(dt) {
+  update(dt, quality = this.quality) {
     if (!this.root.visible) return;
-    const q = preset(); if (q !== this.quality) this.setQuality(q);
+    this.setQuality(quality === 'low' ? 'low' : 'high');
     this.t += dt; const t = this.t;
     if (this.rig) { this.updateRig(dt); return; }
-    if (!this.face.skull) this.face.addSkull();
+    if (!this.head.skull) this.head.addSkull();
     const [hl, hr] = this.legs, [al, ar] = this.arms;
     let armSwing = 0, bob = 0, runLean = 0;
     if (this.mode === 'run' || this.mode === 'walk') {
@@ -232,10 +228,10 @@ export class Entity {
       bob = Math.sin(t * 1.3) * 0.008;
     }
     const reachX = -1.5 * this.reach;
-    al.rotation.x = THREE.MathUtils.lerp(-armSwing - (this.mode === 'run' ? 0.35 : 0), reachX, this.reach);
-    ar.rotation.x = THREE.MathUtils.lerp(armSwing - (this.mode === 'run' ? 0.35 : 0), reachX, this.reach);
-    al.rotation.z = THREE.MathUtils.lerp(-0.1, 0.05, this.reach);
-    ar.rotation.z = THREE.MathUtils.lerp(0.1, -0.05, this.reach);
+    al.rotation.x = lerp(-armSwing - (this.mode === 'run' ? 0.35 : 0), reachX, this.reach);
+    ar.rotation.x = lerp(armSwing - (this.mode === 'run' ? 0.35 : 0), reachX, this.reach);
+    al.rotation.z = lerp(-0.1, 0.05, this.reach);
+    ar.rotation.z = lerp(0.1, -0.05, this.reach);
     this.body.position.y = bob;
     this.body.rotation.x = this.lean + runLean;
 
@@ -249,7 +245,7 @@ export class Entity {
       this.head.rotation.x += (pitch - this.head.rotation.x) * Math.min(1, dt * 6);
     }
     this.head.rotation.z = this.tilt + Math.sin(t * 0.7) * 0.05;
-    this.face.update(dt, { target: this.lookTarget, smile: this.smileScale });
+    this.head.update(dt, { target: this.lookTarget, smile: this.smileScale });
   }
 
   headWorld(out = new THREE.Vector3()) { this.root.updateMatrixWorld(true); return this.head.getWorldPosition(out); }

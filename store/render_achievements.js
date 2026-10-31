@@ -13,7 +13,7 @@
 // the dawn window and get their number typed over it. The vigil and the drive run the game's own scripted scenes, which can't be wound
 // back, so each of those gets a fresh page of its own.
 const { chromium } = require('playwright');
-const http = require('http');
+const { serve } = require('./lib');
 const fs = require('fs');
 const path = require('path');
 
@@ -21,18 +21,6 @@ const ROOT = path.resolve(__dirname, '..');
 const ARGS = process.argv.slice(2);
 const opt = (name, def) => { const i = ARGS.indexOf('--' + name); return i >= 0 && ARGS[i + 1] && !ARGS[i + 1].startsWith('--') ? ARGS[i + 1] : def; };
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
-  '.wav': 'audio/wav', '.glb': 'model/gltf-binary', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.hdr': 'application/octet-stream', '.woff2': 'font/woff2', '.md': 'text/markdown' };
-function serve(port) {
-  return new Promise((res) => {
-    const s = http.createServer((q, r) => {
-      let f = path.join(ROOT, decodeURIComponent(q.url.split('?')[0].split('#')[0]));
-      if (!f.startsWith(ROOT)) { r.writeHead(403); r.end(); return; }
-      if (f.endsWith(path.sep)) f += 'index.html';
-      fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); } });
-    }).listen(port, '127.0.0.1', () => res(s));
-  });
-}
 
 // ---------- the scenes ----------
 // Same shape as the shots in store/shots.js: `setup` runs in the page with g = window.__game and S = window.__shot, `after` once the loop
@@ -50,7 +38,7 @@ const SCENES = [
       g.setPhase('night'); S.flash(true, 1.2); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;
       S.look([5.6, 1.1, -1.0], [5.6, 1.08, -0.32]); } },
   { id: 'covers', fov: 56, what: 'Looking out from under the covers on the top bunk, at the open door',
-    // (the blanket's peephole is sized for a wide screen; here it is opened up to fill a square)
+    // the blanket's peephole is sized for a wide screen; here it is opened up to fill a square
     css: `#blanket{background:radial-gradient(ellipse 42% 36% at 50% 50%,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 55%,rgba(16,20,36,0.96) 100%),
       repeating-linear-gradient(0deg,rgba(120,24,24,0.16) 0 9px,rgba(0,0,0,0) 9px 26px),repeating-linear-gradient(90deg,rgba(120,24,24,0.16) 0 9px,rgba(0,0,0,0) 9px 26px);
       background-color:rgba(12,15,28,0.97);-webkit-mask:radial-gradient(ellipse 42% 36% at 50% 50%,transparent 60%,#000 100%);mask:radial-gradient(ellipse 42% 36% at 50% 50%,transparent 60%,#000 100%)}`,
@@ -58,7 +46,7 @@ const SCENES = [
       g.setPhase('night'); g.UI.blanket(true); g.W.setDoor('kid', true, true); g.W.bathSpot.intensity = g.BATH_I * 0.8;
       S.look([6.13, 1.9, 3.02], [7.05, 1.3, -0.3]); } },
   { id: 'closet', fov: 60, what: 'From inside your closet, through the louvres, the thing standing in your room',
-    // (the slats scaled down to the square, with a gap across the middle where its eyes are)
+    // the slats scaled down to the square, with a gap across the middle where its eyes are
     css: '#pod.louvers{background:repeating-linear-gradient(180deg,rgba(7,7,9,0.985) 0 12px,rgba(7,7,9,0) 12px 24px);background-position:0 -6px;box-shadow:inset 0 0 50px 14px #000}',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.UI.pod('louvers'); S.thing([5.95, 0, 1.9], [5.85, 0.04], { tilt: 0.25, lean: 0.2 });
@@ -89,7 +77,7 @@ const SCENES = [
       g.setPhase('morning'); g.W.moveTeddy(5.75, 0.55, 3.15); S.look([6.4, 0.95, 2.1], [5.78, 0.72, 3.12]); } },
   { id: 'reach', fov: 72, what: 'Caught: it lunges, arms out, and the screen goes red',
     css: '#flash{display:block !important;background:rgb(150,0,0) !important;opacity:0.16 !important;transition:none !important}',
-    // (placed the way caught() in main.js places it: its head at your eye height, an arm's length away)
+    // placed the way caught() in main.js places it: its head at your eye height, an arm's length away
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true, 16); S.look([6.5, 1.32, 2.4], [6.5, 1.25, 1.0]);
       S.thing([6.5, 1.32 - 2.4, 0.5], [6.5, 2.4], { reach: 1, lean: 0.12, smile: 1.3, tilt: 0.3 }); } },
@@ -121,7 +109,7 @@ const SCENES = [
       Object.assign(g.P, { yaw: Math.PI / 2, pitch: 0, mode: 'walk' }); g.P.pos.set(4.4, 0, -0.95); g.F.cutscene = false;
       for (const t0 = performance.now(); !turned() && performance.now() - t0 < 90000;) await sleep(50);
       if (!turned()) console.warn('grandpa never turned round; rendering him from behind');
-      for (const t0 = g.gameTime; g.gameTime < t0 + 0.4;) await sleep(20);   // (the last of the turn)
+      for (const t0 = g.gameTime; g.gameTime < t0 + 0.4;) await sleep(20);   // the last of the turn
       window.__freeze = true; } },
   { id: 'glove', fresh: true, fov: 62, what: 'The drive: the front seats, the glove box, the road through the windscreen',
     css: '#game canvas{filter:brightness(3.2) contrast(1.15)}',
@@ -136,9 +124,8 @@ const SCENES = [
 // achievement id -> scene, and what goes over it
 const ICONS = {
   MOVING_DAY: { scene: 'box' },
-  NIGHT_1: { scene: 'dawn', mark: '1' }, NIGHT_2: { scene: 'dawn', mark: '2' }, NIGHT_3: { scene: 'dawn', mark: '3' }, NIGHT_4: { scene: 'dawn', mark: '4' },
-  NIGHT_5: { scene: 'dawn', mark: '5' }, NIGHT_6: { scene: 'dawn', mark: '6' }, NIGHT_7: { scene: 'dawn', mark: '7' }, NIGHT_8: { scene: 'dawn', mark: '8' },
-  NIGHT_9: { scene: 'dawn', mark: '9' }, NIGHT_10: { scene: 'dawn', mark: '10' },
+  // NIGHT_1 .. NIGHT_10: the dawn window with the night's number over it
+  ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => ['NIGHT_' + (i + 1), { scene: 'dawn', mark: String(i + 1) }])),
   ENDING_TAKEN: { scene: 'taken' },
   ENDING_ALONE: { scene: 'alone' },
   ENDING_BELIEVED: { scene: 'porch' },
@@ -152,7 +139,7 @@ const ICONS = {
   GRANDPA: { scene: 'grandpa' },
   GLOVE_BOX: { scene: 'glove' },
   FIRST_TRY: { scene: 'bear' },
-  TRY_AGAIN: { scene: 'stare', mark: '13' },
+  TRY_AGAIN: { scene: 'stare', mark: '13' },   // caught 13 times
   FLAWLESS: { scene: 'grin' },
 };
 
@@ -160,7 +147,7 @@ const ICONS = {
 function installHelpers(quality) {
   const g = window.__game;
   g.gfx.auto = false; g.gfx.setQuality(quality, { save: false }); g.gfx.setRes(1);
-  g.start();   // (the test mode: the loop runs, no title screen, no story, no achievements)
+  g.start();   // the test mode: the loop runs, no title screen, no story, no achievements
   window.__frames = 0; const render = g.gfx.render.bind(g.gfx); g.gfx.render = (dt) => { render(dt); window.__frames++; };
   window.__norender = true;
   const style = document.createElement('style'); document.head.appendChild(style);
@@ -287,7 +274,7 @@ async function main() {
   const ONLY = (opt('only', '') || '').split(',').filter(Boolean);
   const t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 
-  const srv = await serve(PORT);
+  const srv = await serve(PORT, { root: ROOT });
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   let page = await openGame(browser, { port: PORT, size: SIZE, quality: QUALITY });
   log('game loaded, quality', QUALITY);
@@ -322,5 +309,4 @@ async function main() {
   await browser.close(); srv.close();
 }
 
-if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
-module.exports = { SCENES, ICONS, serve, openGame, renderScene, composeIcon, contactSheet };
+main().catch((e) => { console.error(e); process.exit(1); });
