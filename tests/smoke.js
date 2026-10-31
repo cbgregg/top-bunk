@@ -557,8 +557,8 @@ let BASE = '';
         return { bones: head.skeleton.bones.length, names: [/head/i, /spine/i, /eye/i].filter((re) => head.skeleton.bones.some((b) => re.test(b.name))).length, x: p.x, z: p.z, type: window.__game.F.typeName };
       });
       ok(g.type === 'The Vigil' && g.bones > 20 && g.names === 3, `grandpa's rig: ${JSON.stringify(g)}`);
-      ok(Math.hypot(g.x - 3.5, g.z + 0.65) < 0.5, `grandpa is not in the chair: ${JSON.stringify(g)}`);
-      await stand(page, 4.3, -0.7, 3.5, -0.65);   // at the end of the hall, the way the vigil waits for you
+      ok(Math.hypot(g.x - 3.0, g.z + 0.65) < 0.5, `grandpa is not in the chair: ${JSON.stringify(g)}`);
+      await stand(page, 3.8, -0.7, 3.0, -0.65);   // at the mouth of the hall, the way the vigil waits for you
       await until(page, () => window.__game.P.mode === 'cine', null, 60e3);
       await until(page, () => { const g = window.__game; return g.P.mode === 'bunk' && !g.F.cutscene && !g.F.script; }, null, 150e3);
       const e = await page.evaluate(() => { const g = window.__game; return { ok: g.F.objOk, dead: g.F.dead, body: document.body.classList.contains('nightmare'), blackout: g.F.blackout }; });

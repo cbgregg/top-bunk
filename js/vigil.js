@@ -6,9 +6,9 @@ import { flicker as lightFlicker } from './settings.js';
 import { Rig, loadModel } from './rig.js';
 import { swimFrame } from './swim.js';
 
-const SEAT = { x: 3.5, z: -0.65 };     // the chair: against the north side of the hall, facing west (its back to the bedroom end); any closer and his shoulder is in the wall
+const SEAT = { x: 3.0, z: -0.65 };     // the chair: in the mouth of the hall, half into the living room, facing the picture window (its back to the bedroom end)
 const CANDLE = { x: 5.2, z: -0.95 };   // the tea light, on the floor in the middle of the hall
-const FLASH = { x: 3.86, z: -0.84 };   // the flashlight, on the floor beside the chair, pointed at him
+const FLASH = { x: 3.36, z: -0.84 };   // the flashlight, on the floor beside the chair, pointed at him
 const TRIGGER = 2.5;                   // how close you have to get
 
 // the thing's face, painted over his head texture. Fractions of the texture, measured on the model; the image is stored upside down,
@@ -129,7 +129,7 @@ export function createVigil(env) {
     env.powerOut(true); F.noFlash = true; sfx.drone(0, 3); sfx.tension(0, 3);
     r.spot.intensity = 26;
     await env.wait(4); if (!on) return;
-    await until(() => gpState !== 'loading' && P.pos.x < 4.6 && Math.hypot(P.pos.x - SEAT.x, P.pos.z - SEAT.z) < TRIGGER && P.mode === 'walk' && !F.cutscene);
+    await until(() => gpState !== 'loading' && P.pos.x < 4.1 && Math.hypot(P.pos.x - SEAT.x, P.pos.z - SEAT.z) < TRIGGER && P.mode === 'walk' && !F.cutscene);
     if (!on) return;
 
     // he is talking before he turns; the camera stops where you stand and turns to his eyes

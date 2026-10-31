@@ -3,10 +3,19 @@
 // short noise bursts, every note slightly flat and wobbly, over a plain organ and bass. No dependencies.
 //
 //   node tools/sing.js song.json --out out.wav [--slow 0.97] [--pitch -1] [--wobble 0.5] [--voice 1] [--band 0.8]
+//   node tools/sing.js --midi song.mid --lyrics words.txt --out out.wav [--melody-track N] [--chord-track N,N] [--out-json song.json]
 //
 // song.json: { bpm, key, voice: [{ note: 'C4' | 60 | null, beats, syl: 'dai' }], chords: [{ beats, notes: ['C3','E3','G3'] }] }
 //   syl is spelled ('win', 'dow') or, with spaces, given as sounds ('d o u'): consonants s z sh ch j f v th dh h t d k g p b m n ng l r w y,
 //   vowels a ah ae e eh i ih o oh u oo uh er aw. Spelling guesses the vowel; sounds are exact.
+// --midi song.mid: a standard MIDI file (type 0 or 1) instead of the song file. The melody is the track with the highest average
+//   pitch that never plays two notes at once (or --melody-track N, numbered from 1 in file order); every other pitched track is the
+//   band, grouped into a chord per beat (or --chord-track N,N); channel 10 drums are skipped. Tempo changes are kept.
+// --lyrics words.txt: the words, one syllable per melody note in order, separated by spaces and hyphens ("lit-tle win-dow");
+//   "_" holds the last syllable over the next note, "-" on its own is ignored, "[dh uh]" is one syllable given as sounds,
+//   "#" starts a comment. Rests take no syllable. Notes left without a syllable sing "la". Without the file, lyric events in
+//   the MIDI are used if it has them.
+// --out-json song.json: also write the parsed song in the format above, to edit and sing again from the song file.
 //   --slow F     tape speed; below 1 slows and drops the pitch together (0.97 = the dying-computer feel)
 //   --pitch N    transpose everything N semitones before singing
 //   --wobble W   0..1, how unsteady the pitch is (default 0.5)
@@ -18,11 +27,10 @@ const SR = 44100;
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; };
 const songFile = args.find((a) => !a.startsWith('--') && (args.indexOf(a) === 0 || !args[args.indexOf(a) - 1].startsWith('--')));
-if (!songFile) { console.error('usage: node tools/sing.js song.json --out out.wav'); process.exit(1); }
-const song = JSON.parse(fs.readFileSync(songFile, 'utf8'));
+const MIDI = opt('--midi', null), LYRICS = opt('--lyrics', null), OUT_JSON = opt('--out-json', null);
+if (!songFile && !MIDI) { console.error('usage: node tools/sing.js song.json --out out.wav\n       node tools/sing.js --midi song.mid --lyrics words.txt --out out.wav'); process.exit(1); }
 const OUT = opt('--out', 'song.wav'), SLOW = +opt('--slow', 1), PITCH = +opt('--pitch', 0), WOBBLE = +opt('--wobble', 0.5);
 const VOICE = +opt('--voice', 1), BAND = +opt('--band', 1);
-const beat = 60 / (song.bpm || 96);
 
 // ---------- notes ----------
 const NAMES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -98,6 +106,216 @@ function parse(syl) {
   if (vowelIsY) path = ['ah', 'i'];
   return { onset: flat.slice(0, v0).filter((u) => CONS[u]), vowel: path, coda: flat.slice(v1 + 1).filter((u) => CONS[u]) };
 }
+
+// ---------- MIDI input ----------
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const nameOf = (m) => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+
+// the file as tracks of events: { tick, meta, data } or { tick, kind, ch, d1, d2 }
+function readMidi(file) {
+  const b = fs.readFileSync(file);
+  let p = 0;
+  const u32 = () => { const v = b.readUInt32BE(p); p += 4; return v; };
+  const u16 = () => { const v = b.readUInt16BE(p); p += 2; return v; };
+  const tag = () => { const s = b.toString('latin1', p, p + 4); p += 4; return s; };
+  if (tag() !== 'MThd') throw new Error(file + ' is not a MIDI file');
+  const hlen = u32(), format = u16(), ntrk = u16(), div = u16(); p += hlen - 6;
+  let tickSec = null, ppq = 480;
+  if (div & 0x8000) { const fps = 256 - (div >> 8), tpf = div & 0xff; tickSec = 1 / (fps * tpf); }   // SMPTE time: ticks are a fixed length
+  else ppq = div || 480;
+  const tracks = [];
+  while (tracks.length < ntrk && p + 8 <= b.length) {
+    const t = tag(), len = u32(), end = Math.min(p + len, b.length);
+    if (t !== 'MTrk') { p = end; continue; }
+    const ev = []; let tick = 0, status = 0;
+    const vlq = () => { let v = 0, c; do { c = b[p++]; v = (v << 7) | (c & 0x7f); } while ((c & 0x80) && p < end); return v >>> 0; };
+    while (p < end) {
+      tick += vlq();
+      let s = b[p];
+      if (s & 0x80) { p++; if (s < 0xf0) status = s; } else s = status;   // running status
+      if (s === 0xff) { const type = b[p++], n = vlq(); ev.push({ tick, meta: type, data: b.subarray(p, p + n) }); p += n; }
+      else if (s === 0xf0 || s === 0xf7) { p += vlq(); }
+      else if (s >= 0x80) { const kind = s & 0xf0, d1 = b[p++], d2 = kind === 0xc0 || kind === 0xd0 ? 0 : b[p++]; ev.push({ tick, kind, ch: s & 0x0f, d1, d2 }); }
+      else break;   // a data byte with no status: the track is damaged, keep what was read
+    }
+    p = end; tracks.push(ev);
+  }
+  return { format, ppq, tickSec, tracks };
+}
+
+// tempo map: tick -> seconds, and the first tempo as the song's bpm
+function tempoMap(mid) {
+  const changes = [];
+  for (const t of mid.tracks) for (const e of t) if (e.meta === 0x51 && e.data.length >= 3) changes.push({ tick: e.tick, us: (e.data[0] << 16) | (e.data[1] << 8) | e.data[2] });
+  changes.sort((a, b) => a.tick - b.tick);
+  if (!changes.length || changes[0].tick > 0) changes.unshift({ tick: 0, us: 500000 });
+  const segs = []; let sec = 0;
+  for (let i = 0; i < changes.length; i++) {
+    if (i) sec += (changes[i].tick - changes[i - 1].tick) / mid.ppq * changes[i - 1].us / 1e6;
+    segs.push({ tick: changes[i].tick, sec, us: changes[i].us });
+  }
+  const toSec = (tick) => {
+    if (mid.tickSec) return tick * mid.tickSec;
+    let s = segs[0]; for (const g of segs) { if (g.tick <= tick) s = g; else break; }
+    return s.sec + (tick - s.tick) / mid.ppq * s.us / 1e6;
+  };
+  return { toSec, bpm: 60e6 / segs[0].us, changes: segs.length };
+}
+
+// one part per track and channel: its notes in seconds, sorted, with the lyric events that start on them
+function midiParts(mid, toSec) {
+  const parts = [];
+  mid.tracks.forEach((ev, ti) => {
+    const nameEv = ev.find((e) => e.meta === 0x03);
+    const name = nameEv ? nameEv.data.toString('latin1').replace(/[^\x20-\x7e]/g, '').trim() : '';
+    const open = new Map(), byCh = new Map(), lyrics = [];
+    let last = 0;
+    const close = (key, tick) => {
+      const s = open.get(key); if (s == null) return; open.delete(key);
+      const ch = key >> 7, m = key & 127;
+      if (tick <= s) return;
+      if (!byCh.has(ch)) byCh.set(ch, []);
+      byCh.get(ch).push({ s: toSec(s), e: toSec(tick), m, tick: s });
+    };
+    for (const e of ev) {
+      last = Math.max(last, e.tick);
+      if (e.meta === 0x05) { lyrics.push({ tick: e.tick, text: e.data.toString('latin1').replace(/[^\x20-\x7e]/g, '').trim() }); continue; }
+      if (e.kind == null || e.ch === 9) continue;   // channel 10 is drums
+      const key = e.ch * 128 + e.d1;
+      if (e.kind === 0x90 && e.d2 > 0) { close(key, e.tick); open.set(key, e.tick); }
+      else if (e.kind === 0x80 || e.kind === 0x90) close(key, e.tick);
+    }
+    for (const key of [...open.keys()]) close(key, last);
+    for (const [ch, notes] of byCh) {
+      notes.sort((a, b) => a.s - b.s || b.m - a.m);
+      let overlaps = 0, sum = 0;
+      for (let i = 1; i < notes.length; i++) if (notes[i].s < notes[i - 1].e - 1e-3) overlaps++;
+      for (const n of notes) sum += n.m;
+      for (const l of lyrics) {   // a lyric belongs to the note that starts nearest it, within an eighth of a beat
+        let best = null; for (const n of notes) if (Math.abs(n.tick - l.tick) <= mid.ppq / 8 && (!best || Math.abs(n.tick - l.tick) < Math.abs(best.tick - l.tick))) best = n;
+        if (best && l.text && !best.lyric) best.lyric = l.text;
+      }
+      parts.push({ track: ti + 1, ch: ch + 1, name, notes, overlaps, mean: sum / notes.length });
+    }
+  });
+  return parts;
+}
+
+// the lyrics file as a list of syllables
+function readLyrics(file) {
+  const out = [];
+  for (let line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    line = line.replace(/#.*$/, '');
+    const re = /\[([^\]]*)\]|([^\s-]+)/g; let m;
+    while ((m = re.exec(line))) {
+      const tok = m[1] != null ? m[1].trim() : m[2].replace(/^[^A-Za-z_']+|[^A-Za-z_']+$/g, '');
+      if (tok) out.push(tok);
+    }
+  }
+  return out;
+}
+
+function songFromMidi(file, lyricsFile) {
+  const mid = readMidi(file);
+  const { toSec, bpm, changes } = tempoMap(mid);
+  const bl = 60 / bpm;
+  const parts = midiParts(mid, toSec).filter((pt) => pt.notes.length);
+  if (!parts.length) throw new Error(file + ' has no notes');
+  const log = (s) => console.error(s);
+  log(`${file}: type ${mid.format}, ${mid.tracks.length} track${mid.tracks.length === 1 ? '' : 's'}, ${bpm.toFixed(1)} bpm${changes > 1 ? ` (${changes} tempo changes)` : ''}`);
+  for (const pt of parts) log(`  track ${pt.track}${pt.name ? ` "${pt.name}"` : ''} ch ${pt.ch}: ${pt.notes.length} notes, mean ${nameOf(Math.round(pt.mean))}${pt.overlaps ? `, ${pt.overlaps} overlapping` : ''}`);
+  const trackArg = (k) => (opt(k, '') + '').split(',').map((x) => +x).filter((x) => x > 0);
+  // the melody: a chosen track, or the highest monophonic part
+  let melody;
+  const want = trackArg('--melody-track')[0];
+  if (want) {
+    const onTrack = parts.filter((pt) => pt.track === want);
+    if (!onTrack.length) throw new Error(`--melody-track ${want}: that track has no notes`);
+    melody = onTrack.reduce((a, b) => (b.notes.length > a.notes.length ? b : a));
+  } else {
+    const mono = parts.filter((pt) => !pt.overlaps && pt.notes.length >= 4);
+    const pool = mono.length ? mono : parts;
+    melody = pool.reduce((a, b) => (b.overlaps / b.notes.length < a.overlaps / a.notes.length - 0.05 || (Math.abs(b.overlaps / b.notes.length - a.overlaps / a.notes.length) <= 0.05 && b.mean > a.mean) ? b : a));
+  }
+  const chordTracks = trackArg('--chord-track');
+  const bandParts = parts.filter((pt) => pt !== melody && (chordTracks.length ? chordTracks.includes(pt.track) : true));
+  log(`  melody: track ${melody.track} ch ${melody.ch}; band: ${bandParts.length ? bandParts.map((pt) => `track ${pt.track} ch ${pt.ch}`).join(', ') : 'none'}`);
+
+  // the melody as one line: of notes starting together keep the highest, and cut each note at the next one's start
+  const mel = [];
+  for (const n of melody.notes) { const prev = mel[mel.length - 1]; if (prev && n.s - prev.s < 1e-3) continue; mel.push({ ...n }); }
+  for (let i = 0; i + 1 < mel.length; i++) if (mel[i].e > mel[i + 1].s) mel[i].e = mel[i + 1].s;
+  const voice = []; let t = 0;
+  for (const n of mel) {
+    const gap = n.s - t;
+    if (gap > 0.2 * bl || (gap > 1e-6 && !voice.length)) voice.push({ note: null, beats: gap / bl });
+    else if (gap > 1e-6) voice[voice.length - 1].beats += gap / bl;   // a short gap is slurred over
+    voice.push({ note: n.m, beats: (n.e - n.s) / bl, syl: n.lyric ? n.lyric.replace(/^[-_/\\]+|[-_/\\]+$/g, '') : undefined });
+    t = n.e;
+  }
+  // the words
+  const sung = voice.filter((v) => v.note != null);
+  if (lyricsFile) {
+    const toks = readLyrics(lyricsFile);
+    let si = 0, prev = null;
+    for (let i = 0; i < voice.length; i++) {
+      const v = voice[i]; if (v.note == null) { prev = null; continue; }
+      const tok = toks[si++];
+      if (tok === undefined) { v.syl = 'l ah'; continue; }
+      if (tok === '_') {   // hold the last syllable: a tie on the same pitch, or its vowel on a new one
+        const p = voice[i - 1];
+        if (p && p.note === v.note && p.syl != null) { p.beats += v.beats; voice.splice(i, 1); i--; continue; }
+        v.syl = prev ? parse(prev).vowel.join(' ') : 'ah';
+        continue;
+      }
+      v.syl = tok; prev = tok;
+    }
+    if (toks.length > sung.length) log(`  lyrics: ${toks.length} syllables for ${sung.length} notes; the last ${toks.length - sung.length} syllables are not sung`);
+    else if (toks.length < sung.length) log(`  lyrics: ${toks.length} syllables for ${sung.length} notes; the last ${sung.length - toks.length} notes sing "la"`);
+    else log(`  lyrics: ${toks.length} syllables on ${sung.length} notes`);
+  } else {
+    const withWords = sung.filter((v) => v.syl).length;
+    if (withWords) log(`  lyrics: ${withWords} of ${sung.length} notes have words in the file${withWords < sung.length ? '; the rest sing "la"' : ''}`);
+    else log('  lyrics: none (no --lyrics and no lyric events); every note sings "la"');
+  }
+  for (const v of voice) if (v.note != null && !v.syl) v.syl = 'l ah';
+
+  // the band: whatever the other parts play, as one chord per beat, a new block on every change or attack
+  const all = bandParts.flatMap((pt) => pt.notes);
+  const endSec = Math.max(t, ...all.map((n) => n.e));
+  const nb = Math.ceil(endSec / bl - 1e-6);
+  const chords = [];
+  for (let i = 0; i < nb; i++) {
+    const w0 = i * bl, w1 = w0 + bl, set = new Set(); let attack = false;
+    for (const n of all) {
+      const onset = n.s >= w0 - 1e-3 && n.s < w1 - 1e-3;
+      if (onset || Math.min(n.e, w1) - Math.max(n.s, w0) >= 0.5 * bl) { set.add(n.m); if (onset) attack = true; }
+    }
+    const notes = [...set].sort((a, b) => a - b), key = notes.join(',');
+    const last = chords[chords.length - 1];
+    if (last && last.key === key && !(attack && notes.length)) last.beats += 1;
+    else chords.push({ beats: 1, notes, key });
+  }
+  for (const c of chords) delete c.key;
+  for (const v of voice) v.beats = +v.beats.toFixed(4);
+  const title = (mid.tracks[0] || []).find((e) => e.meta === 0x03);
+  return { title: title ? title.data.toString('latin1').replace(/[^\x20-\x7e]/g, '').trim() : undefined, bpm: +bpm.toFixed(3), voice, chords };
+}
+
+// ---------- the song ----------
+const song = MIDI ? songFromMidi(MIDI, LYRICS) : JSON.parse(fs.readFileSync(songFile, 'utf8'));
+if (OUT_JSON) {
+  const dump = {
+    title: song.title, bpm: song.bpm, key: song.key,
+    voice: song.voice.map((v) => (v.note == null ? { note: null, beats: v.beats } : { note: typeof v.note === 'number' ? nameOf(v.note) : v.note, beats: v.beats, syl: v.syl })),
+    chords: (song.chords || []).map((c) => ({ beats: c.beats, notes: c.notes.map((n) => (typeof n === 'number' ? nameOf(n) : n)) })),
+  };
+  const line = (o) => JSON.stringify(o);
+  const text = `{\n  "title": ${line(dump.title || '')},\n  "bpm": ${line(dump.bpm || 96)},${dump.key ? `\n  "key": ${line(dump.key)},` : ''}\n  "voice": [\n    ${dump.voice.map(line).join(',\n    ')}\n  ],\n  "chords": [\n    ${dump.chords.map(line).join(',\n    ')}\n  ]\n}\n`;
+  fs.writeFileSync(OUT_JSON, text);
+  console.error(`${OUT_JSON}: ${dump.voice.length} voice entries, ${dump.chords.length} chord blocks`);
+}
+const beat = 60 / (song.bpm || 96);
 
 // ---------- filters ----------
 class Reson {   // two-pole resonator, constant peak gain

@@ -10,12 +10,15 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { store } from './store.js';
 
+// dpr is the render scale in CSS pixels; `fixed` presets render at that scale whatever the screen's own ratio is, so on a plain
+// 1080p monitor ultra draws 4K and scales down (the edges of the bunk rails and the door frames are where the picture lives)
 export const QUALITY = {
-  ultra:  { dpr: 2,    msaa: 4, ao: { samples: 16, radius: 0.55, res: 0.7 }, bloom: 0.45, grade: true,  sun: 4096, spot: 2048 },
-  high:   { dpr: 1.5,  msaa: 2, ao: { samples: 8,  radius: 0.55, res: 0.5 }, bloom: 0.4,  grade: true,  sun: 2048, spot: 1024 },
-  medium: { dpr: 1.25, msaa: 0, ao: null,                          bloom: 0.32, grade: true,  sun: 2048, spot: 1024 },
+  ultra:  { dpr: 2,    fixed: true, msaa: 4, ao: { samples: 16, radius: 0.55, res: 0.7 }, bloom: 0.45, grade: true,  sun: 4096, spot: 2048 },
+  high:   { dpr: 1.25, fixed: true, msaa: 4, ao: { samples: 8,  radius: 0.55, res: 0.5 }, bloom: 0.4,  grade: true,  sun: 2048, spot: 1024 },
+  medium: { dpr: 1.25, msaa: 2, ao: null,                          bloom: 0.32, grade: true,  sun: 2048, spot: 1024 },
   low:    { dpr: 1,    msaa: 0, ao: null,                          bloom: 0,    grade: false, sun: 1024, spot: 512, direct: true },
 };
+const baseDpr = (p) => p.fixed ? p.dpr : Math.min(devicePixelRatio || 1, p.dpr);
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
 
@@ -56,7 +59,7 @@ export class Gfx {
     this.autoQuality = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high';   // phones start lighter
     this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
-    this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0;   // res: dynamic resolution scale
+    this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0; this.fast = 0; this.ceiling = null;   // res: dynamic resolution scale
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.loadEnv();
     this.build();
@@ -93,7 +96,7 @@ export class Gfx {
   build() {
     const p = QUALITY[this.quality], r = this.r, scene = this.scene, camera = this.camera;
     if (this.composer) { this.composer.dispose?.(); this.composer = null; }
-    const dpr = Math.min(devicePixelRatio || 1, p.dpr) * this.res;
+    const dpr = baseDpr(p) * this.res;
     r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight);
     for (const l of scene.userData.shadowLights || []) { l.light.shadow.mapSize.set(l.sun ? p.sun : p.spot, l.sun ? p.sun : p.spot); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.autoUpdate = false; l.light.shadow.needsUpdate = true; }
     this.pass = {};
@@ -126,7 +129,7 @@ export class Gfx {
   }
 
   resize() {
-    const p = QUALITY[this.quality], dpr = Math.min(devicePixelRatio || 1, p.dpr) * this.res;
+    const p = QUALITY[this.quality], dpr = baseDpr(p) * this.res;
     this.r.setSize(innerWidth, innerHeight);
     if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(innerWidth, innerHeight); }
     if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
@@ -160,15 +163,18 @@ export class Gfx {
   }
 
   // dynamic resolution: render at a lower pixel ratio when frames are slow, and creep back up when there is headroom
+  // the preset's own render scale, before the dynamic factor
+  baseDpr() { return baseDpr(QUALITY[this.quality]); }
   setRes(v) {
     if (v === this.res) return; this.res = v;
-    const p = QUALITY[this.quality], dpr = Math.min(devicePixelRatio || 1, p.dpr) * v;
+    const p = QUALITY[this.quality], dpr = baseDpr(p) * v;
     this.r.setPixelRatio(dpr);
     if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(innerWidth, innerHeight); }
     if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
   }
 
-  // adaptive: first lower the resolution a little, and if the frame time stays high step down one preset (never back up)
+  // adaptive: first lower the resolution a little, and if the frame time stays high step down one preset. A card with plenty of
+  // headroom (frames well under 9 ms for ten seconds at full resolution) steps up instead, but never back to a preset it stepped down from
   watch(dt) {
     this.age += dt;
     if (this.age < 6 || !this.auto) return;
@@ -176,10 +182,15 @@ export class Gfx {
     if (this.ft > 21 && this.cool <= 0 && this.res > 0.71) { this.setRes(Math.max(0.7, +(this.res - 0.15).toFixed(2))); this.cool = 3; this.ft = 16; return; }
     if (this.ft < 12.5 && this.cool <= 0 && this.res < 1) { this.setRes(Math.min(1, +(this.res + 0.1).toFixed(2))); this.cool = 8; return; }
     this.slow = this.ft > 32 ? this.slow + dt : Math.max(0, this.slow - dt);
+    const i = ORDER.indexOf(this.quality);
     if (this.slow > 3) {
-      const i = ORDER.indexOf(this.quality);
-      if (i < ORDER.length - 1) { console.info('graphics: stepping down to', ORDER[i + 1]); this.setQuality(ORDER[i + 1], { save: false }); }
+      if (i < ORDER.length - 1) { console.info('graphics: stepping down to', ORDER[i + 1]); this.ceiling = i + 1; this.setQuality(ORDER[i + 1], { save: false }); }
       this.slow = 0; this.ft = 16;
+      return;
+    }
+    this.fast = this.ft < 9 && this.res >= 1 ? this.fast + dt : 0;
+    if (this.fast > 10 && i > 0 && (this.ceiling === null || i > this.ceiling)) {
+      console.info('graphics: stepping up to', ORDER[i - 1]); this.setQuality(ORDER[i - 1], { save: false }); this.fast = 0; this.ft = 16; this.age = 0;
     }
   }
 

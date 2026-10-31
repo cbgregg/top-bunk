@@ -15,17 +15,31 @@ if (q.get('trailer')) {
     await new Promise((r) => go.addEventListener('click', r, { once: true }));
     go.remove();
     await player.begin({ letterbox: q.get('lb') === '1' });
-    const audio = await liveAudio(aspect, q.get('music') || 'trailer/music/placeholder.wav', player.duration).catch((e) => { console.warn('trailer audio failed', e); return null; });
+    const audio = await liveAudio(aspect, q.get('music') || 'trailer/music/placeholder.wav', player).catch((e) => { console.warn('trailer audio failed', e); return null; });
     const t0 = performance.now();
     player.play(t0); if (audio) audio.start();
   });
 }
 
+// the times in the sheets: seconds, or a string in the cut's marks ("TURN+2.5"; TURN, DROP, DURATION, ACT2 = DROP-TURN), or for a cue a shot and
+// a point in it ({shot, at} seconds in, {shot, k} a fraction). The same rules as render.js, resolved in place.
+function resolveTimes(cues, plan, marks, shots) {
+  const m = { ...marks, ACT2: marks.DROP - marks.TURN };
+  const ex = (v) => { if (typeof v !== 'string') return v; if (!/^[\d\s.+\-*/()A-Z_]+$/.test(v)) throw new Error('bad time ' + v); return Function(...Object.keys(m), 'return (' + v + ')')(...Object.values(m)); };
+  for (const c of cues) {
+    if (c.shot) { const s = shots.find((x) => x.id === c.shot); if (!s) throw new Error('cue names no shot: ' + c.shot); c.t = s.t + (c.k !== undefined ? c.k * s.dur : ex(c.at) || 0); delete c.shot; delete c.at; delete c.k; }
+    else c.t = ex(c.t);
+  }
+  for (const s of plan.segments || []) { s.out = s.out.map(ex); if (s.src !== undefined) s.src = ex(s.src); }
+  plan.mute = (plan.mute || []).map((w) => w.map(ex));
+  return plan;
+}
+
 // the soundtrack in the browser: the same cue sheet and music plan the renderer mixes with ffmpeg, played through WebAudio
-async function liveAudio(aspect, musicUrl, duration) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+async function liveAudio(aspect, musicUrl, player) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)(), duration = player.duration;
   const [cues, plan] = await Promise.all([fetch(aspect === 'portrait' ? 'trailer/cues_portrait.json' : 'trailer/cues.json').then((r) => r.json()), fetch('trailer/music_plan.json').then((r) => r.json())]);
-  const P = plan[aspect];
+  const P = resolveTimes(cues, plan[aspect], player.marks, player.SHOTS);
   const load = async (url) => ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
   const bufs = new Map(); const get = async (f) => { if (!bufs.has(f)) bufs.set(f, load(f)); return bufs.get(f); };
   const music = await get(musicUrl); await Promise.all(cues.map((c) => get(c.file)));

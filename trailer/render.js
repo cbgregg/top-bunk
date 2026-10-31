@@ -11,6 +11,7 @@
 //   --out DIR           where the mp4s go (default trailer/out)        --scratch DIR   where the PNG frames go (default $TMPDIR/topbunk-trailer)
 //   --quality Q         ultra|high|medium|low (default: high for steam/social, medium for previews)   --shadow N   shadow map size (sun; spots get N/2)
 //   --res F             render scale 0.5..1 (SwiftShader speed knob; the picture is upscaled)   --fps N   override the preset's frame rate
+//   --ss N              pixels drawn per output pixel, each way (default 2 for the full-size presets with --gpu, else off)
 //   --contact           capture only the middle frame of every shot (a fast check of the shot list; no video is encoded)
 //   --every N           capture every Nth frame   --range A-B   capture frames A..B only   --resume   skip frames whose PNG already exists
 //   --no-audio          video only   --no-warp   lay the song under straight (no low-pass, no slowing)   --letterbox   2.39:1 bars (landscape)
@@ -76,6 +77,20 @@ function duckExpr(windows, { gain = 0.4, ramp = 0.3 } = {}) {
   return `1-${(1 - gain).toFixed(3)}*clip(${tri.join('+')},0,1)`;
 }
 const isVoice = (c) => c.duck !== false && /(^|\/)assets\/audio\/vo\//.test(c.file);
+// A time in cues.json or music_plan.json is a number of seconds, or a string in the cut's marks ("TURN+2.5", "TURN+0.4*ACT2": TURN, DROP and
+// DURATION come from trailer.js, ACT2 is DROP-TURN), and a cue can instead name a shot and a point in it ({shot: 'door', at: 0.9} seconds in,
+// or {shot, k} a fraction of it), so the sheet follows the shot list when a mark moves. Resolves both in place. boot.js does the same.
+function resolveTimes(cues, plan, marks, shots) {
+  const m = { ...marks, ACT2: marks.DROP - marks.TURN };
+  const ex = (v) => { if (typeof v !== 'string') return v; if (!/^[\d\s.+\-*/()A-Z_]+$/.test(v)) throw new Error('bad time ' + v); return Function(...Object.keys(m), 'return (' + v + ')')(...Object.values(m)); };
+  for (const c of cues) {
+    if (c.shot) { const s = shots.find((x) => x.id === c.shot); if (!s) throw new Error('cue names no shot: ' + c.shot); c.t = s.t + (c.k !== undefined ? c.k * s.dur : ex(c.at) || 0); delete c.shot; delete c.at; delete c.k; }
+    else c.t = ex(c.t);
+  }
+  for (const s of plan.segments || []) { s.out = s.out.map(ex); if (s.src !== undefined) s.src = ex(s.src); }
+  plan.mute = (plan.mute || []).map((w) => w.map(ex));
+  return { cues, plan };
+}
 function buildMix({ music, cues, plan, duration, warp, outWav, scratch }) {
   const SR = 44100, inputs = [music], parts = [], labels = [], bed = [];
   const idx = (f) => { let i = inputs.indexOf(f); if (i < 0) { inputs.push(f); i = inputs.length - 1; } return i; };
@@ -177,6 +192,8 @@ async function main() {
   if (!preset) throw new Error(`unknown preset ${presetName} (${Object.keys(PRESETS).join(', ')})`);
   const aspect = opt('--aspect', preset.aspect), portrait = aspect === 'portrait';
   const fps = +opt('--fps', preset.fps), W = preset.w, H = preset.h, quality = opt('--quality', preset.quality), shadow = +opt('--shadow', 0) || 0, res = +opt('--res', 1) || 1;
+  // supersampling: the full-size presets on a graphics card draw 2x2 pixels per output pixel (4K for the 1080p cut) and the frame grab scales them down
+  const ss = +opt('--ss', has('--gpu') && Math.min(W, H) >= 1080 ? 2 : 0) || 0;
   const outDir = path.resolve(ROOT, opt('--out', path.join(__dirname, 'out'))), scratch = path.resolve(opt('--scratch', path.join(os.tmpdir(), 'topbunk-trailer')), preset.name);
   const framesDir = path.join(scratch, 'frames'); fs.mkdirSync(framesDir, { recursive: true }); fs.mkdirSync(outDir, { recursive: true });
   const music = path.resolve(ROOT, opt('--music', ensureMusic(path.join(__dirname, 'music', 'placeholder.wav'))));
@@ -199,15 +216,16 @@ async function main() {
   await page.waitForLoadState('networkidle', { timeout: 180000 });
   await page.waitForFunction(() => window.__game.E.rig && window.__game.mom.rig && window.__game.dad.rig, null, { polling: 200, timeout: 180000 });
   await page.waitForTimeout(1500);
-  log(`game loaded in ${((Date.now() - t0) / 1000).toFixed(1)} s; ${W}x${H} @ ${fps} fps, ${aspect}, quality ${quality}${shadow ? `, shadows ${shadow}` : ''}${res !== 1 ? `, res ${res}` : ''}`);
+  log(`game loaded in ${((Date.now() - t0) / 1000).toFixed(1)} s; ${W}x${H} @ ${fps} fps, ${aspect}, quality ${quality}${shadow ? `, shadows ${shadow}` : ''}${res !== 1 ? `, res ${res}` : ''}${ss ? `, ${ss}x supersampled` : ''}`);
   const info = await page.evaluate(async ([o, b]) => {
     const m = await import('/trailer/trailer.js');
     window.__trailer = m.attach(window.__game, o);
     await window.__trailer.begin(b);
-    return { duration: window.__trailer.duration, shots: window.__trailer.SHOTS.map((s) => ({ id: s.id, t: s.t, dur: s.dur, teaser: s.teaser })) };
-  }, [{ aspect, fps, linkInBio: has('--bio'), cta: opt('--cta', ''), shutter: has('--shutter') ? Math.max(1, Math.min(8, Math.round(+opt('--shutter', 1) || 1))) : undefined }, { quality, shadow, res, letterbox: has('--letterbox') }]);
+    return { duration: window.__trailer.duration, marks: window.__trailer.marks, shots: window.__trailer.SHOTS.map((s) => ({ id: s.id, t: s.t, dur: s.dur, teaser: s.teaser })) };
+  }, [{ aspect, fps, linkInBio: has('--bio'), cta: opt('--cta', ''), shutter: has('--shutter') ? Math.max(1, Math.min(8, Math.round(+opt('--shutter', 1) || 1))) : undefined }, { quality, shadow, res, ss: ss || undefined, letterbox: has('--letterbox') }]);
   const duration = info.duration, total = Math.ceil(duration * fps);
-  log(`${info.shots.length} shots, ${duration} s, ${total} frames`);
+  resolveTimes(cues, plan, info.marks, info.shots);
+  log(`${info.shots.length} shots, ${duration} s, ${total} frames${portrait ? '' : `; turn ${info.marks.TURN} s, drop ${info.marks.DROP} s`}`);
   // which frames to capture
   const wanted = new Set();
   if (contact) for (const s of info.shots) wanted.add(Math.min(total - 1, Math.floor((s.t + s.dur / 2) * fps)));
