@@ -15,7 +15,7 @@ const EYES = [
 // from nearby angles either
 const VIEW_Y = -0.148, VIEW_Z = 1.8, PLANE_Z = 0.172, EYE_GROW = 1.08, EYE_EDGE = 0.32;
 const PUPIL_K = 1.075, PUPIL_NEAR = 0.08;   // the pupils a little over the spheres' size, and nearer, as the spheres sat
-const EYE_GLOW = 2.1, GRIN_GLOW = 1.18, WARM = new THREE.Color(1, 0.86, 0.7);   // warm: what the teeth light the mouth with
+const EYE_GLOW = 1.85, GRIN_GLOW = 1.18, WARM = new THREE.Color(1, 0.86, 0.7);   // warm: what the teeth light the mouth with
 // the neck: a capsule from low in the skull down into the chest, thin under the jaw and filling out toward the shoulders, joined to
 // the skull with a small fillet (k round the back, kChin under the chin)
 const NECK = { a: [-0.17, -0.03], b: [-0.50, -0.12], ra: 0.042, rb: 0.085, k: 0.03, kChin: 0.02, end: -0.46, sx: 1.0 };
@@ -66,7 +66,7 @@ function basePoint(a, y, neck, out) {
 // a point (face space) within reach outside the neck is drawn in toward it, the nearest to just inside its surface, and its normal n
 // turned toward the neck's by as much: the shirt collar, which would otherwise stand off the neck as a ring. Eases off toward the
 // neck's open end in the chest
-export function tuckIntoNeck(p, n = null, reach = 0.13, inset = 0.008) {
+export function tuckIntoNeck(p, n = null, reach = 0.13, inset = 0.016) {
   if (p.y > -0.12 || p.y < NECK.end || sdf(p.x, p.y, p.z, true) > reach) return false;
   const zc = ringZ(p.y, true), a = Math.atan2(p.x, p.z - zc), R = rayR(a, p.y, true), d = Math.hypot(p.x, p.z - zc) - R;
   if (d <= 0 || d >= reach) return false;
@@ -537,7 +537,7 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
     // from above; the eyes light the skin out from the socket's edge
     f = f.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
-        float rimK = smoothstep( 0.0, 1.0, dot( uRimFade.xyz, vRest ) + uRimFade.w ) * mix( 0.3, 1.0, smoothstep( -0.5, 0.4, normal.y ) ) * skinOcc;
+        float rimK = smoothstep( 0.0, 1.0, dot( uRimFade.xyz, vRest ) + uRimFade.w ) * mix( 0.45, 1.0, smoothstep( -0.5, 0.4, normal.y ) ) * skinOcc;
         totalEmissiveRadiance += uRim * rimK * pow( 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 );
       }${face ? `
       {

@@ -7,7 +7,7 @@ import { Rig, loadModel, loadAnims } from './rig.js';
 const _v = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
-const BODY_RIM = RIM_COL.clone().multiplyScalar(1.7);   // stronger on the body, so the arms come off the dark
+const BODY_RIM = RIM_COL.clone().multiplyScalar(2.6);   // stronger on the body, so the arms come off the dark
 // the graphics preset lives in gfx, which main.js does not hand to the thing; it is looked up as the thing is drawn
 const preset = () => (typeof window !== 'undefined' && window.__game && window.__game.gfx && window.__game.gfx.quality) === 'low' ? 'low' : 'high';
 const ss = THREE.MathUtils.smoothstep;

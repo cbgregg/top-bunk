@@ -8,10 +8,22 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
 
-function prepare(g) {
+// props that keep their metal and gloss; everything else is made matte
+const SHINY = new Set(['mirror', 'kettle', 'desk_lamp', 'washer', 'dryer', 'stove', 'fridge', 'tv', 'crt_pc', 'clock_wall', 'filing', 'office_chair', 'outlet', 'switch']);
+const METAL = new Set(['mirror', 'kettle', 'desk_lamp', 'washer', 'dryer', 'stove', 'filing', 'office_chair']);
+
+function matte(m, name) {
+  if (!m.isMeshStandardMaterial) return;
+  if (!METAL.has(name)) m.metalness = m.metalnessMap ? Math.min(m.metalness, 0.15) : 0;
+  if (!SHINY.has(name)) m.roughness = m.roughnessMap ? m.roughness : Math.max(m.roughness, 0.7);
+  else if (!m.roughnessMap) m.roughness = Math.max(m.roughness, name === 'mirror' ? 0 : 0.3);
+}
+
+function prepare(g, name) {
   g.scene.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = o.receiveShadow = true;
+    for (const m of [].concat(o.material)) matte(m, name);
     for (const m of [].concat(o.material)) if (m.map && (m.transparent || m.alphaTest > 0)) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.depthWrite = true; }   // leaf cards
   });
   g.scene.updateMatrixWorld(true);
@@ -19,7 +31,7 @@ function prepare(g) {
   return g;
 }
 export const loadProp = (name) => {
-  if (!cache.has(name)) cache.set(name, new Promise((res, rej) => loader.load(`assets/props/${name}.glb`, res, undefined, rej)).then(prepare));
+  if (!cache.has(name)) cache.set(name, new Promise((res, rej) => loader.load(`assets/props/${name}.glb`, res, undefined, rej)).then((g) => prepare(g, name)));
   return cache.get(name);
 };
 
