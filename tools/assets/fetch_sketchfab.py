@@ -50,6 +50,10 @@ MODELS = {
     'grandfather':  dict(uid='cef39f1bd3df43578236f273f273a873', by='longtail', title='Grandfather Clock', tex=1024, tris=9000),
     'mailbox':      dict(uid='132c790ac74c42a0bb1a5fc7e3d43d7e', by='glowbox3d', title='Home US Mailbox', tex=512, tris=2000),
     'trash_can':    dict(uid='69400e2f969f4c44882a398ef583334c', by='AndreyUEDev', title='Trash cans (low poly)', tex=512, tris=1800, keep='Object_2|Object_3'),
+    # the field: the barn out past the fence, the trees of the shelter belt and the treeline
+    'barn':         dict(uid='1d0b768a8e2449de990b3f69f94c5db6', by='andrewriddle', title='American Old Barn', tex=1024, tris=4600),
+    'spruce':       dict(uid='b68f79aee62f4e849be265c903f724f5', by='nenjo', title='Spruce Tree - Low Poly', tex=512, tris=1300),
+    'tree_bare':    dict(uid='33ccce6111604656a4b5709483670ec3', by='MaX3Dd', title='Dead Tree', tex=512, tris=3300),
 }
 LICENSE_SLUG = 'by'
 LICENSE_NAME = 'CC BY 4.0'
