@@ -222,6 +222,13 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     },
     talk(env) { if (this.rig) this.rig.talk(env); },
   };
+  // night clothes: the body material's map is swapped for the pajama repaint (made once, the first time it is asked for)
+  person.night = false; person.nightOf = null;
+  person.setNight = (on) => {
+    person.night = on; const b = person.body; if (!b || !b.map) return;
+    if (on && !person.nightMap) person.nightMap = pajamas(b.map, model);
+    b.map = on ? person.nightMap : person.dayMap; b.needsUpdate = true;
+  };
   if (model) {
     Promise.all([loadModel(model), loadAnims()]).then(([gltf, clips]) => {
       const rig = new Rig(gltf, clips).setHeight(height);
@@ -230,7 +237,103 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       rig.play('idle', { fade: 0, offset: Math.random() });
       rig.jawSign = person.jawSign || 1;
       person.rig = rig;
+      rig.root.traverse((o) => { if (o.isSkinnedMesh) for (const m of [].concat(o.material)) if (/_body$/.test(m.name) && m.map) { person.body = m; person.dayMap = m.map; } });
+      if (person.night) person.setNight(true);
     }).catch((e) => console.warn('person model failed, keeping the low-poly one:', e));
   }
   return person;
+}
+
+// the body texture repainted as pajamas in a canvas. skin is found by its colour and left alone; each garment is told apart by its own
+// colour and gets a new one scaled by the old luminance, so the folds and seams survive. black is unused atlas space.
+const WEAR = {
+  dad: {
+    skin: [0, 0.22, 0, 0.2, 0.78, 1, 0, 0.2], hue: 28,   // the uv rectangles that hold skin (his hands), and the warmest hue that still counts as skin there
+    boots: [0.22, 0.78, 0.0, 0.28],   // the uv rectangle with the boots in it
+    pants: [0, 0.3, 0.58, 1, 0.7, 1, 0.58, 1],   // the trouser legs
+    classes: [
+      { is: (h, s, v, inBoots) => inBoots, col: (u, w, k) => [0.74 * k, 0.72 * k, 0.68 * k] },                                           // grey socks
+      { is: (h, s, v, inBoots, inPants) => inPants, col: (u, w, k) => {                                                                   // flannel plaid
+        const a = (u * 14) % 1 < 0.32, b = (w * 14) % 1 < 0.32, base = a && b ? [0.3, 0.42, 0.34] : a || b ? [0.22, 0.34, 0.3] : [0.15, 0.19, 0.3];
+        return base.map((c) => c * k); } },
+      { is: () => true, col: (u, w, k) => [0.52 * k, 0.52 * k, 0.55 * k] },                                                               // the sweater and vest: a worn grey t-shirt
+    ],
+  },
+  mom: {
+    skin: [0, 0.22, 0.45, 0.73, 0.78, 1, 0.45, 0.73, 0, 0.17, 0.72, 1, 0.83, 1, 0.72, 1, 0.44, 0.56, 0.45, 0.57], hue: 32,   // forearms, hands, the patch of neck
+    boots: [0.17, 0.33, 0.72, 1.0, 0.67, 0.83, 0.72, 1.0],   // two rectangles: the shoes
+    pants: [0, 0.3, 0, 0.42, 0.7, 1, 0, 0.42],   // the jeans
+    classes: [
+      { is: (h, s, v, inBoots) => inBoots, col: (u, w, k) => [0.82 * (0.55 + 0.45 * k), 0.62 * (0.55 + 0.45 * k), 0.5 * (0.55 + 0.45 * k)] },   // bare feet
+      { is: (h, s, v, inBoots, inPants) => inPants, col: (u, w, k) => { const st = (w * 60) % 1 < 0.5; return [(st ? 0.74 : 0.66) * k, (st ? 0.78 : 0.7) * k, (st ? 0.86 : 0.8) * k]; } },   // the jeans: striped cotton bottoms
+      { is: () => true, col: (u, w, k) => {                                                                                                // the blouse: cream with small rose sprigs
+        const fx = (u * 22) % 1 - 0.5, fy = (w * 22) % 1 - 0.5, d = Math.hypot(fx, fy), dot = d < 0.11 ? 1 : d < 0.15 ? 0.5 : 0;
+        return [(0.93 - 0.18 * dot) * k, (0.88 - 0.4 * dot) * k, (0.8 - 0.3 * dot) * k]; } },
+    ],
+  },
+};
+function pajamas(tex, model) {
+  const spec = WEAR[model] || WEAR.dad, img = tex.image, W = img.width, H = img.height;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+  const id = ctx.getImageData(0, 0, W, H), d = id.data, n = W * H;
+  const cls = new Int8Array(n), alt = new Int8Array(n), lum = new Float32Array(n), sk = new Uint8Array(n);   // cls: -1 unused, 0 skin, 1.. the garments; alt: the garment it would be if not skin
+  const quads = (a) => { const r = []; for (let i = 0; i + 3 < a.length; i += 4) r.push(a.slice(i, i + 4)); return r; };
+  const rects = quads(spec.boots), skinRects = quads(spec.skin), pantRects = quads(spec.pants || []), inside = (rs, u, w) => rs.some((q) => u >= q[0] && u < q[1] && w >= q[2] && w < q[3]);
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4] / 255, g = d[i * 4 + 1] / 255, b = d[i * 4 + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), v = mx, s = mx ? (mx - mn) / mx : 0;
+    lum[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (v < 0.06) { cls[i] = -1; continue; }
+    let h = 0; if (mx > mn) { h = mx === r ? (g - b) / (mx - mn) : mx === g ? 2 + (b - r) / (mx - mn) : 4 + (r - g) / (mx - mn); h = (h * 60 + 360) % 360; }
+    const u = (i % W) / W, w = Math.floor(i / W) / H, inBoots = inside(rects, u, w);
+    sk[i] = !inBoots && inside(skinRects, u, w) && h >= 3 && h <= spec.hue && s > 0.2 && s < 0.7 && v > 0.4 ? 1 : 0;
+    alt[i] = 1 + spec.classes.findIndex((k) => k.is(h, s, v, inBoots, inside(pantRects, u, w)));
+  }
+  // the skin mask cleaned up: a pixel goes with the majority of the 7x7 around it, so stray fold pixels do not swap sides
+  const tmp = new Uint16Array(n), R = 3;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let a = 0; for (let k = -R; k <= R; k++) { const xx = Math.min(W - 1, Math.max(0, x + k)); a += sk[y * W + xx]; } tmp[y * W + x] = a; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let a = 0; for (let k = -R; k <= R; k++) { const yy = Math.min(H - 1, Math.max(0, y + k)); a += tmp[yy * W + x]; }
+    const i = y * W + x; if (cls[i] < 0) continue;
+    cls[i] = a > (2 * R + 1) * (2 * R + 1) / 2 ? 0 : alt[i];
+  }
+  // the garment's own brightness is taken out with a wide local average of the luminance (unused atlas space left out), so a dark
+  // sweater and a light vest both come out as the same t-shirt and only the folds remain
+  const mean = (() => {
+    const B = 40, acc = new Float32Array(n), wgt = new Float32Array(n), acc2 = new Float32Array(n), wgt2 = new Float32Array(n);
+    for (let y = 0; y < H; y++) {
+      let a = 0, c = 0;
+      for (let x = -B; x < W + B; x++) {
+        const xi = x + B, xo = x - B - 1;
+        if (xi < W && cls[y * W + xi] >= 0) { a += lum[y * W + xi]; c++; }
+        if (xo >= 0 && cls[y * W + xo] >= 0) { a -= lum[y * W + xo]; c--; }
+        if (x >= 0 && x < W) { acc[y * W + x] = a; wgt[y * W + x] = c; }
+      }
+    }
+    for (let x = 0; x < W; x++) {
+      let a = 0, c = 0;
+      for (let y = -B; y < H + B; y++) {
+        const yi = y + B, yo = y - B - 1;
+        if (yi < H) { a += acc[yi * W + x]; c += wgt[yi * W + x]; }
+        if (yo >= 0) { a -= acc[yo * W + x]; c -= wgt[yo * W + x]; }
+        if (y >= 0 && y < H) { acc2[y * W + x] = a; wgt2[y * W + x] = c; }
+      }
+    }
+    for (let i = 0; i < n; i++) acc2[i] = wgt2[i] ? acc2[i] / wgt2[i] : 0.5;
+    return acc2;
+  })();
+  let skinPx = 0, used = 0;
+  for (let i = 0; i < n; i++) {
+    const k = cls[i]; if (k < 0) continue; used++;
+    if (k === 0) { skinPx++; continue; }
+    const f = Math.min(1.45, Math.max(0.35, lum[i] / Math.max(0.05, mean[i])));
+    const [r, g, b] = spec.classes[k - 1].col((i % W) / W, Math.floor(i / W) / H, f);
+    d[i * 4] = Math.min(255, r * 255); d[i * 4 + 1] = Math.min(255, g * 255); d[i * 4 + 2] = Math.min(255, b * 255);
+  }
+  ctx.putImageData(id, 0, 0);
+  console.info(`${model}: night clothes drawn, skin ${(100 * skinPx / Math.max(1, used)).toFixed(1)}% of the atlas`);
+  const t = new THREE.CanvasTexture(c);
+  t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; t.anisotropy = tex.anisotropy; t.channel = tex.channel;
+  t.minFilter = tex.minFilter; t.magFilter = tex.magFilter;
+  return t;
 }
