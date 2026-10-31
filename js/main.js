@@ -817,7 +817,7 @@ async function momChores() {
   W.colliders.push({ minX: KITCHEN_BOX.x - 0.3, maxX: KITCHEN_BOX.x + 0.3, minZ: KITCHEN_BOX.z - 0.3, maxZ: KITCHEN_BOX.z + 0.3, on: true, dressing: true });
   const open = openable(box); box.userData.open = open;
   const things = ['plates', 'mug', 'pot', 'mug', 'plates', 'mug'];
-  const stand = new V3(KITCHEN_BOX.x - 0.8 * bs, 0, KITCHEN_BOX.z), carry = new V3(-0.2 * bs, 0.95 * bs, 0.3 * bs);   // where she kneels at the box; where a thing rides in her right hand
+  const stand = new V3(KITCHEN_BOX.x - 0.66 * bs, 0, KITCHEN_BOX.z), carry = new V3(-0.2 * bs, 0.95 * bs, 0.3 * bs);   // where she kneels at the box; where a thing rides in her right hand
   // down on one knee at the box, both hands to its rim
   const kneelAt = async (dur) => {
     await turnToward(mom, box.position.x, box.position.z, 0.4);
