@@ -6,7 +6,26 @@
 - **Fonts:** Special Elite (Astigmatic) and Permanent Marker (Font Diner), Apache License 2.0; Courier Prime (Alan Dague-Greene) and Gloria Hallelujah (Kimberly Geswein), SIL Open Font License 1.1. Self-hosted latin WOFF2 subsets in `assets/fonts/`, loaded by `css/fonts.css`; copyright lines and full license texts in `assets/fonts/LICENSE-fonts.md`.
 - **Voices and music:** generated with ElevenLabs (see `tools/`).
 - **Sound effects:** generated with ElevenLabs (`tools/gen_sfx.py`, into `assets/sfx/`), except `night_brown_noise`, which is made with ffmpeg. The trailers use the same files.
-- **Surfaces, models and sky:** [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), all CC0 (no attribution required): the PBR materials in `assets/pbr/`, the HDRI skies in `assets/sky/`, and the furniture, plant, tree, grass and rock models in `assets/props/`.
+- **Surfaces, models and sky:** [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), all CC0 (no attribution required): the PBR materials in `assets/pbr/`, the HDRI skies in `assets/sky/`, and the sofa, armchair, television, hutch, tables, chairs, plants, kettle, pot, clock, tree, grass and rock models in `assets/props/`.
+- **Furniture and fixtures from [Sketchfab](https://sketchfab.com)**, all [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), fetched and compressed by `tools/assets/fetch_sketchfab.py` (triangles reduced, textures resized to WebP; `assets/props/<name>.glb`):
+  - `bunk`: [Simple Bunk Bed](https://sketchfab.com/3d-models/9fb7c54715dd41b98b3dc67b367cf81d) by [Blender3D](https://sketchfab.com/Blender3D), CC BY 4.0
+  - `teddy`: [teddy bear](https://sketchfab.com/3d-models/1b99b250bced4666b709b6d911f1f152) by [maestronoov](https://sketchfab.com/maestronoov), CC BY 4.0
+  - `fridge`: [House Props : Fridge](https://sketchfab.com/3d-models/2fdaa56bbd85404cb4206dcaedc16658) by [whitend.3d](https://sketchfab.com/whitend.3d), CC BY 4.0
+  - `stove`: [Gas Stove](https://sketchfab.com/3d-models/056ccf898f9e49acb6e3e370deabf184) by [longtail](https://sketchfab.com/longtail), CC BY 4.0
+  - `toilet`: [Toilet](https://sketchfab.com/3d-models/132a8ee2af3a40d39d270fbed3d3666c) by [hippostance](https://sketchfab.com/hippostance), CC BY 4.0
+  - `washer`: [Washing Machine](https://sketchfab.com/3d-models/a27aa928a6664473a0ebfbe2c7f72b23) by [goldie](https://sketchfab.com/goldie), CC BY 4.0
+  - `dryer`: [Modern Clothes Dryer](https://sketchfab.com/3d-models/ea0080f2433b41578145944a3d0b350c) by [glowbox3d](https://sketchfab.com/glowbox3d), CC BY 4.0
+  - `dresser_old`: [Old Dresser with Mirror](https://sketchfab.com/3d-models/ccf38598539f4bde9864c84c13255901) by [justincrazyeyes](https://sketchfab.com/justincrazyeyes), CC BY 4.0
+  - `mirror`: [Stand mirror](https://sketchfab.com/3d-models/908260e1319b47f5a9ffa60d4a9544f4) by [jonestudio](https://sketchfab.com/jonestudio), CC BY 4.0
+  - `crt_pc`: [Retro CRT Computer (1990s Desktop PC)](https://sketchfab.com/3d-models/ea9faf1298d24497b916c27a4ea38636) by [MadeByYeshe](https://sketchfab.com/MadeByYeshe), CC BY 4.0
+  - `desk`: [Computer Desk](https://sketchfab.com/3d-models/05353724b7884bfb81211c7033a57fd4) by [felixawani](https://sketchfab.com/felixawani), CC BY 4.0
+  - `office_chair`: [Office Chair](https://sketchfab.com/3d-models/b228a29fa84544c2be501c295653ffe7) by [nokillnando](https://sketchfab.com/nokillnando), CC BY 4.0
+  - `filing`: [File Cabinet](https://sketchfab.com/3d-models/f0742791a0ea432db1f432c24de83867) by [LtxxwSibeRia](https://sketchfab.com/LtxxwSibeRia), CC BY 4.0
+  - `bookcase`: [Wooden Bookcases with Books](https://sketchfab.com/3d-models/d0618ac16b2a4a87b9b6c7d5e6765626) by [mtcollings](https://sketchfab.com/mtcollings), CC BY 4.0 (the tall bookcase only)
+  - `desk_lamp`: [office lamp](https://sketchfab.com/3d-models/d934c6b791c34e0fafc30e9625b4c55c) by [maxdragon](https://sketchfab.com/maxdragon), CC BY 4.0
+  - `dresser`: [Dresser - modern light wood](https://sketchfab.com/3d-models/25134a84c07e420b93cae181731fd7a0) by [mozillareality](https://sketchfab.com/mozillareality), CC BY 4.0
+  - `table_lamp`: [Table Lamp 01](https://sketchfab.com/3d-models/6c395859886f405fb065b31b3e41d680) by [nickhavas](https://sketchfab.com/nickhavas), CC BY 4.0
+  - `outlet` and `switch`: [Free Wall outlets and switches pack](https://sketchfab.com/3d-models/2bb10b5967624d659c83e5ee1701fe56) by [denniswoo1993](https://sketchfab.com/denniswoo1993), CC BY 4.0 (split into the outlet and the switch)
 - **Photographs in the picture frames** (public domain, via Wikimedia Commons; `assets/photos/`, fetched by `tools/assets/fetch_photos.py`):
   - `family1`: Family in a wagon, Lee County, Mississippi, 1935.jpg - Arthur Rothstein, Public domain ([source](https://commons.wikimedia.org/wiki/File:Family_in_a_wagon,_Lee_County,_Mississippi,_1935.jpg))
   - `family2`: About three hunded people attended the annual renuion of the England family. This family has been in this area over... - NARA - 540764.jpg - Russell Lee, Public domain ([source](https://commons.wikimedia.org/wiki/File:About_three_hunded_people_attended_the_annual_renuion_of_the_England_family._This_family_has_been_in_this_area_over..._-_NARA_-_540764.jpg))

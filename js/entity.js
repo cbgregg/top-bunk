@@ -1,12 +1,13 @@
 // The thing: a stretched black body with the face from creature.js on its head bone (one skull running down into the neck, white
 // ring eyes with black pupils that follow the player, the grin cut into the head).
 import * as THREE from 'three';
-import { createFace, headGeometry, skinMaterial, tuckIntoNeck } from './creature.js';
+import { createFace, headGeometry, skinMaterial, tuckIntoNeck, RIM_COL } from './creature.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
 
 const _v = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
+const BODY_RIM = RIM_COL.clone().multiplyScalar(1.7);   // stronger on the body, so the arms come off the dark
 // the graphics preset lives in gfx, which main.js does not hand to the thing; it is looked up as the thing is drawn
 const preset = () => (typeof window !== 'undefined' && window.__game && window.__game.gfx && window.__game.gfx.quality) === 'low' ? 'low' : 'high';
 const ss = THREE.MathUtils.smoothstep;
@@ -117,8 +118,6 @@ export class Entity {
       const ix = o.geometry.index; for (let i = 0; i < ix.count; i++) refVerts.add(ix.getX(i));
     });
     this.rigMeshes = []; rig.root.traverse((o) => { if (o.isSkinnedMesh && o.visible) this.rigMeshes.push(o); });
-    this.skins.rig = { high: skinMaterial({ unit: rig.scale }) };
-    for (const o of this.rigMeshes) o.material = this.skins.rig.high;
     // long arms: stretch each arm along its bone; the forearm keeps scale 1 so it inherits the same stretch
     for (const s of ['L', 'R']) rig.bones[s + '_UpperArm'].scale.x = ARM_STRETCH;
     this.root.add(rig.root);
@@ -132,6 +131,11 @@ export class Entity {
     this.head.updateMatrix();
     // its skull and neck are one mesh skinned to the body's skeleton, bound so its skull part sits exactly where the face group does
     const skel = body.skeleton, hi = skel.bones.indexOf(hb), bind = skel.boneInverses[hi].clone().invert().multiply(this.head.matrix);
+    // the body's rim fades out going up into the collar (rest space is z up, in metres once scaled), as the face's does down the jaw
+    const zAt = (y) => new THREE.Vector3(0, y, 0).applyMatrix4(bind).z * rig.scale;
+    this.rigSkin = { unit: rig.scale, rim: BODY_RIM, rimFade: [new THREE.Vector3(0, 0, 1), zAt(-0.55), zAt(-0.4)] };
+    this.skins.rig = { high: skinMaterial(this.rigSkin) };
+    for (const o of this.rigMeshes) o.material = this.skins.rig.high;
     const geo = headGeometry({ neck: true });
     skinWeights(geo, body, refVerts, bind, hi, skel.bones.indexOf(rig.bones.Neck));
     const P = body.geometry.attributes.position, N = body.geometry.attributes.normal, toFace = bind.clone().invert(), p = new THREE.Vector3(), n = new THREE.Vector3();
@@ -157,7 +161,7 @@ export class Entity {
     const low = q === 'low', pick = (set, opts) => set[q] || (set[q] = skinMaterial({ ...opts, low }));
     const cylSkin = pick(this.skins, {});
     for (const o of this.cyls) o.material = cylSkin;
-    if (this.rig) { const m = pick(this.skins.rig, { unit: this.rig.scale }); for (const o of this.rigMeshes) o.material = m; }
+    if (this.rig) { const m = pick(this.skins.rig, this.rigSkin); for (const o of this.rigMeshes) o.material = m; }
     this.face.setQuality(q);
   }
 

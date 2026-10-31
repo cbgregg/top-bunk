@@ -1,4 +1,5 @@
-// Furniture and plants: Poly Haven models (CC0), compressed to assets/props/*.glb by tools/assets/fetch_models.py.
+// Furniture and plants: Poly Haven models (CC0, tools/assets/fetch_models.py) and Sketchfab models (CC0 and CC-BY, listed in CREDITS.md,
+// tools/assets/fetch_sketchfab.py), compressed to assets/props/*.glb.
 // Model front is +Z, units are metres, and each one is placed by its footprint centre with its base on y.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -23,15 +24,19 @@ export const loadProp = (name) => {
 };
 
 // One model: footprint centre (x, z), base on y, facing rot (radians, front = +Z), uniform scale s.
-// hide: the stand-in meshes, hidden once the model is in. onLoad(holder, box) runs then too (for colliders).
-export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, hide = [], onLoad } = {}) {
-  const holder = new THREE.Group(); holder.userData.prop = name; holder.position.set(x, y, z); holder.rotation.y = rot; parent.add(holder);
+// wall: a plate on a wall instead: (x, y, z) is on the wall face, the model is centred there and its front face sits `proud` metres off the
+// wall, the rest of it inside the wall. The front is the model's -Z face (its +Z face with flip), rot still says where the room is.
+// hide: the stand-in meshes, hidden once the model is in. onLoad(holder, box, model) runs then too (for colliders).
+export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, wall = false, flip = false, proud = 0.012, hide = [], onLoad } = {}) {
+  const holder = new THREE.Group(); holder.userData.prop = name; holder.position.set(x, y, z); holder.rotation.y = rot + (wall && !flip ? Math.PI : 0); parent.add(holder);
   loadProp(name).then((g) => {
     const m = g.scene.clone(true), b = g.box;
-    m.scale.setScalar(s); m.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
+    m.scale.setScalar(s);
+    if (wall) m.position.set(-(b.min.x + b.max.x) / 2 * s, -(b.min.y + b.max.y) / 2 * s, flip ? -b.max.z * s + proud : -b.min.z * s - proud);
+    else m.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
     holder.add(m);
     for (const h of hide) h.visible = false;
-    if (onLoad) onLoad(holder, b);
+    if (onLoad) onLoad(holder, b, m);
   }).catch((e) => console.warn('prop failed, keeping the stand-in:', name, e));
   return holder;
 }

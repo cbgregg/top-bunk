@@ -619,11 +619,12 @@ async function startGame() {
 // ---------- the family at work: Dad carries boxes in from the truck and unpacks them, Mom unpacks the kitchen ----------
 const chore = { run: 0, stop: false, dadHome: false };
 const dressing = [];                                    // everything they set down (cleared when the day restarts)
-const TRUCK_PICK = new V3(2.3, 0.55, -15.2), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(1.9, 0, -6.5), DOOR_IN = new V3(1.9, 0, -3.7), DOOR_OUT = new V3(1.9, 0, -5.4);
+const TRUCK_PICK = new V3(2.35, 0.66, -15.25), TRUCK_BOX = new V3(2.35, 1.82, -15.8), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(1.9, 0, -6.5), DOOR_IN = new V3(1.9, 0, -3.7), DOOR_OUT = new V3(1.9, 0, -5.4);   // (Dad stands on the truck bed, 0.66 up; the next box sits on top of the stack in front of him)
 const LIVING_SPOTS = [new V3(0.85, 0, -3.75), new V3(-0.2, 0, -3.85), new V3(0.35, 0, -2.7)];
 const KITCHEN_BOX = new V3(1.2, 0, 1.4), DAD_HOME = new V3(0.2, 0, 0.6), ARCH = new V3(1.7, 0, -1.0), ARCH_IN = new V3(1.7, 0, 0.3);
-const COUNTER = [[2.8, 0.95, 1.95], [2.8, 0.95, 2.25], [2.8, 0.95, 2.55], [0.0, 0.95, 3.3], [-0.3, 0.95, 3.3], [2.2, 0.95, 3.3]];   // where Mom puts things (the east counter and the back counter)
-const rampY = (x, z) => clamp((-11.4 - z) * 0.18, 0, 0.55) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // (fades out at the ramp's sides: no step up or down)
+// where Mom puts things (the east counter, then the back counter by the corner) and where she stands for each: 0.24 m off the counter's edge, the thing 0.24 m in
+const COUNTER = [[2.8, 0.95, 1.8, 2.32, 1.8], [2.8, 0.95, 2.1, 2.32, 2.1], [2.8, 0.95, 2.4, 2.32, 2.4], [2.8, 0.95, 2.7, 2.32, 2.7], [2.15, 0.95, 3.12, 2.15, 2.64], [2.5, 0.95, 3.12, 2.5, 2.64]];
+const rampY = (x, z) => (z < -14.5 ? 0.66 : clamp((-11.4 - z) * 0.18, 0, 0.58)) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // the ramp, then the bed's floor; fades out at the ramp's sides (no step up or down)
 const stillOn = (run) => run === chore.run;
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
@@ -690,69 +691,108 @@ function makeThing(kind) {
   else { add(new THREE.BoxGeometry(0.16, 0.12, 0.12), mat(0xb98a5a, 0.8), 0, 0.06, 0); }
   return g;
 }
-const wpos = (o) => o.getWorldPosition(new V3());
 const bodyH = (who) => who.group.userData.h || 1.75;
+const bscale = (who) => bodyH(who) / 1.75;              // the distances below are written for a 1.75 m body
+const palmAt = (who, side) => who.rig ? who.palm(side, new V3()) : who.group.localToWorld(new V3(side === 'L' ? 0.25 : -0.25, 0.9, 0.2));
+const facing = (who) => { const y = who.group.rotation.y; return { fwd: new V3(Math.sin(y), 0, Math.cos(y)), left: new V3(Math.cos(y), 0, -Math.sin(y)) }; };
+// how a thing sits in a hand that holds it from above: its origin `down` below the palm (its height), and how far the fingers close on it
+const HOLD = { mug: { down: 0.09, grip: 0.7 }, plates: { down: 0.065, grip: 0.45 }, books: { down: 0.13, grip: 0.5 }, pot: { down: 0.135, grip: 0.55 }, crate: { down: 0.12, grip: 0.5 } };
+const kneeling = { kneel: 1, lean: 1.1 };               // down on one knee over a box on the floor
+const bodyMix = (a, b, k) => ({ lean: lerp(a.lean || 0, b.lean || 0, k), kneel: lerp(a.kneel || 0, b.kneel || 0, k), squat: lerp(a.squat || 0, b.squat || 0, k) });
+const boxTop = (box) => box.position.y + box.geometry.parameters.height / 2;
+// a hand's place on the near rim of a box (s = 1 toward who's left corner, -1 the right); the box stands square to who
+function rim(who, box, s) {
+  const { fwd, left } = facing(who), p = box.geometry.parameters, r = box.position.clone(); r.y = boxTop(box) + 0.01;
+  return r.addScaledVector(fwd, -(p.depth / 2 - 0.03)).addScaledVector(left, s * (p.width / 2 - 0.1));
+}
+const onRim = (who, box, s) => ({ reach: rim(who, box, s), palm: 'down', grip: 0.5 });
+const carryPos = (who) => new V3(0, 1.05 * bscale(who), 0.315 * bscale(who));   // a box against the chest: the elbows stay bent
 
-// pick up a box and carry it; when done, the box is in the arms
-function holdUp(who, box) {
-  const h = bodyH(who); who.group.add(box); box.position.set(0, 0.98 * h / 1.75, 0.42); box.rotation.set(0, 0, 0);
-  who.pose = { hold: box };
-}
-async function setDown(who, box, spot) {
-  const run = chore.run, h = bodyH(who), y0 = box.position.y, z0 = box.position.z;
-  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, lean: 0.75 * k }; box.position.y = y0 + (0.22 - y0) * k;box.position.z = z0 + 0.16 * k; });
+// take the box that sits at `at` (its centre, in the scene) in both hands and bring it to the chest; the hands land on its sides first, then it moves with them
+async function liftBox(who, box, at, lean = 0.25) {
+  const run = chore.run, hw = box.geometry.parameters.width;
+  if (box.parent !== scene) scene.attach(box);
+  box.position.copy(at); box.rotation.set(0, who.group.rotation.y, 0); box.visible = true;
+  who.pose = { hold: box, holdW: hw, lean };
+  await htween(who, 0.5, () => {});
   if (!stillOn(run)) return false;
-  scene.attach(box); box.position.set(spot.x, box.geometry.parameters.height / 2, spot.z); box.rotation.set(0, who.group.rotation.y + 0.15, 0); sfx.thump();
-  W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
-  who.pose = { lean: 0.75, reach: wpos(box).add(new V3(0, 0.25, 0)) };
-  await htween(who, 0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.75 * (1 - k) }; });
-  who.pose = null; return stillOn(run);
+  who.group.attach(box); const p0 = box.position.clone(), p1 = carryPos(who); box.rotation.set(0, 0, 0);
+  await htween(who, 0.8, (k) => { if (!stillOn(run)) return; box.position.lerpVectors(p0, p1, k); who.pose = { hold: box, holdW: hw, lean: lean * (1 - k) }; });
+  if (!stillOn(run)) return false;
+  who.pose = { hold: box, holdW: hw }; sfx.thump(0.4);
+  return true;
 }
-// open a box on the floor and take things out of it; each thing ends up beside it
-async function unpackFloor(who, box, kinds, stand) {
-  const run = chore.run, open = box.userData.open || (box.userData.open = openable(box));
-  if (!(await walkTo(who, [stand]))) return false;
-  await turnToward(who, box.position.x, box.position.z);
-  const top = new V3(box.position.x, box.geometry.parameters.height + 0.02, box.position.z);
-  await htween(who, 0.7, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * k, reach: top }; });
-  await htween(who, 0.6, (k) => { if (stillOn(run)) open(k); });
-  const side = new V3(Math.cos(who.group.rotation.y), 0, -Math.sin(who.group.rotation.y)), fwdv = new V3(Math.sin(who.group.rotation.y), 0, Math.cos(who.group.rotation.y));
-  let i = 0;
-  for (const kind of kinds) {
+// kneel and set the carried box on the floor at spot (straight ahead), the hands sliding up to its top edges as it goes down; who stays kneeling over it
+async function setDown(who, box, spot) {
+  const run = chore.run, hw = box.geometry.parameters.width, p0 = box.position.clone(), end = who.group.worldToLocal(spot.clone()); end.y = box.geometry.parameters.height / 2;
+  await htween(who, 1.3, (k) => { if (!stillOn(run)) return; who.pose = { hold: box, holdW: hw, holdY: lerp(-0.03, 0.12, k), kneel: k, lean: kneeling.lean * k }; box.position.lerpVectors(p0, end, k); });
+  if (!stillOn(run)) return false;
+  scene.attach(box); box.position.set(spot.x, end.y, spot.z); box.rotation.set(0, who.group.rotation.y, 0); sfx.thump();
+  W.colliders.push({ minX: spot.x - 0.3, maxX: spot.x + 0.3, minZ: spot.z - 0.3, maxZ: spot.z + 0.3, on: true, dressing: true });
+  who.pose = { ...kneeling, hold: box, holdW: hw, holdY: 0.12 };
+  return true;
+}
+// up from a kneel or a squat, the hands coming off whatever they were on
+async function rise(who, from = kneeling) {
+  const run = chore.run;
+  await htween(who, 0.8, (k) => { if (stillOn(run)) who.pose = bodyMix(from, {}, k); });
+  if (stillOn(run)) who.pose = null;
+}
+// one hand goes into the open box and comes out holding a new thing of this kind, lifted clear of the rim; `other` is the free hand's spec, `body` the lean/kneel
+async function takeOut(who, box, kind, side, other, body) {
+  const run = chore.run, hs = HOLD[kind] || HOLD.crate, { fwd } = facing(who), top = boxTop(box);
+  const inside = box.position.clone().addScaledVector(fwd, -0.04); inside.y = top - 0.06;
+  const over = box.position.clone().addScaledVector(fwd, -0.12); over.y = top + 0.2;
+  const hand = (p, grip) => ({ ...body, ...other, [side]: { reach: p, palm: 'down', grip } });
+  const from = palmAt(who, side);
+  await htween(who, 0.55, (k) => { if (stillOn(run)) who.pose = hand(from.clone().lerp(inside, k), 0.3); });
+  if (!stillOn(run)) return null;
+  const th = makeThing(kind); scene.add(th); dressing.push(th); who.grab(th, side, { down: hs.down });   // (it was in the box; now it is in the hand)
+  await htween(who, 0.45, (k) => { if (stillOn(run)) who.pose = hand(inside.clone().lerp(over, k), hs.grip); });
+  return stillOn(run) ? th : null;
+}
+// the thing in this hand goes down onto `dest` (a point on a floor or a counter) and is let go there, with a short settle; the body eases from body0 to body1 on the way
+async function putDown(who, th, kind, dest, side, other, body0, body1 = body0) {
+  const run = chore.run, hs = HOLD[kind] || HOLD.crate, from = palmAt(who, side), landing = dest.clone(); landing.y += hs.down + 0.01;
+  const hand = (p, body, grip) => ({ ...body, ...other, [side]: { reach: p, palm: 'down', grip } });
+  await htween(who, 0.7, (k) => { if (!stillOn(run)) return; const p = from.clone().lerp(landing, k); p.y += Math.sin(k * Math.PI) * 0.06; who.pose = hand(p, bodyMix(body0, body1, k), hs.grip); });
+  if (!stillOn(run)) return false;
+  scene.attach(th); const p0 = th.position.clone(), q0 = th.quaternion.clone(), q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, who.group.rotation.y + (Math.random() - 0.5) * 0.6, 0));
+  await htween(who, 0.15, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(p0, dest, k); th.quaternion.slerpQuaternions(q0, q1, k); who.pose = hand(landing, body1, hs.grip * (1 - 0.6 * k)); });
+  if (!stillOn(run)) return false;
+  th.position.copy(dest); th.quaternion.copy(q1); sfx.thump(0.3);
+  return true;
+}
+// kneeling over a box on the floor with both hands on its top edges: open it and take the things out one by one, each set down on the floor beside it
+async function unpackFloor(who, box, kinds) {
+  const run = chore.run, open = box.userData.open || (box.userData.open = openable(box)), bs = bscale(who);
+  await htween(who, 0.7, (k) => { if (stillOn(run)) { open(k); who.pose = { ...kneeling, L: onRim(who, box, 1), R: onRim(who, box, -1) }; } });
+  for (let i = 0; i < kinds.length; i++) {
     if (!stillOn(run)) return false;
-    const th = makeThing(kind); scene.add(th); dressing.push(th);
-    const a = top.clone().add(new V3(0, 0.02, 0)), b = box.position.clone().addScaledVector(side, 0.55 + 0.2 * i).addScaledVector(fwdv, -0.1 * i); b.y = 0.0;
-    const c = new V3(), lift = new V3();
-    await htween(who, 0.9, (k) => {
-      if (!stillOn(run)) return;
-      lift.lerpVectors(a, b, k); lift.y = a.y + Math.sin(Math.min(1, k * 1.15) * Math.PI) * 0.35 * (1 - k) + (b.y - a.y) * k + 0.1;
-      th.position.copy(lift); c.copy(lift); c.y += 0.08; who.pose = { lean: 0.8, reach: c.clone() }; th.position.y = lift.y - 0.05;
-    });
-    th.position.copy(b); sfx.thump(0.35);
-    i++;
+    const side = i % 2 ? 'L' : 'R', sg = side === 'L' ? 1 : -1, other = { [side === 'L' ? 'R' : 'L']: onRim(who, box, -sg) };
+    const dest = who.group.localToWorld(new V3(sg * 0.46 * bs, 0, 0.42 * bs)); dest.y = who.group.position.y;
+    const th = await takeOut(who, box, kinds[i], side, other, kneeling);
+    if (!th) return false;
+    if (!(await putDown(who, th, kinds[i], dest, side, other, kneeling, { kneel: 1, lean: 1.3 }))) return false;
   }
-  await htween(who, 0.5, (k) => { if (stillOn(run)) who.pose = { lean: 0.8 * (1 - k) }; });
-  who.pose = null; return stillOn(run);
+  await rise(who);
+  return stillOn(run);
 }
 
 async function dadChores() {
   const run = chore.run, g = dad.group.position;
   dad.busy = true;
-  const done = new Set();
   for (let i = 0; stillOn(run) && !chore.stop && i < LIVING_SPOTS.length; i++) {
     const spot = LIVING_SPOTS[i], box = W.cardboardBox(0, 0, 0, 0.46, 0.4, 0.46, i % 4, 0, scene); box.visible = false; dressing.push(box);
     if (!(await walkTo(dad, i === 0 ? [RAMP_FOOT, TRUCK_PICK] : [DOOR_IN, DOOR_OUT, PORCH, RAMP_FOOT, TRUCK_PICK]))) return;   // back out through the front door, never through the wall
     await turnToward(dad, g.x, g.z - 1);
-    const grab = new V3(g.x, 1.1, g.z - 0.7);   // just over the top of a box on the truck bed (0.55 m)
-    await htween(dad, 0.8, (k) => { if (stillOn(run)) dad.pose = { lean: 0.5 * Math.sin(k * Math.PI / 2), reach: grab }; });
-    if (!stillOn(run)) return;
-    holdUp(dad, box); box.visible = true; sfx.thump(0.4);
-    if (!(await walkTo(dad, [new V3(2.3, 0.2, -13.3), RAMP_FOOT, PORCH, DOOR_OUT, DOOR_IN, new V3(spot.x, 0, spot.z + 0.85)], 1.15))) return;
+    if (!(await liftBox(dad, box, TRUCK_BOX))) return;   // the next box, off the top of the stack
+    if (!(await walkTo(dad, [new V3(2.3, 0, -13.3), RAMP_FOOT, PORCH, DOOR_OUT, DOOR_IN, new V3(spot.x, 0, spot.z + 0.8 * bscale(dad))], 1.15))) return;
     await turnToward(dad, spot.x, spot.z);
     if (!(await setDown(dad, box, spot))) return;
-    if (chore.stop) break;
-    const kinds = [['books', 'lamp'], ['plates', 'books'], ['lamp', 'mug']][i % 3];
-    if (!(await unpackFloor(dad, box, kinds, new V3(spot.x + 0.1, 0, spot.z + 0.66)))) return;
+    if (chore.stop) { await rise(dad); break; }   // (this one stays packed: he is wanted in the kitchen)
+    const kinds = [['books', 'mug'], ['plates', 'books'], ['crate', 'books']][i % 3];   // (nothing taller than the box is 0.4 m deep)
+    if (!(await unpackFloor(dad, box, kinds))) return;
     if (chore.stop) break;
   }
   if (!stillOn(run)) return;
@@ -761,45 +801,41 @@ async function dadChores() {
   chore.dadHome = true;
 }
 async function momChores() {
-  const run = chore.run, g = mom.group.position;
+  const run = chore.run;
   mom.busy = true;
-  const box = W.cardboardBox(KITCHEN_BOX.x, 0, KITCHEN_BOX.z, 0.55, 0.42, 0.5, 0, 0.3, scene); dressing.push(box);
+  const bs = bscale(mom), box = W.cardboardBox(KITCHEN_BOX.x, 0, KITCHEN_BOX.z, 0.55, 0.42, 0.5, 0, Math.PI / 2, scene); dressing.push(box);   // (square to her: she comes at it from the west)
   W.colliders.push({ minX: KITCHEN_BOX.x - 0.3, maxX: KITCHEN_BOX.x + 0.3, minZ: KITCHEN_BOX.z - 0.3, maxZ: KITCHEN_BOX.z + 0.3, on: true, dressing: true });
   const open = openable(box); box.userData.open = open;
   const things = ['plates', 'mug', 'pot', 'mug', 'plates', 'mug'];
-  const stand = new V3(KITCHEN_BOX.x - 0.62, 0, KITCHEN_BOX.z);
+  const stand = new V3(KITCHEN_BOX.x - 0.8 * bs, 0, KITCHEN_BOX.z), carry = new V3(-0.2 * bs, 0.95 * bs, 0.3 * bs);   // where she kneels at the box; where a thing rides in her right hand
+  // down on one knee at the box, both hands to its rim
+  const kneelAt = async (dur) => {
+    await turnToward(mom, box.position.x, box.position.z, 0.4);
+    await htween(mom, dur, (k) => { if (stillOn(run)) mom.pose = { ...bodyMix({}, kneeling, k), L: onRim(mom, box, 1), R: onRim(mom, box, -1) }; });
+  };
   if (!(await walkTo(mom, [stand]))) return;
-  await turnToward(mom, box.position.x, box.position.z);
-  const top = new V3(box.position.x, 0.44, box.position.z);
-  await htween(mom, 0.8, (k) => { if (stillOn(run)) mom.pose = { lean: 0.75 * k, reach: top }; });
+  await kneelAt(1.0);
   await htween(mom, 0.6, (k) => { if (stillOn(run)) open(k); });
   for (let i = 0; i < things.length && stillOn(run); i++) {
-    const th = makeThing(things[i]); scene.add(th); dressing.push(th);
-    const [cx, cy, cz] = COUNTER[i], hold = new V3();
-    await htween(mom, 0.9, (k) => { if (!stillOn(run)) return; th.position.set(top.x, 0.44 + 0.3 * k, top.z); hold.copy(th.position).add(new V3(0, 0.08, 0)); mom.pose = { lean: 0.75 * (1 - 0.5 * k), reach: hold.clone() }; });
-    const east = cx > 2.5, sx = east ? cx - 0.65 : cx, sz = east ? cz : cz - 0.9;
-    mom.pose = { reach: null };
-    let walking = true;
-    const follow = (async () => {   // the thing rides in her hands while she walks
-      while (walking && stillOn(run)) {
-        const h = bodyH(mom), fx = Math.sin(mom.group.rotation.y), fz = Math.cos(mom.group.rotation.y);
-        th.position.set(g.x + fx * 0.35, 0.95 * h / 1.75 - 0.12, g.z + fz * 0.35); mom.pose = { reach: th.position.clone().add(new V3(0, 0.05, 0)) };
-        await wait(0.02);
-      }
-    })();
-    const okp = await walkTo(mom, [new V3(sx, 0, sz)], 1.1); walking = false; await follow;
-    if (!okp) return;
+    const [cx, cy, cz, sx, sz] = COUNTER[i], kind = things[i], hs = HOLD[kind];
+    const th = await takeOut(mom, box, kind, 'R', { L: onRim(mom, box, 1) }, kneeling);
+    if (!th) return;
+    // up on her feet with it, then to the counter
+    const from = palmAt(mom, 'R');
+    await htween(mom, 0.8, (k) => { if (stillOn(run)) mom.pose = { ...bodyMix(kneeling, {}, k), R: { reach: from.clone().lerp(mom.group.localToWorld(carry.clone()), k), palm: 'down', grip: hs.grip } }; });
+    if (!stillOn(run)) return;
+    mom.pose = { R: { reachLocal: carry, palm: 'down', grip: hs.grip } };
+    if (!(await walkTo(mom, [new V3(sx, 0, sz)], 1.1))) return;
     await turnToward(mom, cx, cz, 0.4);
-    const c0 = th.position.clone(), c1 = new V3(cx, cy, cz);
-    await htween(mom, 0.7, (k) => { if (!stillOn(run)) return; th.position.lerpVectors(c0, c1, k); mom.pose = { lean: 0.25 * Math.sin(k * Math.PI), reach: th.position.clone().add(new V3(0, 0.05, 0)) }; });
-    sfx.thump(0.3); mom.pose = null;
-    if (i < things.length - 1) { if (!(await walkTo(mom, [stand]))) return; await turnToward(mom, box.position.x, box.position.z, 0.4); }
+    if (!(await putDown(mom, th, kind, new V3(cx, cy, cz), 'R', {}, {}, { lean: 0.3 }))) return;
+    mom.pose = null;
+    if (i < things.length - 1) { if (!(await walkTo(mom, [stand]))) return; await kneelAt(0.8); }
   }
   while (stillOn(run)) {   // wipe the counter until the chores are cancelled
-    const a = new V3(2.6, 0.97, 2.0), t0 = gameTime;
-    if (!(await walkTo(mom, [new V3(2.1, 0, 2.2)]))) return;
-    await turnToward(mom, 2.8, 2.2, 0.4);
-    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, reach: new V3(2.75, 0.97, 2.2 + Math.sin(t * 2.2) * 0.45) }; await wait(0.03); if (t > 30) break; }
+    const t0 = gameTime;
+    if (!(await walkTo(mom, [new V3(2.32, 0, 2.25)]))) return;
+    await turnToward(mom, 2.8, 2.25, 0.4);
+    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, R: { reach: new V3(2.74, 0.96, 2.25 + Math.sin(t * 2.2) * 0.3), palm: 'down', grip: 0.4 } }; await wait(0.03); if (t > 30) break; }
   }
 }
 function startChores() {

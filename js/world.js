@@ -210,7 +210,9 @@ export function buildWorld(scene) {
     const geo = new RoundedBoxGeometry(x1 - x0, y1 - y0, z1 - z0, 3, Math.min(r, (x1 - x0) / 2.01, (y1 - y0) / 2.01, (z1 - z0) / 2.01));
     geo.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     if (mat && mat.userData && mat.userData.worldUV) worldUV(geo);
-    const m = new THREE.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = true; (o.parent || defParent || house).add(m); return m;
+    const m = new THREE.Mesh(geo, mat); m.castShadow = o.cast !== false; m.receiveShadow = true; (o.parent || defParent || house).add(m);
+    if (curTag) curTag.push(m);
+    return m;
   }
   // ---------- walls ----------
   const cutsX = [...new Set(Object.values(ROOMS).flatMap((r) => [r[0], r[1]]))], cutsZ = [...new Set(Object.values(ROOMS).flatMap((r) => [r[2], r[3]]))];
@@ -499,6 +501,8 @@ export function buildWorld(scene) {
   // ---------- your room (back-left corner): the bunk, the white built-in closet, a box TV ----------
   // The bunk is built in its own local frame and turned into place: its long side is flush with the end wall (the window wall), the head toward the hall, the ladder at the foot.
   const BUNK = { x0: -5.65, x1: -3.55, z0: 3.95, z1: 4.9 };
+  let cBunk = null;
+  tagStart('bunk');
   {
     const bunkG = new THREE.Group(); bunkG.position.set(10.68, 0, -1.38); house.add(bunkG); defParent = bunkG;   // along the back wall, head against the bathroom wall: world x = local x + 10.68, world z = local z - 1.38
     const { x0, x1, z0, z1 } = BUNK, zc = (z0 + z1) / 2;
@@ -523,8 +527,9 @@ export function buildWorld(scene) {
     for (const zz of [zc - 0.245, zc + 0.245]) box(x1 + 0.01, x1 + 0.06, 0, 1.92, zz - 0.025, zz + 0.025, M.furn, { uv: false });
     for (let y = 0.3; y < 1.8; y += 0.3) box(x1 + 0.015, x1 + 0.055, y, y + 0.04, zc - 0.245, zc + 0.245, M.furn, { uv: false });
     defParent = null;
-    solid(5.0, 7.22, 2.55, 3.55);
+    cBunk = solid(5.0, 7.22, 2.55, 3.55);
   }
+  tagEnd();
   // the white built-in closet and drawers on the hall wall beside the door: louvered bifold doors, drawers, a cubby above
   {
     const wh = M.cabW, x0 = 5.15, x1 = 6.55, z0 = -0.22, z1 = 0.42, zf = z1 + 0.025;
@@ -544,18 +549,25 @@ export function buildWorld(scene) {
   }
   let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null; const chairs = [];
   {
+    // your bear sits on the bottom bunk. The group's origin is under its seat, so it can be set down anywhere (moveTeddy) and tipped over;
+    // a ball-and-sphere bear stands in until the model loads. teddy.rest is where it belongs.
     const bear = new THREE.Group(); const fur = std({ color: 0x7a5232, roughness: 1 });
     const s = (r, x, y, z) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), fur); m.position.set(x, y, z); m.castShadow = true; bear.add(m); };
     s(0.11, 0, 0.11, 0); s(0.08, 0, 0.27, 0.01); s(0.03, -0.06, 0.34, 0); s(0.03, 0.06, 0.34, 0); s(0.035, -0.1, 0.06, 0.06); s(0.035, 0.1, 0.06, 0.06);
     const eye = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });
     for (const x of [-0.025, 0.025]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), eye); e.position.set(x, 0.29, 0.08); bear.add(e); }
-    bear.position.set(6.83, 0.55, 3.0); bear.rotation.y = 2.7; house.add(bear); teddy = bear;
+    const rest = { pos: new THREE.Vector3(6.83, 0.55, 3.0), rot: 2.7 };
+    teddy = place(house, 'teddy', { x: rest.pos.x, y: rest.pos.y, z: rest.pos.z, rot: rest.rot, s: 0.02, hide: [bear] });
+    teddy.add(bear); teddy.rest = rest; teddy.size = { w: 0.31, h: 0.385, d: 0.245 };
+    teddy.reset = () => { teddy.position.copy(rest.pos); teddy.rotation.set(0, rest.rot, 0); teddy.visible = true; };
   }
   {
     // box TV on an oak stand against the bathroom wall, a braided rug, a heater
     rbox(5.1, 5.6, 0, 0.55, 0.5, 1.4, M.oak, 0.015);
+    tagStart('kidtv');
     rbox(5.1, 5.55, 0.55, 1.2, 0.55, 1.35, M.crt, 0.03);
-    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.52), M.crtScreen); scr.rotation.y = Math.PI / 2; scr.position.set(5.605, 0.9, 0.95); house.add(scr);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.52), M.crtScreen); scr.rotation.y = Math.PI / 2; scr.position.set(5.605, 0.9, 0.95); house.add(scr); tagged.kidtv.push(scr);
+    tagEnd();
     solid(5.05, 5.65, 0.45, 1.45);
     const rugM = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.012, 48), M.rug); rugM.scale.set(1.2, 1, 1); rugM.position.set(6.2, 0.006, 1.5); rugM.receiveShadow = true; house.add(rugM);
     heater(5.08, 5.16, 0.1, 1.55, 2.4);
@@ -609,7 +621,7 @@ export function buildWorld(scene) {
     }
     solid(3.38, 4.95, 2.7, 3.55);
     {   // toilet against the west wall: a lathed oval bowl, a seat and lid, a tank with a lid and a flush lever, and the cover caps at the base
-      const t = new THREE.Group(); t.position.set(3.83, 0, 1.9); t.rotation.y = Math.PI; house.add(t);
+      const t = new THREE.Group(); t.position.set(3.83, 0, 1.9); t.rotation.y = Math.PI; house.add(t); tagged.toilet = [t];
       const porcD = porc.clone(); porcD.side = THREE.DoubleSide;
       const seatM = std({ color: 0xf0eee6, roughness: 0.3 });
       const V2 = (a) => a.map(([r, y]) => new THREE.Vector2(r, y));
@@ -696,16 +708,19 @@ export function buildWorld(scene) {
       for (let i = 0; i < n; i++) { const a = x0 + i * w; rbox(a + 0.012, a + w - 0.012, 0.07, 0.86, 2.878, 2.9, M.cabW, 0.006); rbox(a + w - 0.1, a + w - 0.085, 0.62, 0.84, 2.858, 2.878, M.brass, 0.004); }
     };
     // east wall, front to back: fridge, stove, cabinets to the corner
+    tagStart('fridge');
     rbox(2.45, 3.22, 0.04, 1.78, 0.0, 0.92, M.appW, 0.03);                                   // fridge body
     rbox(2.425, 2.45, 0.08, 1.74, 0.01, 0.9, M.appW, 0.012);                                  // the doors, a little proud
     box(2.42, 2.43, 0.08, 1.74, 0.45, 0.46, M.black, { uv: false });                            // seam between the freezer and fridge doors
     rbox(2.405, 2.425, 0.55, 1.35, 0.4, 0.43, M.steelSink, 0.008); rbox(2.405, 2.425, 0.55, 1.35, 0.485, 0.515, M.steelSink, 0.008);   // the two handles
     rbox(2.415, 2.428, 1.0, 1.4, 0.1, 0.36, M.black, 0.01);                                     // water and ice dispenser
-    { const note = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.3), std({ color: 0xf2f0e8, roughness: 0.9 })); note.rotation.y = -Math.PI / 2; note.position.set(2.419, 1.42, 0.66); house.add(note); }
+    { const note = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.3), std({ color: 0xf2f0e8, roughness: 0.9 })); note.rotation.y = -Math.PI / 2; note.position.set(2.419, 1.42, 0.66); house.add(note); tagged.fridge.push(note); }
+    tagEnd(); tagStart('stove');
     rbox(2.6, 3.22, 0, 0.92, 1.0, 1.66, M.appW, 0.015); rbox(2.58, 3.22, 0.92, 0.945, 0.99, 1.67, M.black, 0.01);   // range
-    for (const [bx, bz] of [[2.82, 1.17], [3.02, 1.17], [2.82, 1.49], [3.02, 1.49]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.012, 20), std({ color: 0x151513, roughness: 0.5 })); b.position.set(bx, 0.95, bz); house.add(b); }
+    for (const [bx, bz] of [[2.82, 1.17], [3.02, 1.17], [2.82, 1.49], [3.02, 1.49]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.012, 20), std({ color: 0x151513, roughness: 0.5 })); b.position.set(bx, 0.95, bz); house.add(b); tagged.stove.push(b); }
     rbox(2.575, 2.6, 0.3, 0.75, 1.07, 1.59, M.black, 0.01); rbox(2.55, 2.575, 0.7, 0.74, 1.07, 1.59, M.steelSink, 0.005);   // oven door and its handle
     rbox(2.58, 2.6, 0.78, 0.9, 1.05, 1.61, M.black, 0.008);                                       // control panel
+    tagEnd();
     rbox(2.62, 3.22, 1.45, 1.8, 0.98, 1.68, M.appW, 0.02); rbox(2.6, 2.62, 1.5, 1.75, 1.03, 1.45, M.black, 0.008);                        // microwave over the range
     runE(1.66, 2.9); upperE(1.7, 2.9);
     rbox(2.9, 3.22, 1.95, 2.3, 0.0, 0.92, M.cabW, 0.012);                                         // the cabinet over the fridge
@@ -734,9 +749,11 @@ export function buildWorld(scene) {
     box(-4.1, -3.65, 0, 1.0, -0.85, -0.4, M.brick, { uv: true }); box(-4.15, -3.6, 1.0, 1.06, -0.9, -0.35, M.concrete, { uv: false });
     solid(-4.15, -3.6, -0.9, -0.35);
     box(-4.4, -3.38, 0, 0.15, -0.1, 1.0, M.oak, { uv: false }); box(-3.9, -3.38, 0.15, 0.3, -0.1, 1.0, M.oak, { uv: false });
+    tagStart('wd');
     rbox(-8.0, -7.35, 0, 0.9, -0.4, 0.25, M.appW, 0.02); rbox(-8.0, -7.35, 0, 0.9, 0.3, 0.95, M.appW, 0.02);
-    for (const z of [-0.075, 0.625]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 24), M.glassOut); w.rotation.z = Math.PI / 2; w.position.set(-7.34, 0.5, z); house.add(w); }
+    for (const z of [-0.075, 0.625]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 24), M.glassOut); w.rotation.z = Math.PI / 2; w.position.set(-7.34, 0.5, z); house.add(w); tagged.wd.push(w); }
     rbox(-8.0, -7.35, 0.9, 0.93, -0.4, 0.95, M.appW, 0.01);
+    tagEnd();
     solid(-8.05, -7.3, -0.45, 1.0);
     for (const y of [1.0, 1.45, 1.9]) box(-8.0, -7.6, y, y + 0.04, -3.7, -2.9, M.black, { uv: false }); for (const y of [1.2, 1.6]) box(-6.4, -5.2, y, y + 0.04, 3.45, 3.52, M.black, { uv: false });   // black floating shelves
     heater(-8.0, -7.92, 0.1, -0.5, 0.5);
@@ -789,13 +806,16 @@ export function buildWorld(scene) {
       return fx;
     })();
     solid(5.85, 7.05, -3.77, -1.5);
-    // a low dresser under the front window, with the lamp and Mom's things on it
-    rbox(5.9, 6.9, 0, 0.8, -4.4, -3.95, M.oak, 0.015); for (let i = 0; i < 3; i++) rbox(5.95 + i * 0.32, 6.23 + i * 0.32, 0.12, 0.7, -3.95, -3.935, M.oak, 0.006);
-    for (let i = 0; i < 3; i++) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), M.brass); kn.position.set(6.09 + i * 0.32, 0.41, -3.92); house.add(kn); }
+    // a low dresser under the front window (a light-wood six-drawer model, 0.655 high, replaces the box), with the lamp and Mom's things on it
+    tagStart('pdresser');
+    rbox(5.9, 6.9, 0, 0.655, -4.4, -3.95, M.oak, 0.015); for (let i = 0; i < 3; i++) rbox(5.95 + i * 0.32, 6.23 + i * 0.32, 0.1, 0.57, -3.95, -3.935, M.oak, 0.006);
+    for (let i = 0; i < 3; i++) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), M.brass); kn.position.set(6.09 + i * 0.32, 0.34, -3.92); house.add(kn); tagged.pdresser.push(kn); }
+    tagEnd(); tagStart('plamp');
     { const lampM = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0.0, roughness: 0.7 });
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.65, 0.9, -4.18); house.add(base);
-      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.65, 1.12, -4.18); house.add(shade); }
-    knick(6.15, 0.8, -4.2, 3, 0.3);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(6.65, 0.755, -4.18); house.add(base); tagged.plamp.push(base);
+      const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(6.65, 0.975, -4.18); house.add(shade); tagged.plamp.push(shade); }
+    tagEnd();
+    knick(6.15, 0.655, -4.2, 3, 0.3);
     solid(5.85, 6.95, -4.45, -3.9);
     // where the rigs lie (the origin is 1.4 m down the bed from the pillows; yaw turns them to lie along z, head to the hall wall)
     parentsBed = { mom: { x: 6.68, y: 0.74, z: -3.3, yaw: Math.PI }, dad: { x: 6.24, y: 0.74, z: -3.45, yaw: Math.PI } };
@@ -803,7 +823,9 @@ export function buildWorld(scene) {
     rbox(4.45, 5.5, 0, 2.1, -2.15, -1.58, M.oak, 0.01); for (let i = 1; i < 6; i++) box(4.45 + i * 0.175 - 0.006, 4.45 + i * 0.175 + 0.006, 0.05, 2.05, -2.165, -2.15, M.black, { uv: false });
     rbox(4.45, 5.5, 2.1, 2.4, -2.15, -1.58, M.white, 0.01);
     solid(4.4, 5.55, -2.2, -1.5);
-    rbox(3.4, 5.35, 0, 0.5, -4.4, -3.45, M.oak, 0.02); rbox(3.43, 5.32, 0.4, 0.6, -4.37, -3.48, M.mattress, 0.04); rbox(3.95, 5.32, 0.55, 0.64, -4.35, -3.5, M.floralB, 0.02); rbox(3.46, 3.95, 0.58, 0.7, -4.25, -3.62, M.pillow, 0.05); solid(3.35, 5.4, -4.45, -3.4);   // the spare room's bed runs along the front wall so the door and closet stay reachable
+    // Dad's office: the desk under the front window with the computer on it, the chair pulled out, a filing cabinet in the west corner,
+    // a bookcase on the wall it shares with the parents' room. All of it is models (placed below); only the colliders are here.
+    solid(3.35, 5.15, -4.45, -3.7); solid(5.3, 5.8, -3.85, -2.75);
   }
 
   // moving boxes around the house
@@ -814,6 +836,19 @@ export function buildWorld(scene) {
   };
   cardboardBox(-4.4, 0, -3.2, 0.55, 0.45, 0.5, 3, 0.2); cardboardBox(-4.4, 0.45, -3.2, 0.5, 0.4, 0.45, 1, -0.15); cardboardBox(-5.1, 0, -3.3, 0.5, 0.44, 0.5, 2, 0.1); solid(-5.45, -4.05, -3.65, -2.9);   // more boxes in the utility room
   cardboardBox(-5.0, 0, 2.8, 0.6, 0.5, 0.5, 2, 0.2); cardboardBox(-4.95, 0.5, 2.8, 0.5, 0.4, 0.45, 1, -0.1); solid(-5.35, -4.65, 2.45, 3.15);   // in the utility room
+  // the end of the utility room nobody unpacked: boxes against the back wall, a rolled rug, an old dresser with its drawers out, and a tall
+  // mirror under a sheet (spare.mirror; the sheet comes off with sheet.visible = false). The models are placed below; this is the rest.
+  let spare = null;
+  {
+    cardboardBox(-6.3, 0, 3.05, 0.6, 0.5, 0.55, 0, 0.1); cardboardBox(-6.3, 0.5, 3.05, 0.5, 0.42, 0.5, 2, -0.2); cardboardBox(-5.7, 0, 3.15, 0.55, 0.45, 0.5, 3, 0.3);
+    cardboardBox(-4.3, 0, 3.1, 0.5, 0.44, 0.5, 1, -0.1); cardboardBox(-4.35, 0.44, 3.1, 0.45, 0.4, 0.45, 2, 0.25);
+    const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.6, 14), M.rug); rug.rotation.z = Math.PI / 2; rug.position.set(-5.1, 0.12, 3.35); rug.castShadow = rug.receiveShadow = true; house.add(rug);
+    M.sheet = std({ color: 0xe9e4d8, roughness: 1 }); M.sheet.envMapIntensity = 0.15;
+    const sheet = rbox(-7.08, -6.52, 0.3, 1.74, 2.84, 3.5, M.sheet, 0.08);   // (the mirror model stands inside it)
+    const hem = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.1, 0.72), M.sheet); hem.position.set(-6.8, 0.33, 3.17); hem.rotation.y = 0.15; house.add(hem);
+    solid(-8.05, -7.2, 2.5, 3.55); solid(-7.1, -6.5, 2.9, 3.55); solid(-6.65, -5.4, 2.75, 3.55); solid(-4.6, -4.0, 2.8, 3.55);
+    spare = { mirror: { sheet, hem, pos: new THREE.Vector3(-6.8, 0.9, 3.2) }, bounds: [-8.1, -3.3, 2.3, 3.6] };
+  }
 
   // ---------- out the back door: the stoop, the outside cellar stairs beside it, and the laundry under the utility room ----------
   const B = BASEMENT;
@@ -937,6 +972,34 @@ export function buildWorld(scene) {
     prop('pot', { x: 3.02, y: 0.96, z: 1.49, rot: 0 });
     prop('plant1', { x: -1.65, z: 3.25 }, { box: [-1.9, -1.4, 3.0, 3.5] });   // in the corner by the pantry, clear of the back door
   }
+  // your room: the pine bunk (2.0 long, flush with the back wall, ladder at the foot by the window) and the box TV on its stand
+  prop('bunk', { x: 6.08, z: 2.89, rot: 0, s: 0.115 }, { tag: 'bunk', old: [cBunk], box: [4.98, 7.22, 2.2, 3.55] });
+  const kidTv = prop('tv', { x: 5.33, y: 0.55, z: 0.95, rot: PI / 2 }, { tag: 'kidtv', after: () => plainTv(kidTv) });
+  // kitchen appliances (doors face -x), the toilet (tank on the west wall), the washer and dryer in the utility room (doors face +x)
+  prop('fridge', { x: 2.845, z: 0.46, rot: -PI / 2, s: 0.98 }, { tag: 'fridge' });
+  prop('stove', { x: 2.865, z: 1.33, rot: -PI / 2, s: 0.0095 }, { tag: 'stove' });
+  prop('toilet', { x: 3.72, z: 1.9, rot: PI / 2, s: 1.05 }, { tag: 'toilet' });
+  prop('washer', { x: -7.71, z: -0.075, rot: PI, s: 0.466 }, { tag: 'wd' });   // (this model's door is on its -x side)
+  prop('dryer', { x: -7.67, z: 0.625, rot: PI / 2, s: 0.00118 }, { tag: 'wd' });
+  // the parents' dresser and lamp under their front window
+  prop('dresser', { x: 6.42, z: -4.22, rot: 0, s: 0.52 }, { tag: 'pdresser' });
+  prop('table_lamp', { x: 6.65, y: 0.655, z: -4.18, rot: 0, s: 0.011 }, { tag: 'plamp' });
+  // the office: desk and computer under the window, the chair, the filing cabinet, the bookcase, and a desk lamp that can be on (office.lamp)
+  const office = (() => {
+    const deskTop = 2.98 * 0.26;
+    const desk = prop('desk', { x: 4.5, z: -4.08, rot: 0, s: 0.26 });
+    const pc = prop('crt_pc', { x: 4.42, y: deskTop, z: -4.1, rot: 0, s: 1 });
+    const chair = prop('office_chair', { x: 4.5, z: -3.35, rot: PI, s: 0.008 });
+    prop('filing', { x: 3.62, z: -4.15, rot: 0, s: 1 });
+    prop('bookcase', { x: 5.54, z: -3.3, rot: -PI / 2, s: 1 });
+    const lampM = M.lamp.clone(); const light = new THREE.PointLight(0xffd9a0, 0, 5, 1.8); light.position.set(5.02, deskTop + 0.42, -4.12); scene.add(light);
+    const lamp = prop('desk_lamp', { x: 5.02, y: deskTop, z: -4.15, rot: -0.6, s: 0.0085 }, { after: () => lamp.traverse((o) => { if (o.isMesh && o.material.emissiveMap) { o.material = lampM; } }) });
+    return { desk, pc, chair, deskTop, pos: new THREE.Vector3(4.5, 0, -3.6),
+      lamp: { holder: lamp, light, on: false, base: 2.2, pos: light.position.clone(), set(on) { this.on = on; light.intensity = on ? this.base : 0; lampM.emissiveIntensity = on ? 1.2 : 0; } } };
+  })();
+  // the unpacked end of the utility room: the old dresser (drawers out, mirror on top) against the west wall, the stand mirror inside its sheet
+  spare.dresser = prop('dresser_old', { x: -7.64, z: 3.0, rot: PI / 2, s: 0.02 });
+  spare.mirror.holder = prop('mirror', { x: -6.8, z: 3.2, rot: PI, s: 0.182 });
 
   // ---------- set pieces for the nights: the TV, the wall phone, the bathroom mirror ----------
   const tvFx = (() => {
@@ -1078,12 +1141,15 @@ export function buildWorld(scene) {
   // ---------- outlets, and a few green plug-in night lights (the only light you get at night) ----------
   const outletMat = std({ color: 0xe4ded0, roughness: 0.5 }), holeMat = std({ color: 0x14140f, roughness: 0.9 }), nlBody = std({ color: 0xe9e4d4, roughness: 0.45 });
   const nightLights = [];
-  // (px, pz) on the wall's inner face, (nx, nz) pointing into the room, y = height of the outlet; lit = a night light is plugged into it
+  // (px, pz) on the wall's inner face, (nx, nz) pointing into the room, y = height of the outlet; lit = a night light is plugged into it.
+  // The plate is a model, seated on the wall face; a plain box stands in for it until it loads.
   function outlet(px, y, pz, nx, nz, lit) {
     const g = new THREE.Group(); g.position.set(px, y, pz); g.rotation.y = Math.atan2(nx, nz);   // local +Z points into the room
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.12, 0.01), outletMat); plate.position.z = 0.005; g.add(plate);
-    for (const dy of [0.028, -0.028]) for (const dx of [-0.011, 0.011]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.016, 0.004), holeMat); h.position.set(dx, dy, 0.011); g.add(h); }
+    const standIn = [plate];
+    for (const dy of [0.028, -0.028]) for (const dx of [-0.011, 0.011]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.016, 0.004), holeMat); h.position.set(dx, dy, 0.011); g.add(h); standIn.push(h); }
     house.add(g);
+    place(house, 'outlet', { x: px, y, z: pz, rot: g.rotation.y, s: 0.01, wall: true, hide: standIn });
     if (!lit) return;
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.09, 0.034), nlBody); body.position.set(0, -0.026, 0.027); body.castShadow = true; g.add(body);
     const mat = new THREE.MeshStandardMaterial({ color: 0x163a20, emissive: 0x40ff72, emissiveIntensity: 0, roughness: 0.35 });
@@ -1092,14 +1158,22 @@ export function buildWorld(scene) {
     const pos = new THREE.Vector3(); g.updateMatrixWorld(true); light.getWorldPosition(pos);
     nightLights.push({ light, mat, base: 0.9, pos });
   }
-  // inner faces: hall walls at z = -0.38 (north side) and -1.42 (south side), end wall x = 8.02
+  // inner faces: hall walls at z = -0.38 (north side) and -1.42 (south side), end wall x = 8.02, bathroom tile x = 3.405
   outlet(6.5, 0.35, -0.38, 0, -1, true);       // hall, under the photos
   outlet(5.4, 0.33, -1.42, 0, 1, true);        // hall, by the bedroom doors
   outlet(8.02, 0.33, -0.9, -1, 0, true);       // hall, at the dead end by your door
   outlet(7.85, 0.32, -0.22, 0, 1, true);       // your room, beside the door
-  outlet(3.38, 0.34, 1.0, 1, 0, true);         // bathroom
+  outlet(3.405, 0.34, 1.0, 1, 0, true);        // bathroom
   outlet(0.85, 0.34, -0.38, 0, -1, true);      // living room, on the arch wall
-  for (const [x, y, z, nx, nz] of [[0.4, 0.33, -0.38, 0, -1], [5.08, 0.4, 2.6, 1, 0], [3.5, 0.3, -1.42, 0, 1], [1.5, 1.05, 3.5, 0, -1]]) outlet(x, y, z, nx, nz, false);
+  for (const [x, y, z, nx, nz] of [[0.4, 0.33, -0.38, 0, -1], [8.02, 0.33, 1.6, -1, 0], [4.6, 0.3, -1.42, 0, 1], [2.6, 1.1, 3.52, 0, -1], [4.0, 0.33, -4.42, 0, 1], [5.72, 0.33, -2.4, -1, 0], [-8.02, 0.33, 2.2, 1, 0], [-3.38, 0.33, -2.0, -1, 0]]) outlet(x, y, z, nx, nz, false);
+  // light switches inside each door, knob side, 1.2 m up
+  function switchAt(px, pz, nx, nz, y = 1.2) {
+    const g = new THREE.Group(); g.position.set(px, y, pz); g.rotation.y = Math.atan2(nx, nz); house.add(g);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.12, 0.01), outletMat); plate.position.z = 0.005; g.add(plate);
+    place(house, 'switch', { x: px, y, z: pz, rot: g.rotation.y, s: 0.01, wall: true, hide: [plate] });
+  }
+  switchAt(7.7, -0.22, 0, 1); switchAt(4.75, -0.2, 0, 1); switchAt(6.9, -1.58, 0, -1); switchAt(4.5, -1.58, 0, -1);   // your room, bathroom, the parents', the office
+  switchAt(2.55, -4.42, 0, 1); switchAt(-3.38, 1.15, -1, 0); switchAt(-9.0, PLACES.garage[3] - 0.12, 0, -1);   // by the front door, the utility room, the garage (inside, on the sheathing)
 
   // for the night event: the face's glow, and a passing car's headlights (a shadow-casting spot, so the light only comes in through the windows)
   const faceLight = new THREE.PointLight(0xdce6ff, 0, 20, 2); faceLight.visible = false; scene.add(faceLight);
@@ -1418,6 +1492,6 @@ export function buildWorld(scene) {
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
-    groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry,
+    groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry, office, spare,
   };
 }
