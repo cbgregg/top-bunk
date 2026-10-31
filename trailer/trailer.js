@@ -110,12 +110,12 @@ const ACT2 = [
   { id: 'hall_thing', w: 6,
     setup(c) { c.g.night({ lights: 0.25, spot: BATH_I, flicker: true }); c.g.thing({ x: 2.76, z: -0.42, yaw: Math.PI / 2, tilt: 0 }); c.P.pos.set(9.56, 0, -0.42); },
     update(c, k) {
-      const step = clamp((k - 0.58) / 0.1, 0, 1); c.E.root.position.x = 1.6 + 0.55 * ease.inOut(step); c.E.mode = step > 0 && step < 1 ? 'walk' : 'idle'; if (step > 0) c.E.faceTowards(6.9, -0.9, 1);
+      const step = clamp((k - 0.58) / 0.1, 0, 1); c.E.root.position.x = 2.76 + 0.62 * ease.inOut(step); c.E.mode = step > 0 && step < 1 ? 'walk' : 'idle'; if (step > 0) c.E.faceTowards(9.56, -0.42, 1);
       c.E.tilt = 0.55 * ease.inOut(clamp(k * 1.6, 0, 1)); c.cam.pos = mix3([9.64, 1.22, -0.42], [8.89, 1.2, -0.44], ease.inOut(k)); c.cam.look = [2.76, 1.35, -0.42]; c.cam.fov = 44; c.g.fear(0.8);
     } },
   { id: 'window_face', w: 5,
     setup(c) { c.g.night({ lights: 1 }); c.g.windowFace(0.23); c.P.pos.set(8.28, 0, 4); },
-    update(c, k) { c.WF.t = 0.23 + 0.08 * k; c.cam.pos = [8.55, 2.14, 3.93]; c.cam.look = [11.36, 1.78, 3.83]; c.cam.fov = 50; c.g.fear(0.4); } },
+    update(c, k) { c.WF.t = 0.245 + 0.05 * k; c.cam.pos = [8.55, 2.14, 3.93]; c.cam.look = [11.36, 1.78, 3.83]; c.cam.fov = 50; c.g.fear(0.4); } },
   // the game's hiding camera sits inside the closet body (the leaves are solid, the slats are the overlay), so this one stands a hand's width
   // outside the leaves, as store screenshot 07 does, and keeps the thing's head between the slats while it comes in. Your torch lights its face.
   { id: 'closet', w: 6,
@@ -123,9 +123,9 @@ const ACT2 = [
     update(c, k) {
       const w = clamp((k - 0.08) / 0.6, 0, 1), p = mix3(c.walkFrom, c.walkTo, w); c.E.root.position.copy(p);
       if (w < 1) { c.E.mode = 'walk'; c.E.faceTowards(c.walkTo[0], c.walkTo[2], 1); c.E.lookTarget = null; }
-      else { c.E.mode = 'idle'; c.E.faceTowards(5.95, 0.52, 0.12); c.E.lookTarget = c.camera.position; c.E.tilt = 0.5; c.E.smileScale = 1.1; }
+      else { c.E.mode = 'idle'; c.E.faceTowards(8.14, 1.22, 0.12); c.E.lookTarget = c.camera.position; c.E.tilt = 0.5; c.E.smileScale = 1.1; }
       c.E.headWorld(c.head);
-      c.cam.pos = [5.95, 1.6 + wobble(c.st * 0.5, 2) * 0.01, 0.52]; c.cam.look = [c.head.x, c.head.y - 0.12, c.head.z]; c.cam.fov = 58; c.g.fear(0.6);
+      c.cam.pos = [8.14, 1.6 + wobble(c.st * 0.5, 2) * 0.01, 1.22]; c.cam.look = [c.head.x, c.head.y - 0.12, c.head.z]; c.cam.fov = 58; c.g.fear(0.6);
     } },
   // grandpa in his chair, turning
   { id: 'vigil', w: 6,
@@ -152,15 +152,15 @@ const ACT2 = [
     end(c) { c.W.laundry.bulb.set(false); c.W.laundry.bulb.swing = 0.08; c.W.laundry.washer.open(0); } },
   // from the top bunk: it is standing at the foot of the bed
   { id: 'bunk_foot', w: 4.5,
-    setup(c) { c.g.night({ lights: 0.3 }); c.P.pos.set(8.28, 0, 4); c.g.thing({ x: 8.5, z: 2.23, face: [8.35, 3.98], tilt: 0.45, smile: 1.15 }); c.head = new V3(); },
-    update(c, k) { c.E.tilt = 0.45 + Math.sin(c.st * 0.7) * 0.15; c.E.lean = 0.15 * k; c.E.headWorld(c.head); c.cam.pos = [6.1, 1.95 + Math.sin(c.st * 2.2) * 0.006, 3.05]; c.cam.look = [c.head.x, c.head.y - 0.15, c.head.z]; c.cam.fov = 56; c.g.fear(0.9); } },
+    setup(c) { c.g.night({ lights: 0.3 }); c.P.pos.set(8.28, 0, 4); c.g.thing({ x: 9.85, z: 2.7, face: [8.4, 3.98], tilt: 0.45, smile: 1.15 }); c.head = new V3(); },
+    update(c, k) { c.E.tilt = 0.45 + Math.sin(c.st * 0.7) * 0.15; c.E.lean = 0.15 * k; c.E.headWorld(c.head); c.cam.pos = [8.35, 1.95 + Math.sin(c.st * 2.2) * 0.006, 4.03]; c.cam.look = [c.head.x, c.head.y - 0.15, c.head.z]; c.cam.fov = 56; c.g.fear(0.9); } },
   // under the covers, holding your breath
   { id: 'covers', w: 4.5,
     // the HUD is hidden for the trailer; this one shot brings the breath meter back (nothing else on the HUD is set)
     setup(c) { c.g.night({ lights: 0.6 }); c.UI.blanket(true); c.P.pos.set(8.28, 0, 4); const h = document.getElementById('hud'), b = document.getElementById('breath'); if (h) h.style.setProperty('display', 'block', 'important'); if (b) b.style.transition = 'none'; },
     update(c, k) {
       const t = c.st, br = 1 - 0.85 * ease.in(k); c.UI.breath(br, true, br < 0.3);
-      c.cam.pos = [6.13, 1.9 + Math.sin(t * 2.2) * 0.008, 3.02]; c.cam.yaw = -0.27 + wobble(t * 0.4, 1) * 0.03; c.cam.pitch = -0.06 + Math.sin(t * 2.2) * 0.004; c.cam.fov = 60; c.g.fear(0.9);
+      c.cam.pos = [8.38, 1.9 + Math.sin(t * 2.2) * 0.008, 4.0]; c.cam.yaw = -0.27 + wobble(t * 0.4, 1) * 0.03; c.cam.pitch = -0.06 + Math.sin(t * 2.2) * 0.004; c.cam.fov = 60; c.g.fear(0.9);
     },
     end(c) { c.UI.breath(1, false); const h = document.getElementById('hud'); if (h) h.style.removeProperty('display'); } },
   // the sprint down the hall with it behind you; the look back, and it is on you: the cut
@@ -168,7 +168,7 @@ const ACT2 = [
     setup(c) {
       c.g.night({ lights: 0.4, spot: BATH_I * 0.5, flicker: true }); c.g.door('kid', true);
       // the route: from the living room into the hall, down it, through your door and up to the foot of the bunk. The thing runs the same route behind you.
-      c.route = path([[-1.6, EYE_KID, -1.15], [0.2, EYE_KID, -1.1], [2.2, EYE_KID, -1.0], [3.6, EYE_KID, -0.9], [6.4, EYE_KID, -0.9], [7.05, EYE_KID, -0.1], [7.3, EYE_KID, 1.2], [7.45, EYE_KID, 2.3]]);
+      c.route = path([[-1.6, EYE_KID, -1.15], [0.2, EYE_KID, -1.1], [2.2, EYE_KID, -1.0], [3.6, EYE_KID, -0.9], [6.4, EYE_KID, -0.6], [8.8, EYE_KID, -0.45], [9.5, EYE_KID, 0.15], [9.5, EYE_KID, 1.3], [9.45, EYE_KID, 2.4]]);
       c.K0 = 0.12;   // where you start on it (the thing starts at 0, a couple of metres behind)
       c.g.thing({ x: -0.82, z: -0.72, mode: 'run', speed: 1.1, tilt: 0.2, smile: 1.1 });
       c.ep = new V3(); c.head = new V3();
