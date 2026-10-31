@@ -205,7 +205,7 @@ const EVENT_LIST = [
   { id: 'nmMirror', nm: true, w: 2, minN: 3, once: true, alone: 16, ok: (D) => D.calm() && !D.F.nmDone, run: (D) => D.nightmare('mirror') },
   { id: 'nmHall', nm: true, w: 2, minN: 4, once: true, alone: 16, ok: (D) => D.calm() && !D.F.nmDone, run: (D) => D.nightmare('hall') },
   { id: 'nmBasement', nm: true, w: 2, minN: 4, once: true, alone: 16, ok: (D) => D.calm() && !D.F.nmDone, run: (D) => D.nightmare('basement') },
-  { id: 'chairs', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.scrape(D.pan(-2.1, 2.3)); D.F.fear = Math.max(D.F.fear, 0.25); } },
+  { id: 'chairs', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.scrape(D.pan(-2.1, 1.8)); D.F.fear = Math.max(D.F.fear, 0.25); } },
   { id: 'bunkShake', safe: true, w: 2, minN: 2, ok: (D) => D.onBunk(), run: (D) => { D.shake(0.5); D.sfx.creak(0.35, 0); D.F.fear = Math.max(D.F.fear, 0.5); } },
   { id: 'steps', safe: true, w: 2, minN: 2, ok: (D) => !D.onBunk() && !D.hunter.busy, run: (D) => { D.F.echo = true; D.later(9, () => { D.F.echo = false; }); } },
   { id: 'flush', safe: true, w: 1, run: (D) => D.sfx.flush(D.pan(4.2, 1.5)) },

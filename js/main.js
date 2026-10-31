@@ -1353,7 +1353,7 @@ UI.makeGrain();
 // the title, pause, options and end menus (js/menu.js opens them when the #title / #pause / #end screens show)
 function newRun(seed) {   // New game: a run from moving day on the seed it was given (or a fresh one); a saved run is lost
   store.remove('topbunk.run');
-  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, objDone: {}, briefed: false, skipTold: false, dayDone: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();
 }

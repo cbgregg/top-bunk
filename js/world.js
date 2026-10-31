@@ -427,7 +427,7 @@ export function buildWorld(scene) {
   mkDoor('garage', -8.75, -7.06, [1, 0], [0, -1], [-8.75, -7.85, -7.1, -7.02], [-8.3, -7.06], false);                // the garage's side door, facing the house
   let doorHook = null, fxTick = () => {};
   const setDoor = (name, open, silent = false) => { const d = doors[name]; if (!d || d.target === (open ? 1 : 0)) return; d.target = open ? 1 : 0; if (doorHook && !silent) doorHook(name, open); };
-  const updateDoors = (dt) => { for (const k in doors) { const d = doors[k]; if (d.a === d.target) continue; d.a += Math.sign(d.target - d.a) * Math.min(Math.abs(d.target - d.a), dt * 1.5); d.apply(); } fxTick(dt); };   // (the laundry's bulb and drip ride along)
+  const updateDoors = (dt) => { if (teddy && teddy.step) teddy.step(dt); for (const k in doors) { const d = doors[k]; if (d.a === d.target) continue; d.a += Math.sign(d.target - d.a) * Math.min(Math.abs(d.target - d.a), dt * 1.5); d.apply(); } fxTick(dt); };   // (the laundry's bulb and drip ride along)
   // the barn door into the utility room (at the dining end): a whitewashed Z-brace leaf on a black rail, slid open along the dining-room wall
   {
     const x = -3.3 + WT / 2 + 0.04;
@@ -559,7 +559,31 @@ export function buildWorld(scene) {
     const rest = { pos: new THREE.Vector3(6.83, 0.55, 3.0), rot: 2.7 };
     teddy = place(house, 'teddy', { x: rest.pos.x, y: rest.pos.y, z: rest.pos.z, rot: rest.rot, s: 0.02, hide: [bear] });
     teddy.add(bear); teddy.rest = rest; teddy.size = { w: 0.31, h: 0.385, d: 0.245 };
-    teddy.reset = () => { teddy.position.copy(rest.pos); teddy.rotation.set(0, rest.rot, 0); teddy.visible = true; };
+    teddy.reset = () => { teddy.sim = null; teddy.position.copy(rest.pos); teddy.rotation.set(0, rest.rot, 0); teddy.scale.setScalar(1); teddy.visible = true; };
+    // knocked or dropped: gravity, a tumble that dies away, two soft bounces, then it lies where it landed. floor is the surface it falls to
+    teddy.fling = (from, vel, floor = 0.02, spin = 5) => {
+      teddy.visible = true; teddy.position.copy(from); teddy.rotation.set(0, teddy.rotation.y, 0);
+      teddy.sim = { v: new THREE.Vector3(vel.x, vel.y, vel.z), w: new THREE.Vector3((Math.random() - 0.5) * spin, (Math.random() - 0.5) * spin * 0.4, (Math.random() - 0.5) * spin), floor, hits: 0, t: 0 };
+    };
+    // set down on a surface: upright with a small settle
+    teddy.setDown = (x, y, z) => { teddy.sim = null; teddy.position.set(x, y, z); teddy.rotation.set(0, rest.rot, 0); teddy.visible = true; teddy.settleT = 0.35; };
+    teddy.step = (dt) => {
+      if (teddy.settleT > 0) { teddy.settleT = Math.max(0, teddy.settleT - dt); const k = teddy.settleT / 0.35; teddy.scale.set(1 + 0.05 * k, 1 - 0.06 * k, 1 + 0.05 * k); if (!teddy.settleT) teddy.scale.setScalar(1); }
+      const m = teddy.sim; if (!m) return;
+      m.t += dt; m.v.y -= 9.8 * dt;
+      teddy.position.addScaledVector(m.v, dt); teddy.rotation.x += m.w.x * dt; teddy.rotation.y += m.w.y * dt; teddy.rotation.z += m.w.z * dt;
+      if (m.done) return;
+      const lie = teddy.size.d / 2;
+      if (teddy.position.y <= m.floor + (m.hits ? lie : 0.1) && m.v.y < 0) {
+        teddy.position.y = m.floor + (m.hits ? lie : 0.1);
+        m.hits++; m.v.y *= -0.32; m.v.x *= 0.55; m.v.z *= 0.55; m.w.multiplyScalar(0.45);
+        if (m.hits >= 3 || Math.abs(m.v.y) < 0.5) {   // it comes to rest on its back or side, leaning the way it fell
+          m.done = true; m.sim = null; teddy.sim = null;
+          teddy.rotation.set(-1.1 - Math.random() * 0.35, teddy.rotation.y, (Math.random() - 0.5) * 0.9);
+          teddy.position.y = m.floor + lie;
+        }
+      }
+    };
   }
   {
     // box TV on an oak stand against the bathroom wall, a braided rug, a heater
@@ -1489,7 +1513,7 @@ export function buildWorld(scene) {
     hemi, sun, stars, moon, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
     doors, setDoor, updateDoors, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
     get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
-    get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.position.set(x, y, z); },
+    get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) { teddy.sim = null; teddy.rotation.set(0, teddy.rotation.y, 0); teddy.position.set(x, y, z); } },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
     groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry, office, spare,
