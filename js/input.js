@@ -1,10 +1,12 @@
 // Game controller and touch input, merged into one analog state that the game reads next to the keyboard and mouse.
 //   input.fx / input.fy   move (right / forward, -1..1)      input.lookX / input.lookY   look speed (right stick, -1..1)
 //   input.run / input.breath   held buttons                  input.scheme   which device was used last: 'kb' | 'pad' | 'touch'
+//   input.menuActive() / input.onMenu(action)   set by js/menu.js: while a menu is up the controller drives it ('menuUp' 'menuDown' 'menuLeft'
+//   'menuRight' 'menuConfirm' 'menuBack', once per press, directions repeating while held) and A no longer interacts or confirms
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const input = {
   fx: 0, fy: 0, lookX: 0, lookY: 0, run: false, breath: false, scheme: 'kb', touchDevice: false, onScheme: null,
-  setUse() {}, setBreathVisible() {}, rumble() {},
+  setUse() {}, setBreathVisible() {}, rumble() {}, menuActive: null, onMenu: null,
 };
 
 const LABELS = {
@@ -62,7 +64,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover }) {
     const up = () => { tch[key] = false; b.classList.remove('down'); }; b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); };
   hold('t-run', 'run'); hold('t-breath', 'breath');
   $('t-act').addEventListener('pointerdown', (e) => { interact(); show(); e.preventDefault(); });
-  $('t-pause').addEventListener('pointerdown', (e) => { pause(); e.preventDefault(); });
+  $('t-pause').addEventListener('click', (e) => { pause(); e.preventDefault(); });   // (on click: on pointerdown the tap's click then landed on the pause screen and resumed)
   $('t-light').addEventListener('pointerdown', (e) => { if (light) light(); e.preventDefault(); });
   input.setUse = (on) => $('t-act').classList.toggle('ready', !!on);
   input.setBreathVisible = (on) => $('t-breath').classList.toggle('show', !!on);
@@ -72,6 +74,20 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover }) {
 
   // ---------- game controller ----------
   let prev = [], rumbleAt = 0, pad = { fx: 0, fy: 0, lookX: 0, lookY: 0, run: false, breath: false };
+  // menu directions from the d-pad or the left stick: first press at once, then a repeat while held. A direction already held when the
+  // menu opens (walking when you paused) waits for its release.
+  const held = {}, fire = (a) => { try { input.onMenu && input.onMenu(a); } catch (e) { console.error(e); } };
+  function menuNav(gp, btn, edge, on) {
+    const now = performance.now(), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    const dirs = { menuUp: btn(12) || ay < -0.55, menuDown: btn(13) || ay > 0.55, menuLeft: btn(14) || ax < -0.55, menuRight: btn(15) || ax > 0.55 };
+    for (const a in dirs) {
+      if (!dirs[a]) { delete held[a]; continue; }
+      if (!on) { held[a] = Infinity; continue; }
+      if (!(a in held)) { held[a] = now + 420; fire(a); } else if (now >= held[a]) { held[a] = now + 110; fire(a); }
+    }
+    if (on && edge(0)) fire('menuConfirm');
+    if (on && edge(1)) fire('menuBack');
+  }
   const dz = (x, y) => { const m = Math.hypot(x, y); if (m < 0.2) return [0, 0]; const k = (m - 0.2) / 0.8 / m; return [x * k, y * k]; };
   input.rumble = (strong, weak, ms) => {
     const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((g) => g && g.connected), now = performance.now();
@@ -90,7 +106,9 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover }) {
       pad.fy += dpad[0] - dpad[1]; pad.fx += dpad[3] - dpad[2];
       const active = Math.hypot(lx, ly, rx, ry) > 0 || gp.buttons.some((b, i) => b.pressed && !prev[i]);
       if (active) setScheme('pad');
-      if (edge(0) || edge(2)) { interact(); confirm(); }
+      const menuOn = !!(input.menuActive && input.menuActive());
+      menuNav(gp, btn, edge, menuOn);
+      if (!menuOn && (edge(0) || edge(2))) { interact(); confirm(); }
       if (edge(9)) pause();
       if (edge(3) && light) light();
       prev = gp.buttons.map((b) => b.pressed);

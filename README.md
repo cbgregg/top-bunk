@@ -1,19 +1,14 @@
 # TOP BUNK
 
-A short first-person horror game built with [Three.js](https://threejs.org), runs straight from GitHub Pages — no build step. Every texture is drawn on canvas at load. Sound is synthesized with WebAudio and layered with recorded voices, music and jump scares (see Audio); if those files are missing, the synth covers everything. Mom, Dad and the spirit are real rigged character models (see Characters).
+![The end of the hall at night](store/screenshots/05_end_of_hall.png)
 
-> The rent on the old farmhouse was cheap. Now we know why.
+A short first-person horror game made with [three.js](https://threejs.org). Your family has just moved into a cheap rented farmhouse, you've got the top bunk, and something tall lives at the end of the hall. It runs in the browser straight from GitHub Pages, with no build step, and as a desktop build for Steam ([STEAM.md](STEAM.md)).
 
 ## Story
 
-| Beat | What happens |
-|---|---|
-| **Moving day** | Your family pulls up to the rented house. Carry your boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Top bunk is yours. Your parents are tired, short-tempered, and not interested. Someone left a crayon drawing taped in the hallway. |
-| **Night one** | You get up for the bathroom. Headlights slide across the room, and something huge and pale drifts past the window, moaning. In the hallway, at the far end where it opens into the living room, something tall and black is **just standing there** while screaming violins build. It doesn't move. Get back under the covers and hold your breath. |
-| **Breakfast** | You tell them. Nobody believes you. |
-| **Night two** | You hear your parents arguing about you through the wall. Something scratches inside the closet. Then it is standing in your room, looking at you. Pull the covers over your head. It walks to the side of your bunk. |
-| **Night three** | Your parents hear it too, and still say it's you. The bathroom light goes out. It comes for you down the hall. Run. Hide. Hold your breath. |
-| **The last morning** | Sunlight, birds, Mom calling you for breakfast. It was just a dream. Get up. |
+Moving day: carry your three boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Someone left a crayon drawing taped up in the hall. At 2:47 that night the house wakes up. Your bear falls off the bunk, your door shuts by itself, something scratches inside the closet and the photo in the hall comes off the wall, but you never see what does it. When it all goes quiet, get under the covers and hold your breath. At breakfast nobody believes you.
+
+From night two the whole house is open, a clock runs toward dawn, and the thing in the hall hunts you. You run, shut doors, hide and hold your breath. The run's seed decides what each night is about (the phone, the TV, Mom calling from the kitchen while she's asleep, the blackout, the drive, the vigil and others), and most nights leave something behind to show your parents in the morning. Get caught and you play the night again. On night ten it comes down the hall, and how much proof you found decides which of the three endings you get.
 
 ## Controls
 
@@ -21,12 +16,16 @@ A short first-person horror game built with [Three.js](https://threejs.org), run
 |---|---|---|---|
 | Move | WASD / arrows | Left stick or d-pad | Drag on the left half (floating stick) |
 | Look | Mouse | Right stick | Drag on the right half |
-| Sprint (limited stamina) | Shift | RT / RB / L3 / B | RUN button |
-| Interact | E | A or X | USE button (glows when something is in reach) |
-| Hold your breath (while hiding) | Space | LT / LB / A | HOLD BREATH button |
-| Pause | Esc | Start | II button |
+| Sprint (limited stamina) | Shift | RT / RB / L3 / B | RUN |
+| Interact | E | A or X | USE (lights up when something is in reach) |
+| Flashlight | F | Y | LIGHT |
+| Pull the covers over your head (in the bunk) | Space | LT / LB / A | COVER UP |
+| Hold your breath while hiding (tap once to keep holding) | Space | LT / LB / A | HOLD BREATH |
+| Pause | Esc | Start | II |
 
-The game switches prompts and the title screen's control list to whichever input you last used. Controllers rumble when things get scary. On phones the game goes fullscreen in landscape and defaults to the medium graphics preset. Headphones recommended.
+Prompts and the Controls panel follow whichever input you used last, and the menus work from the keyboard or a controller. Controllers rumble on the scares. On phones the game goes fullscreen in landscape and starts on the Medium graphics preset. Headphones recommended.
+
+Options (title and pause menus) has volume, look sensitivity, invert Y, field of view, head bob, graphics, subtitles and a reduce-flashing switch.
 
 ## Run locally
 
@@ -37,60 +36,81 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
+`npm test` runs `tests/smoke.js`: the game in headless Chromium through the title, a day, a night and a phone-sized touch screen. It needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`).
+
 ## Deploy to GitHub Pages
 
-Settings → Pages → **Deploy from a branch** → `main` / `(root)`. The site will be at `https://<user>.github.io/<repo>/`.
+Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml` then deploys every push to `main`. The site will be at `https://<user>.github.io/<repo>/`.
 
 ## Project layout
 
-| File | Purpose |
+| Path | What it is |
 |---|---|
-| `index.html` | HUD, title/pause/death/end screens, import map for Three.js (CDN) |
-| `css/style.css` | HUD and screen styling, film grain, vignette, blanket overlay |
-| `js/main.js` | Game loop, player controller, collisions, story script, chase/hide logic |
-| `js/world.js` | The 2002 ranch house (carpet, floral wallpaper, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights |
-| `js/entity.js` | The tall one — model, animation, head/pupil tracking |
-| `js/textures.js` | Procedural canvas textures (wallpaper, floors, the crayon drawing, the grin) |
-| `js/audio.js` | Procedural sound: footsteps, creaks, drone, heartbeat, stinger, scream |
-| `js/people.js` | Mom and Dad |
+| `index.html` | HUD, title/pause/death/end screens, import map for the vendored three.js r170 (`vendor/three`) |
+| `css/` | HUD and screen styling, film grain, vignette, blanket overlay; `fonts.css` loads the fonts in `assets/fonts/` |
+| `js/main.js` | Game loop, player, collisions, moving day, the mornings, night ten's endings |
+| `js/nights.js` | The nights: clock, hiding places, proof, and what each kind of night does |
+| `js/director.js` | Which night is which for a seed, and the small events that fill a night |
+| `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, and the graph of the house it walks on |
+| `js/entity.js` | The thing itself: model, animation, head and eye tracking |
+| `js/world.js` | The early-2000s farmhouse (brown carpet, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights |
+| `js/people.js`, `js/rig.js` | Mom and Dad, and the skeleton and clips their models share |
+| `js/vigil.js`, `js/cars.js`, `js/windowface.js` | The vigil night; the car for the dream drive and the drive away; headlights and the face at the window |
+| `js/gfx.js`, `js/pbr.js`, `js/props.js`, `js/textures.js`, `js/dust.js` | Post-processing and quality presets, PBR materials, furniture models, canvas textures (the crayon drawing, the grin, the floral fabric), dust in the air |
+| `js/audio.js` | Synthesized sound, with the recorded files layered on top |
+| `js/input.js`, `js/menu.js`, `js/settings.js`, `js/ui.js` | Controller and touch input, the menus, saved options, HUD helpers |
+| `js/achievements.js`, `js/rng.js` | Achievements; seeded random numbers |
+| `desktop/` | The Electron shell for the desktop build |
+| `steam/`, `store/`, `trailer/` | SteamPipe upload config, store page art and copy, the trailer renderer (each has a README) |
+| `tools/` | The scripts that made the files in `assets/` |
 
 ## Dev shortcuts
 
-Append a hash to the URL to jump ahead: `#night`, `#chase`, `#morning`.
+Add a hash to the URL to jump ahead:
+
+| Hash | Goes to |
+|---|---|
+| `#night`, `#night5` | Night one, or any night from 1 to 10 |
+| `#breakfast` | The first morning |
+| `#morning` | The drive away after the best ending |
+| `#seed=ABCD-1234&night=5` | That run's seed, from that night |
+| `#type=vigil` | Forces the kind of night (the names are `TYPES` in `js/director.js`) |
+| `#proof=7` | Counts as that much proof found, to reach each ending |
+
+A jump earns no achievements. `#shot` keeps the WebGL drawing buffer so the trailer renderer can capture frames.
 
 ## Audio
 
-The files in `assets/` are generated with ElevenLabs and committed; the game plays them with the synth as a fallback.
+The files in `assets/` were generated with ElevenLabs and are committed; the game plays them, and the synth covers anything missing.
 
 | What | Where | Made by |
 |---|---|---|
-| Mom and Dad's lines (match the subtitles in `js/main.js`) | `assets/audio/vo/` + `manifest.json` | `tools/gen_voice.py` |
+| Mom and Dad's lines (text and subtitles in `assets/audio/lines.json`) | `assets/audio/vo/` + `manifest.json` | `tools/gen_voice.py` |
 | Music: moving day, night, chase, morning | `assets/music/` + `tracks.json` | `tools/gen_music.py` |
 | Night brown-noise bed, jump scares (synth blast, violin screech, slam), the shove, waterphone and music box | `assets/sfx/` + `sfx.json` | `tools/gen_sfx.py` |
 
-To change anything: edit the table in the script, then `ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --only vo/mom --force` (needs Python 3 and ffmpeg). The key is read from the environment only — never put it in a file. The brown noise is made locally with ffmpeg and needs no key.
+To change a line, edit `lines.json` and run `ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --only vo/mom --force` (needs Python 3 and ffmpeg); music and effects work the same way, from the table in their script. The key is read from the environment only, so never put it in a file. The brown noise is made locally with ffmpeg and needs no key.
 
 ## Characters
 
 | Who | Model | Animation |
 |---|---|---|
 | Mom, Dad | [Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) adults (`Female_Adult_01`, `Male_Adult_05`), MIT | Idle clip, head follows you when you're near, mouth moves with their voice |
-| The spirit | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze |
+| Grandpa | Rocketbox `Male_Adult_03`, without his hair cards, MIT | One seated clip for the vigil chair (`tools/models/sit.js`) |
+| The thing | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze |
 
-The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`) retargeted onto the Rocketbox skeleton. How the models are built: `tools/models/`. The game works without the model files: the old low-poly people and spirit take over. Credits and licenses: [CREDITS.md](CREDITS.md).
+The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`) retargeted onto the Rocketbox skeleton; `tools/models/` rebuilds them. Without the model files the game falls back to low-poly people and a low-poly thing. Credits and licences: [CREDITS.md](CREDITS.md).
 
 ## Graphics
 
-Rendered with three.js and a post-processing pipeline: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). There is a **Graphics** setting on the title screen (Auto, Ultra, High, Medium, Low). Auto starts on High, lowers the render resolution a little when frames get slow (and raises it again when there is headroom), and only then steps down a preset.
-
-Performance work (so it runs well on ordinary laptops and phones): the house's static geometry is merged into a few dozen meshes (about 2,000 draw calls became about 500), the props were simplified with `tools/assets/slim_models.mjs` (3.4 M triangles in the scene became 0.8 M), the grass is chunked so the camera only draws what it can see, there is one fewer light per ceiling fixture, the shadow maps are only re-rendered when something can change, the ambient occlusion is computed at half resolution, and every shader variant is compiled behind the black screen when you press play.
+three.js with a post-processing chain: an HDR sky and image-based lighting, ambient occlusion, bloom, and a film grade (grain, vignette, a dark-adapted look at night). Options → Graphics picks Auto, Ultra, High, Medium or Low. Auto starts on High (Medium on phones), lowers the render resolution when frames get slow and raises it again when there is headroom, and steps down a preset only if that is not enough.
 
 | Part | Source |
 |---|---|
-| Surfaces: floors, walls, siding, roof, grass, tile, counters | PBR materials from Poly Haven and ambientCG (CC0), packed by `tools/assets/fetch_pbr.py` into `assets/pbr/` |
+| Surfaces: floors, walls, siding, roof, grass, tile | PBR materials from Poly Haven and ambientCG (CC0), packed by `tools/assets/fetch_pbr.py` into `assets/pbr/` |
 | Sky and ambient light | Poly Haven HDRIs (CC0), `tools/assets/fetch_sky.py` into `assets/sky/` |
 | Furniture, plants, a tree, rocks, grass | Poly Haven models (CC0), compressed by `tools/assets/fetch_models.py` into `assets/props/` |
-| Kitchen, bathroom, windows, house | built in code (`js/world.js`) |
+| Photographs in the frames | Public domain, from Wikimedia Commons, `tools/assets/fetch_photos.py` into `assets/photos/` |
+| Kitchen, bathroom, windows, house | Built in code (`js/world.js`) |
 
-Everything has a fallback: if an asset file is missing, the older procedural look takes over for that item.
-
+If an asset file is missing, the procedural look takes over for that item.

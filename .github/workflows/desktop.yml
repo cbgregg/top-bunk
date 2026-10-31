@@ -5,7 +5,7 @@
 # wants, plus zip / tar.gz for direct downloads) and uploads them as artifacts. When the Steam secrets
 # exist, the "steam" job pushes the three unpacked builds to SteamPipe with game-ci/steam-deploy.
 #
-# Secrets:   STEAM_USERNAME, STEAM_CONFIG_VDF (steamcmd's config/config.vdf after one Steam Guard login)
+# Secrets:   STEAM_USERNAME, STEAM_CONFIG_VDF (base64; how to make it is in steam/README.md, section 6)
 # Variables: STEAM_APP_ID (falls back to desktop/steam_appid.txt; 480 = Spacewar is refused)
 name: Desktop builds
 
@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing yet (STEAM.md lists it under "not done")
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing yet (see STEAM.md)
 
 jobs:
   build:
@@ -42,7 +42,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest, target: win,   unpacked: win-unpacked }
-          - { os: macos-latest,   target: mac,   unpacked: mac }            # x64 .app for Steam; mac-arm64 is built and zipped too
+          - { os: macos-latest,   target: mac,   unpacked: mac }            # universal .app (x64 + arm64, merged with lipo, so it has to build on macOS)
           - { os: ubuntu-latest,  target: linux, unpacked: linux-unpacked }
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +70,29 @@ jobs:
 
       - name: Package
         run: npm run dist:${{ matrix.target }}
+
+      - name: The macOS app has Intel and Apple silicon code and loads the Steam module
+        if: matrix.target == 'mac'
+        run: |
+          app="dist/mac/Top Bunk.app"
+          for f in "$app/Contents/MacOS/Top Bunk" "$app/Contents/Frameworks/Electron Framework.framework/Electron Framework"; do
+            echo "$f: $(lipo -archs "$f")"
+            lipo "$f" -verify_arch x86_64 arm64 || { echo "::error::$f is not universal"; exit 1; }
+          done
+          # the packaged Electron run as plain Node, requiring steamworks.js the way desktop/steam.js does
+          probe='require(process.argv[1]); if (process.arch !== process.argv[2]) throw new Error("ran as " + process.arch); console.log("steamworks.js loaded on", process.arch)'
+          mod="$PWD/$app/Contents/Resources/app.asar.unpacked/node_modules/steamworks.js"
+          if [ "$(uname -m)" = arm64 ]; then
+            ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/Top Bunk" -e "$probe" "$mod" arm64
+            if arch -x86_64 /usr/bin/true 2>/dev/null; then
+              ELECTRON_RUN_AS_NODE=1 arch -x86_64 "$app/Contents/MacOS/Top Bunk" -e "$probe" "$mod" x64
+            else
+              echo "::warning::no Rosetta on this runner, so the x86_64 slice was only checked with lipo"
+            fi
+          else
+            ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/Top Bunk" -e "$probe" "$mod" x64
+            echo "::warning::Intel runner, so the arm64 slice was only checked with lipo"
+          fi
 
       - name: Depot tarball (keeps executable bits and symlinks across the artifact round trip)
         shell: bash
@@ -114,6 +137,12 @@ jobs:
       - name: Unpack the depots
         run: |
           for t in win mac linux; do mkdir -p "depots/$t"; tar -xzf "dist/depot-$t.tar.gz" -C "depots/$t" --strip-components=1; done
+          # steam-deploy writes its own depot scripts without steam/depot_build_*.vdf's exclusions: drop the other platforms' Steamworks binaries here
+          for t in win mac linux; do
+            find "depots/$t" -type d -path '*steamworks.js/dist' | while read -r d; do
+              case $t in win) rm -rf "$d/osx" "$d/linux64" "$d"/win64/*.lib;; mac) rm -rf "$d/win64" "$d/linux64";; linux) rm -rf "$d/win64" "$d/osx";; esac
+            done
+          done
           ls -la depots/*
 
       - name: App ID

@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { store } from './store.js';
 
 export const QUALITY = {
   ultra:  { dpr: 2,    msaa: 4, ao: { samples: 16, radius: 0.55, res: 0.7 }, bloom: 0.45, grade: true,  sun: 4096, spot: 2048 },
@@ -18,7 +19,7 @@ export const QUALITY = {
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
 
-// radians to turn the sky so its sun lines up with the game's sun light (tuned by eye in the yard)
+// radians to turn the sky so its sun lines up with the game's sun light
 const SKY_ROT = -1.125;
 
 const GradeShader = {
@@ -33,7 +34,7 @@ const GradeShader = {
       vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, sat);
-      // dark-adapted eyes: dim areas lose colour and lean blue-grey, and blacks never quite reach black (the green lights stay green)
+      // dark-adapted eyes: dim areas lose colour and lean blue-grey, and blacks are lifted slightly
       float dark = 1.0 - smoothstep(0.04, 0.36, l);
       float gr = clamp((c.g - max(c.r, c.b)) * 5.0, 0.0, 1.0);                 // the green night lights stay green
       c = mix(c, vec3(l) * vec3(0.5, 0.82, 1.5), 0.72 * night * dark * (1.0 - gr));
@@ -51,8 +52,9 @@ const GradeShader = {
 export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
-    let q = quality, saved = null; try { saved = localStorage.getItem(KEY); q = q || saved; } catch (e) { /* private window */ }
-    this.quality = QUALITY[q] ? q : (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high');   // phones start lighter this.auto = !(QUALITY[saved] || quality);
+    const saved = store.get(KEY), q = quality || saved;
+    this.autoQuality = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high';   // phones start lighter
+    this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
     this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0;   // res: dynamic resolution scale
     this.pmrem = new THREE.PMREMGenerator(renderer);
@@ -104,7 +106,7 @@ export class Gfx {
       ao.updateGtaoMaterial({ radius: p.ao.radius, distanceExponent: 1.2, thickness: 1.2, scale: 1.0, samples: p.ao.samples, distanceFallOff: 1, screenSpaceRadius: false });
       ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: p.ao.samples > 8 ? 12 : 8 });
       ao.blendIntensity = 1;
-      // the AO is computed at a fraction of the screen resolution (it is soft anyway) and upsampled: most of its cost
+      // the AO runs at a fraction of the screen resolution and is scaled up: it is soft anyway, and the pixel count is most of its cost
       const baseSize = ao.setSize.bind(ao), k = p.ao.res ?? 0.5;
       ao.setSize = (w, h) => baseSize(Math.max(2, Math.round(w * k)), Math.max(2, Math.round(h * k)));
       ao.setSize(innerWidth * dpr, innerHeight * dpr);
@@ -130,11 +132,31 @@ export class Gfx {
     if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
   }
 
+  // the colour a grey surface of linear value v ends up on screen at night with exposure e, taken through the same steps as the picture:
+  // ACES filmic, sRGB, then the grade's night terms (GradeShader at night = 1) when this preset grades. The brightness calibration draws with it.
+  shade(v, e) {
+    const x = v * e / 0.6, t = THREE.MathUtils.clamp((x * (x + 0.0245786) - 0.000090537) / (x * (0.983729 * x + 0.432951) + 0.238081), 0, 1);
+    const l = t <= 0.0031308 ? t * 12.92 : 1.055 * t ** (1 / 2.4) - 0.055;
+    let c = [l, l, l];
+    if (this.pass.grade) {
+      const k = 0.72 * (1 - THREE.MathUtils.smoothstep(l, 0.04, 0.36)), con = this.pass.grade.uniforms.contrast.value;
+      const dark = [0.5, 0.82, 1.5], cast = [0.7, 0.84, 1.12], lift = [0.4, 0.7, 1.3];
+      c = c.map((y, i) => ((y + (y * dark[i] - y) * k) * (1 + (cast[i] - 1) * 0.65) * 0.86 + 0.016 * lift[i] - 0.5) * con + 0.5);
+    }
+    return c.map((y) => Math.round(THREE.MathUtils.clamp(y, 0, 1) * 255));
+  }
+
   setQuality(q, { save = true } = {}) {
     if (!QUALITY[q] || q === this.quality) return;
     this.quality = q; this.build();
-    if (save) try { localStorage.setItem(KEY, q); this.auto = false; } catch (e) { /* ignore */ }
+    if (save) { store.set(KEY, q); this.auto = false; }
     this.slow = 0; if (this.onChange) this.onChange(q);
+  }
+  // the options menu's setting: 'auto' (a preset picked for the device, stepped down when frames are slow) or a preset kept as chosen
+  get mode() { return this.auto ? 'auto' : this.quality; }
+  setMode(m) {
+    if (m === 'auto') { store.remove(KEY); this.auto = true; this.age = 0; this.setQuality(this.autoQuality, { save: false }); }
+    else if (QUALITY[m]) { this.setQuality(m, { save: false }); this.auto = false; store.set(KEY, m); }
   }
 
   // dynamic resolution: render at a lower pixel ratio when frames are slow, and creep back up when there is headroom

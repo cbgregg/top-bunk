@@ -1,66 +1,51 @@
-# Top Bunk — Steam store copy
+# Top Bunk: Steam store copy
 
-Everything on this page is pasted into Steamworks by hand (Store Page → Basic Info, → Description, → Supported Languages, → Mature
-Content). Steam's description fields take a BBCode subset (`[h2]`, `[b]`, `[list]`/`[*]`); the "About this game" section below is
-written in that subset so it can be pasted as-is. Nothing here claims a feature the game does not have; when the game changes, change
-this file in the same commit.
-
-Re-check before the page goes live (these depend on work that was in flight when this was written):
-
-- **Endings.** The copy says only that the ending depends on where you are and whether anyone sees it. Today the finale has two
-  outcomes ("They never believed you" if you are in bed when it comes; "They saw it. Then it had them." if you are not). The third,
-  driving away at dawn ("They believed you"), exists in the code but is not reachable from the finale until the evidence work wires
-  it up. Once it is, "Three endings" can go into the About text, the features list and `press-kit.md`.
-- **In flight alongside this copy**, named in the features list (here and in `press-kit.md`) without specifics so the lines stay
-  true whatever shape they land in: an options menu and pause menu with settings that are remembered, usable from keyboard, mouse or
-  controller; Steam Achievements; and evidence objectives on the nights between the first and the last that feed the breakfast
-  dialogue and the finale. Before pasting, confirm each is in the build and drop the bullet for any that is not. *Steam
-  Achievements* stays unticked in Supported Features until the achievements work lands.
-- **System requirements** are estimates from the render pipeline, not measurements; see that section.
+Paste-ready Steamworks copy. The "About this game" block is in Steam's BBCode subset (`[h2]`, `[b]`, `[list]`/`[*]`), so it pastes
+as-is.
 
 ## Short description
 
-Steam limit: 300 characters. This one is 267.
+Steam limit: 300 characters.
 
-> Your family just moved into a cheap old farmhouse. Something tall lives in the hallway, and it only comes at night. Ten nights, a top bunk, a flashlight and your own held breath. Nobody believes you. A short first-person horror game for keyboard, mouse or controller.
+> Your family just moved into a cheap old farmhouse. Something tall lives at the end of the hall, and it only comes out at night. You've got a top bunk, a flashlight and ten nights to make your parents believe you. A short first-person horror game for keyboard and mouse or controller.
 
 ## About this game (long description, BBCode)
 
 ```
 [b]The rent on the old farmhouse was cheap. Now we know why.[/b]
 
-You are a kid. Your family has just moved into a rented farmhouse at the end of a gravel drive, and the landlord mentioned the last family left in a hurry. You get the top bunk in the back corner room, next to the bathroom. Somebody left a crayon drawing taped to the hallway wall: a tall black shape with huge white eyes and a big smile. It says HE WATCHES.
+You're the kid. Your family just moved into a rented farmhouse at the end of a gravel drive, and the landlord let slip that the last family left in a hurry. You get the top bunk in the back corner room, next to the bathroom. Someone left a crayon drawing taped to the hallway wall: a tall black shape with huge white eyes and a big smile. Under it, in red, it says HE WATCHES.
 
-Then it is night, and you really, really need to pee.
+At 2:47 that first night, the house wakes up.
 
 [h2]Ten nights[/h2]
-Top Bunk is a short first-person horror game played over ten nights in one house. Night one, the house wakes up: doors shut by themselves, the photo in the hall comes off the wall, every cabinet in the kitchen bangs at once, and something walks around your bunk while you hold your breath under the covers. From night two the house is yours to explore, a clock runs toward dawn, and the thing in the hallway is hunting you.
+Top Bunk is a short first-person horror game set over ten nights in one house. On night one, doors shut by themselves, the photo in the hall comes off the wall, every cabinet in the kitchen bangs at once, and something walks around your bunk while you hold your breath under the covers. From night two the whole house is open, a clock runs toward dawn, and the thing in the hallway hunts you.
 
-Every run has a seed, and the seed decides what each night is about. Among them: the phone ringing in the dining room in the small hours, the TV turning itself on with Dad standing in front of it, Mom calling you to the kitchen when Mom is asleep, the power going out with the breaker in the utility room, your bear turning up somewhere it should not be, a night where you cannot move at all, a drive to the store that is not a drive to the store, and a long vigil by candlelight. Survive the night and you get breakfast. Get caught and you do that night again.
+Each run has a seed, and the seed picks what each night is about. The phone rings in the dining room in the middle of the night. The TV switches itself on with Dad standing in front of it. Mom calls you to the kitchen while she's asleep down the hall. The power cuts out and the breaker's in the utility room. Your bear turns up where you didn't leave it. There's a night you can't move, a drive in the family car you have to wake up from, and a long night sitting up with grandpa by candlelight. Make it to dawn and you get breakfast. Get caught and you play the night again.
 
 [h2]Hide. Hold your breath.[/h2]
-It is bigger than you and faster than you. You do not fight it. You run, you break its line of sight, and you hide: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. When it is close enough to hear you, you hold your breath, and the breath meter runs down while it stands there, tilts its head, and waits. Let go too early and it has you. Hold too long and your lungs give out.
+It's bigger and faster than you, and you can't fight it. Break its line of sight and hide: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. When it's close enough to hear you, hold your breath. The meter drains while it stands there with its head tilted, waiting. Let go too early and it has you. Hold on too long and you gasp, and it has you anyway.
 
-You have a flashlight, two legs that get tired, doors you can shut behind you, and a house whose geography you had better learn fast.
+You've got a flashlight and doors you can shut behind you. Sprinting wears you out fast, so learn the house.
 
 [h2]The house[/h2]
-A single-storey farmhouse from the early 2000s, built room by room: the brown carpet, the floral wallpaper, the white kitchen, the narrow hall of family photos, the box TV, the dining-room wall phone, the utility room with the breaker panel, the yard with the moving truck still parked on the gravel. Every night the house does a little more.
+A single-storey farmhouse from the early 2000s, with brown carpet, a white kitchen, a narrow hall of family photos, a box TV and a phone on the dining-room wall. The breaker panel is out in the utility room, and the moving truck is still parked on the gravel.
 
 [h2]Nobody believes you[/h2]
-Every morning you tell them at breakfast, and every morning they explain it away. The tap was running. The breaker was flipped. The bear was in the middle of the hall. Every night the house leaves something behind; find it, and you have something to show them in the morning. Your parents notice the evidence, and still they would rather believe it was you.
+You tell them at breakfast and they explain it away. The tap was left running. The breaker tripped. You must have dropped the bear in the hall. Most nights the house leaves something behind, and if you find it, you've got something to show them. Show them enough and they start to listen.
 
-How it ends depends on where you are when it finally comes down the hall on the tenth night, and on whether anyone else is awake to see it.
+There are three endings. Which one you get depends on how much proof you've found by the tenth night, when it finally comes down the hall.
 
 [h2]Features[/h2]
 [list]
-[*] A short, focused horror story: ten nights, one house, one thing in the hallway
-[*] Seeded runs: the same seed replays the same ten nights; a new seed shuffles what each night is about
-[*] Hiding spots, a breath meter, a flashlight, stamina, and doors you can close
-[*] Evidence objectives: the house leaves something behind every night, and what you find shapes breakfast and the ending
-[*] A house that changes every night: night lights that die, a drawing that changes, a clock that lies
-[*] Mom and Dad are voiced, with subtitles
-[*] Keyboard and mouse or a game controller, with rumble; the pause and options menus work from any of them
-[*] Graphics presets from Low to Ultra, with an Auto mode that keeps the frame rate up on ordinary laptops
+[*] A short horror story over ten nights in one house
+[*] Seeded runs: the same seed replays the same ten nights, and a new seed shuffles them
+[*] Hiding spots, a breath meter, a flashlight, stamina and doors that shut
+[*] Proof to find: what you turn up changes breakfast and decides which of three endings you get
+[*] The house gets worse each night: night lights die, the drawing in the hall changes, the clock lies
+[*] Every line is subtitled. Mom and Dad are voiced on moving day and for most of the first two mornings; after that their lines are subtitles over a murmur
+[*] Keyboard and mouse, or a game controller with rumble
+[*] Graphics presets from Low to Ultra, plus an Auto mode that lowers the resolution, then the preset, when the frame rate drops
 [*] Steam Achievements
 [/list]
 
@@ -69,33 +54,40 @@ How it ends depends on where you are when it finally comes down the hall on the 
 
 ## System requirements
 
-The desktop build is the web game inside Electron (Chromium), so what it needs is what Chromium needs to run WebGL 2 at a steady
-frame rate. These are working estimates from the render pipeline (HDR sky, ambient occlusion, bloom, soft shadows on High; none of
-that on Low): check them on real hardware before the page goes live, and raise the GPU line if the Low preset does not hold 30 fps
-on it. Steamworks has one block per OS; the lines are the same except where noted.
+These are estimates. The game hasn't been timed on any of the hardware named below, so don't quote a frame rate anywhere on the page.
+
+The desktop build is the web game inside Electron 45 (Chromium), so it needs what Chromium needs to run WebGL 2. The OS lines are
+Electron 45's floor: Windows 10, macOS 13 Ventura (the app's Info.plist asks for 13.0), and Linux distributions that are still
+maintained. The macOS app is one universal bundle with Intel and Apple silicon code side by side, so Apple silicon Macs run it
+without Rosetta. CI checks that both slices are in the bundle and starts the bundled Electron on its Apple silicon runner (natively,
+and under Rosetta when the runner has it), but nobody has played the game on a Mac of either kind yet. The CPU and GPU lines are
+guesses from the presets: Low turns off ambient occlusion, bloom, colour grading and anti-aliasing and uses smaller shadow maps,
+and High and Ultra turn them all on. The storage lines are the unpacked build plus room to spare (the Linux build is about 320 MB, the
+universal macOS app about 530 MB). Steamworks has one block per OS; the lines are the same except where noted.
 
 ### Minimum
 
 | | |
 | --- | --- |
-| OS | Windows 10 64-bit · macOS 11 (Big Sur) · Ubuntu 20.04 or SteamOS 3 |
-| Processor | Dual-core 2.0 GHz (Intel Core i3 / AMD equivalent) |
+| OS | Windows 10 64-bit · macOS 13 (Ventura), Intel or Apple silicon · Ubuntu 22.04 or SteamOS 3 |
+| Processor | Dual-core 2.0 GHz (Intel Core i3 / AMD equivalent); on macOS, any Mac that runs macOS 13 |
 | Memory | 4 GB RAM |
-| Graphics | Any GPU with WebGL 2 (OpenGL ES 3.0 / DirectX 11 class), 1 GB VRAM; Intel HD 4000 or newer |
-| Storage | 500 MB available space |
+| Graphics | A GPU with WebGL 2 support (DirectX 11 / OpenGL ES 3.0 class), such as Intel HD Graphics 620 or newer |
+| Storage | 400 MB available space (macOS: 600 MB) |
 | Sound | Stereo output; headphones recommended |
-| Additional | 64-bit only. The Low and Medium presets are meant for integrated graphics. |
+| Additional | 64-bit only. Estimated, not measured. The Low and Medium presets are meant for integrated graphics. |
 
 ### Recommended
 
 | | |
 | --- | --- |
-| OS | Windows 11 64-bit · macOS 13 · Ubuntu 22.04 or SteamOS 3 |
-| Processor | Quad-core 3.0 GHz (Intel Core i5 / AMD Ryzen 5) |
+| OS | Windows 10 or 11 64-bit · macOS 13 or later · Ubuntu 22.04 or SteamOS 3 |
+| Processor | Quad-core 3.0 GHz (Intel Core i5 / AMD Ryzen 5); on macOS, Apple M1 or newer |
 | Memory | 8 GB RAM |
-| Graphics | NVIDIA GTX 1060 / AMD RX 580 / Apple M1 or better, for High at 1080p60 |
-| Storage | 500 MB on an SSD |
+| Graphics | NVIDIA GTX 1060 / AMD RX 580 class, or Apple M1 or newer |
+| Storage | 400 MB available space (macOS: 600 MB) |
 | Sound | Headphones |
+| Additional | Estimated, not measured. |
 
 ## Content warnings (for the description and the Mature Content survey)
 
@@ -103,7 +95,7 @@ on it. Steamworks has one block per OS; the lines are the same except where note
 - **Jump scares**, with loud sudden sounds (screams, stingers, slams). Headphones are recommended, which makes the loud parts louder.
 - **Flashing lights / photosensitivity**: lights flicker and strobe (night lights, the bathroom light, TV static, white screen flashes
   on scares, a distorted colour "nightmare" effect on one night). Put the photosensitivity line on the store page and keep it on the
-  title screen.
+  title screen. Options → Reduce flashing softens them.
 - Implied violence against the player character (it catches you: it lunges, a scream, a white flash and a cut to black; no injury is
   shown).
 - One ending has it take the parents, on screen but abstract: it takes hold of each of them and pulls them down out of sight, with
@@ -120,35 +112,46 @@ shows the description above the store page for users with the horror filter on.
 Steamworks asks about AI-generated content in the app's content survey (App Admin → Edit Store Page → Basic Info, the "AI Generated
 Content" questions; the answer is shown on the store page). Answer truthfully from `CREDITS.md`:
 
-- **Pre-generated content: yes.** The voice lines for Mom and Dad and the music tracks were generated with ElevenLabs
-  (`tools/gen_voice.py`, `tools/gen_music.py`) and are shipped as fixed audio files; the subtitles were written by hand.
+- **Pre-generated content: yes.** The voice lines for Mom and Dad, the music tracks and the sound effects in `assets/sfx/` (the
+  jump-scare stingers, the violins, the whispers and drones, the slams, thumps and scratches, the car going by, the waterphone and
+  the music box; all but the brown-noise bed, which ffmpeg makes) were generated with ElevenLabs (`tools/gen_voice.py`,
+  `tools/gen_music.py`, `tools/gen_sfx.py`) and are shipped as fixed audio files; the subtitles were written by hand. The trailers
+  use the same files.
 - **Live-generated content: no.** Nothing is generated while the game runs; there is no network use at all.
 - Everything else (the 3D models, textures, sky, photographs, fonts, code) is listed in `CREDITS.md` with its licence and is not AI-generated.
 
-Suggested disclosure text for the survey: "The parents' voice lines and the music were generated with ElevenLabs and are shipped as
-fixed audio files. No content is generated at runtime."
+Suggested disclosure text for the survey: "The parents' voice lines, the music and most of the sound effects were generated with
+ElevenLabs and are shipped as fixed audio files. No content is generated at runtime."
 
 ## Supported input
 
 | Input | Support | Notes |
 | --- | --- | --- |
 | Keyboard and mouse | Full | WASD / arrows, mouse look, E, Shift, Space, F, Esc |
-| Game controller | Full (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads work when Steam presents them as XInput. |
+| Game controller | **Partial** (Xbox layout) | Left stick / d-pad move, right stick look, A or X interact (A also confirms on menus), RT / RB / L3 / B sprint, LT / LB / A hold your breath, Y flashlight, Start pause; rumble on scares. Read through the browser Gamepad API, so no Steam Input action set is needed; PlayStation pads should work when Steam presents them as XInput, but none has been tried. The menus take the d-pad or left stick, A to confirm and B to go back, but not every screen has been played through on a pad yet. |
 | Touch | Web build only | Not relevant to the Steam build |
-| Steam Cloud | **Not supported** | Progress (one run per seed, the night you reached) is saved locally in the app's user-data folder |
+| Steam Cloud | Once Auto-Cloud is configured | One saved run plus settings and achievements. The desktop build keeps them as small JSON files in a `saves` folder; `STEAM.md` has the folder for each OS and the Auto-Cloud root paths to enter under Steamworks → Application → Steam Cloud. |
 | Steam Deck | Untested | Expect *Playable* at best until the Linux build has been tried on a Deck |
 
-Store Page → Basic Info → Supported Features: tick *Single-player* and *Full Controller Support* (once the title, pause, death and
-end screens are all confirmed usable from a pad; until then *Partial Controller Support*). Tick *Steam Achievements* only when the
-achievements work lands.
+Store Page → Basic Info → Supported Features: tick *Single-player* and *Partial Controller Support*. Switch to *Full Controller
+Support* only after every screen has been used on a pad from start to finish: title, new game (the seed entry), options, controls,
+credits, achievements, pause, death and the three endings. Tick *Steam Cloud* once Auto-Cloud is set up and a run has carried over
+from one machine to another. The achievements are in the build (`steam/achievements.json`); tick *Steam Achievements* once their
+icons exist.
 
 ## Languages
 
 | Language | Interface | Full audio | Subtitles |
 | --- | --- | --- | --- |
-| English | yes | yes | yes |
+| English | yes | no | yes |
 
-No other languages. The voice lines are English only; every voice line is subtitled.
+English only. Every line is subtitled, but only some are voiced. The game has 83 scripted lines (78 in `assets/audio/lines.json` and
+five in the proof scene at breakfast, written into `js/main.js`), and 16 of them have a recording: everything Mom and Dad say on
+moving day and on the first morning, and most of the second morning. The other 67 aren't recorded. Mom's, Dad's and grandpa's lines
+from `lines.json` play as a wordless murmur under the subtitle; the kid's lines and the proof scene are text only. (The four other
+recordings in `assets/audio/vo/`, Mom and Dad through the wall, are only used by the trailer.)
+
+Leave *Full audio* unticked. It would take a recording of every line Mom, Dad and grandpa have, the proof scene included.
 
 ## Tags
 
@@ -170,9 +173,11 @@ Genre (Basic Info): Indie, Adventure. Steam does not have a Horror genre; the Ho
 
 ## Age-rating notes
 
-Steam requires its own Mature Content survey; official ratings are optional but free through the IARC questionnaire in Steamworks
-(gives ESRB, PEGI, USK, ClassInd, ACB and GRAC in one go) and some regions and promotions need them. Answer it from the content list
-above, truthfully:
+The game has no rating yet, so neither the store page nor the press kit names one, not even as a guess. Steamworks makes you fill in
+its content survey before the store page and build go to review; an official board rating, once you have one, goes in the game's
+Ratings section. Germany needs one: since November 2024 Steam hides games there that have no German age rating, so read the Germany
+page of Valve's content survey docs before launch (Valve won't take a USK rating that came through IARC on another store). Answer
+the survey from the content list above:
 
 - Violence: horror and fear themes; the player character is caught by a monster (implied, cut to black); in one ending the monster
   takes the parents, pulled down out of sight with cracking and chewing sounds and a red flash, without blood, wounds or bodies.
@@ -180,7 +185,14 @@ above, truthfully:
 - Language: mild, infrequent (one or two exclamations).
 - Sex and nudity, drugs, alcohol, gambling, user-generated content, in-game purchases, user interaction, location sharing: none.
 
-Expected outcome is in the Teen / PEGI 16 range because of the horror intensity rather than any explicit content; do not state a
-rating on the page until the questionnaire has returned one. Mark at least four of the eight screenshots as suitable for all ages:
-02 (your room), 03 (the drawing), 06 (breakfast) and 08 (the TV, with a man's back to you) have no creature in frame and are the
-safe choices; 01, 04, 05 and 07 show the thing and can stay mature-only if the review asks.
+Mark at least four screenshots as suitable for all ages: 02 (your room) and 06 (breakfast) have no creature in frame, and 03 (the
+hall) shows it only as the kid's crayon drawing. The fourth is 07: Dad, seen side-on, standing at the TV, with a tall dark shape in
+the static on the screen. 01, 04 and 05 show the thing and can stay mature-only if the review asks.
+
+## Before the page goes live
+
+- Make the 64×64 achieved and unachieved achievement icons, then tick *Steam Achievements* in Supported Features.
+- Try the system requirements on real hardware, and raise the minimum GPU if the Low preset can't hold 30 fps on it. Try the macOS
+  build on both an Intel Mac and an Apple silicon one.
+- Play every screen on a controller before switching to *Full Controller Support*.
+- Set up Auto-Cloud and check a run carries over between two machines before ticking *Steam Cloud*.

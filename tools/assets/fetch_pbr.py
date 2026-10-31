@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch the CC0 PBR materials the game uses (Poly Haven and ambientCG) and pack each into three small WebP files:
 
-    python3 tools/assets/fetch_pbr.py [--only floor] [--force]
+    python3 tools/assets/fetch_pbr.py [--only carpet] [--force]
 
 assets/pbr/<name>_c.webp  colour (sRGB)
 assets/pbr/<name>_n.webp  normal map (OpenGL, +Y up)
@@ -19,7 +19,6 @@ UA = {'User-Agent': 'Mozilla/5.0'}
 
 # name: (source, id, size in px, tile size in metres or None to use the library's value)
 SETS = {
-    'floor':    ('ph', 'wood_floor_worn', 1024, None),
     'roof':     ('ph', 'grey_roof_01', 1024, None),
     'siding':   ('acg', 'Planks022', 1024, 1.2),
     'concrete': ('ph', 'concrete_floor_worn_001', 512, None),
@@ -33,9 +32,7 @@ SETS = {
     'wall':     ('acg', 'PaintedPlaster017', 1024, 1.8),
     'grass':    ('acg', 'Grass004', 1024, 2.0),
     'tile':     ('acg', 'Tiles105', 512, 0.9),
-    'counter':  ('ph', 'terrazzo_tiles', 512, None),
     'carpet':   ('acg', 'Carpet012', 512, 0.8),
-    'panel':    ('ph', 'coated_pine', 512, 0.6),
 }
 
 
@@ -80,7 +77,7 @@ def acg(id_, size, name):
 
 
 # colour maps recoloured to a target average colour (keeps the texture's light/dark detail): the carpet is dark brown
-RECOLOR = {'carpet': (104, 74, 52), 'panel': (214, 168, 112)}
+RECOLOR = {'carpet': (104, 74, 52)}
 
 
 def recolor(c, rgb):

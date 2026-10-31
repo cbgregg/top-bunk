@@ -1,11 +1,10 @@
 # Shipping Top Bunk on Steam
 
 The desktop build is the web game wrapped in Electron (`desktop/`), packaged by electron-builder
-(`package.json` → `"build"`), uploaded with SteamPipe (`steam/`). This is the launch checklist, in
-order. Sizes and rules below are Valve's as of this writing; Steamworks shows the current numbers on
-each upload form, so trust the form when they disagree.
+(`package.json` → `"build"`) and uploaded with SteamPipe (`steam/`). This page is the launch order; the
+details are in the files it links to.
 
-## 0. What you can do today, without a Steam app
+## Before there is a Steam app
 
 ```sh
 npm ci
@@ -32,155 +31,88 @@ The game sees the shell as `window.desktop`:
 | `clearAchievement(id)`, `isAchieved(id)` | Dev helpers |
 | `quit()` | Close the app |
 | `toggleFullscreen()`, `isFullscreen()` | Fullscreen state |
+| `saves` | The save files for `js/store.js` (see below); `null` if the folder can't be used |
 
-## 1. Steamworks partner account
+## Saves and Steam Cloud
 
-1. Sign up at https://partner.steamgames.com (Steam Direct). You need a legal entity or your own name,
-   a bank account, and tax information; the identity, tax and bank checks take days.
-2. Pay the per-app fee (USD 100, recouped once the app passes USD 1,000 in adjusted gross revenue).
-   Paying it creates the app and gives you the **App ID**. New partner accounts have a waiting period
-   (currently 30 days from payment) before the first release can go live; plan the date around it.
-3. Add the people who will upload builds to the partner group with the "Edit App Metadata" and
-   "Publish App Changes To Steam" permissions, and enable Steam Guard on the uploading account.
+There are five saves: `topbunk.run` (the run in progress: seed, night, proof found), `topbunk.settings`,
+`topbunk.achievements`, `topbunk.stats` (the counters some achievements need) and `topbunk.quality`
+(the graphics preset). The game reads and writes them through `js/store.js`. In a browser they're in
+`localStorage`. The desktop build keeps each one as `<name>.json` in a `saves` folder, writing a temp
+file and renaming it over the old one so a crash never leaves half a save:
 
-## 2. App ID into the repo
+| OS | Saves folder |
+| --- | --- |
+| Windows | `%APPDATA%\Top Bunk\saves` |
+| macOS | `~/Library/Application Support/Top Bunk/saves` |
+| Linux | `$XDG_DATA_HOME/Top Bunk/saves`, usually `~/.local/share/Top Bunk/saves` |
 
-```sh
-APP=1234560   # your App ID
-sed -i.bak -e "s/YOUR_APP_ID/$APP/" -e "s/YOUR_DEPOT_ID_WINDOWS/$((APP+1))/" \
-  -e "s/YOUR_DEPOT_ID_MAC/$((APP+2))/" -e "s/YOUR_DEPOT_ID_LINUX/$((APP+3))/" steam/*.vdf && rm steam/*.vdf.bak
-echo $APP > desktop/steam_appid.txt
-npm run check   # cross-checks the IDs
-```
+On Windows and macOS that's inside Electron's user-data folder. On Linux the user-data folder is
+`$XDG_CONFIG_HOME/Top Bunk` (usually `~/.config/Top Bunk`). Steam has no cloud root that follows
+`$XDG_CONFIG_HOME`, so the saves go under the XDG data folder instead, which `LinuxXdgDataHome` does
+follow. The first time a desktop build starts on a machine, it copies whatever an older build
+left in `localStorage` into the folder, unless that save already has a file there (one Steam Cloud
+brought down wins).
 
-Also set the `STEAM_APP_ID` repository variable on GitHub if you want CI uploads. Commit all of it:
-`desktop/steam_appid.txt` is tracked on purpose, it is how the shell knows which app it is when it is
-started outside Steam (when Steam starts it, the `SteamAppId` environment variable wins).
+Set up Auto-Cloud under **Steamworks → Application → Steam Cloud**:
 
-## 3. Depots and launch options (Steamworks → App Admin)
+1. Byte quota per user: `1000000`. Number of files per user: `10`. The five files come to a few KB.
+2. Add one root path: root `WinAppDataRoaming`, subdirectory `Top Bunk/saves`, pattern `*.json`, OS
+   "All OSes", not recursive.
+3. Add two root overrides for it, so the same files land in the macOS and Linux folders:
 
-1. **SteamPipe → Depots**: Steam made depot AppID+1. Rename it "Windows", OS Windows, 64-bit. Create
-   AppID+2 "macOS" (OS macOS) and AppID+3 "Linux" (OS Linux + SteamOS, 64-bit). Publish.
-2. **Installation → General Installation → Launch Options**, one per OS:
-
-   | OS | Executable | Launch type | Operating system | Arch |
+   | Original root | OS | New root | Add/Replace path | Replace path |
    | --- | --- | --- | --- | --- |
-   | Windows | `Top Bunk.exe` | Launch (Default) | Windows | 64-bit |
-   | macOS | `Top Bunk.app/Contents/MacOS/Top Bunk` | Launch (Default) | macOS | (any) |
-   | Linux | `top-bunk` | Launch (Default) | Linux + SteamOS | 64-bit |
+   | `WinAppDataRoaming` | macOS | `MacHome` | `Library/Application Support/Top Bunk/saves` | on |
+   | `WinAppDataRoaming` | Linux | `LinuxXdgDataHome` | `Top Bunk/saves` | on |
 
-   Leave Arguments empty. (If the Linux build exits at once on Ubuntu 24.04 with a "SUID sandbox helper
-   binary" error, add the argument `--no-sandbox`: Steam does not preserve the set-uid bit on
-   `chrome-sandbox` and that distribution blocks the user-namespace fallback. SteamOS/Steam Deck is fine.)
-3. **Steam overlay**: keep it enabled (Installation → General Installation). The shell passes the Chromium
-   switches the overlay needs (`in-process-gpu`, `disable-direct-composition`) and repaints every frame.
-4. **Controller support** (Store Page → Basic Info → Supported Features): tick *Full Controller Support*
-   only once every screen, including the title, pause, death and end screens, is usable from a pad;
-   until then *Partial Controller Support*. Steam Input (Application → Steam Input) can stay unconfigured:
-   controllers then reach the game as ordinary gamepads through the browser Gamepad API.
-5. Publish the app changes (the "Publish" tab) after each of these.
+4. Save, then publish from the **Publish** tab. Before release, "Enable cloud support for developers
+   only" lets your own account test it.
 
-Full detail, including the `steam/*.vdf` layout and the upload scripts: `steam/README.md`.
+Steam uploads the folder when the game exits and downloads it before the next launch, so a run saved on
+one machine continues on another: the title screen there says `Continue: night N of 10` with the same
+seed. Settings, unlocked achievements and the graphics preset come along too. To check it, finish moving
+day on one machine and quit, then start the game on a second machine signed in to the same account.
 
-## 4. Store page
-
-Store Page → Graphical Assets. Sizes Steam currently requires (JPG or PNG unless noted); the game's
-logo must be readable on the capsules and nothing on them may carry review quotes, awards or
-discount text. The `store/` folder (produced separately) is meant to hold these at exactly these sizes:
-
-| Asset | Size | Notes |
-| --- | --- | --- |
-| Header capsule | 920 × 430 | store page top, search, "recommended" |
-| Small capsule | 462 × 174 | lists, search results; logo must stay legible |
-| Main capsule | 1232 × 706 | front page features |
-| Vertical capsule | 748 × 896 | front page, sale pages |
-| Page background | 1438 × 810 | optional, shown blurred behind the page |
-| Library capsule | 600 × 900 | the user's library grid |
-| Library header | 920 × 430 | library "recent games" |
-| Library hero | 3840 × 1240 | library detail page banner (keep the middle 2560 × 1240 safe) |
-| Library logo | 1280 × 720 PNG with transparency | overlaid on the hero |
-| Community icon | 184 × 184 JPG | community hub |
-| Client icon | 32 × 32 (`.ico`, plus `.icns` for macOS) | the Steam client's game list |
-| Screenshots | at least 5, 1920 × 1080 (16:9) | in-game only, no marketing text or UI mock-ups; mark at least 4 as suitable for all ages |
-| Trailer | 1920 × 1080, H.264 MP4, 30 fps (60 accepted), 5+ Mbps, AAC audio 44.1/48 kHz | plus a 1920 × 1080 thumbnail; the whole video must be rated-appropriate |
-
-Also fill in: short description (≤ 300 characters), "About this game", system requirements for each OS
-(the Electron build needs a 64-bit OS, WebGL 2-capable GPU, ~1 GB RAM, ~400 MB disk), languages,
-genre/tags, features (Single-player, Steam Achievements, controller support), release date or
-"Coming soon", and the **Mature content** survey (horror themes, jump scares, frightening imagery).
-
-Content warnings that belong in the description and on the title screen:
-
-- **Flashing lights / photosensitivity**: lightning, TV static and jump-scare flashes are strobing
-  effects. The title screen currently says "Contains jump scares"; add "and flashing lights".
-- Headphones recommended, loud sudden sounds.
-
-## 5. Achievements
-
-Stats & Achievements → Achievements → New, one per entry in `steam/achievements.json` (owned by the
-achievements work). Each needs:
-
-- **API name**: exactly the `id` the game passes to `window.desktop.achieve(id)` (the JSON's `name`).
-- Display name, description, hidden flag (keep spoilers hidden).
-- Two icons, **64 × 64 JPG**: unlocked and locked (grey) versions.
-
-Publish the Stats & Achievements changes (their own "Publish" button). Until the app has achievements,
-test the plumbing against Spacewar (App ID 480) whose achievement API names are
-`ACH_WIN_ONE_GAME`, `ACH_WIN_100_GAMES`, `ACH_TRAVEL_FAR_ACCUM`, `ACH_TRAVEL_FAR_SINGLE`.
-
-## 6. Build and upload
-
-Per OS, on that OS (CI does this for you on a `v*` tag: `.github/workflows/desktop.yml`):
+Without Steam, two smoke runs on the same folder check that a setting survives a restart (the second
+run fails if the page didn't start with what the first one saved):
 
 ```sh
-npm ci && npm run check
-npm run dist:win    # dist/win-unpacked/, dist/Top Bunk-<v>-win-x64.zip
-npm run dist:mac    # dist/mac/Top Bunk.app (x64, the Steam depot), dist/mac-arm64/Top Bunk.app, zips
-npm run dist:linux  # dist/linux-unpacked/, dist/Top Bunk-<v>-linux-x64.tar.gz
+npm run smoke -- --user-data=/tmp/tb-saves
+npm run smoke -- --user-data=/tmp/tb-saves
 ```
 
-Then either `STEAM_USERNAME=<account> steam/upload.sh` (`steam/upload.ps1` on Windows; both take
-`--preview` for a dry run), or in CI add the `STEAM_USERNAME` and `STEAM_CONFIG_VDF` secrets and the
-`STEAM_APP_ID` variable and push a tag. Upload macOS and Linux content from macOS, Linux or CI, not from
-Windows, which drops executable bits.
+## Launch order
 
-Then in Steamworks: SteamPipe → Builds → set the build live on **default** (only the website can do
-that), install the game through the Steam client on each OS, and check: it starts fullscreen, Shift+Tab
-shows the overlay, an achievement unlocks, F11 / Alt+Enter toggles fullscreen, the in-game quit closes
-the app, a controller works. Test the Linux build on a Steam Deck if you can.
+1. Create the app in Steamworks to get its App ID. Valve's
+   [onboarding docs](https://partner.steamgames.com/doc/gettingstarted) cover the partner account itself.
+2. Put the App ID and depot IDs into the repo and commit them: `steam/README.md`, section 1. Set the
+   `STEAM_APP_ID` repository variable too if CI should upload.
+3. Create the three depots and the launch options, keep the overlay on, then publish the app changes:
+   `steam/README.md`, sections 4 and 5.
+4. Fill in the store page from `store/description.md` and upload the art from `store/out/` and
+   `store/screenshots/`. `store/README.md` says which file goes in which slot.
+5. Enter the achievements from `steam/achievements.json` (`steam/achievements.md` goes through the form)
+   and publish them. Until then, test unlocks against Spacewar (App ID 480), whose API names are
+   `ACH_WIN_ONE_GAME`, `ACH_WIN_100_GAMES`, `ACH_TRAVEL_FAR_ACCUM` and `ACH_TRAVEL_FAR_SINGLE`.
+6. Build on each OS and upload, by hand or from CI on a `v*` tag: `steam/README.md`, sections 2, 3 and 6.
+7. Set the build live on the default branch, install it through the Steam client on each OS and run the
+   checks at the end of `steam/README.md`, section 3, plus a controller and, if you have one, a Steam Deck.
 
-## 7. Review and release
-
-- The **Coming Soon** page must be live for at least **2 weeks** before release. Submit it for review
-  early (store page review takes up to ~5 business days).
-- Submit the build for review (another ~1 to 5 business days). Reviewers launch the game through Steam
-  on the OSes you flagged: a crash on launch or a missing launch option fails it.
-- Release checklist in App Admin must be all green: store page approved, build approved, pricing set,
-  release date, the mature content survey, tax/bank onboarding complete, the waiting period over.
-- Press "Release" from the App Admin page on launch day; it takes a few minutes to propagate.
-
-Content ratings: Steam's own mature-content survey is mandatory. Official age ratings are optional
-on Steam but free through the **IARC** questionnaire in Steamworks (gives ESRB, PEGI, USK, ClassInd,
-ACB and GRAC ratings) and some storefront regions and promotions need them; fill it in truthfully
-(horror, fear, violence toward the player character, no gore, no language, no purchases).
-
-## 8. Not done (deliberately, so nothing pretends to be)
+## Not done yet
 
 - **Code signing**: Windows builds are unsigned (SmartScreen will warn on direct downloads; Steam
   installs are fine). Signing needs an Authenticode certificate and `win.certificateFile` /
   `signtoolOptions` in the electron-builder config.
 - **macOS notarization**: `mac.identity` is `null`. Steam strips the quarantine attribute so Steam
-  installs run, but the arm64/x64 zips from GitHub will be blocked by Gatekeeper until the app is
+  installs run, but the universal zip from GitHub will be blocked by Gatekeeper until the app is
   signed with a Developer ID and notarized (`identity`, `hardenedRuntime: true`, `notarize`).
-- **App icon**: electron-builder uses Electron's default icon. Drop a 1024 × 1024 `icon.png` into
-  `desktop/build/` and electron-builder derives `.ico` / `.icns`.
-- **Steam Cloud**: saves live in the browser `localStorage` inside Electron's user-data folder
-  (`%APPDATA%\Top Bunk`, `~/Library/Application Support/Top Bunk`, `~/.config/Top Bunk`). Steam
-  Auto-Cloud could sync those paths (Steamworks → Application → Steam Cloud) but is not configured or
-  tested.
+- **Steam Cloud**: the save files and the Auto-Cloud settings above are ready, but haven't been tried
+  against the real app yet (that needs the App ID). Check a run carries over between Windows, macOS and
+  Linux before release.
 - **Steam Input**: no action manifest / default controller configuration; controllers are read through
   the Gamepad API only.
 - **Localization**: English only, including the store page.
 - **Steam Deck verification**: untested; expect "Playable" at best until the Linux build is tried on a
-  Deck (text size, controller glyphs, the sandbox note above).
+  Deck (text size, controller glyphs, the Linux sandbox note in `steam/README.md`).
 - Trading cards, workshop, leaderboards, DLC: none.

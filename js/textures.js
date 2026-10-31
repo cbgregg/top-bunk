@@ -1,4 +1,4 @@
-// Procedural canvas textures — no external image assets needed.
+// Procedural canvas textures: the drawing, the grin, the floral fabric, and the stand-ins until (or unless) the assets/pbr sets load (js/pbr.js).
 import * as THREE from 'three';
 
 export function rng(seed = 1) {
@@ -23,9 +23,7 @@ function grain(g, w, h, amt, r) {
   g.putImageData(d, 0, 0);
 }
 function wrapDraw(w, h, fn) { for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) fn(ox, oy); }
-// Web fonts used inside textures are often not ready when the world is built
-// (and iOS falls back to a swirly script for `cursive`). Draw now with the
-// fallback, then redraw the same canvas once the real font arrives.
+// web fonts are often not ready when the world is built (and iOS swaps `cursive` for a script face): draw with the fallback now, redraw once the font loads
 function redrawWhenFont(tex, fonts, paint) {
   if (!document.fonts || !document.fonts.load) return;
   if (fonts.every((f) => document.fonts.check(f))) return;
@@ -40,74 +38,6 @@ function stains(g, S, r, n, color, maxR) {
       g.fillStyle = gr; g.fillRect(x + ox - rad, y + oy - rad, rad * 2, rad * 2);
     });
   }
-}
-
-// 1 texture tile = 2m
-export function woodFloor(base = 26) {
-  const S = 512, [c, g] = mk(S), r = rng(7 + base);
-  const rows = 8, ph = S / rows;
-  for (let i = 0; i < rows; i++) {
-    let x = -r() * S * 0.5;
-    while (x < S) {
-      const len = S * (0.35 + r() * 0.5);
-      g.fillStyle = `hsl(${base + r() * 8},${30 + r() * 14}%,${20 + r() * 11}%)`;
-      g.fillRect(x, i * ph, len, ph);
-      for (let k = 0; k < 12; k++) {
-        g.strokeStyle = `rgba(35,18,8,${0.08 + r() * 0.14})`; g.lineWidth = 0.6 + r() * 1.3;
-        g.beginPath(); const y = i * ph + 3 + r() * (ph - 6); g.moveTo(x, y);
-        for (let xx = x; xx < x + len; xx += 16) g.lineTo(xx, y + Math.sin(xx * 0.03 + k) * 1.4 + (r() - 0.5));
-        g.stroke();
-      }
-      if (r() < 0.35) { g.fillStyle = 'rgba(30,15,6,0.5)'; g.beginPath(); g.ellipse(x + r() * len, i * ph + ph / 2, 5 + r() * 5, 3, 0, 0, 7); g.fill(); }
-      g.fillStyle = 'rgba(12,6,3,0.9)'; g.fillRect(x, i * ph, 2, ph);
-      x += len;
-    }
-    g.fillStyle = 'rgba(10,5,2,0.9)'; g.fillRect(0, i * ph, S, 2);
-  }
-  g.fillStyle = 'rgba(12,6,3,0.9)'; for (let i = 0; i < rows; i++) g.fillRect(0, i * ph, 2, ph);
-  stains(g, S, r, 6, 'rgba(20,10,4,0.18)', 90);
-  grain(g, S, S, 16, r);
-  return toTex(c, { repeat: 0.5 });
-}
-
-// 1 tile = 1.6m
-export function wallpaper() {
-  const S = 512, [c, g] = mk(S), r = rng(11);
-  g.fillStyle = '#d3c6aa'; g.fillRect(0, 0, S, S);
-  for (let x = 0; x < S; x += 128) {
-    g.fillStyle = 'rgba(150,84,96,0.30)'; g.fillRect(x + 10, 0, 44, S);
-    g.fillStyle = 'rgba(70,40,48,0.30)'; g.fillRect(x + 62, 0, 3, S); g.fillRect(x + 70, 0, 1.5, S);
-  }
-  for (let y = 0; y < S; y += 64) for (let x = 0; x < S; x += 128) {
-    const ox = (x + 32 + ((y / 64) % 2) * 64) % S, oy = y + 32;
-    wrapDraw(S, S, (dx, dy) => {
-      g.fillStyle = 'rgba(110,62,72,0.42)';
-      g.beginPath(); g.ellipse(ox + dx, oy + dy - 4, 4, 10, 0, 0, 7); g.fill();
-      g.beginPath(); g.ellipse(ox + dx - 8, oy + dy + 2, 7, 3, 0.6, 0, 7); g.fill();
-      g.beginPath(); g.ellipse(ox + dx + 8, oy + dy + 2, 7, 3, -0.6, 0, 7); g.fill();
-    });
-  }
-  stains(g, S, r, 10, 'rgba(70,50,20,0.16)', 110);
-  stains(g, S, r, 6, 'rgba(30,25,15,0.12)', 50);
-  grain(g, S, S, 14, r);
-  return toTex(c, { repeat: 1 / 1.6 });
-}
-
-export function kidWallpaper() {
-  const S = 512, [c, g] = mk(S), r = rng(23);
-  g.fillStyle = '#5f7184'; g.fillRect(0, 0, S, S);
-  const star = (x, y, R) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? R * 0.45 : R; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); };
-  for (let i = 0; i < 46; i++) {
-    const x = r() * S, y = r() * S, R = 5 + r() * 9;
-    wrapDraw(S, S, (dx, dy) => {
-      g.fillStyle = `rgba(232,220,170,${0.35 + r() * 0.2})`;
-      if (r() < 0.8) star(x + dx, y + dy, R);
-      else { g.beginPath(); g.arc(x + dx, y + dy, R, 0, 7); g.fill(); g.fillStyle = '#5f7184'; g.beginPath(); g.arc(x + dx + R * 0.45, y + dy - 2, R, 0, 7); g.fill(); }
-    });
-  }
-  stains(g, S, r, 10, 'rgba(60,45,25,0.2)', 120);
-  grain(g, S, S, 14, r);
-  return toTex(c, { repeat: 1 / 1.6 });
 }
 
 export function plaster() {
@@ -235,19 +165,6 @@ export function rug() {
   return t;
 }
 
-export function runner() {
-  const W = 128, Hh = 512, [c, g] = mk(W, Hh), r = rng(121);
-  g.fillStyle = '#5a1f1c'; g.fillRect(0, 0, W, Hh);
-  g.fillStyle = '#2a1a14'; g.fillRect(0, 0, 10, Hh); g.fillRect(W - 10, 0, 10, Hh);
-  g.fillStyle = '#9a7a4a'; g.fillRect(14, 0, 4, Hh); g.fillRect(W - 18, 0, 4, Hh);
-  for (let y = 0; y < Hh; y += 64) {
-    g.fillStyle = '#8a6a3a'; g.beginPath(); g.moveTo(W / 2, y + 8); g.lineTo(W - 34, y + 32); g.lineTo(W / 2, y + 56); g.lineTo(34, y + 32); g.closePath(); g.fill();
-    g.fillStyle = '#2a3a4a'; g.beginPath(); g.arc(W / 2, y + 32, 8, 0, 7); g.fill();
-  }
-  grain(g, W, Hh, 26, r);
-  return toTex(c, { repeat: [1, 9] });
-}
-
 // Crayon drawing left by the previous kid. v=0 day, v=1 night (it changed).
 export function drawing(v = 0) {
   const W = 512, Hh = 384, [c, g] = mk(W, Hh);
@@ -325,58 +242,15 @@ export function drawing(v = 0) {
   return t;
 }
 
-export function painting(kind = 0) {
-  if (kind >= 2) return print90s(kind);
-  const W = 256, Hh = 320, [c, g] = mk(W, Hh), r = rng(131 + kind);
-  const gr = g.createLinearGradient(0, 0, 0, Hh);
-  gr.addColorStop(0, kind ? '#2a2018' : '#3a3a30'); gr.addColorStop(1, '#14100c');
-  g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
-  if (kind === 0) {
-    g.fillStyle = '#23241c'; g.fillRect(0, 210, W, 110);
-    g.fillStyle = '#4a1e18'; g.fillRect(60, 150, 120, 70);
-    g.beginPath(); g.moveTo(52, 150); g.lineTo(120, 105); g.lineTo(188, 150); g.fill();
-    g.fillStyle = '#0d0b08'; g.fillRect(105, 180, 30, 40);
-    g.fillStyle = 'rgba(220,210,170,0.6)'; g.beginPath(); g.arc(200, 60, 14, 0, 7); g.fill();
-  } else {
-    // stern couple, faces worn away
-    for (const [x, s] of [[85, 1], [170, 1.1]]) {
-      g.fillStyle = '#16120e'; g.beginPath(); g.ellipse(x, 250 - s * 10, 45 * s, 90, 0, 0, 7); g.fill();
-      g.fillStyle = '#8a7a62'; g.beginPath(); g.ellipse(x, 120 - s * 10, 26 * s, 32 * s, 0, 0, 7); g.fill();
-      g.fillStyle = 'rgba(20,15,10,0.85)'; g.fillRect(x - 22 * s, 110 - s * 10, 44 * s, 10);
-    }
-  }
-  stains(g, W, r, 6, 'rgba(0,0,0,0.35)', 80);
-  grain(g, W, Hh, 18, r);
-  return toTex(c, { wrap: false });
-}
-
-export function windowTex(phase) {
-  const W = 256, Hh = 320, [c, g] = mk(W, Hh), r = rng(141);
-  const gr = g.createLinearGradient(0, 0, 0, Hh);
-  if (phase === 'night') { gr.addColorStop(0, '#0b1426'); gr.addColorStop(1, '#1c2c48'); }
-  else if (phase === 'morning') { gr.addColorStop(0, '#f6d7a8'); gr.addColorStop(1, '#fff3dc'); }
-  else { gr.addColorStop(0, '#9fc0e0'); gr.addColorStop(1, '#e6eef4'); }
-  g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
-  if (phase === 'night') {
-    for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${r() * 0.6})`; g.fillRect(r() * W, r() * Hh * 0.6, 1.5, 1.5); }
-    const mg = g.createRadialGradient(180, 70, 0, 180, 70, 60); mg.addColorStop(0, 'rgba(220,230,255,0.9)'); mg.addColorStop(0.2, 'rgba(200,215,255,0.5)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = mg; g.fillRect(0, 0, W, Hh);
-  }
-  if (phase === 'morning') { const sg = g.createRadialGradient(60, 260, 0, 60, 260, 200); sg.addColorStop(0, 'rgba(255,240,200,1)'); sg.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = sg; g.fillRect(0, 0, W, Hh); }
-  // tree line
-  g.fillStyle = phase === 'night' ? '#05070c' : phase === 'morning' ? '#5a5040' : '#3a4a32';
-  g.beginPath(); g.moveTo(0, Hh);
-  for (let x = 0; x <= W; x += 8) g.lineTo(x, Hh - 50 - Math.abs(Math.sin(x * 0.09)) * 40 - r() * 20);
-  g.lineTo(W, Hh); g.fill();
-  // bare branches
-  const branch = (x, y, a, len, w) => {
-    if (len < 6) return;
-    const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
-    g.strokeStyle = phase === 'night' ? '#020305' : 'rgba(40,35,30,0.7)'; g.lineWidth = w; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
-    branch(x2, y2, a - 0.4 - r() * 0.3, len * 0.72, w * 0.7);
-    branch(x2, y2, a + 0.3 + r() * 0.3, len * 0.68, w * 0.7);
-  };
-  branch(-5, 40, 0.15, 70, 7);
+// a pastel floral still life, shown in a frame until its photograph loads
+export function painting() {
+  const W = 256, Hh = 256, [c, g] = mk(W, Hh), r = rng(302);
+  g.fillStyle = '#e9d9c3'; g.fillRect(0, 0, W, Hh);
+  g.fillStyle = '#a9b9a0'; g.fillRect(0, 170, W, 86);
+  g.fillStyle = '#5b7fa6'; g.beginPath(); g.moveTo(98, 250); g.quadraticCurveTo(80, 190, 108, 160); g.lineTo(148, 160); g.quadraticCurveTo(176, 190, 158, 250); g.fill();
+  for (let i = 0; i < 16; i++) { const a = r() * 6.28, d = 20 + r() * 55; g.fillStyle = ['#c25a6e', '#e8b0b8', '#f4e6c0', '#9a5aa0'][i % 4]; g.beginPath(); g.arc(128 + Math.cos(a) * d, 110 + Math.sin(a) * d * 0.7, 14 + r() * 8, 0, 7); g.fill(); }
+  g.strokeStyle = '#6d8461'; g.lineWidth = 5; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(128, 160); g.quadraticCurveTo(128 + (i - 2.5) * 22, 130, 128 + (i - 2.5) * 34, 90); g.stroke(); }
+  grain(g, W, Hh, 10, r);
   return toTex(c, { wrap: false });
 }
 
@@ -418,6 +292,58 @@ export function smile() {
   return t;
 }
 
+// what the nights leave on the house, one quarter each on a transparent sheet: claw marks gouged through white paint (top left), a long wet
+// bare footprint (top right), a sooty handprint with fingers far too long (bottom left), black crayon on a wall (bottom right).
+// world.js maps each decal's uvs to its quarter, so everything stays inside its own 512 px with a margin.
+export function marks() {
+  const S = 1024, Q = 512, [c, g] = mk(S), r = rng(1313);
+  // claws: four ragged furrows, pale wood in the middle and dirty at the edges
+  for (let i = 0; i < 4; i++) {
+    const x0 = 96 + i * 78 + r() * 14, y0 = 30 + i * 10 + r() * 20, len = 330 + r() * 50, bend = 30 + r() * 20;
+    const at = (t) => [x0 + bend * Math.sin(t * 1.4) + t * 70, y0 + t * len];
+    for (const [w, col] of [[15, 'rgba(46,34,24,0.85)'], [8, 'rgba(206,182,140,0.95)'], [3, 'rgba(120,92,62,0.8)']]) {
+      g.beginPath();
+      for (let k = 0; k <= 40; k++) { const t = k / 40, [x, y] = at(t), ww = w * Math.sin(Math.min(1, t * 1.3) * Math.PI) * (0.75 + r() * 0.5); g.lineTo(x - ww, y); }
+      for (let k = 40; k >= 0; k--) { const t = k / 40, [x, y] = at(t), ww = w * Math.sin(Math.min(1, t * 1.3) * Math.PI) * (0.75 + r() * 0.5); g.lineTo(x + ww, y); }
+      g.closePath(); g.fillStyle = col; g.fill();
+    }
+    g.fillStyle = 'rgba(206,182,140,0.8)';
+    for (let k = 0; k < 6; k++) { const [x, y] = at(0.2 + r() * 0.6); g.fillRect(x + (r() - 0.5) * 30, y, 2 + r() * 3, 1.5); }   // flakes of paint
+  }
+  // a bare foot: heel, a narrow arch, the ball, and five long toes
+  g.save(); g.translate(Q, 0); g.shadowColor = 'rgba(8,6,5,0.9)'; g.shadowBlur = 10; g.fillStyle = 'rgba(8,6,5,0.78)';
+  g.beginPath(); g.ellipse(256, 400, 52, 70, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.moveTo(214, 380); g.quadraticCurveTo(196, 260, 222, 170); g.lineTo(312, 170); g.quadraticCurveTo(296, 270, 300, 380); g.closePath(); g.fill();
+  g.beginPath(); g.ellipse(262, 168, 66, 46, 0.1, 0, Math.PI * 2); g.fill();
+  for (const [x, y, l, a] of [[214, 104, 70, -0.25], [242, 92, 76, -0.1], [268, 92, 72, 0.02], [292, 100, 62, 0.15], [314, 114, 50, 0.3]]) {
+    g.beginPath(); g.ellipse(x + Math.sin(a) * l * 0.5, y - l * 0.5, 11, l * 0.55, a, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+  // a hand: the palm, then fingers half again too long, smudged
+  g.save(); g.translate(0, Q); g.shadowColor = 'rgba(14,11,9,0.9)'; g.shadowBlur = 14; g.fillStyle = 'rgba(14,11,9,0.82)';
+  g.beginPath(); g.ellipse(256, 380, 70, 84, 0, 0, Math.PI * 2); g.fill();
+  for (const [x, a, l] of [[196, -0.3, 190], [232, -0.1, 230], [268, 0.04, 236], [302, 0.18, 206]]) {
+    g.beginPath(); g.moveTo(x - 13, 330); g.quadraticCurveTo(x + Math.sin(a) * l * 0.5 - 14, 330 - l * 0.5, x + Math.sin(a) * l, 330 - l); g.quadraticCurveTo(x + Math.sin(a) * l * 0.5 + 14, 330 - l * 0.5, x + 13, 330); g.fill();
+  }
+  g.beginPath(); g.moveTo(320, 400); g.quadraticCurveTo(390, 360, 430, 290); g.lineTo(444, 300); g.quadraticCurveTo(410, 380, 330, 430); g.fill();   // the thumb
+  g.restore();
+  // crayon: a tall figure with long arms, white eyes and a wide smile, standing over a little bunk bed
+  g.save(); g.translate(Q, Q); g.lineCap = 'round'; g.lineJoin = 'round';
+  const wax = (pts, w = 7) => { for (let pass = 0; pass < 3; pass++) { g.strokeStyle = `rgba(12,12,14,${0.45 + pass * 0.15})`; g.lineWidth = w - pass * 2; g.beginPath(); pts.forEach(([x, y], k) => { const jx = x + (r() - 0.5) * 4, jy = y + (r() - 0.5) * 4; if (k) g.lineTo(jx, jy); else g.moveTo(jx, jy); }); g.stroke(); } };
+  g.fillStyle = 'rgba(12,12,14,0.85)'; g.beginPath(); g.ellipse(200, 110, 46, 56, 0, 0, Math.PI * 2); g.fill();
+  for (let k = 0; k < 30; k++) wax([[176 + r() * 48, 160], [172 + r() * 56, 330]], 6);   // the body, scribbled solid
+  wax([[180, 330], [160, 460]]); wax([[220, 330], [244, 460]]);
+  wax([[176, 190], [110, 300], [96, 420]]); wax([[224, 190], [300, 290], [330, 380]]);
+  g.fillStyle = '#fff'; g.globalCompositeOperation = 'destination-out';
+  for (const x of [184, 216]) { g.beginPath(); g.ellipse(x, 100, 9, 13, 0, 0, Math.PI * 2); g.fill(); }
+  g.lineWidth = 5; g.strokeStyle = '#fff'; g.beginPath(); g.arc(200, 118, 26, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  g.globalCompositeOperation = 'source-over';
+  wax([[330, 470], [330, 360], [460, 360], [460, 470]], 6); wax([[330, 420], [460, 420]], 6);   // the bunk
+  wax([[390, 360], [390, 330]], 5); g.beginPath(); g.arc(392, 320, 12, 0, Math.PI * 2); g.stroke();   // you, on top
+  g.restore();
+  return toTex(c, { wrap: false });
+}
+
 // dense fir needles: a tileable mat of short strokes in several greens
 export function needles() {
   const S = 256, [c, g] = mk(S), r = rng(91);
@@ -431,8 +357,7 @@ export function needles() {
   return toTex(c, { repeat: [2, 2] });
 }
 
-
-// 90s wallpaper: scattered roses with leaves on a faint diagonal stripe. 1 tile = 0.9 m.
+// 90s floral print for the quilt and curtains: scattered roses with leaves on a faint stripe. 1 tile = 0.9 m.
 export function floral(bg = '#c9a3a0', rose = '#a4505f', leaf = '#6d8461', seed = 41) {
   const S = 512, [c, g] = mk(S), r = rng(seed);
   g.fillStyle = bg; g.fillRect(0, 0, S, S);
@@ -446,48 +371,4 @@ export function floral(bg = '#c9a3a0', rose = '#a4505f', leaf = '#6d8461', seed 
   stains(g, S, r, 8, 'rgba(70,50,20,0.14)', 100);
   grain(g, S, S, 12, r);
   return toTex(c, { repeat: 1 / 0.9 });
-}
-
-// wallpaper border (a frieze of roses and ribbon). The canvas is 4:1; tile 0.8 m wide, 0.2 m tall, so a strip 0.2 m high at a multiple of 0.2 m fits exactly.
-export function border(a = '#a4505f', b = '#6d8461', bg = '#e9ddc6') {
-  const [c, g] = mk(512, 128), r = rng(9);
-  g.fillStyle = bg; g.fillRect(0, 0, 512, 128);
-  g.fillStyle = b; g.fillRect(0, 6, 512, 8); g.fillRect(0, 114, 512, 8);
-  g.strokeStyle = b; g.lineWidth = 6; g.beginPath(); for (let x = 0; x <= 512; x += 8) g.lineTo(x, 64 + Math.sin(x / 512 * Math.PI * 4) * 22); g.stroke();
-  for (let i = 0; i < 4; i++) {
-    const x = 64 + i * 128, y = 64 + Math.sin(x / 512 * Math.PI * 4) * 22;
-    g.fillStyle = b; g.beginPath(); g.ellipse(x - 34, y + 6, 22, 9, -0.5, 0, 7); g.fill(); g.beginPath(); g.ellipse(x + 34, y - 6, 22, 9, 0.5, 0, 7); g.fill();
-    for (let k = 0; k < 3; k++) { g.fillStyle = k % 2 ? a : '#f3e6e2'; g.beginPath(); g.arc(x, y, 24 - k * 7, 0, 7); g.fill(); }
-  }
-  grain(g, 512, 128, 10, r);
-  const t = toTex(c, { repeat: 1 }); t.repeat.set(1 / 0.8, 1 / 0.2); return t;
-}
-
-// bright 90s wall art: a pastel floral still life (2), a sailboat at sunset (3), a studio family portrait on a blue laser backdrop (4)
-function print90s(kind) {
-  const W = 256, Hh = 256, [c, g] = mk(W, Hh), r = rng(300 + kind);
-  if (kind === 2) {
-    g.fillStyle = '#e9d9c3'; g.fillRect(0, 0, W, Hh);
-    g.fillStyle = '#a9b9a0'; g.fillRect(0, 170, W, 86);
-    g.fillStyle = '#5b7fa6'; g.beginPath(); g.moveTo(98, 250); g.quadraticCurveTo(80, 190, 108, 160); g.lineTo(148, 160); g.quadraticCurveTo(176, 190, 158, 250); g.fill();
-    for (let i = 0; i < 16; i++) { const a = r() * 6.28, d = 20 + r() * 55; g.fillStyle = ['#c25a6e', '#e8b0b8', '#f4e6c0', '#9a5aa0'][i % 4]; g.beginPath(); g.arc(128 + Math.cos(a) * d, 110 + Math.sin(a) * d * 0.7, 14 + r() * 8, 0, 7); g.fill(); }
-    g.strokeStyle = '#6d8461'; g.lineWidth = 5; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(128, 160); g.quadraticCurveTo(128 + (i - 2.5) * 22, 130, 128 + (i - 2.5) * 34, 90); g.stroke(); }
-  } else if (kind === 3) {
-    const gr = g.createLinearGradient(0, 0, 0, 150); gr.addColorStop(0, '#6a7fb0'); gr.addColorStop(0.7, '#f0a070'); gr.addColorStop(1, '#f6d28a');
-    g.fillStyle = gr; g.fillRect(0, 0, W, 150); g.fillStyle = '#2f5f86'; g.fillRect(0, 150, W, 106);
-    g.fillStyle = 'rgba(246,210,138,0.5)'; g.fillRect(90, 152, 60, 100);
-    g.fillStyle = '#f4efe4'; g.beginPath(); g.moveTo(130, 70); g.lineTo(130, 150); g.lineTo(80, 150); g.fill(); g.beginPath(); g.moveTo(138, 85); g.lineTo(138, 150); g.lineTo(176, 150); g.fill();
-    g.fillStyle = '#5a3a28'; g.fillRect(70, 150, 120, 10);
-  } else {
-    const gr = g.createRadialGradient(128, 110, 10, 128, 110, 200); gr.addColorStop(0, '#6d9ad8'); gr.addColorStop(1, '#2c4a8a');
-    g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
-    for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(255,255,255,0.08)'; g.beginPath(); g.arc(r() * W, r() * Hh, 6 + r() * 14, 0, 7); g.fill(); }
-    for (const [x, y, rad, col] of [[84, 120, 30, '#c9a07a'], [150, 106, 33, '#d2ab88'], [200, 150, 22, '#e0b894'], [118, 168, 18, '#e0b894']]) {
-      g.fillStyle = ['#4a5a7a', '#7a3a4a', '#3a6a5a', '#8a7a4a'][(x / 10) | 0 & 3]; g.beginPath(); g.ellipse(x, y + rad * 2.2, rad * 1.3, rad * 1.5, 0, 0, 7); g.fill();
-      g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rad * 0.78, rad, 0, 0, 7); g.fill();
-      g.fillStyle = '#4a3020'; g.beginPath(); g.ellipse(x, y - rad * 0.6, rad * 0.82, rad * 0.5, 0, Math.PI, 0); g.fill();
-    }
-  }
-  grain(g, W, Hh, 10, r);
-  return toTex(c, { wrap: false });
 }

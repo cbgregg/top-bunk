@@ -15,6 +15,7 @@
     "start": "electron .",
     "smoke": "node desktop/smoke.js",
     "check": "node desktop/check.js",
+    "test": "node tests/smoke.js",
     "dist": "electron-builder --win --mac --linux",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
@@ -22,7 +23,8 @@
   },
   "devDependencies": {
     "electron": "45.1.0",
-    "electron-builder": "26.18.0"
+    "electron-builder": "26.18.0",
+    "playwright": "1.63.0"
   },
   "optionalDependencies": {
     "steamworks.js": "0.4.0"
@@ -69,9 +71,11 @@
     },
     "mac": {
       "target": [
-        { "target": "dir", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
+        { "target": "dir", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
       ],
+      "defaultArch": "universal",
+      "x64ArchFiles": "**/node_modules/steamworks.js/dist/osx/*.node",
       "category": "public.app-category.games",
       "identity": null,
       "hardenedRuntime": false,

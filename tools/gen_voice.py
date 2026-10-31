@@ -16,16 +16,11 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 OUT = os.path.join(ROOT, 'assets', 'audio')
 EL_MODEL = 'eleven_v4'
 
-
-def el(voice_id, speed=1.0):
-    return (voice_id, speed)
-
-
-# account voices (the same ones Breachpoint uses): Sarah for Mom, Chris for Dad
-MOM = el('EXAVITQu4vr4xnSDxMaL', 1.0)
-DAD = el('iP95p4xoKVk53GoZ742B', 1.0)
+# (voice id, speed). ElevenLabs library voices: Sarah for Mom, Chris for Dad
+MOM = ('EXAVITQu4vr4xnSDxMaL', 1.0)
+DAD = ('iP95p4xoKVk53GoZ742B', 1.0)
 # Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).
-GRAMPS = el(os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)
+GRAMPS = (os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)
 
 # The lines live in assets/audio/lines.json, which the game reads too (subtitles and voice stay in sync): {id: {voice, say, html}}.
 # id -> (voice, line). Lines without a voice (what the kid says, shown as subtitles only) are skipped.

@@ -1,61 +1,60 @@
-# Top Bunk — press kit
+# Top Bunk: press kit
 
 ## Pitch
 
-Top Bunk is a short first-person horror game about being a kid in a house that is wrong. Your family has just moved into a cheap
-rented farmhouse, you have the top bunk in the back corner room, and something tall with huge white eyes and a big smile lives at the
-end of the hallway. It only comes at night. Over ten nights the house does a little more each time (doors shut, the phone rings, the
-TV turns itself on, Mom calls you from a kitchen she is not in) and the thing hunts you through the dark, while you run, shut doors,
-hide under the covers or in the closet, and hold your breath until it goes. Every morning you tell your parents. Every morning they
-explain it away. How it ends depends on where you are when it comes down the hall on the last night, and on whether anyone else is
-awake to see it.
+Top Bunk is a short first-person horror game about a kid in a house that's wrong. Your family just moved into a cheap rented
+farmhouse, you've got the top bunk in the back corner room, and something tall with huge white eyes and a big smile lives at the end
+of the hallway. It only comes out at night. Over ten nights the doors start shutting on their own, the phone rings, the TV switches
+itself on, and Mom calls you from the kitchen while she's asleep in bed. The thing hunts you through the dark, and you run, shut
+doors, hide under the covers or in a closet, and hold your breath until it leaves. At breakfast your parents explain it all away
+unless you've found something they can't. How it ends on the last night depends on how much proof you've shown them.
 
 ## Fact sheet
 
 | | |
 | --- | --- |
 | Title | Top Bunk |
-| Developer | *[developer name]* (the repository owner; replace before publishing) |
+| Developer | *[developer name]* |
 | Website | https://github.com/cbgregg/top-bunk |
-| Platforms | Windows, macOS, Linux (Steam); also runs in a web browser from GitHub Pages |
+| Platforms | Windows, macOS (Intel and Apple silicon), Linux (Steam); also runs in a web browser from GitHub Pages |
 | Release date | TBD |
 | Price | TBD |
 | Genre | First-person horror, single-player |
 | Players | 1 |
-| Length | Short: ten nights plus the mornings. Estimate, not a measurement: a night's clock runs to dawn in about six real minutes, so a full run is roughly an hour to ninety minutes, more if it catches you |
-| Input | Keyboard and mouse, game controller (with rumble); touch on the web build |
-| Languages | English (interface, voice, subtitles) |
+| Length | Short: ten nights plus the mornings. A night's clock runs to dawn in about six real minutes, so a full run should take an hour to ninety minutes, more if it catches you |
+| Input | Keyboard and mouse; game controller with rumble (partial support: not every screen has been checked on a pad); touch on the web build |
+| Languages | English: interface and subtitles. Only some lines are voiced: Mom and Dad on moving day and for most of the first two mornings. The rest of their lines, and grandpa's, are subtitles over a murmur, and the kid's are text only |
 | Engine | three.js (WebGL 2) in Electron for the desktop build; no engine licence, no middleware |
 | Rating | Not yet rated; horror themes, jump scares, flashing lights, no gore |
 | Press contact | *[email]* |
 
 ## Features
 
-- **Ten nights in one house.** Night one is a haunting with nothing to see; from night two the house is open, a clock runs toward dawn,
-  and the thing is hunting. Night ten is the end.
-- **Seeded runs.** A seed decides what each night is about and shuffles the order: the phone, the TV, the mimic, the blackout, the
-  missing bear, the paralysis, the drive, the vigil. The same seed replays the same ten nights.
-- **Hide and hold your breath.** Under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower
-  curtain. A breath meter runs down while it stands there and waits.
-- **A child's toolkit.** A flashlight, stamina that runs out, doors you can shut, and a house you have to learn in the dark.
-- **A house that changes.** Night lights that die, a drawing that is different every time you look, a clock that lies, a photo that
-  comes off the wall while you are looking at it.
-- **Breakfast every morning.** Voiced, subtitled dialogue with Mom and Dad, who notice what the house leaves behind (the tap left
-  running, the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
-- **Evidence.** The house leaves something behind every night; what you find shapes breakfast and the ending.
-- **More than one ending.** Where you are when it comes on the tenth night, and whether anyone else is awake to see it, decides how it
-  goes.
-- **Runs on ordinary hardware.** Graphics presets from Low to Ultra; the Auto preset keeps the frame rate up on integrated graphics.
-- **Keyboard and mouse or controller**, with the prompts and the title screen following whichever you picked up last, and pause and
-  options menus that work from either.
-- **Steam Achievements.**
+- Ten nights in one house. Night one is a haunting with nothing to see. From night two the house is open, a clock runs toward dawn,
+  and the thing is hunting you. Night ten is the end.
+- Seeded runs. The seed decides what each night is about and in what order: the phone, the TV, the mimic, the blackout, the missing
+  bear, the paralysis, the drive, the vigil. The same seed replays the same ten nights.
+- Hiding: under the covers on the top bunk, in the louvered closet, in your parents' closet, behind the shower curtain. A breath meter
+  runs down while it stands there and waits.
+- A flashlight, stamina that runs out, doors you can shut, and a house you have to learn in the dark.
+- The house changes. Night lights die, the drawing in the hall looks different, the clock lies, and a photo comes off the wall while
+  you are looking at it.
+- Breakfast after each night you survive, all of it subtitled. Mom and Dad notice what the house leaves behind (the tap left running,
+  the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
+- Proof. Most nights the house leaves something behind, and what you find changes breakfast. How much you have by the tenth night
+  decides which of three endings you get.
+- Graphics presets from Low to Ultra. Auto lowers the resolution, then the preset, when the frame rate drops.
+- Keyboard and mouse or a controller, and the on-screen prompts follow whichever you used last. Controller support is partial for
+  now: not every screen has been played through on a pad.
+- Steam Achievements.
 
 ## Story in one paragraph (spoiler-light)
 
-Moving day: carry your boxes from the truck to the back-corner room. Top bunk is yours, the bottom one is for boxes. The landlord said
-the last family left in a hurry. Night one, you get up for the bathroom and something is just standing at the far end of the hall
-while the violins scream. Breakfast: nobody believes you. From then on every night is different and worse, and every morning is the
-same. On the tenth night it comes down the hall, and whether anyone else sees it depends on where you are.
+Moving day: carry your boxes from the truck to the back-corner room. The top bunk is yours, the bottom one is for boxes. The landlord
+said the last family left in a hurry. On night one the house wakes up around you: doors shut by themselves, something scratches in
+the closet, the photo in the hall comes off the wall, and you never see what's doing it. Nobody believes you at breakfast. After that
+the thing in the hall starts hunting you, and your parents keep finding reasons not to listen. On the tenth night it comes down the
+hall, and whether anyone believes you depends on what you found.
 
 ## Assets
 
@@ -63,7 +62,7 @@ Everything below is produced from the game itself by the scripts in this folder 
 
 | File | What |
 | --- | --- |
-| `screenshots/01_porch_night.png` … `08_tv_static.png` | Eight 1920×1080 in-game captures, HUD hidden except where the prompt helps |
+| `screenshots/01_porch_night.png` … `07_tv_static.png` | Seven 1920×1080 in-game captures, HUD hidden except where the prompt helps |
 | `out/header_capsule.png` (460×215, and `_2x` 920×430) | Store header |
 | `out/small_capsule.png` (462×174) | Lists and search |
 | `out/main_capsule.png` (616×353, and `_2x` 1232×706) | Front-page feature |
@@ -78,11 +77,12 @@ Everything below is produced from the game itself by the scripts in this folder 
 | `capsules/src/*.png` | The wide and tall source renders the capsules are cut from |
 
 Logo: the game's title is set in Special Elite (the typewriter face the game uses for its title and cards) with Courier Prime for
-everything else; both are open fonts (SIL OFL, see `assets/fonts/LICENSE-fonts.md`).
+everything else. Special Elite is under the Apache License 2.0 and Courier Prime under the SIL Open Font License 1.1 (see
+`assets/fonts/LICENSE-fonts.md`).
 
 ## Credits
 
 Built with three.js. Character models from Microsoft Rocketbox (MIT) with Mixamo animation clips; surface textures, sky and props from
-Poly Haven and ambientCG (CC0); the parents' voice lines and the music were generated with ElevenLabs and shipped as fixed audio files
-(disclosed on the Steam page as pre-generated AI content; nothing is generated at runtime). Full list and licences: `CREDITS.md` in
-the repository.
+Poly Haven and ambientCG (CC0); the parents' voice lines, the music and most of the sound effects were generated with ElevenLabs and
+ship as fixed audio files (disclosed on the Steam page as pre-generated AI content; nothing is generated at runtime). Full list and
+licences: `CREDITS.md` in the repository.

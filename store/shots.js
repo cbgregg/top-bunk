@@ -3,7 +3,7 @@
 // Renders the Steam store screenshots from the live game, headless. The page is the real index.html served from the repo root; each
 // shot drives window.__game (see the last line of js/main.js): a phase, a camera, the thing posed somewhere, the HUD hidden.
 //
-//   node store/shots.js                      -> store/screenshots/01..08 at 1920x1080 (a minute or so per frame under SwiftShader)
+//   node store/shots.js                      -> store/screenshots/01..07 at 1920x1080
 //   node store/shots.js --extra              -> also the capsule sources (store/capsules/src/: the 3840x1240 hero, a portrait)
 //   node store/shots.js --preview            -> 960x540 framing passes, quality "medium", into --out (default: a temp folder)
 //   node store/shots.js --only 03,05 --port 8801 --quality high --frames 3 --out DIR
@@ -48,7 +48,6 @@ function serve(port) {
 // settled, just before the frames render (for anything the game loop would otherwise undo). Positions are world metres from js/world.js:
 // your room x 5..8.1, z -0.3..3.6 (bunk along the back wall, head at x 5, ladder at x 7.2); the hall z -1.5..-0.3 running from the
 // living room (x 3.3) to the dead end (x 8.1); the living room TV at (2.95, 0.55, -3.2) facing -x; the front door at (1.9, 0, -4.5).
-const EYE = 1.32;
 const SHOTS = [
   { id: '01_porch_night', what: 'The porch at night, from the yard, and something standing in the porch light',
     setup: () => { const g = window.__game, S = window.__shot;
@@ -83,19 +82,7 @@ const SHOTS = [
         if (p.rig) p.rig.play('idle', { fade: 0, speed: 1 });
       }
       g.P.pos.set(0.95, 0, 0.6); S.look([0.95, 1.3, 0.45], [1.45, 1.22, 1.85]); } },
-  { id: '07_closet_louvers', what: 'Hiding in the closet: the room through the louvers, and it has come looking',
-    setup: () => { const g = window.__game, S = window.__shot;
-      // the game's closet camera sits inside the closet box (the door leaves are solid; the louvers are the overlay), so for the picture the
-      // camera stands a hand's width outside the leaves, higher than the hiding kid's eyes, and the overlay does the slats. The slats pass a
-      // quarter of the light and the overlay's inset shadow eats the edges, so its face has to be big and dead centre: it stands a metre away,
-      // lit by the flashlight (the game turns it off while you hide; here it is what lights its face), and `after` aims the camera at its head.
-      // (A cine camera, not the hide mode: that mode clamps the pitch at 0.4 and the face would sit up in the overlay's dark border.)
-      g.setPhase('night'); S.nightLights(4); g.W.hemi.intensity = 0.9; g.renderer.toneMappingExposure = 1.6;
-      S.look([5.95, 1.75, 0.52], [6.05, 2.35, 1.45]); S.flash(true, 12); g.UI.pod('louvers');
-      S.thing([6.05, 0, 1.45], [5.95, 0.5], { tilt: 0.35, smile: 1.25, lean: 0.1 }); },
-    after: () => { const g = window.__game, h = g.E.head.getWorldPosition(g.E.root.position.clone()), c = g.P.cam;
-      g.P.yaw = Math.atan2(-(h.x - c.x), -(h.z - c.z)); g.P.pitch = Math.atan2(h.y - c.y, Math.hypot(h.x - c.x, h.z - c.z)); } },
-  { id: '08_tv_static', what: 'The living room TV turned itself on, and someone who looks like Dad is standing in front of it',
+  { id: '07_tv_static', what: 'The living room TV turned itself on, and someone who looks like Dad is standing in front of it',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.tvFx.set(true); g.W.tvFx.figure = 1;
       const d = g.dad; g.mom.group.visible = true; d.sleeping = false; d.busy = true; d.pose = null; d.lookAt = null; d.group.rotation.order = 'XYZ';
@@ -164,7 +151,7 @@ function installHelpers(quality) {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   const t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
   await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'load', timeout: 300000 });
-  await page.waitForFunction(() => window.__game, null, { timeout: 300000 });   // (the models and shaders take minutes on a shared CPU)
+  await page.waitForFunction(() => window.__game, null, { timeout: 300000 });   // (SwiftShader compiles the shaders on the CPU)
   await page.evaluate(installHelpers, QUALITY);
   // the character models, the sky and the surface textures all stream in after the page is up
   await page.waitForFunction(() => { const g = window.__game; return g.E.rig && g.mom.rig && g.dad.rig; }, null, { timeout: 180000 }).catch(() => log('warning: character rigs did not load, the simple bodies will show'));

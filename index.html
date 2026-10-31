@@ -36,24 +36,26 @@
     <div class="panel">
       <h1>TOP BUNK</h1>
       <p class="tag">The rent on the old farmhouse was cheap.<br>Now we know why.</p>
-      <table class="controls" id="controls"></table>
-      <p class="note gfx">Graphics <select id="quality"><option value="auto">Auto</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></p>
-      <p id="runinfo" class="note"></p>
-      <button id="start" type="button">Start game</button>
+      <nav id="title-menu" class="menu" aria-label="Main menu"><button id="start" type="button">Start game</button></nav>
       <p class="begin" id="begin">Click to begin</p>
-      <p class="note"><a id="newrun" href="#" style="color:inherit">Start a new run</a></p>
-      <p class="note">Headphones recommended. Contains jump scares.</p>
+      <p id="runinfo" class="note"></p>
+      <p class="note">Headphones recommended. Contains jump scares and flashing lights.</p>
       <p id="mobile" class="note">Keyboard and mouse, a game controller, or touch. Landscape works best on a phone.</p>
     </div>
   </div>
-  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><p class="begin" id="resume">Click to resume</p></div></div>
+  <div id="pause" class="screen hidden"><div class="panel"><h2>Paused</h2><nav id="pause-menu" class="menu" aria-label="Pause menu"></nav><p class="begin" id="resume">Click to resume</p><p id="pauseinfo" class="note"></p></div></div>
+  <div id="menu" class="screen hidden"></div>
+  <!-- hidden: js/menu.js moves the controls table into its Controls panel -->
+  <div id="menu-keep" hidden>
+    <table class="controls" id="controls"></table>
+  </div>
   <div id="death" class="screen hidden"><div class="panel"><h2 class="red">It found you.</h2><button id="retry">Try again</button></div></div>
   <div id="end" class="screen hidden">
     <div class="panel">
-      <h1>TOP BUNK</h1>
-      <p class="tag" id="endtag">Three nights.<br>Nobody believed you.</p>
-      <p class="note">To be continued…</p>
-      <button id="again">Play again</button>
+      <h2 id="endtitle"></h2>
+      <p class="tag" id="endtag"></p>
+      <nav id="end-menu" class="menu" aria-label="End menu"></nav>
+      <p id="endinfo" class="note"></p>
     </div>
   </div>
   <div id="loading">Unpacking…</div>

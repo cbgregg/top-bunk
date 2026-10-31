@@ -19,7 +19,7 @@ function readAppId(file = path.join(__dirname, 'steam_appid.txt')) {
 
 function loadModule() { try { return require('steamworks.js'); } catch (e) { return null; } }
 
-// Builds the bridge. Call it BEFORE app.whenReady(): the Steam overlay needs Chromium switches
+// Builds the bridge. Call it before app.whenReady(): the Steam overlay needs Chromium switches
 // (in-process-gpu, disable-direct-composition) that only take effect before the GPU process starts.
 //   appId     - defaults to readAppId()
 //   disabled  - skip Steam entirely (--no-steam)

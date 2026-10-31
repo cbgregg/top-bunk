@@ -1,4 +1,4 @@
-// The family: real Rocketbox models (assets/models), with the old low-poly people as a fallback until they load.
+// The family: Rocketbox models (assets/models), with low-poly stand-ins until they load.
 import * as THREE from 'three';
 import { Rig, loadModel, loadAnims } from './rig.js';
 

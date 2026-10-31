@@ -82,11 +82,6 @@
   "say": "[whispering, tired] Then why did he draw that thing on the wall?",
   "html": "<i>Your mom:</i> Then why did he draw that thing on the wall?"
  },
- "dad/n2_b": {
-  "voice": "dad",
-  "say": "[whispering, irritated] The kid before him drew it. It's crayon, for God's sake. Go to sleep.",
-  "html": "<i>Your dad:</i> The kid before him drew it. It's crayon, for God's sake. Go to sleep."
- },
  "you/m2_a": {
   "voice": null,
   "html": "<b>You:</b> It was in my room. It stood right next to my bed. It was smiling."
@@ -115,31 +110,6 @@
   "voice": "dad",
   "say": "[whispering, groggy] Go back to sleep. It's the kid.",
   "html": "<i>Your dad:</i> Go back to sleep. It's the kid."
- },
- "mom/breakfast": {
-  "voice": "mom",
-  "say": "[calling, irritated] Breakfast! I'm not calling you again!",
-  "html": "<b>Mom:</b> Breakfast! I'm not calling you again!"
- },
- "mom/thump": {
-  "voice": "mom",
-  "say": "[sharp, alarmed] What was that?",
-  "html": "<b>Mom:</b> What was that?"
- },
- "mom/again": {
-  "voice": "mom",
-  "say": "[exasperated] Did you fall out of bed? Again? You're fine. You are always fine.",
-  "html": "<b>Mom:</b> Did you fall out of bed? <i>Again?</i> You're fine. You are always fine."
- },
- "dad/ending": {
-  "voice": "dad",
-  "say": "[flat, tired] Stop jumping on that bunk. I'm not buying another mattress.",
-  "html": "<b>Dad:</b> Stop jumping on that bunk. I'm not buying another mattress."
- },
- "mom/bottom_bunk": {
-  "voice": "mom",
-  "say": "[low, whispering, to her husband] He keeps talking to somebody in that room. All night. Every night.",
-  "html": "<i>Your mom, quietly, to your dad:</i> He keeps talking to somebody in that room. All night. Every night."
  },
  "dad/lure_a": {
   "voice": "dad",
@@ -380,31 +350,6 @@
   "voice": "mom",
   "say": "[screaming, raw terror] I SEE IT. OH MY GOD, I SEE IT.",
   "html": "<b>Mom:</b> I SEE IT. OH MY GOD, I SEE IT."
- },
- "dad/f_b": {
-  "voice": "dad",
-  "say": "[roaring, stepping forward] Get away from my son! Get out of my house!",
-  "html": "<b>Dad:</b> Get away from my son! Get out of my house!"
- },
- "mom/f_b": {
-  "voice": "mom",
-  "say": "[sobbing, grabbing you] We're leaving. Right now. Get in the car. Don't look back.",
-  "html": "<b>Mom:</b> We're leaving. Right now. Get in the car. Don't look back."
- },
- "dad/f_c": {
-  "voice": "dad",
-  "say": "[hoarse, wrecked] Leave everything. Leave all of it. Go. GO.",
-  "html": "<b>Dad:</b> Leave everything. Leave all of it. Go. Go."
- },
- "mom/f_c": {
-  "voice": "mom",
-  "say": "[to you, whispering] I'm so sorry. I'm so sorry we didn't believe you.",
-  "html": "<b>Mom:</b> I'm so sorry. I'm so sorry we didn't believe you."
- },
- "you/f_b": {
-  "voice": null,
-  "say": "I told you.",
-  "html": "<b>You:</b> I told you."
  },
  "mom/car_a": {
   "voice": "mom",

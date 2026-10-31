@@ -16,17 +16,13 @@ GT = os.environ.get('GLTF_TRANSFORM', 'gltf-transform')
 # name: (Poly Haven id, texture size in px[, simplify ratio]). The trees are photogrammetry-grade (millions of triangles): they are simplified hard.
 MODELS = {
     # interior
-    'sofa': ('Sofa_01', 1024), 'armchair': ('ArmChair_01', 1024), 'tv': ('Television_01', 1024), 'rocker': ('Rockingchair_01', 1024),
-    'cabinet': ('vintage_cabinet_01', 1024), 'drawers': ('vintage_wooden_drawer_01', 1024), 'cabinet_blue': ('painted_wooden_cabinet_02', 1024),
-    'stove': ('electric_stove', 1024), 'chair': ('painted_wooden_chair_01', 512), 'table_round': ('round_wooden_table_01', 512),
-    'table': ('WoodenTable_01', 512), 'coffee_table': ('coffee_table_round_01', 512), 'lamp': ('vintage_oil_lamp', 512),
-    'plant1': ('potted_plant_01', 512), 'plant2': ('potted_plant_02', 512),
-    'clock_mantel': ('mantel_clock_01', 512), 'clock_grandfather': ('vintage_grandfather_clock_01', 1024), 'clock_wall': ('wall_clock', 512),
-    'frame1': ('hanging_picture_frame_01', 512), 'frame2': ('hanging_picture_frame_02', 512), 'frame3': ('hanging_picture_frame_03', 512),
-    'kettle': ('vintage_electric_kettle', 512), 'pot': ('brass_pot_01', 512), 'books': ('decorative_book_set_01', 512), 'pillows': ('throw_pillows_01', 512),
+    'sofa': ('Sofa_01', 1024), 'armchair': ('ArmChair_01', 1024), 'tv': ('Television_01', 1024),
+    'cabinet': ('vintage_cabinet_01', 1024), 'chair': ('painted_wooden_chair_01', 512), 'table_round': ('round_wooden_table_01', 512),
+    'table': ('WoodenTable_01', 512), 'plant1': ('potted_plant_01', 512), 'plant2': ('potted_plant_02', 512), 'clock_wall': ('wall_clock', 512),
+    'kettle': ('vintage_electric_kettle', 512), 'pot': ('brass_pot_01', 512),
     # outdoors (the conifer models are photogrammetry-grade and don't survive simplification, so the forest stays procedural)
-    'tree_small': ('tree_small_02', 1024, 0.015), 'shrub2': ('shrub_02', 512), 'grass1': ('grass_medium_01', 512, 0.05), 'grass2': ('grass_medium_02', 512, 0.15),
-    'rock1': ('boulder_01', 512, 0.08), 'rock2': ('rock_07', 512, 0.1), 'stump': ('tree_stump_01', 512),
+    'tree_small': ('tree_small_02', 1024, 0.015), 'grass1': ('grass_medium_01', 512, 0.05), 'grass2': ('grass_medium_02', 512, 0.15),
+    'rock1': ('boulder_01', 512, 0.08), 'rock2': ('rock_07', 512, 0.1),
 }
 
 
@@ -67,7 +63,7 @@ def main():
     jobs = [n for n in MODELS if (not only or n == only) and (force or not os.path.exists(os.path.join(OUT, n + '.glb')))]
     with ThreadPoolExecutor(3) as pool:
         for name, size in pool.map(one, jobs):
-            print(f'{name}: {size // 1024 if isinstance(size, int) else size} KB' if isinstance(size, int) else f'{name}: {size}', flush=True)
+            print(f'{name}: {size // 1024} KB' if isinstance(size, int) else f'{name}: {size}', flush=True)
 
 
 if __name__ == '__main__':
