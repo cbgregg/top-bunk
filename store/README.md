@@ -56,6 +56,12 @@ electron-builder turns into the Windows `.ico` and the macOS `.icns`.
 ## Not in this folder
 
 - The trailer (`trailer/`; Steam wants 1920×1080 H.264 MP4 with a 1920×1080 thumbnail).
-- Achievement icons: a 64×64 JPG pair (achieved and unachieved) for each entry in `steam/achievements.json`. None are made yet.
 - The developer name and press contact in `press-kit.md`.
 - Localised copy: the page is English only, which `description.md` says.
+
+## Achievement icons
+
+`achievements/<API name>.jpg` and `achievements/<API name>_locked.jpg`, 64×64, one pair for each of the 26 entries in
+`steam/achievements.json`. Upload the plain one as the achieved icon and the `_locked` one as the unachieved icon, on the entry's
+page under Stats & Achievements. `node store/render_achievements.js` redraws them from the game (`--only NIGHT_1,GRANDPA` for some,
+`--sheet file.png` for a contact sheet).
