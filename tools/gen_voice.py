@@ -18,9 +18,9 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 OUT = os.path.join(ROOT, 'assets', 'audio')
 EL_MODEL = os.environ.get('EL_MODEL', 'eleven_v4')
 
-# (voice id, speed). ElevenLabs library voices: Sarah for Mom, Chris for Dad
-MOM = ('EXAVITQu4vr4xnSDxMaL', 0.95)
-DAD = ('iP95p4xoKVk53GoZ742B', 0.92)
+# (voice id, speed). ElevenLabs library voices: Andrea (kind, calm) for Mom, Jerry B (off-the-cuff, unpolished) for Dad
+MOM = ('wVZ5qbJFYF3snuC65nb4', 0.95)
+DAD = ('1t1EeRixsJrKbiF1zwM6', 0.9)
 # steady, low-style delivery: these are people talking in a kitchen, not a radio play
 SETTINGS = {'stability': 1.0, 'similarity_boost': 0.8, 'style': 0.0}
 # lines that are one conversation, in order; each is read with its neighbours as context so it is not delivered as an announcement
