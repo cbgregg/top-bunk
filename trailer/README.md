@@ -24,6 +24,10 @@ does nothing.
 
 ## Rendering
 
+On a Windows PC with a graphics card, `trailer\render-windows.cmd` does the whole thing: it installs Playwright and its Chromium into
+the project folder the first time, then renders both full-size cuts on the GPU in a visible browser window (a few minutes each).
+It needs Node.js and ffmpeg on PATH. Pass a licensed recording as the first argument to use it instead of the placeholder.
+
 ```
 node trailer/gen_music.js                                   # the placeholder soundtrack (render.js runs this itself if the WAV is missing)
 node trailer/render.js --preset preview                     # trailer/out/topbunk-trailer-preview-360p12.mp4 (+ a 10 s teaser)
