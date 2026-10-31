@@ -14,11 +14,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 OUT = os.path.join(ROOT, 'assets', 'audio')
-EL_MODEL = 'eleven_v4'
+EL_MODEL = os.environ.get('EL_MODEL', 'eleven_v4')
 
 # (voice id, speed). ElevenLabs library voices: Sarah for Mom, Chris for Dad
 MOM = ('EXAVITQu4vr4xnSDxMaL', 1.0)
-DAD = ('iP95p4xoKVk53GoZ742B', 1.0)
+DAD = ('iP95p4xoKVk53GoZ742B', 0.95)
+# steady, low-style delivery: these are people talking in a kitchen, not a radio play
+SETTINGS = {'stability': 0.75, 'similarity_boost': 0.8, 'style': 0.0}
 # Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).
 GRAMPS = (os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)
 
@@ -37,7 +39,7 @@ def ssml_safe(s):
 def synth(voice, text):
     vid, speed = voice
     req = urllib.request.Request(f'https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128',
-                                 data=json.dumps({'text': text, 'model_id': EL_MODEL, 'voice_settings': {'speed': speed}}).encode(),
+                                 data=json.dumps({'text': text, 'model_id': EL_MODEL, 'voice_settings': {'speed': speed, **SETTINGS}}).encode(),
                                  headers={'xi-api-key': os.environ['ELEVENLABS_API_KEY'], 'Content-Type': 'application/json'})
     for attempt in range(6):
         try:
