@@ -40,28 +40,28 @@ const SHOTS = [
   { id: '01_porch_night', what: 'The porch at night, from the yard, and something standing in the porch light',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('title'); g.W.porchLight.intensity = 9; g.W.porchBulb.material.emissiveIntensity = 4;
-      S.look([2.7, 1.32, -9.4], [1.75, 1.45, -4.8]);
-      S.thing([1.9, 0.14, -5.05], [2.7, -9.4], { tilt: 0.35, smile: 1.1, reach: 0.3 }); } },
+      S.look([3.9, 1.32, -9.4], [2.93, 1.45, -4.8]);
+      S.thing([3.1, 0.14, -5.05], [2.7, -9.4], { tilt: 0.35, smile: 1.1, reach: 0.3 }); } },
   { id: '02_kid_room_bunk', what: 'Your room on the first night: the bunk, the boxes, the bear, the flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('night'); S.flash(true); S.boxesOnBunk(); g.W.moveTeddy(5.75, 1.8, 3.15); g.W.setDoor('kid', true, true);
-      S.look([7.55, 1.32, 0.75], [6.1, 1.25, 3.0]); } },   // from the room's east side, so the closet's side panel is not an arm's length from the lens
+      g.setPhase('night'); S.flash(true); S.boxesOnBunk(); g.W.moveTeddy(8, 1.8, 4.13); g.W.setDoor('kid', true, true);
+      S.look([10.54, 1.32, 1.48], [8.35, 1.25, 3.98]); } },   // from the room's east side, so the closet's side panel is not an arm's length from the lens
   { id: '03_hall_drawing', what: 'The crayon drawing taped to the hall wall ("HE WATCHES"), by flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true, 8); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;   // the moving-day drawing, not the night one
-      S.look([6.2, 1.25, -1.15], [5.55, 1.08, -0.38]); } },
+      S.look([8.51, 1.25, -0.72], [7.56, 1.08, 0.2]); } },
   { id: '04_under_covers', what: 'Under the covers on the top bunk while it leans over the rail (with the hold-your-breath HUD)', hud: true,
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.nlMult(0.3, false);
       g.P.mode = 'hide'; g.P.pod = null; g.P.podYaw = 0; g.P.cam.copy(g.BUNK_LIE); g.P.yaw = 0.06; g.P.pitch = 0.4; g.F.cutscene = false;
-      g.UI.blanket(true); S.thing([6.03, 0, 1.55], [6.03, 3.02], { lean: 0.4, tilt: -0.35, smile: 1.18 });
+      g.UI.blanket(true); S.thing([8.28, 0, 2.53], [6.03, 3.02], { lean: 0.4, tilt: -0.35, smile: 1.18 });
       g.F.breathUI = true; g.UI.objective('Stay quiet.'); g.UI.hint('Hold <b>Space</b> to hold your breath', 600); },
     after: () => { const g = window.__game; window.__freeze = true; g.UI.breath(0.27, true, true); } },
   { id: '05_end_of_hall', what: 'The thing at the far end of the hall, lit from behind by the living room',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.setDoor('kid', true, true); g.W.setDoor('bath', true, true);
       g.W.bathSpot.intensity = g.BATH_I * 0.8; g.F.flicker = true;
-      S.thing([3.7, 0, -0.9], [8, -0.9], { tilt: 0.3 }); S.look([7.35, 1.32, -0.9], [3.7, 1.55, -0.9]); } },
+      S.thing([5.17, 0, -0.42], [8, -0.9], { tilt: 0.3 }); S.look([10.24, 1.32, -0.42], [5.17, 1.55, -0.42]); } },
   { id: '06_breakfast', what: 'Breakfast: Mom at the stove, Dad at the sink, nobody believing you',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('morning'); g.sleepers(false);
@@ -69,16 +69,16 @@ const SHOTS = [
         p.group.visible = true; p.busy = false; p.sleeping = false; p.pose = null; p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, ry, 0); p.group.position.set(x, 0, z);
         if (p.rig) p.rig.play('idle', { fade: 0, speed: 1 });
       }
-      g.P.pos.set(0.95, 0, 0.6); S.look([0.95, 1.3, 0.45], [1.45, 1.22, 1.85]); } },
+      g.P.pos.set(2.04, 0, 1.31); S.look([2.04, 1.3, 1.14], [2.6, 1.22, 2.71]); } },
   { id: '07_tv_static', what: 'The living room TV turned itself on, and someone who looks like Dad is standing in front of it',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.tvFx.set(true); g.W.tvFx.figure = 1;
       const d = g.dad; g.mom.group.visible = true; d.sleeping = false; d.busy = true; d.pose = null; d.lookAt = null; d.group.rotation.order = 'XYZ';
       // a step to the side of his spot in the game, so the screen shows past him
-      d.group.rotation.set(0, Math.atan2(2.95 - 2.0, -3.2 + 3.65), 0); d.group.position.set(2.0, 0, -3.65); d.group.visible = true;
+      d.group.rotation.set(0, Math.atan2(2.95 - 2.0, -3.2 + 3.65), 0); d.group.position.set(3.21, 0, -3.55); d.group.visible = true;
       if (d.rig) d.rig.play('idle', { fade: 0, speed: 0.6 }); g.W.bedSleepers.one('dad', false);
       g.P.pos.set(-30, 0, -30);   // far away, so he does not turn his head to you
-      S.look([1.3, 1.25, -1.95], [2.75, 1.0, -3.25]); } },   // back far enough that his head is in the frame
+      S.look([2.43, 1.25, -1.64], [4.05, 1.0, -3.1]); } },   // back far enough that his head is in the frame
   { id: '08_garage_breaker', what: 'The garage breaker box, panel open, by flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true, 9); g.W.garage.panel.open(1); g.W.garage.light.intensity = 0;
@@ -89,11 +89,11 @@ const EXTRA = [
   { id: 'hero_3840x1240', size: [3840, 1240], fov: 52, what: 'Library hero source: the hall, wide',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.setDoor('kid', true, true); g.W.setDoor('bath', true, true); g.W.bathSpot.intensity = g.BATH_I * 0.8; g.F.flicker = true;
-      S.thing([3.9, 0, -0.9], [8, -0.9], { tilt: 0.3 }); S.look([7.5, 1.32, -0.9], [3.9, 1.5, -0.9]); } },
+      S.thing([5.42, 0, -0.42], [8, -0.9], { tilt: 0.3 }); S.look([10.46, 1.32, -0.42], [5.42, 1.5, -0.42]); } },
   { id: 'portrait_1000x1400', size: [1000, 1400], what: 'Vertical capsule source: the hall, tall',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.setDoor('kid', true, true); g.W.setDoor('bath', true, true); g.W.bathSpot.intensity = g.BATH_I * 0.8; g.F.flicker = true;
-      S.thing([3.9, 0, -0.9], [8, -0.9], { tilt: 0.3 }); S.look([7.2, 1.32, -0.9], [3.9, 1.6, -0.9]); } },
+      S.thing([5.42, 0, -0.42], [8, -0.9], { tilt: 0.3 }); S.look([10.01, 1.32, -0.42], [5.42, 1.6, -0.42]); } },
 ];
 
 // ---------- page-side helpers ----------

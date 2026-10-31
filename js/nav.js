@@ -2,19 +2,20 @@
 // Coordinates are world metres (x, z), with a third value for the floor height where it is not 0 (the stairwell and the basement).
 // Every edge is a straight, clear line.
 export const NODES = {
-  hallW: [3.95, -0.9], hallM: [5.6, -0.9], hallE: [7.3, -0.9],
-  bathIn: [4.15, 0.4], bathMid: [4.15, 1.15], bathMid2: [4.5, 1.9], bathTub: [4.45, 2.4],
-  kidIn: [7.05, 0.4], kidMid: [6.5, 1.35], kidBunk: [6.03, 2.1], kidCloset: [5.95, 0.95],
-  r2In: [3.9, -1.95], r2Alc: [4.1, -2.5], r2Mid: [4.7, -2.95], r2Closet: [4.97, -2.55],
-  pIn: [7.5, -2.0], pBed: [7.35, -2.75], pClos: [7.5, -3.4],
-  livMouth: [3.0, -0.9], livE: [2.2, -1.35], livC: [0.9, -1.3], livW: [-0.5, -1.35], livMid: [-1.7, -1.4], livFar: [-2.4, -1.1], livDoor: [1.9, -3.5], livTV: [2.0, -2.6],
-  archN: [1.7, -0.85], archS: [1.7, 0.35], kit2: [0.5, 0.9], kit3: [0.4, 2.1], kit4: [2.0, 1.9],
-  dinN: [-2.7, 0.1], dinS: [-2.75, 0.55], dinW: [-2.95, 1.9], backIn: [-2.5, 3.1],
-  utilIn: [-4.3, 0.45], util2: [-5.8, 1.4], util3: [-6.0, -1.8],
+  hallW: [5.48, -0.42], hallM: [7.63, -0.42], hallE: [10.16, -0.42],
+  bathIn: [5.73, 1.08], bathMid: [5.73, 1.92], bathMid2: [6.17, 2.76], bathTub: [6.11, 3.32],
+  kidIn: [9.79, 1.08], kidMid: [8.96, 2.15], kidBunk: [8.26, 2.99], kidCloset: [8.14, 1.7],
+  r2In: [5.42, -1.64], r2Alc: [5.67, -2.26], r2Mid: [6.42, -2.76], r2Closet: [6.76, -2.32],
+  sIn: [10.46, -1.7], sMid: [10.01, -2.71], sClos: [10.46, -3.38],
+  livMouth: [4.33, -0.42], livE: [3.44, -0.96], livC: [1.98, -0.9], livW: [0.41, -0.96], livMid: [-0.93, -1.02], livFar: [-1.72, -0.66], livDoor: [3.1, -3.38], livTV: [3.21, -2.37],
+  archN: [2.88, -0.36], archS: [2.88, 1.03], kit2: [1.53, 1.64], kit3: [1.42, 2.99], kit4: [3.21, 2.76],
+  dinN: [-2.05, 0.75], dinS: [-2.11, 1.25], dinW: [-2.33, 2.76], backIn: [-1.83, 4.11],
+  // Mom and Dad's room, through the barn door: inside the door, the middle, the foot of the bed, by the dresser, the closet, the far end
+  pIn: [-3.4, 1.14], pMid: [-4.63, 0.75], pFoot: [-5.19, -0.42], pDress: [-5.41, -2.71], pClos: [-4.07, -2.26], pFar: [-5.19, 3.21],
   // out the back door, down the outside stairs to the laundry, and round the west end of the house to the garage
-  stoop: [-2.3, 4.3], stoopS: [-2.2, 5.6], stairTop: [-3.5, 4.25, -0.15], stairMid: [-4.9, 4.25, -1.23], stairBot: [-6.9, 4.25, -2.4],
-  lauIn: [-6.9, 3.0, -2.4], lauMid: [-5.7, 1.7, -2.4], lauWash: [-7.0, 1.6, -2.4], lauSink: [-5.65, 0.9, -2.4], lauSump: [-4.7, 0.7, -2.4],
-  yardB1: [-5.0, 5.9], yardB2: [-8.2, 5.9], yardW: [-9.3, 0.5], yardSW: [-9.3, -5.2], garDoor: [-8.3, -6.4],
+  stoop: [-1.6, 5.37], stoopS: [-1.49, 6.67], stairTop: [-2.95, 5.32, -0.15], stairMid: [-4.52, 5.32, -1.23], stairBot: [-6.76, 5.32, -2.4],
+  lauIn: [-6.76, 4.0, -2.4], lauMid: [-5.41, 2.54, -2.4], lauWash: [-6.87, 2.43, -2.4], lauSink: [-5.36, 1.64, -2.4], lauSump: [-4.29, 1.42, -2.4],
+  yardB1: [-4.5, 7.0], yardB2: [-8.2, 7.0], yardW: [-9.3, 0.5], yardSW: [-9.3, -5.2], garDoor: [-8.3, -6.4],
   garIn: [-8.3, -7.8], garMid: [-10.6, -10.3], garPanel: [-9.7, -7.9],
 };
 // [a, b, door that has to be open to pass]
@@ -23,10 +24,10 @@ const EDGES = [
   ['hallW', 'bathIn', 'bath'], ['bathIn', 'bathMid'], ['bathMid', 'bathMid2'], ['bathMid2', 'bathTub'],
   ['hallE', 'kidIn', 'kid'], ['kidIn', 'kidMid'], ['kidMid', 'kidBunk'], ['kidMid', 'kidCloset'],
   ['hallW', 'r2In', 'room2'], ['r2In', 'r2Alc'], ['r2Alc', 'r2Mid'], ['r2Alc', 'r2Closet'], ['r2Mid', 'r2Closet'],
-  ['hallE', 'pIn', 'parents'], ['pIn', 'pBed'], ['pBed', 'pClos'],
+  ['hallE', 'sIn', 'spare'], ['sIn', 'sMid'], ['sMid', 'sClos'],
   ['hallW', 'livMouth'], ['livMouth', 'livE'], ['livE', 'livC'], ['livC', 'livW'], ['livW', 'livMid'], ['livMid', 'livFar'], ['livE', 'livDoor'], ['livE', 'livTV'], ['livDoor', 'livTV'],
   ['livE', 'archN'], ['archN', 'archS'], ['archS', 'kit2'], ['archS', 'kit4'], ['kit2', 'kit3'], ['kit3', 'kit4'],
-  ['livFar', 'dinN'], ['dinN', 'dinS'], ['dinS', 'utilIn'], ['utilIn', 'util2'], ['utilIn', 'util3'],
+  ['livFar', 'dinN'], ['dinN', 'dinS'], ['dinS', 'pIn', 'parents'], ['pIn', 'pMid'], ['pMid', 'pFoot'], ['pFoot', 'pDress'], ['pFoot', 'pClos'], ['pDress', 'pClos'], ['pMid', 'pFar'],
   ['dinS', 'dinW'], ['dinW', 'backIn'], ['backIn', 'stoop', 'back'],
   ['stoop', 'stairTop'], ['stairTop', 'stairMid'], ['stairMid', 'stairBot'], ['stairBot', 'lauIn', 'basement'], ['lauIn', 'lauMid'], ['lauMid', 'lauWash'], ['lauMid', 'lauSink'], ['lauSink', 'lauSump'],
   ['stoop', 'stoopS'], ['stoopS', 'yardB1'], ['yardB1', 'yardB2'], ['yardB2', 'yardW'], ['yardW', 'yardSW'], ['yardSW', 'garDoor'],
@@ -41,7 +42,7 @@ for (const [a, b, door] of EDGES) {
 export const pos = (id) => ({ x: NODES[id][0], z: NODES[id][1], y: NODES[id][2] || 0 });
 export const dist = (a, b) => Math.hypot(NODES[a][0] - NODES[b][0], NODES[a][1] - NODES[b][1]);
 
-// the node nearest a point on the same floor (y: the floor height there; the laundry's nodes lie right under the utility room's)
+// the node nearest a point on the same floor (y: the floor height there; the laundry's nodes lie right under Mom and Dad's room)
 export function nearestNode(x, z, filter = null, y = 0) {
   let best = null, bd = 1e9;
   for (const k in NODES) {

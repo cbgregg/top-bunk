@@ -27,7 +27,7 @@ export function createHunter(ctx) {
 
   // ---- sight lines ----
   function los(ax, az, bx, bz, ay = 0, by = 0) {
-    if (Math.abs(ay - by) > 1.2) return false;   // another floor: the laundry lies under the utility room
+    if (Math.abs(ay - by) > 1.2) return false;   // another floor: the laundry lies under Mom and Dad's room
     for (const c of W.colliders) {
       if (!c.on || !(c.wall || c.door)) continue;
       let t0 = 0, t1 = 1;

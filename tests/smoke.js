@@ -557,8 +557,8 @@ let BASE = '';
         return { bones: head.skeleton.bones.length, names: [/head/i, /spine/i, /eye/i].filter((re) => head.skeleton.bones.some((b) => re.test(b.name))).length, x: p.x, z: p.z, type: window.__game.F.typeName };
       });
       ok(g.type === 'The Vigil' && g.bones > 20 && g.names === 3, `grandpa's rig: ${JSON.stringify(g)}`);
-      ok(Math.hypot(g.x - 3.0, g.z + 0.65) < 0.5, `grandpa is not in the chair: ${JSON.stringify(g)}`);
-      await stand(page, 3.8, -0.7, 3.0, -0.65);   // at the mouth of the hall, the way the vigil waits for you
+      ok(Math.hypot(g.x - 4.33, g.z + 0.12) < 0.5, `grandpa is not in the chair: ${JSON.stringify(g)}`);
+      await stand(page, 5.2, -0.15, 4.33, -0.12);   // at the mouth of the hall, the way the vigil waits for you
       await until(page, () => window.__game.P.mode === 'cine', null, 60e3);
       await until(page, () => { const g = window.__game; return g.P.mode === 'bunk' && !g.F.cutscene && !g.F.script; }, null, 150e3);
       const e = await page.evaluate(() => { const g = window.__game; return { ok: g.F.objOk, dead: g.F.dead, body: document.body.classList.contains('nightmare'), blackout: g.F.blackout }; });
@@ -590,12 +590,12 @@ let BASE = '';
       ok(sp, 'no shadow figure in the living room');
       await stand(page, sp[0] - 0.6, sp[1] + 0.2); times.shadow = await finish('shadow');
       await begin('hall');   // the hall turns you round three times, the fourth it ends
-      for (let i = 0; i < 4; i++) { await stand(page, 3.8, -0.9); await sleep(900); }
+      for (let i = 0; i < 4; i++) { await stand(page, 5.3, -0.42); await sleep(900); }
       times.hall = await finish('hall');
       await begin('basement');   // down in the laundry
-      await stand(page, -7.0, 0.5, undefined, undefined, -2.4); times.basement = await finish('basement');
+      await stand(page, -6.87, 1.2, undefined, undefined, -2.4); times.basement = await finish('basement');
       await begin('mirror');   // at the bathroom mirror, then moving
-      await stand(page, 4.2, 0.9); await sleep(500); await hold(page, 'KeyS', 1500); times.mirror = await finish('mirror');
+      await stand(page, 5.79, 1.64); await sleep(500); await hold(page, 'KeyS', 1500); times.mirror = await finish('mirror');
       clean(w);
       return `all four end awake in the bunk (${Object.entries(times).map(([k, v]) => `${k} ${v} s`).join(', ')})`;
     }), 420e3);
@@ -627,27 +627,27 @@ let BASE = '';
       await page.evaluate(() => { window.__game.nights.director.stop(); });
       await climbDown(page);
       const door = (n) => page.evaluate((n) => { const d = window.__game.W.doors[n]; return { target: d.target, a: d.a, on: d.col.on }; }, n);
-      // the parents' door is locked at night: the handle does not turn, and you cannot walk through it
-      await stand(page, 7.5, -0.9, 7.5, -1.5); await sleep(400);
+      // Mom and Dad's barn door off the dining room is locked at night: the handle does not turn, and you cannot walk through it
+      await stand(page, -2.05, 1.14, -2.72, 1.14); await sleep(400);
       ok((await prompt(page)) === 'E Try the handle', `parents' door prompt "${await prompt(page)}"`);
       await page.keyboard.press('KeyE'); await sleep(500);
       await hold(page, 'KeyW', 2500);
-      let d = await door('parents'), z = await page.evaluate(() => window.__game.P.pos.z);
-      ok(d.target === 0 && d.a === 0 && d.on && z > -1.4, `the parents' door at night: ${JSON.stringify(d)}, z ${z}`);
+      let d = await door('parents'), z = await page.evaluate(() => window.__game.P.pos.x);
+      ok(d.target === 0 && d.a === 0 && d.on && z > -2.95, `the parents' door at night: ${JSON.stringify(d)}, x ${z}`);
       // the back door opens, and you walk out through it onto the stoop
-      await stand(page, -2.3, 3.0, -2.3, 3.6); await sleep(400);
+      await stand(page, -1.83, 4.0, -1.83, 4.67); await sleep(400);
       ok((await prompt(page)) === 'E Open the door', `back door prompt "${await prompt(page)}"`);
       await page.keyboard.press('KeyE');
       await until(page, () => window.__game.W.doors.back.a === 1, null, 10e3);
       d = await door('back'); ok(d.target === 1 && !d.on, `back door: ${JSON.stringify(d)}`);
       await hold(page, 'KeyW', 1800);
       z = await page.evaluate(() => window.__game.P.pos.z);
-      ok(z > 4.2, `walking through the open back door reached only z ${z.toFixed(2)}`);
+      ok(z > 5.2, `walking through the open back door reached only z ${z.toFixed(2)}`);
       // from the stoop west down the outside stairs to the foot, then the basement door
-      await stand(page, -2.3, 5.0, -4.3, 4.2);
+      await stand(page, -1.83, 5.3, -3.8, 5.3);
       await hold(page, 'KeyW', 3600);
       const f = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y }));
-      ok(f.y < -2.2 && f.x < -6.5, `the outside stairs: ${JSON.stringify(f)}`);
+      ok(f.y < -2.2 && f.x < -6.0, `the outside stairs: ${JSON.stringify(f)}`);
       await page.evaluate(() => { window.__game.P.yaw = 0; window.__game.P.pitch = 0; }); await sleep(500);
       ok((await prompt(page)) === 'E Open the door', `basement door prompt "${await prompt(page)}"`);
       await page.keyboard.press('KeyE');
@@ -655,7 +655,7 @@ let BASE = '';
       await hold(page, 'KeyW', 1800);
       const p = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y, z: window.__game.P.pos.z }));
       const room = await roomAt(page, p.x, p.z, p.y);
-      ok(room === 'laundry' && p.z < 3.3, `through the basement door: ${JSON.stringify(p)} in ${room}`);
+      ok(room === 'laundry' && p.z < 4.3, `through the basement door: ${JSON.stringify(p)} in ${room}`);
       clean(w);
       return `parents' door stays shut; back door to z ${z.toFixed(1)}, stairs down to y ${f.y.toFixed(1)}, into the ${room}`;
     }), 300e3);
