@@ -56,6 +56,12 @@
   .mrow .inline { display: flex; gap: 14px; align-items: center; color: var(--dim); flex-wrap: wrap; }
   .keyline { margin-top: 8px; font-size: 13px; color: var(--dim); }
   .keyline b { color: var(--ink); font-weight: 400; }
+  .split { margin-top: 6px; font-size: 12.5px; color: var(--faint); line-height: 1.6; max-height: 150px; overflow: auto; }
+  .split .ln { display: flex; gap: 12px; }
+  .split .ln .w { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .split .ln .c { white-space: nowrap; color: var(--dim); }
+  .split .ln.warn .c { color: var(--amber); }
+  .split .ln.bad .c { color: var(--red); }
   .words { margin-top: 24px; }
   textarea { width: 100%; height: 150px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 10px 12px; font: 14px/1.5 'Courier Prime', monospace; resize: vertical; outline: none; }
   textarea:focus { border-color: var(--dim); }
@@ -123,21 +129,27 @@
       <table class="tracks" id="tracks"></table>
     </div>
     <div class="melody" id="melody">
-      <h2>Melody <small>what the tracker heard; click a note to delete it, drag one up or down to move it</small></h2>
+      <h2>Melody <small id="rollhint">click a note to delete it, drag it up or down to move it, shift-click to split it</small></h2>
       <canvas class="roll" id="roll" width="1200" height="380"></canvas>
       <div class="mrow">
-        <label for="bpm">tempo</label><div class="inline"><input type="number" id="bpm" min="30" max="300" step="0.01" value="96"> <span>bpm, as heard; type the real one if you know it</span></div><span></span>
+        <label for="bpm">tempo</label><div class="inline"><input type="number" id="bpm" min="30" max="300" step="0.01" value="96"> <span id="bpmnote">bpm</span></div><span></span>
         <label for="quant">snap to</label><input type="range" id="quant" min="0" max="3" step="1" value="2"><span class="v" id="quant_v">½ beat</span>
-        <label for="bars">bar</label><div class="inline"><select id="bars"><option value="4">4 beats</option><option value="3">3 beats</option><option value="2">2 beats</option></select><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="chords" checked> add chords from the melody</label></div><span></span>
+        <label for="long">long notes</label><div class="inline"><input type="range" id="long" min="1" max="8" step="0.5" value="4" style="width: 140px"><span id="long_v">over 4 beats: 0</span><button class="small" id="trim">TRIM THEM</button></div><span></span>
+        <label for="bars">bar</label><div class="inline"><select id="bars"><option value="4">4 beats</option><option value="3">3 beats</option><option value="2">2 beats</option></select><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="chords" checked> <span id="chordslabel">add chords from the melody</span></label></div><span></span>
       </div>
       <div class="keyline" id="keyline"></div>
       <div class="bar" style="margin-top: 12px"><button class="small" id="retrack">FIND THE MELODY AGAIN</button><span class="status" id="mstatus"></span></div>
     </div>
     <div class="words">
-      <h2>Words <small>one syllable per melody note</small></h2>
-      <textarea id="lyrics" spellcheck="false" placeholder="lit-tle win-dow in the wall..."></textarea>
+      <h2>Words <small>one line per phrase; plain words are split into syllables</small></h2>
+      <textarea id="lyrics" spellcheck="false" placeholder="little window in the wall&#10;keep the night out, hold the light"></textarea>
+      <div class="split" id="split"></div>
+      <div class="mrow" style="margin-top: 8px">
+        <label for="rest">phrase at a rest of</label><input type="range" id="rest" min="0.1" max="2" step="0.05" value="0.4"><span class="v" id="rest_v">0.40 beat</span>
+        <label></label><label style="display:flex;gap:8px;align-items:center;color:var(--dim)"><input type="checkbox" id="exact"> exact: one syllable per note, as typed</label><span></span>
+      </div>
       <div class="count"><span id="count">—</span><span id="rule"></span></div>
-      <div class="help">Syllables are separated by spaces and hyphens. <code>_</code> holds the last syllable over the next note. <code>[dh uh]</code> gives a syllable as sounds (consonants <code>s z sh ch j f v th dh h t d k g p b m n ng l r w y</code>, vowels <code>a ah ae e eh i ih o oh u oo uh er aw</code>). <code>#</code> starts a comment. Rests take no syllable. Too few syllables and the last notes sing "la"; too many and the extra are not sung.</div>
+      <div class="help">A line is a phrase. Words are split into syllables for you; a hyphen splits where you put it (<code>win-dow</code>), <code>_</code> holds the last syllable over a note, <code>[dh uh]</code> gives a syllable as sounds (consonants <code>s z sh ch j f v th dh h t d k g p b m n ng l r w y</code>, vowels <code>a ah ae e eh i ih o oh u oo uh er aw</code>), <code>#</code> starts a comment. Extra notes in a phrase hold the vowel before them; extra syllables double up on a note and the line is marked.</div>
     </div>
     <div class="log" id="log"></div>
   </section>
@@ -711,7 +723,7 @@ function chordsFromMelody(notes, key, bpm, barBeats, totalBeats) {
 
 // the song from detected notes: starts and lengths snapped to a grid (quantize 0 off, 1 beats, 2 half beats, 4 quarter beats),
 // rests where nothing is sung, "la" on every note until lyrics are given, and a chord per bar if chords is on
-function songFromNotes(notes, { bpm = 96, quantize = 2, chords = true, barBeats = 4, lyrics = null, key = null, offset = null, log = () => {} } = {}) {
+function songFromNotes(notes, { bpm = 96, quantize = 2, chords = true, band = null, barBeats = 4, lyrics = null, exact = false, restBeats = 0.4, key = null, offset = null, log = () => {} } = {}) {
   const beat = 60 / bpm, g = quantize ? beat / quantize : 0;
   const off = g ? (offset == null ? gridOffset(notes, bpm, quantize) : offset) : 0;   // the grid can start a little after the recording
   const snap = (t) => (g ? Math.max(0, Math.round((t - off) / g) * g + off) : t);
@@ -727,10 +739,205 @@ function songFromNotes(notes, { bpm = 96, quantize = 2, chords = true, barBeats 
   }
   const k = key || detectKey(kept);
   const totalBeats = voice.reduce((a, v) => a + v.beats, 0);
-  const song = { bpm: +bpm.toFixed(3), key: k.name, voice, chords: chords ? chordsFromMelody(kept, k, bpm, barBeats, totalBeats) : [] };
-  log(`melody: ${kept.length} notes, ${bpm} bpm, ${k.name}${g ? `, snapped to ${quantize === 1 ? 'beats' : quantize === 2 ? 'half beats' : 'quarter beats'}` : ''}${chords ? `, ${song.chords.length} bars of chords` : ''}`);
-  const words = applyLyrics(voice, lyrics, log);
+  const song = { bpm: +bpm.toFixed(3), key: k.name, voice, chords: chords ? chordsFromMelody(kept, k, bpm, barBeats, totalBeats) : band || [] };
+  log(`melody: ${kept.length} notes, ${bpm} bpm, ${k.name}${g ? `, snapped to ${quantize === 1 ? 'beats' : quantize === 2 ? 'half beats' : 'quarter beats'}` : ''}${chords ? `, ${song.chords.length} bars of chords from the melody` : band ? `, ${band.length} chord blocks from the file` : ''}`);
+  const words = exact || lyrics == null ? applyLyrics(voice, lyrics, log) : alignWords(voice, lyrics, { restBeats, log });
   return { song, key: k, words };
+}
+
+// a voice line as notes in seconds, for the roll and for editing: [{ s, e, m }]
+function notesFromVoice(voice, bpm) {
+  const beat = 60 / bpm, out = []; let t = 0;
+  for (const v of voice) { if (v.note != null) out.push({ s: t, e: t + v.beats * beat, m: midi(v.note) }); t += v.beats * beat; }
+  return out;
+}
+
+// notes held longer than maxBeats are cut there; the rest of their time becomes a rest. Returns how many were cut.
+function trimLongNotes(notes, bpm, maxBeats = 4) {
+  const max = maxBeats * 60 / bpm; let n = 0;
+  for (const x of notes) if (x.e - x.s > max + 1e-6) { x.e = x.s + max; n++; }
+  return n;
+}
+
+// ---------- words ----------
+// English words into syllables, by rule: vowel groups are the nuclei (y between consonants counts, a vowel run is one nucleus except
+// the pairs that are two: ia io eo ua uo and y before a vowel), a final e is silent, -es and -ed are syllables only after the
+// consonants that need them, then the consonants between two nuclei go to the second one (a cluster is split after its first
+// consonant, a digraph or a stop+l/r blend stays together) and a final consonant+le is its own syllable. A few words the rules
+// get wrong are listed.
+const EXC = { people: ['peo', 'ple'], every: ['ev', 'ery'], everything: ['ev', 'ery', 'thing'], everyone: ['ev', 'ery', 'one'], sacred: ['sa', 'cred'], naked: ['na', 'ked'], wicked: ['wick', 'ed'],
+  rugged: ['rug', 'ged'], crooked: ['crook', 'ed'], beloved: ['be', 'lov', 'ed'], wretched: ['wretch', 'ed'], jagged: ['jag', 'ged'], ragged: ['rag', 'ged'], blessed: ['bles', 'sed'],
+  evening: ['eve', 'ning'], heaven: ['hea', 'ven'], fire: ['fire'], hour: ['hour'], our: ['our'], power: ['pow', 'er'], flower: ['flow', 'er'], prayer: ['prayer'], being: ['be', 'ing'],
+  going: ['go', 'ing'], doing: ['do', 'ing'], seeing: ['see', 'ing'], idea: ['i', 'de', 'a'], quiet: ['qui', 'et'], science: ['sci', 'ence'], poem: ['po', 'em'], ocean: ['o', 'cean'],
+  again: ['a', 'gain'], against: ['a', 'gainst'], lonely: ['lone', 'ly'], lovely: ['love', 'ly'], something: ['some', 'thing'], nothing: ['noth', 'ing'], anything: ['an', 'y', 'thing'],
+  maybe: ['may', 'be'], always: ['al', 'ways'], together: ['to', 'geth', 'er'], another: ['an', 'oth', 'er'], mother: ['moth', 'er'], father: ['fa', 'ther'], brother: ['broth', 'er'],
+  water: ['wa', 'ter'], over: ['o', 'ver'], under: ['un', 'der'], never: ['nev', 'er'], ever: ['ev', 'er'], river: ['riv', 'er'], little: ['lit', 'tle'], window: ['win', 'dow'] };
+const DIG = ['th', 'sh', 'ch', 'ph', 'wh', 'ck', 'qu', 'gh'], STOPS = 'bcdfgkpt';
+function syllabify(word) {
+  const w = word.toLowerCase().replace(/[^a-z']/g, '');
+  if (!w) return [];
+  if (EXC[w]) return EXC[w].slice();
+  const letters = w.replace(/'/g, '');
+  if (letters.length <= 3) return [w];
+  const isVowel = (i) => 'aeiou'.includes(letters[i]) || (letters[i] === 'y' && i > 0 && !'aeiou'.includes(letters[i - 1]));
+  // the nuclei as [start, end) over the letters
+  const nuclei = [];
+  for (let i = 0; i < letters.length; i++) {
+    if (!isVowel(i)) continue;
+    const last = nuclei[nuclei.length - 1];
+    if (last && last[1] === i) {
+      const pair = letters[i - 1] + letters[i], before = letters.slice(Math.max(0, i - 3), i - 1);
+      const two = (['ia', 'io', 'eo', 'ua', 'uo'].includes(pair) && !(pair === 'io' && /[tsc]$/.test(before)) && !(pair === 'ua' && /[qg]$/.test(before))) || letters[i - 1] === 'y';
+      if (!two) { last[1] = i + 1; continue; }
+    }
+    nuclei.push([i, i + 1]);
+  }
+  if (nuclei.length <= 1) return [w];
+  // endings: a silent e, and -es / -ed that add nothing after most consonants
+  const lastN = nuclei[nuclei.length - 1], tail = letters.slice(lastN[0]);
+  if (tail === 'e' && !/[^aeiou]le$/.test(letters) && nuclei.length > 1) nuclei.pop();
+  else if (tail === 'es' && !/(s|x|z|c|g|ch|sh)es$/.test(letters)) nuclei.pop();
+  else if (tail === 'ed' && !/[dt]ed$/.test(letters)) nuclei.pop();
+  if (nuclei.length <= 1) return [w];
+  // the split points
+  const cuts = [];
+  for (let k = 0; k + 1 < nuclei.length; k++) {
+    const a = nuclei[k][1], b = nuclei[k + 1][0], cons = letters.slice(a, b), n = cons.length;
+    let cut;
+    if (n === 0) cut = a;
+    else if (n === 1) cut = a;
+    else if (n === 2) cut = DIG.includes(cons) || (STOPS.includes(cons[0]) && 'lr'.includes(cons[1])) ? a : a + 1;
+    else { const lastTwo = cons.slice(-2); cut = DIG.includes(lastTwo) || (STOPS.includes(lastTwo[0]) && 'lr'.includes(lastTwo[1])) ? b - 2 : a + 1; }
+    if (letters.slice(a, b) === 'ng' && letters.endsWith('ing') && b === letters.length - 3) cut = a + 2;   // sing-ing, not si-nging
+    cuts.push(cut);
+  }
+  if (/[^aeiou]le$/.test(letters) && nuclei[nuclei.length - 1][0] === letters.length - 1) cuts[cuts.length - 1] = letters.length - 3;   // lit-tle
+  // back onto the word with its apostrophes
+  const out = []; let p = 0, li = 0, wi = 0;
+  const map = []; for (let i = 0; i < w.length; i++) if (w[i] !== "'") map[li++] = i;
+  for (const c of cuts) { const at = map[c]; out.push(w.slice(wi, at)); wi = at; }
+  out.push(w.slice(wi));
+  return out.filter(Boolean);
+}
+
+// the words box as lines of syllables. A plain word is syllabified; "lit-tle" is split where the hyphen is; "_" holds the last
+// syllable over a note; "[dh uh]" is a syllable given as sounds; "#" starts a comment
+function wordsToLines(text) {
+  const lines = [];
+  for (let line of text.split(/\r?\n/)) {
+    line = line.replace(/#.*$/, '').trim();
+    if (!line) continue;
+    const syls = [], re = /\[([^\]]*)\]|(_+)|([^\s\[\]_]+)/g; let m;
+    while ((m = re.exec(line))) {
+      if (m[1] != null) { const t = m[1].trim(); if (t) syls.push({ syl: t, sounds: true }); }
+      else if (m[2]) for (let i = 0; i < m[2].length; i++) syls.push({ hold: true });
+      else for (const piece of m[3].split('-')) {
+        const word = piece.replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, '');
+        if (!word) continue;
+        if (m[3].includes('-')) syls.push({ syl: word }); else for (const sy of syllabify(word)) syls.push({ syl: sy });
+      }
+    }
+    if (syls.length) lines.push(syls);
+  }
+  return lines;
+}
+
+// the words onto the notes, phrase by phrase: a line of words is a phrase; the melody's phrases are what its rests cut it into
+// (a rest of restBeats or more). With more notes than syllables in a phrase, the longest extra notes are held on the vowel of the
+// syllable before them; with more syllables than notes, the shortest syllables double up on a note. Returns the per-line report.
+function alignWords(voice, text, { restBeats = 0.4, log = () => {} } = {}) {
+  const lines = typeof text === 'string' ? wordsToLines(text) : text;
+  // the phrases: runs of sung notes between rests
+  const sungIdx = [];
+  for (let i = 0; i < voice.length; i++) if (voice[i].note != null) sungIdx.push(i);
+  let phrases = [], cur = [], restBefore = [], lastRest = 0;
+  for (let i = 0; i < voice.length; i++) {
+    const v = voice[i];
+    if (v.note == null) { lastRest += v.beats; continue; }
+    if (cur.length && lastRest >= restBeats) { phrases.push(cur); restBefore.push(lastRest); cur = []; }
+    cur.push(i); lastRest = 0;
+  }
+  if (cur.length) phrases.push(cur);
+  // as many phrases as lines: join the phrases parted by the shortest rests first...
+  while (phrases.length > lines.length && phrases.length > 1) {
+    let k = 0; for (let i = 1; i < restBefore.length; i++) if (restBefore[i] < restBefore[k]) k = i;
+    phrases[k] = phrases[k].concat(phrases[k + 1]); phrases.splice(k + 1, 1); restBefore.splice(k, 1);
+  }
+  // ...or cut the long ones: each phrase takes lines in proportion to its notes, and is cut between them in proportion to the
+  // lines' syllables, at the end of the longest note near that point
+  if (phrases.length < lines.length && phrases.length) {
+    const total = phrases.reduce((a, ph) => a + ph.length, 0), L = lines.length;
+    const share = phrases.map((ph) => ph.length / total * L), take = share.map((v) => Math.max(1, Math.floor(v)));
+    let left = L - take.reduce((a, b) => a + b, 0);
+    const order = share.map((v, i) => i).sort((a, b) => (share[b] - take[b]) - (share[a] - take[a]));
+    for (let i = 0; left > 0; i = (i + 1) % order.length) { if (phrases[order[i]].length > take[order[i]]) { take[order[i]]++; left--; } else if (order.every((o) => phrases[o].length <= take[o])) break; }
+    const cut = []; let li = 0;
+    for (let pi = 0; pi < phrases.length; pi++) {
+      const ph = phrases[pi], k = Math.min(take[pi], ph.length), mine = lines.slice(li, li + k); li += k;
+      if (k <= 1) { cut.push(ph); continue; }
+      const syl = mine.map((l) => l.length), sum = syl.reduce((a, b) => a + b, 0) || 1;
+      const lens = ph.map((i) => voice[i].beats), med = [...lens].sort((a, b) => a - b)[lens.length >> 1];
+      let at = 0, acc = 0;
+      for (let j = 0; j < k; j++) {
+        if (j === k - 1) { cut.push(ph.slice(at)); break; }
+        acc += syl[j];
+        let want = Math.round(ph.length * acc / sum); want = Math.max(at + 1, Math.min(ph.length - (k - 1 - j), want));
+        let best = want;   // a long note just before the cut reads as a phrase end; the nearest one to the share wins
+        for (const d of [0, 1, -1, 2, -2]) { const c = want + d; if (c > at && c <= ph.length - (k - 1 - j) && lens[c - 1] >= 1.5 * med) { best = c; break; } }
+        cut.push(ph.slice(at, best)); at = best;
+      }
+    }
+    phrases = cut;
+  }
+  const report = { lines: [], syllables: 0, notes: sungIdx.length, held: 0, merged: 0 };
+  const vowelOf = (syl) => { const last = syl.split('+').pop(); return /\s/.test(last) ? parse(last).vowel.join(' ') : parse(last).vowel.join(' '); };
+  const toRemove = [];
+  for (let li = 0; li < lines.length; li++) {
+    const syls = lines[li].slice();
+    const ph = phrases[li];
+    if (!ph) { report.lines.push({ line: li + 1, syllables: syls.length, notes: 0, held: 0, merged: 0, extra: true }); continue; }
+    const notes = ph.map((i) => voice[i]);
+    const slots = syls.map((sy) => (sy.hold ? { hold: true } : { syl: sy.syl }));
+    let held = 0, merged = 0;
+    if (slots.length > notes.length) {
+      // the shortest syllables double up with a neighbour
+      while (slots.length > notes.length && slots.length > 1) {
+        let k = -1; for (let i = 0; i < slots.length; i++) if (!slots[i].hold && (k < 0 || slots[i].syl.length < slots[k].syl.length)) k = i;
+        if (k < 0) break;
+        const j = k + 1 < slots.length && !slots[k + 1].hold ? k + 1 : k - 1;
+        if (j < 0 || slots[j].hold) { slots.splice(k, 1); continue; }
+        const a = Math.min(k, j), b = Math.max(k, j);
+        slots[a] = { syl: slots[a].syl + '+' + slots[b].syl }; slots.splice(b, 1); merged++;
+      }
+    } else if (slots.length < notes.length) {
+      // the longest notes, never the first, are held over
+      const extra = notes.length - slots.length;
+      const order = notes.map((n, i) => i).filter((i) => i > 0).sort((a, b) => notes[b].beats - notes[a].beats);
+      const heldAt = new Set(order.slice(0, extra));
+      const filled = []; let si = 0;
+      for (let i = 0; i < notes.length; i++) { if (heldAt.has(i) || si >= slots.length) filled.push({ hold: true }); else filled.push(slots[si++]); }
+      slots.length = 0; slots.push(...filled);
+    }
+    // onto the notes
+    let prev = null;
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i], sl = slots[i];
+      if (!sl || sl.hold) {
+        held++;
+        const p = i ? notes[i - 1] : null;
+        if (p && p.note === n.note && p.syl != null && !p.gone) { p.beats = +(p.beats + n.beats).toFixed(4); n.gone = true; toRemove.push(ph[i]); notes[i] = p; continue; }   // same pitch: one longer note
+        n.syl = prev ? vowelOf(prev) : 'ah';
+      } else { n.syl = sl.syl; prev = sl.syl; }
+    }
+    report.lines.push({ line: li + 1, syllables: syls.length, notes: notes.length, held, merged });
+    report.syllables += syls.length; report.held += held; report.merged += merged;
+  }
+  // phrases past the last line sing la; lines past the last phrase are reported as extra
+  for (let k = lines.length; k < phrases.length; k++) for (const i of phrases[k]) if (!voice[i].syl) voice[i].syl = 'l ah';
+  for (const i of toRemove.sort((a, b) => b - a)) voice.splice(i, 1);
+  for (const v of voice) { delete v.gone; if (v.note != null && !v.syl) v.syl = 'l ah'; }
+  for (const l of report.lines) log(`  line ${l.line}: ${l.syllables} syllable${l.syllables === 1 ? '' : 's'}, ${l.notes} note${l.notes === 1 ? '' : 's'}${l.held ? ` (${l.held} held)` : ''}${l.merged ? ` (${l.merged} doubled up)` : ''}${l.extra ? ' - no phrase left for it' : ''}`);
+  return report;
 }
 
 // ---------- filters ----------
@@ -881,7 +1088,13 @@ function renderBand(band, song, beat, pitch, progress) {
 function render(song, { slow = 1, pitch = 0, wobble = 0.5, voice: voiceLevel = 1, band: bandLevel = 1, progress = null } = {}) {
   seed = 1234;
   const beat = 60 / (song.bpm || 96);
-  const notes = song.voice.map((n) => ({ m: midi(n.note, pitch), dur: n.beats * beat, syl: n.syl || 'ah' }));
+  const notes = [];
+  for (const n of song.voice) {
+    const syl = n.syl || 'ah', m = midi(n.note, pitch), dur = n.beats * beat;
+    if (m == null || !syl.includes('+')) { notes.push({ m, dur, syl }); continue; }
+    const parts = syl.split('+').filter(Boolean), w = parts.map((p) => Math.max(1, p.replace(/\s/g, '').length)), tot = w.reduce((a, b) => a + b, 0);
+    parts.forEach((p, i) => notes.push({ m, dur: dur * w[i] / tot, syl: p }));   // two syllables on one note: each gets its share
+  }
   const totalV = notes.reduce((a, n) => a + n.dur, 0);
   const totalC = (song.chords || []).reduce((a, c) => a + c.beats * beat, 0);
   const total = Math.max(totalV, totalC) + 1.5;
@@ -930,7 +1143,7 @@ function encodeWav(mix) {
   return out;
 }
 
-return { SR, midi, nameOf, parse, readMidi, scoreParts, parseLyrics, applyLyrics, midiInfo, songFromMidi, songText, toTrackerRate, trackPitch, notesFromPitch, estimateTempo, gridOffset, detectKey, chordsFromMelody, songFromNotes, render, toStereo, encodeWav };
+return { SR, midi, nameOf, parse, readMidi, scoreParts, parseLyrics, applyLyrics, midiInfo, songFromMidi, songText, toTrackerRate, trackPitch, notesFromPitch, estimateTempo, gridOffset, detectKey, chordsFromMelody, songFromNotes, notesFromVoice, trimLongNotes, syllabify, wordsToLines, alignWords, render, toStereo, encodeWav };
 })();
 <!-- core:end -->
 </script>
@@ -943,7 +1156,7 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
 (() => {
   const $ = (id) => document.getElementById(id);
   const C = SingCore;
-  const state = { name: '', source: null, midi: null, audio: null, song: null, lyricsFromFile: false, mix: null, L: null, R: null, renderedWith: null, busy: false };
+  const state = { name: '', source: null, midi: null, audio: null, notes: null, band: null, f0: null, times: null, duration: 0, midiLog: null, song: null, lyricsFromFile: false, mix: null, L: null, R: null, renderedWith: null, busy: false };
   const KNOBS = ['slow', 'pitch', 'wobble', 'voice', 'band'];
   const PRESETS = { 1961: { slow: 0.97, pitch: 0, wobble: 0.6, voice: 1, band: 1 }, clean: { slow: 1, pitch: 0, wobble: 0, voice: 1, band: 1 } };
   const fmt = { slow: (v) => v.toFixed(3), pitch: (v) => (v > 0 ? '+' : '') + v + ' st', wobble: (v) => v.toFixed(2), voice: (v) => v.toFixed(2), band: (v) => v.toFixed(2) };
@@ -989,16 +1202,25 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
 
   // ---------- the song ----------
   function setSong(song, { name, source, lyricsFromFile, words, lines }) {
+    stopPlay();
     state.song = song; state.name = name; state.source = source; state.lyricsFromFile = lyricsFromFile;
-    state.renderedWith = null; state.mix = state.L = state.R = null; buffer = null;
-    stopPlay(); drawWave();
+    state.renderedWith = null; state.mix = state.L = state.R = null; buffer = null; peaks = null;
+    drawWave();
     $('file').classList.add('on');
     $('fname').textContent = name;
     const sung = song.voice.filter((v) => v.note != null).length, secs = song.voice.reduce((a, v) => a + v.beats, 0) * 60 / (song.bpm || 96);
     $('fmeta').textContent = `· ${(+song.bpm || 96).toFixed(1)} bpm · ${sung} notes · ${(song.chords || []).length} chord blocks · ${mmss(secs)}`;
     $('lyrics').disabled = lyricsFromFile;
+    $('split').innerHTML = '';
     if (lyricsFromFile) { $('count').innerHTML = `<span class="n">${sung}</span> notes, words from the song file`; $('rule').textContent = ''; }
-    else if (words) {
+    else if (words && words.lines) {
+      const typed = $('lyrics').value, shown = C.wordsToLines(typed);
+      $('split').innerHTML = words.lines.map((l, i) => { const syl = (shown[i] || []).map((t) => (t.hold ? '_' : t.sounds ? `[${t.syl}]` : t.syl)).join('-'); const cls = l.extra ? 'bad' : l.merged ? 'warn' : '';
+        return `<div class="ln ${cls}"><span class="w" title="${esc(syl)}">${esc(syl)}</span><span class="c">line ${l.line}: ${l.syllables} syllable${l.syllables === 1 ? '' : 's'}, ${l.notes} note${l.notes === 1 ? '' : 's'}${l.held ? ` (${l.held} held)` : ''}${l.merged ? ` (${l.merged} doubled up)` : ''}${l.extra ? ' · no phrase left' : ''}</span></div>`; }).join('');
+      const bad = words.lines.filter((l) => l.extra).length, warn = words.lines.filter((l) => l.merged).length;
+      $('count').innerHTML = `<span class="n">${words.syllables}</span> syllables on <span class="n">${words.notes}</span> notes in ${words.lines.length} line${words.lines.length === 1 ? '' : 's'}`;
+      $('rule').innerHTML = bad ? `<span class="warn">${bad} line${bad === 1 ? '' : 's'} with no phrase to sing</span>` : warn ? `<span class="warn">${warn} line${warn === 1 ? '' : 's'} doubled up</span>` : words.held ? `${words.held} held` : typed.trim() ? 'every note has a word' : '';
+    } else if (words) {
       const d = words.syllables - words.notes;
       $('count').innerHTML = `<span class="n">${words.syllables}</span> syllables / <span class="n">${words.notes}</span> notes`;
       $('rule').innerHTML = d === 0 ? 'every note has a word' : d < 0 ? `<span class="warn">the last ${-d} note${-d === 1 ? '' : 's'} sing "la"</span>` : `<span class="warn">the last ${d} syllable${d === 1 ? '' : 's'} are not sung</span>`;
@@ -1008,20 +1230,49 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     status('ready to sing');
   }
   const lyricsText = () => ($('lyrics').value.trim() ? $('lyrics').value : null);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+  // every melody, from a MIDI or a recording, ends up as notes in seconds (state.notes) that the roll edits and the song is built from
+  function showMelody(notes, { name, bpm, band, f0 = null, times = null, duration = null }) {
+    state.notes = notes; state.band = band; state.f0 = f0; state.times = times;
+    state.duration = duration || Math.max(1, ...notes.map((n) => n.e)) + 0.5;
+    $('bpm').value = bpm;
+    $('chordslabel').textContent = band ? "replace the file's band with chords from the melody" : 'add chords from the melody';
+    $('chords').checked = !band;
+    $('melody').classList.add('on');
+    $('retrack').style.display = state.audio ? '' : 'none';
+    $('rollhint').textContent = (f0 ? 'what the tracker heard; ' : '') + 'click a note to delete it, drag it up or down to move it, shift-click to split it';
+    rebuild();
+  }
+  const QUANT_DEFAULT = { midi: 0, audio: 2 };
+  function rebuild() {
+    if (state.midi) return rebuildMidi();
+    if (state.notes) return rebuildNotes();
+  }
+  function rebuildNotes() {
+    const lines = [], bpm = Math.max(30, Math.min(300, +$('bpm').value || 96)), quantize = QUANT[+$('quant').value], barBeats = +$('bars').value, chords = $('chords').checked;
+    const r = C.songFromNotes(state.notes, { bpm, quantize, chords, band: state.band, barBeats, lyrics: lyricsText(), exact: $('exact').checked, restBeats: +$('rest').value, log: (s) => lines.push(s) });
+    state.key = r.key;
+    const long = state.notes.filter((n) => n.e - n.s > +$('long').value * 60 / bpm + 1e-6).length;
+    $('long_v').textContent = `over ${$('long').value} beats: ${long}`; $('trim').disabled = !long;
+    $('keyline').innerHTML = `key heard: <b>${r.key.name}</b>${state.notes.length ? ` · range ${C.nameOf(Math.min(...state.notes.map((n) => n.m)))} to ${C.nameOf(Math.max(...state.notes.map((n) => n.m)))}` : ''} · the pitch slider transposes the whole thing`;
+    drawRoll();
+    setSong(r.song, { name: state.name || 'melody', source: state.source, lyricsFromFile: false, words: r.words, lines: (state.midiLog || []).concat(lines) });
+  }
 
   // a MIDI file: keep the bytes, show the parts ranked by how much they look like the singer, and rebuild the song whenever the
   // words or the track choice change. A choice made for a file is kept for as long as the page is open, so dropping it again keeps it.
   const chosen = new Map();   // file name -> { melody, band }
-  const esc = (s) => String(s).replace(/</g, '&lt;');
   function loadMidi(bytes, name) {
     const info = C.midiInfo(bytes, name);
     if (!info.parts.length) throw new Error(name + ' has no notes');
     const kept = chosen.get(name) || { melody: 0, band: null };
     if (kept.melody && !info.parts.some((p) => p.track === kept.melody)) kept.melody = 0;
-    state.midi = { bytes, name, info, melody: kept.melody, band: kept.band }; state.audio = null; $('melody').classList.remove('on');
+    state.midi = { bytes, name, info, melody: kept.melody, band: kept.band }; state.audio = null;
+    state.name = name.replace(/\.[^.]+$/, ''); state.source = 'midi';
     const lines = [], first = C.songFromMidi(bytes, { name, melodyTrack: kept.melody, chordTracks: kept.band || [], log: (s) => lines.push(s) });
-    const sel = $('melsel');
-    sel.innerHTML = `<option value="0">as found: track ${first.melody}${(first.ranked.find((p) => p.track === first.melody) || {}).name ? ' “' + esc(first.ranked.find((p) => p.track === first.melody).name) + '”' : ''}</option>` +
+    const sel = $('melsel'), found = first.ranked.find((p) => p.track === first.melody) || {};
+    sel.innerHTML = `<option value="0">as found: track ${first.melody}${found.name ? ' “' + esc(found.name) + '”' : ''}</option>` +
       first.ranked.map((p) => `<option value="${p.track}">track ${p.track}${p.name ? ' “' + esc(p.name) + '”' : ''} · ${p.notes} notes · ${C.nameOf(p.median)}</option>`).join('');
     sel.value = String(kept.melody);
     $('choose').classList.add('on');
@@ -1030,17 +1281,18 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
       <td><input type="radio" name="mel" value="${p.track}"></td><td><input type="checkbox" class="band" value="${p.track}" checked></td>
       <td>${p.track}${p.name ? ' “' + esc(p.name) + '”' : ''} <span style="color: var(--faint)">ch ${p.ch}${p.program != null ? ' prog ' + p.program : ''}</span></td>
       <td>${p.notes}</td><td>${Math.round(p.mono * 100)}%</td><td>${C.nameOf(p.median)}</td><td>${p.lyrics ? 'yes' : '–'}</td><td>${p.score.toFixed(1)}</td></tr>`).join('');
-    t.querySelectorAll('input[name=mel]').forEach((r) => r.addEventListener('change', () => { state.midi.melody = +r.value; sel.value = r.value; remember(); rebuild(); }));
-    t.querySelectorAll('input.band').forEach((c) => c.addEventListener('change', () => { state.midi.band = [...t.querySelectorAll('input.band:checked')].map((x) => +x.value); remember(); rebuild(); }));
-    rebuild();
+    t.querySelectorAll('input[name=mel]').forEach((r) => r.addEventListener('change', () => { state.midi.melody = +r.value; sel.value = r.value; remember(); rebuildMidi(); }));
+    t.querySelectorAll('input.band').forEach((c) => c.addEventListener('change', () => { state.midi.band = [...t.querySelectorAll('input.band:checked')].map((x) => +x.value); remember(); rebuildMidi(); }));
+    $('quant').value = QUANT_DEFAULT.midi; $('quant_v').textContent = QUANT_NAMES[QUANT_DEFAULT.midi];
+    rebuildMidi();
   }
   const remember = () => { if (state.midi) chosen.set(state.midi.name, { melody: state.midi.melody, band: state.midi.band }); };
-  $('melsel').addEventListener('change', () => { if (!state.midi) return; state.midi.melody = +$('melsel').value; remember(); rebuild(); });
-  function rebuild() {
-    if (state.audio) return rebuildAudio();
+  $('melsel').addEventListener('change', () => { if (!state.midi) return; state.midi.melody = +$('melsel').value; remember(); rebuildMidi(); });
+  // the file's melody and band, from the chosen tracks, onto the roll; edits there do not come back here
+  function rebuildMidi() {
     const m = state.midi; if (!m) return;
     const lines = [];
-    const r = C.songFromMidi(m.bytes, { name: m.name, lyrics: lyricsText(), melodyTrack: m.melody, chordTracks: m.band || [], log: (s) => lines.push(s) });
+    const r = C.songFromMidi(m.bytes, { name: m.name, melodyTrack: m.melody, chordTracks: m.band || [], log: (s) => lines.push(s) });
     const mel = r.ranked.find((p) => p.track === r.melody) || {};
     $('melwhy').textContent = m.melody ? 'your choice' : mel.lyrics ? 'it carries the words' : `best score, ${(mel.why || []).slice(0, 3).join(', ')}`;
     $('tracks').querySelectorAll('tr[data-track]').forEach((tr) => {
@@ -1049,12 +1301,19 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
       tr.querySelector('input[name=mel]').checked = isMel;
       const box = tr.querySelector('input.band'); box.disabled = isMel; if (isMel) box.checked = false; else if (m.band === null) box.checked = true; else box.checked = m.band.includes(n);
     });
-    setSong(r.song, { name: m.name.replace(/\.[^.]+$/, ''), source: 'midi', lyricsFromFile: false, words: r.words, lines });
+    state.midiLog = lines.filter((l) => !l.startsWith('  lyrics'));
+    // the file's own words land in the box when it has them and the box is empty
+    const fileWords = r.song.voice.filter((v) => v.note != null && v.syl && v.syl !== 'l ah').map((v) => v.syl);
+    if (fileWords.length && !$('lyrics').value.trim()) { $('lyrics').value = fileWords.join(' '); $('exact').checked = true; }
+    const prev = state.midi; state.midi = null;   // showMelody rebuilds from the notes
+    const band = r.song.chords.some((c) => c.notes.length) ? r.song.chords : null;   // a file with no band still comes with one empty block
+    showMelody(C.notesFromVoice(r.song.voice, r.song.bpm), { name: m.name, bpm: r.song.bpm, band });
+    state.midi = prev;
   }
   function loadJson(text, name) {
     const song = JSON.parse(text);
     if (!song || !Array.isArray(song.voice)) throw new Error(name + ' is not a song file');
-    state.midi = null; state.audio = null; $('tracks').innerHTML = ''; $('choose').classList.remove('on'); $('melody').classList.remove('on');
+    state.midi = null; state.audio = null; state.notes = null; state.midiLog = null; $('tracks').innerHTML = ''; $('choose').classList.remove('on'); $('melody').classList.remove('on');
     setSong(song, { name: name.replace(/\.[^.]+$/, ''), source: 'json', lyricsFromFile: true, lines: [`${name}: ${song.voice.length} voice entries, ${(song.chords || []).length} chord blocks`] });
   }
 
@@ -1065,10 +1324,11 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     const mono = new Float32Array(buf.length);
     for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < mono.length; i++) mono[i] += d[i] / buf.numberOfChannels; }
     const samples = C.toTrackerRate(mono, buf.sampleRate);
-    state.midi = null; $('tracks').innerHTML = ''; $('choose').classList.remove('on');
-    state.audio = { name: file.name, samples, duration: buf.duration, notes: [], times: null, f0: null };
+    state.midi = null; state.midiLog = null; $('tracks').innerHTML = ''; $('choose').classList.remove('on');
+    state.audio = { name: file.name, samples, duration: buf.duration };
+    state.name = file.name.replace(/\.[^.]+$/, ''); state.source = 'audio';
     $('file').classList.add('on'); $('fname').textContent = file.name; $('fmeta').textContent = `· ${mmss(buf.duration)} · ${buf.sampleRate} Hz · ${buf.numberOfChannels === 1 ? 'mono' : 'stereo'}`;
-    $('melody').classList.add('on');
+    $('quant').value = QUANT_DEFAULT.audio; $('quant_v').textContent = QUANT_NAMES[QUANT_DEFAULT.audio];
     await track();
   }
   async function track() {
@@ -1077,21 +1337,10 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     const mst = $('mstatus'); mst.textContent = 'listening…'; mst.className = 'status busy';
     try {
       const r = await inWorker({ kind: 'track', samples: a.samples.slice() }, [], (k) => { $('prog').style.width = (k * 100).toFixed(1) + '%'; });
-      a.notes = r.notes; a.times = r.times; a.f0 = r.f0;
-      $('bpm').value = r.bpm;
       mst.textContent = `${r.notes.length} notes heard`; mst.className = 'status';
-      rebuildAudio();
+      showMelody(r.notes, { name: a.name, bpm: r.bpm, band: null, f0: r.f0, times: r.times, duration: a.duration });
     } catch (err) { mst.textContent = err.message; mst.className = 'status err'; }
     finally { state.busy = false; $('retrack').disabled = false; $('render').disabled = !state.song; $('prog').style.width = '0%'; }
-  }
-  function rebuildAudio() {
-    const a = state.audio; if (!a) return;
-    const lines = [], bpm = Math.max(30, Math.min(300, +$('bpm').value || 96)), quantize = QUANT[+$('quant').value], barBeats = +$('bars').value, chords = $('chords').checked;
-    const r = C.songFromNotes(a.notes, { bpm, quantize, chords, barBeats, lyrics: lyricsText(), log: (s) => lines.push(s) });
-    a.key = r.key;
-    $('keyline').innerHTML = `key heard: <b>${r.key.name}</b>${a.notes.length ? ` · range ${C.nameOf(Math.min(...a.notes.map((n) => n.m)))} to ${C.nameOf(Math.max(...a.notes.map((n) => n.m)))}` : ''} · the pitch slider transposes the whole thing`;
-    drawRoll();
-    setSong(r.song, { name: a.name.replace(/\.[^.]+$/, ''), source: 'audio', lyricsFromFile: false, words: r.words, lines });
   }
   async function loadFile(file) {
     try {
@@ -1107,50 +1356,61 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
   for (const ev of ['dragleave', 'drop']) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); });
   drop.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
   $('demo').addEventListener('click', () => {
-    state.midi = null; state.audio = null; $('tracks').innerHTML = ''; $('choose').classList.remove('on'); $('melody').classList.remove('on');
+    state.midi = null; state.audio = null; state.notes = null; state.midiLog = null; $('tracks').innerHTML = ''; $('choose').classList.remove('on'); $('melody').classList.remove('on');
     $('lyrics').value = DEMO.words;
-    setSong(JSON.parse(JSON.stringify(DEMO.song)), { name: DEMO.name, source: 'demo', lyricsFromFile: true, lines: ['the demo: "Little Window", an original lullaby in the shape of the trailer song (3/4, about 90 s)', 'the words box shows its lyrics file, as you would write one for a MIDI or a recording'] });
+    setSong(JSON.parse(JSON.stringify(DEMO.song)), { name: DEMO.name, source: 'demo', lyricsFromFile: true, lines: ['the demo: "Little Window", an original lullaby in the shape of the trailer song (3/4, about 90 s)', 'the words box shows its lyrics file; for a MIDI or a recording you would type the plain words, a line per phrase'] });
   });
   let lyricsTimer = null;
-  $('lyrics').addEventListener('input', () => { clearTimeout(lyricsTimer); lyricsTimer = setTimeout(rebuild, 250); });
-  $('bpm').addEventListener('change', rebuildAudio);
-  $('quant').addEventListener('input', () => { $('quant_v').textContent = QUANT_NAMES[+$('quant').value]; rebuildAudio(); });
-  $('bars').addEventListener('change', rebuildAudio);
-  $('chords').addEventListener('change', rebuildAudio);
+  $('lyrics').addEventListener('input', () => { clearTimeout(lyricsTimer); lyricsTimer = setTimeout(rebuildNotes, 250); });
+  $('exact').addEventListener('change', rebuildNotes);
+  $('rest').addEventListener('input', () => { $('rest_v').textContent = (+$('rest').value).toFixed(2) + ' beat'; clearTimeout(lyricsTimer); lyricsTimer = setTimeout(rebuildNotes, 150); });
+  $('bpm').addEventListener('change', rebuildNotes);
+  $('quant').addEventListener('input', () => { $('quant_v').textContent = QUANT_NAMES[+$('quant').value]; rebuildNotes(); });
+  $('bars').addEventListener('change', rebuildNotes);
+  $('chords').addEventListener('change', rebuildNotes);
+  $('long').addEventListener('input', rebuildNotes);
+  $('trim').addEventListener('click', () => { if (!state.notes) return; const n = C.trimLongNotes(state.notes, +$('bpm').value || 96, +$('long').value); status(`${n} note${n === 1 ? '' : 's'} trimmed to ${$('long').value} beats`); rebuildNotes(); });
   $('retrack').addEventListener('click', track);
 
   // ---------- the piano roll ----------
   const roll = $('roll'), rg = roll.getContext('2d');
   let rollMap = null;
   function drawRoll() {
-    const a = state.audio, W = roll.width, H = roll.height;
+    const W = roll.width, H = roll.height, notes = state.notes;
     rg.fillStyle = '#0d0c0b'; rg.fillRect(0, 0, W, H);
-    if (!a || !a.times) return;
-    const dur = a.duration, lo = Math.min(48, ...a.notes.map((n) => n.m)) - 2, hi = Math.max(60, ...a.notes.map((n) => n.m)) + 2;
+    if (!notes) return;
+    const dur = state.duration, lo = Math.min(48, ...notes.map((n) => n.m)) - 2, hi = Math.max(60, ...notes.map((n) => n.m)) + 2;
     const x = (t) => t / dur * W, y = (m) => H - (m - lo) / (hi - lo) * H, rowH = H / (hi - lo);
     rollMap = { x, y, lo, hi, rowH, dur };
     // the rows, the black keys a shade darker, and the beat lines
     for (let m = Math.ceil(lo); m < hi; m++) { if ([1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12)) { rg.fillStyle = 'rgba(0,0,0,0.35)'; rg.fillRect(0, y(m + 0.5), W, rowH); } if (m % 12 === 0) { rg.fillStyle = 'rgba(233,226,208,0.12)'; rg.fillRect(0, y(m - 0.5), W, 1); rg.fillStyle = '#5d574b'; rg.font = '12px "Courier Prime", monospace'; rg.fillText(C.nameOf(m), 4, y(m) + 4); } }
-    const bpm = +$('bpm').value || 96, q = QUANT[+$('quant').value], g = q ? 60 / bpm / q : 0, off = g ? C.gridOffset(a.notes, bpm, q) : 0, barBeats = +$('bars').value;
-    if (g) for (let t = off, i = 0; t < dur; t += g, i++) { rg.fillStyle = i % (q * barBeats) === 0 ? 'rgba(233,226,208,0.22)' : i % q === 0 ? 'rgba(233,226,208,0.1)' : 'rgba(233,226,208,0.04)'; rg.fillRect(Math.round(x(t)), 0, 1, H); }
-    // the pitch curve
-    rg.fillStyle = '#9a9281';
-    for (let i = 0; i < a.f0.length; i++) if (a.f0[i]) { const m = 69 + 12 * Math.log2(a.f0[i] / 440); rg.fillRect(x(a.times[i]), y(m) - 1.5, 2, 3); }
-    // the notes
-    for (const n of a.notes) {
+    const bpm = +$('bpm').value || 96, q = QUANT[+$('quant').value] || 1, g = 60 / bpm / q, off = QUANT[+$('quant').value] ? C.gridOffset(notes, bpm, q) : 0, barBeats = +$('bars').value;
+    for (let t = off, i = 0; t < dur; t += g, i++) { rg.fillStyle = i % (q * barBeats) === 0 ? 'rgba(233,226,208,0.22)' : i % q === 0 ? 'rgba(233,226,208,0.1)' : 'rgba(233,226,208,0.04)'; rg.fillRect(Math.round(x(t)), 0, 1, H); }
+    // the pitch curve, when there was a recording
+    if (state.f0) { rg.fillStyle = '#9a9281'; for (let i = 0; i < state.f0.length; i++) if (state.f0[i]) { const m = 69 + 12 * Math.log2(state.f0[i] / 440); rg.fillRect(x(state.times[i]), y(m) - 1.5, 2, 3); } }
+    // the notes; a long one gets a red edge
+    const longSec = +$('long').value * 60 / bpm;
+    for (const n of notes) {
       const px = x(n.s), pw = Math.max(2, x(n.e) - px), py = y(n.m + 0.5);
       rg.fillStyle = n === dragging ? '#fff0c8' : '#e0a33a'; rg.fillRect(px, py + 1, pw, rowH - 2);
       rg.fillStyle = 'rgba(0,0,0,0.35)'; rg.fillRect(px, py + 1, 1, rowH - 2);
+      if (n.e - n.s > longSec + 1e-6) { rg.fillStyle = '#c0261e'; rg.fillRect(px, py + 1, pw, 2); }
     }
   }
   let dragging = null, dragY0 = 0, dragM0 = 0, moved = false;
-  const noteAt = (ev) => {
-    if (!rollMap || !state.audio) return null;
+  const rollPoint = (ev) => {
     const r = roll.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * roll.width, py = (ev.clientY - r.top) / r.height * roll.height;
-    const t = px / roll.width * rollMap.dur, m = rollMap.lo + (roll.height - py) / roll.height * (rollMap.hi - rollMap.lo);
-    return state.audio.notes.find((n) => t >= n.s && t <= n.e && Math.abs(m - n.m) <= 0.6) || null;
+    return { t: px / roll.width * rollMap.dur, m: rollMap.lo + (roll.height - py) / roll.height * (rollMap.hi - rollMap.lo) };
   };
-  roll.addEventListener('mousedown', (ev) => { const n = noteAt(ev); if (!n) return; dragging = n; dragY0 = ev.clientY; dragM0 = n.m; moved = false; drawRoll(); });
+  const noteAt = (ev) => { if (!rollMap || !state.notes) return null; const { t, m } = rollPoint(ev); return state.notes.find((n) => t >= n.s && t <= n.e && Math.abs(m - n.m) <= 0.6) || null; };
+  roll.addEventListener('mousedown', (ev) => {
+    const n = noteAt(ev); if (!n) return;
+    if (ev.shiftKey) {   // split it where the click fell
+      const { t } = rollPoint(ev); if (t - n.s < 0.05 || n.e - t < 0.05) return;
+      state.notes.push({ s: t, e: n.e, m: n.m }); n.e = t; state.notes.sort((a, b) => a.s - b.s); rebuildNotes(); return;
+    }
+    dragging = n; dragY0 = ev.clientY; dragM0 = n.m; moved = false; drawRoll();
+  });
   window.addEventListener('mousemove', (ev) => {
     if (!dragging) return;
     const r = roll.getBoundingClientRect(), dm = -Math.round((ev.clientY - dragY0) / r.height * roll.height / rollMap.rowH);
@@ -1159,8 +1419,8 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
   });
   window.addEventListener('mouseup', () => {
     if (!dragging) return;
-    if (!moved) state.audio.notes = state.audio.notes.filter((n) => n !== dragging);   // a click: the note goes
-    dragging = null; rebuildAudio();
+    if (!moved) state.notes = state.notes.filter((n) => n !== dragging);   // a click: the note goes
+    dragging = null; rebuildNotes();
   });
 
   // ---------- the knobs ----------
@@ -1220,7 +1480,7 @@ const DEMO = {"name":"little-window","song":{"title":"Little Window","bpm":92,"k
     if (playing) offset = position();
     playing = false; $('play').textContent = '▶'; cancelAnimationFrame(raf); drawWave();
   }
-  const position = () => (playing ? Math.min(buffer.duration, offset + ctx.currentTime - startedAt) : offset);
+  const position = () => (playing && buffer ? Math.min(buffer.duration, offset + ctx.currentTime - startedAt) : offset);
   function tick() { drawWave(); $('time').textContent = `${mmss(position())} / ${mmss(state.mix ? state.mix.length / C.SR : 0)}`; if (playing) raf = requestAnimationFrame(tick); }
   $('play').addEventListener('click', () => { if (playing) stopPlay(); else startPlay(offset); });
   document.addEventListener('keydown', (e) => { if (e.code === 'Space' && !/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName) && state.L) { e.preventDefault(); playing ? stopPlay() : startPlay(offset); } });

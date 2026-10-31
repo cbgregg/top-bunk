@@ -530,7 +530,7 @@ export function chordsFromMelody(notes, key, bpm, barBeats, totalBeats) {
 
 // the song from detected notes: starts and lengths snapped to a grid (quantize 0 off, 1 beats, 2 half beats, 4 quarter beats),
 // rests where nothing is sung, "la" on every note until lyrics are given, and a chord per bar if chords is on
-export function songFromNotes(notes, { bpm = 96, quantize = 2, chords = true, barBeats = 4, lyrics = null, key = null, offset = null, log = () => {} } = {}) {
+export function songFromNotes(notes, { bpm = 96, quantize = 2, chords = true, band = null, barBeats = 4, lyrics = null, exact = false, restBeats = 0.4, key = null, offset = null, log = () => {} } = {}) {
   const beat = 60 / bpm, g = quantize ? beat / quantize : 0;
   const off = g ? (offset == null ? gridOffset(notes, bpm, quantize) : offset) : 0;   // the grid can start a little after the recording
   const snap = (t) => (g ? Math.max(0, Math.round((t - off) / g) * g + off) : t);
@@ -546,10 +546,205 @@ export function songFromNotes(notes, { bpm = 96, quantize = 2, chords = true, ba
   }
   const k = key || detectKey(kept);
   const totalBeats = voice.reduce((a, v) => a + v.beats, 0);
-  const song = { bpm: +bpm.toFixed(3), key: k.name, voice, chords: chords ? chordsFromMelody(kept, k, bpm, barBeats, totalBeats) : [] };
-  log(`melody: ${kept.length} notes, ${bpm} bpm, ${k.name}${g ? `, snapped to ${quantize === 1 ? 'beats' : quantize === 2 ? 'half beats' : 'quarter beats'}` : ''}${chords ? `, ${song.chords.length} bars of chords` : ''}`);
-  const words = applyLyrics(voice, lyrics, log);
+  const song = { bpm: +bpm.toFixed(3), key: k.name, voice, chords: chords ? chordsFromMelody(kept, k, bpm, barBeats, totalBeats) : band || [] };
+  log(`melody: ${kept.length} notes, ${bpm} bpm, ${k.name}${g ? `, snapped to ${quantize === 1 ? 'beats' : quantize === 2 ? 'half beats' : 'quarter beats'}` : ''}${chords ? `, ${song.chords.length} bars of chords from the melody` : band ? `, ${band.length} chord blocks from the file` : ''}`);
+  const words = exact || lyrics == null ? applyLyrics(voice, lyrics, log) : alignWords(voice, lyrics, { restBeats, log });
   return { song, key: k, words };
+}
+
+// a voice line as notes in seconds, for the roll and for editing: [{ s, e, m }]
+export function notesFromVoice(voice, bpm) {
+  const beat = 60 / bpm, out = []; let t = 0;
+  for (const v of voice) { if (v.note != null) out.push({ s: t, e: t + v.beats * beat, m: midi(v.note) }); t += v.beats * beat; }
+  return out;
+}
+
+// notes held longer than maxBeats are cut there; the rest of their time becomes a rest. Returns how many were cut.
+export function trimLongNotes(notes, bpm, maxBeats = 4) {
+  const max = maxBeats * 60 / bpm; let n = 0;
+  for (const x of notes) if (x.e - x.s > max + 1e-6) { x.e = x.s + max; n++; }
+  return n;
+}
+
+// ---------- words ----------
+// English words into syllables, by rule: vowel groups are the nuclei (y between consonants counts, a vowel run is one nucleus except
+// the pairs that are two: ia io eo ua uo and y before a vowel), a final e is silent, -es and -ed are syllables only after the
+// consonants that need them, then the consonants between two nuclei go to the second one (a cluster is split after its first
+// consonant, a digraph or a stop+l/r blend stays together) and a final consonant+le is its own syllable. A few words the rules
+// get wrong are listed.
+const EXC = { people: ['peo', 'ple'], every: ['ev', 'ery'], everything: ['ev', 'ery', 'thing'], everyone: ['ev', 'ery', 'one'], sacred: ['sa', 'cred'], naked: ['na', 'ked'], wicked: ['wick', 'ed'],
+  rugged: ['rug', 'ged'], crooked: ['crook', 'ed'], beloved: ['be', 'lov', 'ed'], wretched: ['wretch', 'ed'], jagged: ['jag', 'ged'], ragged: ['rag', 'ged'], blessed: ['bles', 'sed'],
+  evening: ['eve', 'ning'], heaven: ['hea', 'ven'], fire: ['fire'], hour: ['hour'], our: ['our'], power: ['pow', 'er'], flower: ['flow', 'er'], prayer: ['prayer'], being: ['be', 'ing'],
+  going: ['go', 'ing'], doing: ['do', 'ing'], seeing: ['see', 'ing'], idea: ['i', 'de', 'a'], quiet: ['qui', 'et'], science: ['sci', 'ence'], poem: ['po', 'em'], ocean: ['o', 'cean'],
+  again: ['a', 'gain'], against: ['a', 'gainst'], lonely: ['lone', 'ly'], lovely: ['love', 'ly'], something: ['some', 'thing'], nothing: ['noth', 'ing'], anything: ['an', 'y', 'thing'],
+  maybe: ['may', 'be'], always: ['al', 'ways'], together: ['to', 'geth', 'er'], another: ['an', 'oth', 'er'], mother: ['moth', 'er'], father: ['fa', 'ther'], brother: ['broth', 'er'],
+  water: ['wa', 'ter'], over: ['o', 'ver'], under: ['un', 'der'], never: ['nev', 'er'], ever: ['ev', 'er'], river: ['riv', 'er'], little: ['lit', 'tle'], window: ['win', 'dow'] };
+const DIG = ['th', 'sh', 'ch', 'ph', 'wh', 'ck', 'qu', 'gh'], STOPS = 'bcdfgkpt';
+export function syllabify(word) {
+  const w = word.toLowerCase().replace(/[^a-z']/g, '');
+  if (!w) return [];
+  if (EXC[w]) return EXC[w].slice();
+  const letters = w.replace(/'/g, '');
+  if (letters.length <= 3) return [w];
+  const isVowel = (i) => 'aeiou'.includes(letters[i]) || (letters[i] === 'y' && i > 0 && !'aeiou'.includes(letters[i - 1]));
+  // the nuclei as [start, end) over the letters
+  const nuclei = [];
+  for (let i = 0; i < letters.length; i++) {
+    if (!isVowel(i)) continue;
+    const last = nuclei[nuclei.length - 1];
+    if (last && last[1] === i) {
+      const pair = letters[i - 1] + letters[i], before = letters.slice(Math.max(0, i - 3), i - 1);
+      const two = (['ia', 'io', 'eo', 'ua', 'uo'].includes(pair) && !(pair === 'io' && /[tsc]$/.test(before)) && !(pair === 'ua' && /[qg]$/.test(before))) || letters[i - 1] === 'y';
+      if (!two) { last[1] = i + 1; continue; }
+    }
+    nuclei.push([i, i + 1]);
+  }
+  if (nuclei.length <= 1) return [w];
+  // endings: a silent e, and -es / -ed that add nothing after most consonants
+  const lastN = nuclei[nuclei.length - 1], tail = letters.slice(lastN[0]);
+  if (tail === 'e' && !/[^aeiou]le$/.test(letters) && nuclei.length > 1) nuclei.pop();
+  else if (tail === 'es' && !/(s|x|z|c|g|ch|sh)es$/.test(letters)) nuclei.pop();
+  else if (tail === 'ed' && !/[dt]ed$/.test(letters)) nuclei.pop();
+  if (nuclei.length <= 1) return [w];
+  // the split points
+  const cuts = [];
+  for (let k = 0; k + 1 < nuclei.length; k++) {
+    const a = nuclei[k][1], b = nuclei[k + 1][0], cons = letters.slice(a, b), n = cons.length;
+    let cut;
+    if (n === 0) cut = a;
+    else if (n === 1) cut = a;
+    else if (n === 2) cut = DIG.includes(cons) || (STOPS.includes(cons[0]) && 'lr'.includes(cons[1])) ? a : a + 1;
+    else { const lastTwo = cons.slice(-2); cut = DIG.includes(lastTwo) || (STOPS.includes(lastTwo[0]) && 'lr'.includes(lastTwo[1])) ? b - 2 : a + 1; }
+    if (letters.slice(a, b) === 'ng' && letters.endsWith('ing') && b === letters.length - 3) cut = a + 2;   // sing-ing, not si-nging
+    cuts.push(cut);
+  }
+  if (/[^aeiou]le$/.test(letters) && nuclei[nuclei.length - 1][0] === letters.length - 1) cuts[cuts.length - 1] = letters.length - 3;   // lit-tle
+  // back onto the word with its apostrophes
+  const out = []; let p = 0, li = 0, wi = 0;
+  const map = []; for (let i = 0; i < w.length; i++) if (w[i] !== "'") map[li++] = i;
+  for (const c of cuts) { const at = map[c]; out.push(w.slice(wi, at)); wi = at; }
+  out.push(w.slice(wi));
+  return out.filter(Boolean);
+}
+
+// the words box as lines of syllables. A plain word is syllabified; "lit-tle" is split where the hyphen is; "_" holds the last
+// syllable over a note; "[dh uh]" is a syllable given as sounds; "#" starts a comment
+export function wordsToLines(text) {
+  const lines = [];
+  for (let line of text.split(/\r?\n/)) {
+    line = line.replace(/#.*$/, '').trim();
+    if (!line) continue;
+    const syls = [], re = /\[([^\]]*)\]|(_+)|([^\s\[\]_]+)/g; let m;
+    while ((m = re.exec(line))) {
+      if (m[1] != null) { const t = m[1].trim(); if (t) syls.push({ syl: t, sounds: true }); }
+      else if (m[2]) for (let i = 0; i < m[2].length; i++) syls.push({ hold: true });
+      else for (const piece of m[3].split('-')) {
+        const word = piece.replace(/^[^A-Za-z']+|[^A-Za-z']+$/g, '');
+        if (!word) continue;
+        if (m[3].includes('-')) syls.push({ syl: word }); else for (const sy of syllabify(word)) syls.push({ syl: sy });
+      }
+    }
+    if (syls.length) lines.push(syls);
+  }
+  return lines;
+}
+
+// the words onto the notes, phrase by phrase: a line of words is a phrase; the melody's phrases are what its rests cut it into
+// (a rest of restBeats or more). With more notes than syllables in a phrase, the longest extra notes are held on the vowel of the
+// syllable before them; with more syllables than notes, the shortest syllables double up on a note. Returns the per-line report.
+export function alignWords(voice, text, { restBeats = 0.4, log = () => {} } = {}) {
+  const lines = typeof text === 'string' ? wordsToLines(text) : text;
+  // the phrases: runs of sung notes between rests
+  const sungIdx = [];
+  for (let i = 0; i < voice.length; i++) if (voice[i].note != null) sungIdx.push(i);
+  let phrases = [], cur = [], restBefore = [], lastRest = 0;
+  for (let i = 0; i < voice.length; i++) {
+    const v = voice[i];
+    if (v.note == null) { lastRest += v.beats; continue; }
+    if (cur.length && lastRest >= restBeats) { phrases.push(cur); restBefore.push(lastRest); cur = []; }
+    cur.push(i); lastRest = 0;
+  }
+  if (cur.length) phrases.push(cur);
+  // as many phrases as lines: join the phrases parted by the shortest rests first...
+  while (phrases.length > lines.length && phrases.length > 1) {
+    let k = 0; for (let i = 1; i < restBefore.length; i++) if (restBefore[i] < restBefore[k]) k = i;
+    phrases[k] = phrases[k].concat(phrases[k + 1]); phrases.splice(k + 1, 1); restBefore.splice(k, 1);
+  }
+  // ...or cut the long ones: each phrase takes lines in proportion to its notes, and is cut between them in proportion to the
+  // lines' syllables, at the end of the longest note near that point
+  if (phrases.length < lines.length && phrases.length) {
+    const total = phrases.reduce((a, ph) => a + ph.length, 0), L = lines.length;
+    const share = phrases.map((ph) => ph.length / total * L), take = share.map((v) => Math.max(1, Math.floor(v)));
+    let left = L - take.reduce((a, b) => a + b, 0);
+    const order = share.map((v, i) => i).sort((a, b) => (share[b] - take[b]) - (share[a] - take[a]));
+    for (let i = 0; left > 0; i = (i + 1) % order.length) { if (phrases[order[i]].length > take[order[i]]) { take[order[i]]++; left--; } else if (order.every((o) => phrases[o].length <= take[o])) break; }
+    const cut = []; let li = 0;
+    for (let pi = 0; pi < phrases.length; pi++) {
+      const ph = phrases[pi], k = Math.min(take[pi], ph.length), mine = lines.slice(li, li + k); li += k;
+      if (k <= 1) { cut.push(ph); continue; }
+      const syl = mine.map((l) => l.length), sum = syl.reduce((a, b) => a + b, 0) || 1;
+      const lens = ph.map((i) => voice[i].beats), med = [...lens].sort((a, b) => a - b)[lens.length >> 1];
+      let at = 0, acc = 0;
+      for (let j = 0; j < k; j++) {
+        if (j === k - 1) { cut.push(ph.slice(at)); break; }
+        acc += syl[j];
+        let want = Math.round(ph.length * acc / sum); want = Math.max(at + 1, Math.min(ph.length - (k - 1 - j), want));
+        let best = want;   // a long note just before the cut reads as a phrase end; the nearest one to the share wins
+        for (const d of [0, 1, -1, 2, -2]) { const c = want + d; if (c > at && c <= ph.length - (k - 1 - j) && lens[c - 1] >= 1.5 * med) { best = c; break; } }
+        cut.push(ph.slice(at, best)); at = best;
+      }
+    }
+    phrases = cut;
+  }
+  const report = { lines: [], syllables: 0, notes: sungIdx.length, held: 0, merged: 0 };
+  const vowelOf = (syl) => { const last = syl.split('+').pop(); return /\s/.test(last) ? parse(last).vowel.join(' ') : parse(last).vowel.join(' '); };
+  const toRemove = [];
+  for (let li = 0; li < lines.length; li++) {
+    const syls = lines[li].slice();
+    const ph = phrases[li];
+    if (!ph) { report.lines.push({ line: li + 1, syllables: syls.length, notes: 0, held: 0, merged: 0, extra: true }); continue; }
+    const notes = ph.map((i) => voice[i]);
+    const slots = syls.map((sy) => (sy.hold ? { hold: true } : { syl: sy.syl }));
+    let held = 0, merged = 0;
+    if (slots.length > notes.length) {
+      // the shortest syllables double up with a neighbour
+      while (slots.length > notes.length && slots.length > 1) {
+        let k = -1; for (let i = 0; i < slots.length; i++) if (!slots[i].hold && (k < 0 || slots[i].syl.length < slots[k].syl.length)) k = i;
+        if (k < 0) break;
+        const j = k + 1 < slots.length && !slots[k + 1].hold ? k + 1 : k - 1;
+        if (j < 0 || slots[j].hold) { slots.splice(k, 1); continue; }
+        const a = Math.min(k, j), b = Math.max(k, j);
+        slots[a] = { syl: slots[a].syl + '+' + slots[b].syl }; slots.splice(b, 1); merged++;
+      }
+    } else if (slots.length < notes.length) {
+      // the longest notes, never the first, are held over
+      const extra = notes.length - slots.length;
+      const order = notes.map((n, i) => i).filter((i) => i > 0).sort((a, b) => notes[b].beats - notes[a].beats);
+      const heldAt = new Set(order.slice(0, extra));
+      const filled = []; let si = 0;
+      for (let i = 0; i < notes.length; i++) { if (heldAt.has(i) || si >= slots.length) filled.push({ hold: true }); else filled.push(slots[si++]); }
+      slots.length = 0; slots.push(...filled);
+    }
+    // onto the notes
+    let prev = null;
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i], sl = slots[i];
+      if (!sl || sl.hold) {
+        held++;
+        const p = i ? notes[i - 1] : null;
+        if (p && p.note === n.note && p.syl != null && !p.gone) { p.beats = +(p.beats + n.beats).toFixed(4); n.gone = true; toRemove.push(ph[i]); notes[i] = p; continue; }   // same pitch: one longer note
+        n.syl = prev ? vowelOf(prev) : 'ah';
+      } else { n.syl = sl.syl; prev = sl.syl; }
+    }
+    report.lines.push({ line: li + 1, syllables: syls.length, notes: notes.length, held, merged });
+    report.syllables += syls.length; report.held += held; report.merged += merged;
+  }
+  // phrases past the last line sing la; lines past the last phrase are reported as extra
+  for (let k = lines.length; k < phrases.length; k++) for (const i of phrases[k]) if (!voice[i].syl) voice[i].syl = 'l ah';
+  for (const i of toRemove.sort((a, b) => b - a)) voice.splice(i, 1);
+  for (const v of voice) { delete v.gone; if (v.note != null && !v.syl) v.syl = 'l ah'; }
+  for (const l of report.lines) log(`  line ${l.line}: ${l.syllables} syllable${l.syllables === 1 ? '' : 's'}, ${l.notes} note${l.notes === 1 ? '' : 's'}${l.held ? ` (${l.held} held)` : ''}${l.merged ? ` (${l.merged} doubled up)` : ''}${l.extra ? ' - no phrase left for it' : ''}`);
+  return report;
 }
 
 // ---------- filters ----------
@@ -700,7 +895,13 @@ function renderBand(band, song, beat, pitch, progress) {
 export function render(song, { slow = 1, pitch = 0, wobble = 0.5, voice: voiceLevel = 1, band: bandLevel = 1, progress = null } = {}) {
   seed = 1234;
   const beat = 60 / (song.bpm || 96);
-  const notes = song.voice.map((n) => ({ m: midi(n.note, pitch), dur: n.beats * beat, syl: n.syl || 'ah' }));
+  const notes = [];
+  for (const n of song.voice) {
+    const syl = n.syl || 'ah', m = midi(n.note, pitch), dur = n.beats * beat;
+    if (m == null || !syl.includes('+')) { notes.push({ m, dur, syl }); continue; }
+    const parts = syl.split('+').filter(Boolean), w = parts.map((p) => Math.max(1, p.replace(/\s/g, '').length)), tot = w.reduce((a, b) => a + b, 0);
+    parts.forEach((p, i) => notes.push({ m, dur: dur * w[i] / tot, syl: p }));   // two syllables on one note: each gets its share
+  }
   const totalV = notes.reduce((a, n) => a + n.dur, 0);
   const totalC = (song.chords || []).reduce((a, c) => a + c.beats * beat, 0);
   const total = Math.max(totalV, totalC) + 1.5;

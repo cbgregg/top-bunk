@@ -100,13 +100,30 @@ It has no dependencies and writes a stereo WAV. The synthesis lives in `tools/si
 
 ### The page
 
-`tools/robot-voice.html` is the same singer with knobs: drop a MIDI file and type its words, drop a recording of a voice on its own,
-or open a song file; set the tape speed, pitch, wobble and the two levels (the `1961` and `clean` presets are starting points);
+`tools/robot-voice.html` is the same singer with knobs: drop a MIDI file and type its words a line per phrase, drop a recording of a
+voice on its own, or open a song file; set the tape speed, pitch, wobble and the two levels (the `1961` and `clean` presets are starting points);
 `Preview` renders in the background and plays it with a waveform you can click to seek; `Export WAV` saves exactly what the command
 line writes for the same settings, `Export song JSON` the song file (what `--out-json` gives). `tools\robot-voice.cmd` serves the
 project and opens it (`node trailer/render.js --serve`, then `http://127.0.0.1:8700/tools/robot-voice.html`); the page also works
 opened straight from disk. It is one file with the core and the demo built in: after a change to `sing_core.js`, run
 `node tools/build_robot_voice.js` to put the new core into it.
+
+Words go on in phrases: a line in the box is a phrase, and the melody's phrases are what its rests cut it into (a rest of 0.4 beat
+or more; the slider moves it). Plain words are split into syllables by rule (vowel groups, a silent final e, -es/-ed only where
+they sound, consonant clusters split after their first consonant with digraphs and stop+l/r kept together, consonant+le at the
+end, and a short list of words the rules get wrong); a hyphen you type is honoured, `_` holds the last syllable over a note and
+`[dh uh]` gives a syllable as sounds. Within a phrase, extra notes hold the vowel of the syllable before them (the longest notes
+first, never the first note; on the same pitch the two notes become one), and extra syllables double up on a note, the shortest
+first, and the line is marked. When there are more lines than phrases the long phrases are cut between lines in proportion to
+their syllables, at the end of a long note; more phrases than lines and the ones parted by the shortest rests are joined. The
+split and a count per line ("line 3: 7 syllables, 9 notes (2 held)") show under the box. `exact: one syllable per note` is the
+old flat mode, for a words file written one syllable per note.
+
+The melody panel shows a MIDI's melody on the roll too, with the same editing: click a note to delete it, drag it up or down,
+shift-click to split it (so a melisma can take a syllable). Notes held longer than N beats (4 by default; the slider sets it)
+get a red edge and a count, and `TRIM THEM` cuts them there and turns the rest into a rest, which is what a transcription's
+phrase-end drones need. `add chords from the melody` puts a triad under each bar whenever the file has no band (or instead of
+its band, when it has one).
 
 A recording goes through a pitch tracker (YIN, 46 ms windows every 10 ms, a median over five frames), then into notes wherever the
 pitch holds a semitone for 60 ms or more, with a repeated note split where the level dips between syllables and each note starting
@@ -156,7 +173,9 @@ from 1, in file order) override it; the page has the same choice as a dropdown a
 lyrics file is plain text, one syllable per melody note in order, separated by spaces and hyphens, with `_` to hold the last syllable
 over the next note, `[dh uh]` for a syllable given as sounds and `#` for comments; `trailer/music/robot_lyrics_example.txt` is the
 demo's words in that form. Rests take no syllable. If the syllable and note counts differ it says so, and notes left over sing "la".
-Without a lyrics file, lyric events in the MIDI are used when it has them. `--out-json song.json` also writes what it read as a song
+Without a lyrics file, lyric events in the MIDI are used when it has them. `--words words.txt` takes plain lyrics instead, a line per
+phrase, laid on the melody the way the page does (`--phrase-rest B` sets the rest that ends a phrase); `--trim N` cuts notes held
+past N beats; `--guess-chords` adds a chord per bar from the melody. `--out-json song.json` also writes what it read as a song
 file, to fix a syllable or a chord by hand and sing again from that.
 
 A synthesized cover does not need the recording's master licence, but the composition is still under copyright, and so is a
