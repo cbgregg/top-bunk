@@ -46,6 +46,18 @@ const RQ = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qu = new THREE
 const GA = new THREE.Vector3(), GB = new THREE.Vector3(), GC = new THREE.Vector3(), GD = new THREE.Vector3(), GE = new THREE.Vector3(), GF = new THREE.Vector3();
 const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0), RG = new THREE.Vector3();
 const IA = new THREE.Vector3(), IB = new THREE.Vector3(), IC = new THREE.Vector3(), IW = new THREE.Vector3(), IL = new THREE.Vector3(), IX = new THREE.Vector3();
+
+// finger curl, radians at the knuckle, middle and end joints, index to pinky then the thumb. The clips leave every finger
+// straight and splayed (a blade), so a hand is never shown without at least the relaxed curl; more toward the pinky, the thumb
+// turned in. grip blends relaxed -> grip by how far the fingers close; flat is a palm pressed on the side of a box.
+const FINGERS = ['Finger1', 'Finger2', 'Finger3', 'Finger4', 'Finger0'];
+const CURL = {
+  relaxed: [[0.32, 0.42, 0.24], [0.38, 0.48, 0.28], [0.44, 0.54, 0.32], [0.5, 0.6, 0.36], [0.22, 0.18, 0.14]],
+  grip:    [[0.95, 1.2, 0.6], [1.0, 1.25, 0.65], [1.05, 1.3, 0.7], [1.1, 1.3, 0.7], [0.5, 0.45, 0.35]],
+  flat:    [[0.12, 0.18, 0.1], [0.14, 0.2, 0.12], [0.16, 0.22, 0.14], [0.18, 0.24, 0.14], [0.2, 0.15, 0.1]],
+};
+const WRIST_FLEX = 0.2;     // the relaxed wrist: this far off the forearm's line (the clips come in with the hands bent nearly 60 degrees at the wrist)
+const WRIST_ROLL = 1.1;     // how far grip may turn the hand about the forearm
 const HINGE = { L: new THREE.Vector3(0, -0.135, -0.991), R: new THREE.Vector3(0, 0.135, -0.991) };   // the elbow axis in upper-arm space when the clip's own bend is too small to read it
 const legNames = (s) => [s + '_Thigh', s + '_Calf', s + '_Foot'];
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
@@ -66,6 +78,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
       r.update(dt);
+      this.relaxHands(r);
       const p = this.pose;
       if (p && p.sleep) this.applyPose(r, p, 1, 0);
       else {
@@ -163,27 +176,59 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const y = r.rootY0 - (drop > 1e-4 ? drop : 0);
       if (r.root.position.y !== y) { r.root.position.y = y; r.root.updateMatrixWorld(true); }
     },
-    // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), then curl every finger toward it.
-    grip(r, side, c, amount, w = 1) {
-      const B = r.bones, hand = B[side + '_Hand'], fo = B[side + '_Forearm'], i1 = B[side + '_Finger1'], i2 = B[side + '_Finger2'], i4 = B[side + '_Finger4'];
-      if (!hand || !fo || !i1 || !i2 || !i4) return;
-      for (const b of [fo, hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
+    // the axis the fingers of one hand close about (across the knuckles, signed so a positive turn goes toward the palm `cp`)
+    curlAxis(r, side, cp, out) {
+      const B = r.bones, hand = B[side + '_Hand'], i1 = B[side + '_Finger1'], i2 = B[side + '_Finger2'], i4 = B[side + '_Finger4'];
+      for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
+      i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
+      const d = GA.copy(RA).sub(RH).normalize(); out.copy(RT).sub(RS).normalize();
+      if (GF.crossVectors(out, d).dot(cp) < 0) out.negate();
+      return out;
+    },
+    // curl every finger by a table of joint angles (minus `from`, when that table is already on the hand), about `ax`
+    curl(r, side, ax, table, from = null, w = 1) {
+      for (let f = 0; f < 5; f++) {
+        const n = FINGERS[f], chain = [n, n + '1', n + '2'];
+        for (let i = 0; i < 3; i++) {
+          const b = r.bones[side + '_' + chain[i]]; if (!b) continue;
+          const a = (table[f][i] - (from ? from[f][i] : 0)) * w;
+          if (Math.abs(a) > 1e-4) r.rotateWorld(b, new THREE.Quaternion().setFromAxisAngle(ax, a));
+        }
+      }
+    },
+    // the resting hand, every frame on both sides: the clip's bent blade becomes a loose hand, the wrist brought back near the
+    // forearm's line, the fingers curled
+    relaxHands(r) {
+      for (const side of ['L', 'R']) {
+        const hand = r.bones[side + '_Hand'], fo = r.bones[side + '_Forearm'], th = r.bones[side + '_Finger0'], i1 = r.bones[side + '_Finger1'], i4 = r.bones[side + '_Finger4'];
+        if (!hand || !fo || !th || !i1 || !i4) continue;
+        const knuckles = () => { for (const b of [fo, hand, th, i1, i4]) b.updateWorldMatrix(true, false); fo.getWorldPosition(RE); hand.getWorldPosition(RH); i1.getWorldPosition(RS); i4.getWorldPosition(RT); th.getWorldPosition(RA); return GE.copy(RS).add(RT).multiplyScalar(0.5).sub(RH).normalize(); };
+        let along = knuckles();
+        const fa = GA.copy(RH).sub(RE).normalize(), flex = fa.angleTo(along);
+        if (flex > WRIST_FLEX + 0.02) { const axis = GF.crossVectors(along, fa); if (axis.lengthSq() > 1e-8) { r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(axis.normalize(), flex - WRIST_FLEX)); along = knuckles(); } }
+        // the palm side is the side the thumb's root sits on: its offset from the knuckle line with the across- and along-hand parts taken out
+        const lat = GD.copy(RT).sub(RS).normalize();
+        GB.copy(RA).sub(RS).lerp(GF.copy(RA).sub(RT), 0.5).addScaledVector(lat, -GB.dot(lat)).addScaledVector(along, -GB.dot(along)).normalize();
+        this.curl(r, side, this.curlAxis(r, side, GB, GC), CURL.relaxed);
+      }
+    },
+    // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), within the
+    // wrist's range, then close the fingers toward it: `amount` 0..1 blends the relaxed hand to a full grip; `flat` presses the palm open
+    grip(r, side, c, amount, w = 1, flat = false) {
+      const B = r.bones, hand = B[side + '_Hand'], fo = B[side + '_Forearm'], i1 = B[side + '_Finger1'], i4 = B[side + '_Finger4'];
+      if (!hand || !fo || !i1 || !i4) return;
+      for (const b of [fo, hand, i1, i4]) b.updateWorldMatrix(true, false);
       fo.getWorldPosition(RE); hand.getWorldPosition(RH);
       const fa = GA.copy(RH).sub(RE).normalize();
       const cp = GB.copy(c).addScaledVector(fa, -c.dot(fa)).normalize();
       i1.getWorldPosition(RS); i4.getWorldPosition(RT); const lat = GC.copy(RT).sub(RS).normalize();
       const latT = GD.crossVectors(fa, cp); if (latT.dot(lat) < 0) latT.negate();
       const lp = GE.copy(lat).addScaledVector(fa, -lat.dot(fa)).normalize(), tp = latT.addScaledVector(fa, -latT.dot(fa)).normalize();
-      const roll = Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp));
+      const roll = THREE.MathUtils.clamp(Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp)), -WRIST_ROLL, WRIST_ROLL);
       if (Math.abs(c.dot(fa)) < 0.95) r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll * w));   // no roll to speak of when the palm should face along the forearm
-      for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
-      i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
-      const d = GA.copy(RA).sub(RH).normalize(), ax = GC.copy(RT).sub(RS).normalize();
-      if (GF.crossVectors(ax, d).dot(cp) < 0) ax.negate();
-      const total = amount * 1.7;
-      for (const [chain, k] of [[['Finger1', 'Finger11', 'Finger12'], 1], [['Finger2', 'Finger21', 'Finger22'], 1], [['Finger3', 'Finger31', 'Finger32'], 1], [['Finger4', 'Finger41', 'Finger42'], 1], [['Finger0', 'Finger01', 'Finger02'], 0.45]]) {
-        chain.forEach((n, i) => { const b = B[side + '_' + n]; if (b) r.rotateWorld(b, new THREE.Quaternion().setFromAxisAngle(ax, total * k * [0.35, 0.4, 0.25][i])); });
-      }
+      const ax = this.curlAxis(r, side, cp, GC);
+      const k = THREE.MathUtils.clamp(amount, 0, 1), to = flat ? CURL.flat : CURL.relaxed.map((f, i) => f.map((a, j) => a + (CURL.grip[i][j] - a) * k));
+      this.curl(r, side, ax, to, CURL.relaxed, w);
     },
     applyPose(r, p, w = 1, lean = p.lean || 0, squat = p.squat || 0, kneel = p.kneel || 0) {
       if (p.sleep) {   // asleep on the back: the head turned toward the room, the feet flat, a slow breath in the chest
@@ -201,7 +246,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       for (const [s, sg] of [['L', 1], ['R', -1]]) {
         const own = p[s];
         if (!own && hands !== 'both' && hands !== s) continue;
-        let T = null, palm = null, close = 0.75;
+        let T = null, palm = null, close = 0.75, flat = false;
         if (own) {
           T = own.reach ? own.reach.clone() : own.reachLocal ? this.group.localToWorld(own.reachLocal.clone()) : null;
           palm = facing(own.palm, RG.copy(left).multiplyScalar(-sg)); close = own.grip ?? 0.75;
@@ -209,7 +254,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
           p.hold.updateWorldMatrix(true, false); p.hold.getWorldPosition(RC);
           const hw = p.holdW !== undefined ? p.holdW / 2 : p.hold.geometry.parameters.width / 2 * p.hold.getWorldScale(RS).x;
           T = RC.clone().addScaledVector(left, sg * (hw + 0.03)); T.y += p.holdY ?? -0.03; T.addScaledVector(fwd, -0.04);
-          palm = RG.copy(left).multiplyScalar(-sg); close = 0.3;
+          palm = RG.copy(left).multiplyScalar(-sg); close = 0; flat = true;
         } else if (p.reach || p.reachLocal) {
           T = p.reach ? p.reach.clone() : this.group.localToWorld(p.reachLocal.clone());
           if (hands === 'both') T.addScaledVector(left, sg * 0.08);
@@ -217,7 +262,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         }
         if (!T || w <= 0.005) continue;
         this.ik(r, s, T, RPole.copy(left).multiplyScalar(sg * 0.7).addScaledVector(fwd, -0.3).add(RDown), w);
-        this.grip(r, s, palm, close * w, w);
+        this.grip(r, s, palm, close, w, flat);
       }
     },
     talk(env) { if (this.rig) this.rig.talk(env); },
