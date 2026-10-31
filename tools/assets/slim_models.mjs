@@ -1,21 +1,18 @@
-// Slims glTF models into the small meshopt-compressed GLBs in assets/props.
+// slims glTF models into the small meshopt-compressed GLBs in assets/props.
 //   node tools/assets/slim_models.mjs [name ...]
 //       cuts the triangle count of the Poly Haven props already in assets/props to their budget (textures untouched)
 //   node tools/assets/slim_models.mjs --in model.gltf --out assets/props/name.glb [--tris 6000] [--tex 1024] [--keep regex] [--drop regex] [--list]
 //       one downloaded model (tools/assets/fetch_sketchfab.py calls this): keeps only the nodes matching --keep (and not --drop),
 //       converts spec-gloss materials, welds and simplifies to --tris triangles, resizes every texture to --tex px as WebP, meshopt-compresses
-// Needs @gltf-transform/core, @gltf-transform/extensions, @gltf-transform/functions, meshoptimizer and sharp, installed next to this file
-// or in the folder GLTF_TOOLS points at.
-import fs from 'fs'; import path from 'path'; import { createRequire } from 'module'; import { fileURLToPath, pathToFileURL } from 'url';
+// install its tools first: cd tools && npm install
+import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
+import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { dedup, flatten, join, meshopt, metalRough, prune, simplify, textureCompress, weld, unpartition } from '@gltf-transform/functions';
+import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
+import sharp from 'sharp';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const req = createRequire(path.join(process.env.GLTF_TOOLS || here, 'x.js'));
-const load = (m) => import(pathToFileURL(req.resolve(m)).href);
-const { NodeIO } = await load('@gltf-transform/core');
-const { ALL_EXTENSIONS } = await load('@gltf-transform/extensions');
-const { dedup, flatten, join, meshopt, metalRough, prune, simplify, textureCompress, weld, unpartition } = await load('@gltf-transform/functions');
-const { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } = await load('meshoptimizer');
-const sharp = (await load('sharp')).default;
 
 const dir = path.join(here, '..', '..', 'assets', 'props');
 // triangles each Poly Haven model may keep (everything else is already light)
@@ -28,7 +25,7 @@ const kb = (f) => (fs.statSync(f).size / 1024) | 0;
 
 const argv = process.argv.slice(2), opt = (k, d) => { const i = argv.indexOf(k); return i < 0 ? d : argv[i + 1]; };
 if (argv.includes('--in')) {
-  const src = opt('--in'), out = opt('--out'), budget = +opt('--tris', 8000), tex = +opt('--tex', 1024), keep = opt('--keep'), drop = opt('--drop'), dropMat = opt('--dropmat');
+  const src = opt('--in'), out = opt('--out'), budget = +opt('--tris', 8000), tex = +opt('--tex', 1024), keep = opt('--keep'), drop = opt('--drop');
   const doc = await io.read(src), root = doc.getRoot();
   if (argv.includes('--list')) {   // the node tree with mesh triangle counts, to pick --keep from
     const walk = (n, d) => { const m = n.getMesh(); console.log(' '.repeat(d * 2) + (n.getName() || '(unnamed)') + (m ? '  mesh ' + m.listPrimitives().reduce((a, p) => a + (p.getIndices() ? p.getIndices().getCount() : p.getAttribute('POSITION').getCount()) / 3, 0) : '')); n.listChildren().forEach((c) => walk(c, d + 1)); };
@@ -45,15 +42,11 @@ if (argv.includes('--in')) {
     };
     for (const s of root.listScenes()) s.listChildren().forEach((n) => visit(n, false, false));
   }
-  if (dropMat) {   // --dropmat regex: primitives with a matching material go (badges, number plates, lettering)
-    const re = new RegExp(dropMat, 'i');
-    for (const mesh of root.listMeshes()) for (const p of mesh.listPrimitives()) { const mat = p.getMaterial(); if (mat && re.test(mat.getName())) mesh.removePrimitive(p); }
-  }
   const before = tris(doc);
   await doc.transform(unpartition(), metalRough(), dedup(), prune(), flatten(), join(), weld());
   if (tris(doc) > budget) await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: budget / tris(doc), error: 0.02, lockBorder: true }));
   await doc.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [tex, tex], quality: 82 }), prune(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
-  for (const t of root.listTextures()) t.setName('');   // (texture names carry the original file names)
+  for (const t of root.listTextures()) t.setName('');   // texture names carry the original file names
   fs.mkdirSync(path.dirname(out), { recursive: true });
   await io.write(out, doc);
   console.log(path.basename(out), before, '->', tris(doc), 'tris,', root.listTextures().length, 'textures,', kb(out), 'KB');

@@ -15,13 +15,13 @@
   "portrait": {
     "_comment": "The song comes in on the first daylight shot, warps through the TV, cuts out when the set switches off, and comes back slower from beyond the door until the latch shuts it out. After that: tape hiss before the scare, a dropout as the camera hits the floor, and the record again, faint, under the title. Mono and in a small room throughout, as the camcorder's mic would hear it. loudness (LUFS) and truePeak (dBTP) are the targets the finished mix is mastered to, the levels Shorts, Reels and TikTok play at.",
     "segments": [
-      { "out": [2.55, 6.45], "src": 8, "rate": 1, "lp": 5000, "mono": true, "room": 0.5, "gain": 0.26, "fadeIn": 0.02 },
-      { "out": [6.45, 9.45], "src": 11.9, "rate": 0.98, "lp": 3500, "vib": 0.08, "mono": true, "room": 0.5, "gain": 0.24 },
-      { "out": [9.45, 10.42], "src": 14.84, "rate": 0.95, "lp": 2200, "vib": 0.15, "mono": true, "room": 0.5, "gain": 0.18, "fadeOut": 0.02 },
-      { "out": [11.0, 11.46], "src": 16.3, "rate": 0.88, "lp": 1200, "vib": 0.3, "mono": true, "room": 0.5, "gain": 0.34, "fadeIn": 0.05, "fadeOut": 0.02 },
-      { "out": [20.05, 21.45], "src": 113, "rate": 1, "lp": 900, "hp": 250, "mono": true, "room": 0.5, "gain": 0.1, "fadeIn": 0.1, "fadeOut": 0.3 }
+      { "out": [2.55, 6.25], "src": 8, "rate": 1, "lp": 5000, "mono": true, "room": 0.5, "gain": 0.4, "fadeIn": 0.02 },
+      { "out": [6.25, 8.3], "src": 11.9, "rate": 0.98, "lp": 3500, "vib": 0.08, "mono": true, "room": 0.5, "gain": 0.24 },
+      { "out": [8.3, 9.07], "src": 14.84, "rate": 0.95, "lp": 2200, "vib": 0.15, "mono": true, "room": 0.5, "gain": 0.18, "fadeOut": 0.02 },
+      { "out": [10.2, 10.56], "src": 16.3, "rate": 0.88, "lp": 1200, "vib": 0.3, "mono": true, "room": 0.5, "gain": 0.34, "fadeIn": 0.05, "fadeOut": 0.02 },
+      { "out": [18.6, 20.6], "src": 113, "rate": 1, "lp": 900, "hp": 250, "mono": true, "room": 0.5, "gain": 0.1, "fadeIn": 0.1, "fadeOut": 0.3 }
     ],
-    "mute": [[18.15, 18.75], [19.41, 19.48]],
+    "mute": [[4.97, 5.25], [16.4, 16.87], [17.6, 17.67]],
     "muteFloor": -52,
     "loudness": -14,
     "truePeak": -1

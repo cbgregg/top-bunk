@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
 import { flicker as lightFlicker } from './settings.js';
 import { Rig, loadModel } from './rig.js';
+import { swimFrame } from './swim.js';
 
 const SEAT = { x: 3.5, z: -0.65 };     // the chair: against the north side of the hall, facing west (its back to the bedroom end); any closer and his shoulder is in the wall
 const CANDLE = { x: 5.2, z: -0.95 };   // the tea light, on the floor in the middle of the hall
@@ -168,8 +169,7 @@ export function createVigil(env) {
     sfx.heartbeat(0.7); sfx.whisper(-0.7, 0.22); sfx.whisper(0.8, 0.2);
     let shown = -1; const yaw0 = P.yaw;
     await env.tween(9, (k) => {
-      P.roll = Math.sin(k * 15) * 0.5 * (1 - k * 0.5); P.pitch = -1.15 + Math.sin(k * 11) * 0.3; P.yaw = yaw0 + Math.sin(k * 9) * 0.12;
-      env.setFovOff(-34 + Math.sin(k * 13) * 34);
+      swimFrame(P, env.setFovOff, k, -1.15, yaw0);
       const i = Math.min(DREAM.length - 1, Math.floor(k * DREAM.length));
       if (i !== shown) { shown = i; sfx.whisper(Math.sin(i * 2.1), 0.14 + i * 0.01); }
       if (i === 3) sfx.pianoSlam();

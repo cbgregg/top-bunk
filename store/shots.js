@@ -3,7 +3,7 @@
 // Renders the Steam store screenshots from the live game, headless. The page is the real index.html served from the repo root; each
 // shot drives window.__game (see the last line of js/main.js): a phase, a camera, the thing posed somewhere, the HUD hidden.
 //
-//   node store/shots.js                      -> store/screenshots/01..07 at 1920x1080
+//   node store/shots.js                      -> store/screenshots/01..08 at 1920x1080
 //   node store/shots.js --extra              -> also the capsule sources (store/capsules/src/: the 3840x1240 hero, a portrait)
 //   node store/shots.js --preview            -> 960x540 framing passes, quality "medium", into --out (default: a temp folder)
 //   node store/shots.js --only 03,05 --port 8801 --quality high --frames 3 --out DIR
@@ -11,7 +11,7 @@
 // Rendering is skipped (window.__norender) while a shot is set up, so the game loop settles at full speed; then exactly --frames
 // frames are rendered and the page is captured. Nothing here touches the game's files.
 const { chromium } = require('playwright');
-const http = require('http');
+const { serve } = require('./lib');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -30,18 +30,6 @@ const SRC = path.resolve(opt('src', path.join(__dirname, 'capsules', 'src')));
 const SIZE = PREVIEW ? [960, 540] : [1920, 1080];
 const SCALE = PREVIEW ? 0.5 : 1;
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
-  '.wav': 'audio/wav', '.glb': 'model/gltf-binary', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.hdr': 'application/octet-stream', '.woff2': 'font/woff2', '.md': 'text/markdown' };
-function serve(port) {
-  return new Promise((res) => {
-    const s = http.createServer((q, r) => {
-      let f = path.join(ROOT, decodeURIComponent(q.url.split('?')[0].split('#')[0]));
-      if (!f.startsWith(ROOT)) { r.writeHead(403); r.end(); return; }
-      if (f.endsWith(path.sep)) f += 'index.html';
-      fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' }); r.end(d); } });
-    }).listen(port, '127.0.0.1', () => res(s));
-  });
-}
 
 // ---------- the shots ----------
 // Each setup runs in the page with g = window.__game and S = window.__shot (helpers injected below). `after` runs once the loop has
@@ -57,10 +45,10 @@ const SHOTS = [
   { id: '02_kid_room_bunk', what: 'Your room on the first night: the bunk, the boxes, the bear, the flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true); S.boxesOnBunk(); g.W.moveTeddy(5.75, 1.8, 3.15); g.W.setDoor('kid', true, true);
-      S.look([7.55, 1.32, 0.75], [6.1, 1.25, 3.0]); } },   // (from the room's east side, so the closet's side panel is not an arm's length from the lens)
+      S.look([7.55, 1.32, 0.75], [6.1, 1.25, 3.0]); } },   // from the room's east side, so the closet's side panel is not an arm's length from the lens
   { id: '03_hall_drawing', what: 'The crayon drawing taped to the hall wall ("HE WATCHES"), by flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('night'); S.flash(true, 8); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;   // (the moving-day drawing, not the night one)
+      g.setPhase('night'); S.flash(true, 8); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;   // the moving-day drawing, not the night one
       S.look([6.2, 1.25, -1.15], [5.55, 1.08, -0.38]); } },
   { id: '04_under_covers', what: 'Under the covers on the top bunk while it leans over the rail (with the hold-your-breath HUD)', hud: true,
     setup: () => { const g = window.__game, S = window.__shot;
@@ -86,10 +74,15 @@ const SHOTS = [
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.tvFx.set(true); g.W.tvFx.figure = 1;
       const d = g.dad; g.mom.group.visible = true; d.sleeping = false; d.busy = true; d.pose = null; d.lookAt = null; d.group.rotation.order = 'XYZ';
-      d.group.rotation.set(0, Math.atan2(2.95 - 2.0, -3.2 + 3.65), 0); d.group.position.set(2.0, 0, -3.65); d.group.visible = true;   // (a step to the side of his spot in the game, so the screen shows past him)
+      // a step to the side of his spot in the game, so the screen shows past him
+      d.group.rotation.set(0, Math.atan2(2.95 - 2.0, -3.2 + 3.65), 0); d.group.position.set(2.0, 0, -3.65); d.group.visible = true;
       if (d.rig) d.rig.play('idle', { fade: 0, speed: 0.6 }); g.W.bedSleepers.one('dad', false);
-      g.P.pos.set(-30, 0, -30);   // (far away, so he does not turn his head to you)
-      S.look([1.3, 1.25, -1.95], [2.75, 1.0, -3.25]); } },   // (back far enough that his head is in the frame)
+      g.P.pos.set(-30, 0, -30);   // far away, so he does not turn his head to you
+      S.look([1.3, 1.25, -1.95], [2.75, 1.0, -3.25]); } },   // back far enough that his head is in the frame
+  { id: '08_garage_breaker', what: 'The garage breaker box, panel open, by flashlight',
+    setup: () => { const g = window.__game, S = window.__shot;
+      g.setPhase('night'); S.flash(true, 9); g.W.garage.panel.open(1); g.W.garage.light.intensity = 0;
+      S.look([-9.3, 1.5, -9.1], [-9.75, 1.4, -7.1]); } },
 ];
 // capsule sources (not Steam screenshots): the hero banner and a portrait, both of the thing in the hall
 const EXTRA = [
@@ -107,7 +100,7 @@ const EXTRA = [
 function installHelpers(quality) {
   const g = window.__game;
   g.gfx.auto = false; g.gfx.setQuality(quality, { save: false }); g.gfx.setRes(1);
-  g.start();   // (the test mode: the loop runs, no title screen, no story)
+  g.start();   // the test mode: the loop runs, no title screen, no story
   window.__frames = 0; const render = g.gfx.render.bind(g.gfx); g.gfx.render = (dt) => { render(dt); window.__frames++; };
   window.__norender = true;
   const yawTo = (a, b) => Math.atan2(-(b[0] - a[0]), -(b[2] - a[2]));
@@ -143,7 +136,7 @@ function installHelpers(quality) {
   const list = [...SHOTS, ...(flag('extra') ? EXTRA : [])].filter((s) => !ONLY.length || ONLY.some((o) => s.id.startsWith(o)));
   if (!list.length) { console.error('no shots match', ONLY); process.exit(1); }
   fs.mkdirSync(OUT, { recursive: true }); if (list.some((s) => s.size)) fs.mkdirSync(SRC, { recursive: true });
-  const srv = await serve(PORT);
+  const srv = await serve(PORT, { root: ROOT });
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: SIZE[0], height: SIZE[1] }, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message));
@@ -151,7 +144,7 @@ function installHelpers(quality) {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   const t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
   await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'load', timeout: 300000 });
-  await page.waitForFunction(() => window.__game, null, { timeout: 300000 });   // (SwiftShader compiles the shaders on the CPU)
+  await page.waitForFunction(() => window.__game, null, { timeout: 300000 });   // SwiftShader compiles the shaders on the CPU
   await page.evaluate(installHelpers, QUALITY);
   // the character models, the sky and the surface textures all stream in after the page is up
   await page.waitForFunction(() => { const g = window.__game; return g.E.rig && g.mom.rig && g.dad.rig; }, null, { timeout: 180000 }).catch(() => log('warning: character rigs did not load, the simple bodies will show'));

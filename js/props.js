@@ -1,6 +1,6 @@
-// Furniture and plants: Poly Haven models (CC0, tools/assets/fetch_models.py) and Sketchfab models (CC0 and CC-BY, listed in CREDITS.md,
+// furniture and plants: Poly Haven models (CC0, tools/assets/fetch_models.py) and Sketchfab models (CC BY 4.0, listed in CREDITS.md,
 // tools/assets/fetch_sketchfab.py), compressed to assets/props/*.glb.
-// Model front is +Z, units are metres, and each one is placed by its footprint centre with its base on y.
+// model front is +Z, units are metres, and each one is placed by its footprint centre with its base on y.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -35,7 +35,7 @@ export const loadProp = (name) => {
   return cache.get(name);
 };
 
-// One model: footprint centre (x, z), base on y, facing rot (radians, front = +Z), uniform scale s.
+// one model: footprint centre (x, z), base on y, facing rot (radians, front = +Z), uniform scale s.
 // wall: a plate on a wall instead: (x, y, z) is on the wall face, the model is centred there and its front face sits `proud` metres off the
 // wall, the rest of it inside the wall. The front is the model's -Z face (its +Z face with flip), rot still says where the room is.
 // hide: the stand-in meshes, hidden once the model is in. onLoad(holder, box, model) runs then too (for colliders).
@@ -53,7 +53,7 @@ export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, wall = false,
   return holder;
 }
 
-// Many copies of one model as instanced meshes. mats: Matrix4[] of where each copy goes (feet at the local origin).
+// many copies of one model as instanced meshes. mats: Matrix4[] of where each copy goes (feet at the local origin).
 export function scatter(parent, name, mats, { cast = true } = {}) {
   loadProp(name).then((g) => {
     const b = g.box, norm = new THREE.Matrix4().makeTranslation(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2), out = new THREE.Group(), t = new THREE.Matrix4();

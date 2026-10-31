@@ -1,14 +1,14 @@
-// The nightmares: four things that can happen on a night, at most one a night. Each pulls the kid under, and each ends the same way: awake in
-// the bunk, with something left behind in the house to find (nights.js proof). They run from the director as events (director.js, nm: true).
-//   shadow    a figure in the darkest corner of the living room that only shows at the edge of your eye
-//   hall      the hall that does not end: it turns you round three times and the fourth time something is standing at the far end
-//   basement  the washer drums with the power out; go down and the door shuts behind you
-//   mirror    the bathroom mirror, and a reflection that stays where it was
-// ctx is the nights.js environment (P, F, W, E, sfx, UI, camera, tween, wait, ...) plus alive(), hunter and D.
+// the nightmares: shadow, hall, basement and mirror. at most one a night; each pulls the kid under and ends awake in the bunk.
+// ctx is the nights.js environment plus alive(), hunter and D; the director runs them as events (nm: true).
 import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
+import { swimFrame } from './swim.js';
 
 const V3 = THREE.Vector3;
+const TAU = Math.PI * 2;
+const SHADOW_LIFE = 150000, SCENE_LIFE = 200000;   // real ms: a night is about six minutes
+const MIRROR_W = 148, MIRROR_H = 132;              // the mirror's canvas
+const MIRROR_MOVE = 0.45, MIRROR_PATIENCE = 14000; // metres you walk before the reflection stays put, and how long it waits
 
 export function createNightmares(ctx) {
   const { P, F, W, E, sfx, UI, camera, wait, tween, lerp, hunter, D } = ctx;
@@ -27,29 +27,28 @@ export function createNightmares(ctx) {
   const blackenPhotos = (on) => { for (const m of photos()) { m.userData.keep ||= m.color.clone(); if (on) m.color.set(0x000000); else m.color.copy(m.userData.keep); } };
 
   // out of the dream: the lenses back, the colours back, the bunk, a few seconds before anything else happens
-  async function wake(token) {
+  async function wake() {
     document.body.classList.remove('nightmare'); ctx.setFovOff(0); blackenPhotos(false);
     UI.fade(1, 0.5); await wait(0.7);
     for (const n of W.nightLights) n.dead = false;
     F.blackout = false; ctx.nlMult(1, false); F.flicker = false;
     ctx.toBunk(); P.roll = 0; P.pitch = -0.18; F.fear = 0.5;
     UI.fade(0, 2.4); await wait(1.6);
-    F.cutscene = false; F.script = false; void token;
+    F.cutscene = false; F.script = false;
   }
-  async function pullUnder() {
+  function pullUnder() {
     F.script = true; F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position); P.vel.set(0, 0, 0);
     document.body.classList.add('nightmare');
   }
   // the room turns over and over, the lens swings, the colours go wrong
   async function swim(secs, pitch0, yaw0, fn) {
     await tween(secs, (k) => {
-      P.roll = Math.sin(k * 15) * 0.5 * (1 - k * 0.5); P.pitch = pitch0 + Math.sin(k * 11) * 0.3; P.yaw = yaw0 + Math.sin(k * 9) * 0.12;
-      ctx.setFovOff(-34 + Math.sin(k * 13) * 34);
+      swimFrame(P, ctx.setFovOff, k, pitch0, yaw0);
       if (fn) fn(k);
     }, ctx.ease.lin);
   }
 
-  // ---------------- the shadow ----------------
+  // ---------- the shadow ----------
   // a figure with no face: black on a dark wall, there at the edge of sight and gone when you look straight at it
   function makeShadow() {
     const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color: 0x010102, transparent: true, opacity: 0, depthWrite: false, fog: true });
@@ -71,7 +70,7 @@ export function createNightmares(ctx) {
     sh.position.set(x, 0, z); sh.lookAt(0, 0, -2.4); sh.rotation.x = 0; sh.visible = true;
     const dir = new V3(), to = new V3();
     let lookT = 0, gone = false;
-    const until = Date.now() + 150000;   // (real time: a night is about six minutes)
+    const until = Date.now() + SHADOW_LIFE;
     // it is there while you are in the living room or can see into it; it shows at the edge of sight only
     while (ctx.alive(t) && !gone && Date.now() < until) {
       await wait(0.05);
@@ -89,7 +88,7 @@ export function createNightmares(ctx) {
     sh.visible = false; W.house.remove(sh);
   }
   async function pulled(sh, t) {
-    await pullUnder(); sh.visible = false;
+    pullUnder(); sh.visible = false;
     const yaw0 = P.yaw, pitch0 = P.pitch;
     sfx.heartbeat(0.8); sfx.drone(0.12, 1); sfx.whisper(-0.7, 0.2);
     // the lights go out one by one, and the faces on the walls go black
@@ -111,10 +110,10 @@ export function createNightmares(ctx) {
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmShadow');
   }
 
-  // ---------------- the hall that does not end ----------------
+  // ---------- the hall that does not end ----------
   async function hall(t) {
     let passes = 0, busy = false;
-    const until = Date.now() + 200000;
+    const until = Date.now() + SCENE_LIFE;
     while (ctx.alive(t) && Date.now() < until) {
       await wait(0.1);
       if (F.script || F.cutscene || hunter.busy || P.mode !== 'walk' || ctx.roomAt(P.pos.x, P.pos.z) !== 'hall' || busy) continue;
@@ -131,7 +130,7 @@ export function createNightmares(ctx) {
         busy = true; F.script = true; D.flicker(1.2); sfx.violins(0.5, 0.5);
         hunter.sight(west ? 'hallW' : 'hallE', { dur: 4, vanishOnLook: false }); ctx.addShake(1.2);
         await wait(2.6);
-        await pullUnder(); ctx.nlMult(0, false); sfx.jolt(1); UI.flash('rgba(255,255,255,0.85)', 0.4);
+        pullUnder(); ctx.nlMult(0, false); sfx.jolt(1); UI.flash('rgba(255,255,255,0.85)', 0.4);
         await wait(0.5); hunter.vanish(false);
         await wake(); if (ctx.alive(t)) ctx.proofFire('nmHall');
         return;
@@ -139,11 +138,11 @@ export function createNightmares(ctx) {
     }
   }
 
-  // ---------------- the basement ----------------
+  // ---------- the basement ----------
   async function basement(t) {
     const L = W.laundry; if (!L) return;
     L.bulb.set(true); L.drum.spin(true);
-    let beat = 0; const until = Date.now() + 200000;
+    let beat = 0; const until = Date.now() + SCENE_LIFE;
     while (ctx.alive(t) && Date.now() < until) {
       await wait(0.1);
       beat += 0.1; if (beat > 2.4) { beat = 0; sfx.thump(); sfx.noiseHit({ dur: 0.4, type: 'lowpass', f: 300, gain: 0.35, pan: ctx.pan(-7.6, 1.6), wet: 0.3 }); }
@@ -162,25 +161,25 @@ export function createNightmares(ctx) {
     sfx.lurk(ctx.pan(-7.67, 1.62), 1, 3.2); await wait(3.4);                                 // a voice, inside the washer
     sfx.lurk(ctx.pan(-7.67, 1.62), 1, 2.4); L.washer.open(1); sfx.slamFar(-0.4); ctx.addShake(1.6); sfx.appear(1.2);   // the lid bangs open
     await wait(0.5);
-    F.script = false; await pullUnder();
+    F.script = false; pullUnder();
     await swim(4, P.pitch, P.yaw);
     L.sink.set(false); if (L.sink.stream && L.sink.stream.material) L.sink.stream.material.color.set(0xb9c6cc); L.washer.open(0);
     W.setDoor('basement', false);
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmBasement');
   }
 
-  // ---------------- the mirror ----------------
+  // ---------- the mirror ----------
   async function mirror(t) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.74, 0.66), new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, fog: false, opacity: 0 }));
-    const cv = document.createElement('canvas'); cv.width = 148; cv.height = 132; const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; m.material.map = tex;
+    const cv = document.createElement('canvas'); cv.width = MIRROR_W; cv.height = MIRROR_H; const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; m.material.map = tex;
     m.rotation.y = -Math.PI / 2; m.position.set(4.838, 1.6, 0.9); W.house.add(m);
     const paint = (face) => {   // the room behind you, empty, and you in front of it, standing exactly where you were
-      const gr = g.createLinearGradient(0, 0, 148, 132); gr.addColorStop(0, '#20262c'); gr.addColorStop(1, '#0d1013'); g.fillStyle = gr; g.fillRect(0, 0, 148, 132);
-      g.fillStyle = '#050607'; g.beginPath(); g.ellipse(74, 118, 40, 34, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(74, 56, 22, 27, 0, 0, 7); g.fill();
-      if (face) { g.drawImage(smileTex().image, 0, 0, 148, 74, 36, 52, 76, 38); g.fillStyle = '#fff'; g.beginPath(); g.ellipse(64, 48, 5, 7, 0.3, 0, 7); g.ellipse(84, 48, 5, 7, -0.3, 0, 7); g.fill(); }
+      const gr = g.createLinearGradient(0, 0, MIRROR_W, MIRROR_H); gr.addColorStop(0, '#20262c'); gr.addColorStop(1, '#0d1013'); g.fillStyle = gr; g.fillRect(0, 0, MIRROR_W, MIRROR_H);
+      g.fillStyle = '#050607'; g.beginPath(); g.ellipse(74, 118, 40, 34, 0, 0, TAU); g.fill(); g.beginPath(); g.ellipse(74, 56, 22, 27, 0, 0, TAU); g.fill();
+      if (face) { g.drawImage(smileTex().image, 0, 0, 148, 74, 36, 52, 76, 38); g.fillStyle = '#fff'; g.beginPath(); g.ellipse(64, 48, 5, 7, 0.3, 0, TAU); g.ellipse(84, 48, 5, 7, -0.3, 0, TAU); g.fill(); }
       tex.needsUpdate = true;
     };
-    const until = Date.now() + 200000; let shown = false;
+    const until = Date.now() + SCENE_LIFE; let shown = false;
     while (ctx.alive(t) && Date.now() < until) {
       await wait(0.1);
       if (F.script || F.cutscene || P.mode !== 'walk' || hunter.busy) continue;
@@ -198,10 +197,10 @@ export function createNightmares(ctx) {
     let moved = 0; const x0 = P.pos.x, z0 = P.pos.z;
     F.script = false;
     const t0 = Date.now();
-    while (ctx.alive(t) && moved < 0.45 && Date.now() - t0 < 14000) { await wait(0.1); moved = Math.hypot(P.pos.x - x0, P.pos.z - z0); }
+    while (ctx.alive(t) && moved < MIRROR_MOVE && Date.now() - t0 < MIRROR_PATIENCE) { await wait(0.1); moved = Math.hypot(P.pos.x - x0, P.pos.z - z0); }
     F.script = true; paint(true); sfx.appear(1.2); ctx.addShake(1.1); D.flicker(1.4);
     await wait(1.3);
-    await pullUnder(); ctx.nlMult(0, false); UI.flash('rgba(255,255,255,0.85)', 0.4);
+    pullUnder(); ctx.nlMult(0, false); UI.flash('rgba(255,255,255,0.85)', 0.4);
     await wait(0.5); m.visible = false; W.house.remove(m);
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmMirror');
   }

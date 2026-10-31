@@ -22,9 +22,10 @@
 //   --headed            a visible browser window (needs a display; with --gpu this is the fast path on a real machine)
 //   --serve [--port N]  only serve the repo for the live preview (index.html?trailer=1) and keep running
 'use strict';
-const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), { execFileSync, spawnSync } = require('child_process');
+const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync, spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
+const { serve: serveDir } = require('../store/lib');
 const args = process.argv.slice(2);
 const has = (k) => args.includes(k), opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; };
 // frame files: PNG by default; --frames jpg writes quality-95 JPEGs (the film grain keeps full-size PNGs from compressing)
@@ -35,22 +36,15 @@ const PRESETS = {
   'social-preview': { w: 360, h: 640, fps: 12, aspect: 'portrait', quality: 'medium', name: 'topbunk-social-preview-360x640-12' },
   social: { w: 1080, h: 1920, fps: 30, aspect: 'portrait', quality: 'high', name: 'topbunk-social-1080x1920-30' },
 };
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.hdr': 'application/octet-stream', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // ---------- the static server (index.html gets the live-preview boot script; nothing else changes) ----------
-function serve(port) {
-  const srv = http.createServer((req, res) => {
-    let p = decodeURIComponent(req.url.split('?')[0].split('#')[0]); if (p === '/') p = '/index.html';
-    const f = path.join(ROOT, p);
-    if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('not found'); }
-    const type = MIME[path.extname(f).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
-    if (p === '/index.html') return res.end(fs.readFileSync(f, 'utf8').replace('</body>', '  <script type="module" src="trailer/boot.js"></script>\n</body>'));
-    fs.createReadStream(f).pipe(res);
-  });
-  return new Promise((resolve, reject) => { srv.on('error', reject); srv.listen(port, '127.0.0.1', () => resolve(srv)); });
-}
+const BOOT = '  <script type="module" src="trailer/boot.js"></script>\n</body>';
+const serve = (port) => serveDir(port, {
+  root: ROOT,
+  headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+  rewrite: (url, bytes) => (url === '/index.html' ? bytes.toString('utf8').replace('</body>', BOOT) : bytes),
+});
 
 // the frozen clock: the game's requestAnimationFrame loop only runs when __pump(ms) is called, and every clock agrees with it
 const INIT = `(() => {
@@ -64,7 +58,7 @@ const INIT = `(() => {
 })();`;
 
 function ensureMusic(file) {
-  if (fs.existsSync(file) && fs.existsSync(path.join(__dirname, 'music', 'box_note.wav'))) return file;   // (the last file gen_music.js writes)
+  if (fs.existsSync(file) && fs.existsSync(path.join(__dirname, 'music', 'box_note.wav'))) return file;   // the last file gen_music.js writes
   log('no placeholder music yet: generating it (trailer/gen_music.js)');
   execFileSync(process.execPath, [path.join(__dirname, 'gen_music.js')], { stdio: 'inherit' });
   return file;
@@ -94,16 +88,16 @@ function buildMix({ music, cues, plan, duration, warp, outWav, scratch }) {
     if (warp && s.lp) f += `,lowpass=f=${s.lp}`;
     if (s.hp) f += `,highpass=f=${s.hp}`;
     if (warp && s.vib) f += `,vibrato=f=0.45:d=${s.vib}`;
-    if (s.mono) f += ',pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1';   // (a camcorder's mic: one channel)
+    if (s.mono) f += ',pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1';   // a camcorder's mic: one channel
     if (s.room) f += `,${ROOM(s.room)}`;
     f += `,volume=${s.gain ?? 1}`;
     if (s.fadeIn) f += `,afade=t=in:st=0:d=${s.fadeIn}`;
     if (s.fadeOut) f += `,afade=t=out:st=${(len - s.fadeOut).toFixed(3)}:d=${s.fadeOut}`;
-    // (asetpts after adelay: the delay's leading silence comes out with no timestamps after an atrim, amix then starts late and the final atrim cuts the end)
+    // asetpts after adelay: the delay's leading silence comes out with no timestamps after an atrim, amix then starts late and the final atrim cuts the end
     f += `,atrim=end=${len.toFixed(4)},adelay=${Math.round(a * 1000)}|${Math.round(a * 1000)},asetpts=N/SR/TB,apad=whole_dur=${duration}[m${i}]`;
     parts.push(f); bed.push(`[m${i}]`);
   });
-  if (ducks.length && bed.length) {   // (small frames, so the gain moves in 6 ms steps rather than whole frames)
+  if (ducks.length && bed.length) {   // small frames, so the gain moves in 6 ms steps rather than whole frames
     parts.push(`${bed.join('')}amix=inputs=${bed.length}:normalize=0:dropout_transition=0,asetnsamples=n=256:p=0,volume='${duckExpr(ducks, plan.duck)}':eval=frame[bed]`);
     labels.push('[bed]');
   } else labels.push(...bed);
@@ -121,10 +115,11 @@ function buildMix({ music, cues, plan, duration, warp, outWav, scratch }) {
     if (c.fadeIn) f += `,afade=t=in:st=0:d=${c.fadeIn}`;
     if (c.fadeOut) f += `,afade=t=out:st=${Math.max(0, len - c.fadeOut).toFixed(3)}:d=${c.fadeOut}`;
     if (c.pan) { const p = Math.max(-1, Math.min(1, c.pan)), gl = (Math.cos((p + 1) * Math.PI / 4) * Math.SQRT2).toFixed(4), gr = (Math.sin((p + 1) * Math.PI / 4) * Math.SQRT2).toFixed(4); f += `,pan=stereo|c0=${gl}*c0|c1=${gr}*c1`; }
-    f += `,adelay=${Math.round(c.t * 1000)}|${Math.round(c.t * 1000)},asetpts=N/SR/TB,apad=whole_dur=${duration}[c${i}]`;   // (every track runs the full length: amix then never ends early)
+    f += `,adelay=${Math.round(c.t * 1000)}|${Math.round(c.t * 1000)},asetpts=N/SR/TB,apad=whole_dur=${duration}[c${i}]`;   // every track runs the full length: amix then never ends early
     parts.push(f); labels.push(`[c${i}]`);
   });
   let tail = `${labels.join('')}amix=inputs=${labels.length}:normalize=0:dropout_transition=0`;
+  if ((plan.mute || []).length) tail += ',asetnsamples=n=256:p=0';   // small frames: the mute edges land on the sample, not the frame
   for (const [a, b] of plan.mute || []) tail += `,volume=enable='between(t,${a},${b})':volume=0`;
   tail += `,atrim=end=${duration},alimiter=limit=0.95:level=false[out]`;
   parts.push(tail);
@@ -173,7 +168,7 @@ function master(wav, target, ceiling, scratch) {
 async function main() {
   const port = +opt('--port', 8700);
   if (has('--serve')) {
-    ensureMusic(path.join(__dirname, 'music', 'placeholder.wav'));   // (boot.js plays the generated files: a fresh clone has none)
+    ensureMusic(path.join(__dirname, 'music', 'placeholder.wav'));   // boot.js plays the generated files: a fresh clone has none
     const srv = await serve(port);
     log(`serving ${ROOT} at http://127.0.0.1:${port}/  (open /index.html?trailer=1 or /index.html?trailer=1&aspect=portrait)`);
     return new Promise(() => { process.on('SIGINT', () => { srv.close(); process.exit(0); }); });

@@ -8,6 +8,7 @@
 //   loom    stands over your hiding place while you hold your breath
 //   leave   walks away and fades from the world
 import * as THREE from 'three';
+import { SLAM } from './audio.js';
 import { NODES, path as navPath, nearestNode, dist as navDist, edgeDoor, pathLength } from './nav.js';
 
 const V3 = THREE.Vector3;
@@ -20,7 +21,7 @@ export function createHunter(ctx) {
     lastSeen: null, lostT: 0, replan: 0, doorWait: 0, doorName: null,
     sightT: 0, sightDur: 4, seenT: 0, sightOpts: {}, frozen: false, lookT: 0,
     searchList: [], searchWait: 0, searchT: 0, forcePod: null, heard: 0, checks: {},
-    murT: 0, loomT: 0, loomDur: 5, loomPod: null, stepAcc: 0, hb: 0, leaveT: 0, startedAt: 0,
+    lurkT: 0, loomT: 0, loomDur: 5, loomPod: null, stepAcc: 0, hb: 0, leaveT: 0, startedAt: 0,
   };
   const tmp = new V3(), dirv = new V3();
 
@@ -107,7 +108,7 @@ export function createHunter(ctx) {
   function vanish(flicker = true) {
     if (S.state === 'away') return;
     E.visible = false; E.mode = 'idle'; E.lookTarget = null; E.lean = 0; E.tilt = 0;
-    setState('away'); F.breathCheck = false; ctx.onVanish && ctx.onVanish(flicker);
+    setState('away'); F.breathCheck = false; ctx.onVanish(flicker);
     S.path = []; S.cool = Math.max(S.cool, 8);
   }
   // it is simply there, somewhere you can see (or soon will)
@@ -121,12 +122,12 @@ export function createHunter(ctx) {
   }
   function sting() {
     if (S.stung) return; S.stung = true;
-    S.slammed = true; sfx.appear(); ctx.flicker && ctx.flicker(0.5); ctx.addShake && ctx.addShake(0.6); F.fear = Math.max(F.fear, 0.85);
+    S.slammed = true; sfx.appear(); ctx.flicker(0.5); ctx.addShake(0.6); F.fear = Math.max(F.fear, 0.85);
   }
   // the jolt of a hunt: when it comes into view, not when it starts somewhere out of sight
   function huntJolt() {
     if (S.jolted) return; S.jolted = true;
-    sfx.jolt(0.85); sfx.pianoSlam(1.4); ctx.flicker && ctx.flicker(0.6); ctx.addShake && ctx.addShake(0.9);
+    sfx.jolt(0.85); sfx.pianoSlam(SLAM.jolt); ctx.flicker(0.6); ctx.addShake(0.9);
   }
   function stalk(node) {
     place(node); setState('stalk'); S.frozen = false; S.lookT = 0; S.replan = 0;
@@ -139,7 +140,7 @@ export function createHunter(ctx) {
     sfx.violins(0.7, 0.3); sfx.bed('music/chase', 0.55, 0.6); sfx.bed('music/night', 0, 1.5); sfx.drone(0.17, 0.5);
     F.fear = 1; F.chase = true;
     if (inView(ep().x, ep().z, 0.6) && sees()) huntJolt();
-    ctx.onHunt && ctx.onHunt();
+    ctx.onHunt();
   }
   function startSearch(fromHunt = true) {
     setState('search'); S.searchT = 0; S.searchWait = 0; S.heard = 0; S.forcePod = null;
@@ -148,7 +149,7 @@ export function createHunter(ctx) {
     for (let i = 0; i < 2 + (S.level > 4 ? 1 : 0) && near.length; i++) S.searchList.push(near.splice((Math.random() * near.length) | 0, 1)[0]);
     F.chase = false; sfx.bed('music/chase', 0, 1.5); sfx.bed('music/night', 0.35, 2);
     planTo(S.searchList[0]); E.tilt = 0.45;
-    if (hidden() && !S.hinted && ctx.hint) { S.hinted = true; ctx.hint(); }   // the breath meter and the key, the moment it starts looking while you hide
+    if (hidden() && !S.hinted) { S.hinted = true; ctx.hint(); }   // shows the breath meter and key the first time it looks while you hide
   }
   function pickSpawn(minPath = 7, prefer = null) {
     const pn = playerNode(), c = [];
@@ -168,7 +169,7 @@ export function createHunter(ctx) {
     const pod = ctx.pods[podId]; place(pod.node); E.mode = 'idle';
     E.root.position.x = NODES[pod.node][0]; E.root.position.z = NODES[pod.node][1]; E.faceTowards(pod.look[0], pod.look[1], 1);
     sfx.violins(1, 0.4); sfx.tension(0.05, 1); sfx.whisper(ctx.panFor(ep()), 0.16);
-    F.breathCheck = true; F.grace = 2.2; if (P.breath < 0.9) P.breath = 0.9; ctx.hint && ctx.hint();   // (it never finds you with the meter already empty)
+    F.breathCheck = true; F.grace = 2.2; if (P.breath < 0.9) P.breath = 0.9; ctx.hint();   // it never finds you with the meter already empty
   }
   function notifyPod(podId) {   // you just got into a hiding place: did it see you do it?
     if ((S.state === 'hunt' || S.state === 'stalk') && gap() < 9 && los(ep().x, ep().z, P.pos.x, P.pos.z)) {
@@ -195,21 +196,21 @@ export function createHunter(ctx) {
     }
     // while it stalks or hunts, a voice you can barely hear, from where it is and louder the nearer it gets
     if (S.state === 'stalk' || S.state === 'hunt') {
-      S.murT -= dt;
-      if (S.murT <= 0) { S.murT = S.state === 'hunt' ? 1.7 : 2.3; sfx.lurk(ctx.panFor(ep()), clamp(1 - g / 14, 0.03, 1), 1.4); }
+      S.lurkT -= dt;
+      if (S.lurkT <= 0) { S.lurkT = S.state === 'hunt' ? 1.7 : 2.3; sfx.lurk(ctx.panFor(ep()), clamp(1 - g / 14, 0.03, 1), 1.4); }
     }
     switch (S.state) {
       case 'sight': {
         S.sightT += dt;
         if (S.sightOpts.facing && !S.turned) {   // it has its back to you, watching something else, until you come close
           if (S.sightOpts.stab !== false && inView(ep().x, ep().z, 0.7) && g < 18) sting();
-          if (g < (S.sightOpts.turnDist ?? 3.4) && !podId) { S.turned = true; E.lookTarget = camera.position; sfx.giggle(ctx.panFor(ep())); ctx.onTurn && ctx.onTurn(); if (S.sightOpts.chase) { hunt(); break; } }
+          if (g < (S.sightOpts.turnDist ?? 3.4) && !podId) { S.turned = true; E.lookTarget = camera.position; sfx.giggle(ctx.panFor(ep())); ctx.onTurn(); if (S.sightOpts.chase) { hunt(); break; } }
           else if (S.sightT > S.sightDur) { vanish(); break; }
           else break;
         }
         E.faceTowards(P.pos.x, P.pos.z, Math.min(1, dt * 4));
         const seen = inView(ep().x, ep().z, 0.7) && g < 18;
-        if (seen) { if (S.sightOpts.stab !== false) sting(); else if (!S.slammed && S.sightOpts.slam !== false) { S.slammed = true; sfx.pianoSlam(1.6); } S.seenT += dt; }
+        if (seen) { if (S.sightOpts.stab !== false) sting(); else if (!S.slammed) { S.slammed = true; sfx.pianoSlam(SLAM.full); } S.seenT += dt; }
         if (S.sightOpts.chase && g < (S.sightOpts.chaseDist ?? 4)) { hunt(); break; }
         if ((S.sightOpts.vanishOnLook !== false && S.seenT > (S.sightOpts.lookTime ?? 0.9)) || S.sightT > S.sightDur) {
           if (S.sightOpts.then === 'hunt') hunt(); else vanish();
@@ -270,7 +271,7 @@ export function createHunter(ctx) {
         if (S.loomT > 2.2 && !S.giggled) { S.giggled = true; sfx.giggle(ctx.panFor(ep())); }
         if (S.loomT > S.loomDur) {
           F.breathCheck = false; S.giggled = false; E.lean = 0;
-          sfx.violins(0, 0.05); sfx.ceilingThump(); ctx.survived && ctx.survived();
+          sfx.violins(0, 0.05); sfx.ceilingThump(); ctx.survived();
           setState('leave'); S.leaveT = 0; E.smileScale = 1;
           const far = pickSpawn(9) || 'hallW'; planTo(far);
         }

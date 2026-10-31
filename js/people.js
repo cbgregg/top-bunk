@@ -100,7 +100,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       r.bones[side + '_Hand'].attach(obj);
     },
     // letting go: remember what the arm bones were doing with the thing, and ease from that back to the clip (no solver against a target that is walking away)
-    // (the bones keep their Bip01_ prefix; only the rig's lookup keys drop it)
+    // the bones keep their Bip01_ prefix; only the rig's lookup keys drop it
     // after a solve: each arm bone goes a fraction of the way from last frame's solved rotation to this frame's, and that becomes the new memory
     smoothSnap(r, a, prevW = 1) {
       for (const [b, clipQ] of r.saved) {
@@ -116,7 +116,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       for (const [b, q] of this.snap) { if (!r.saved.has(b)) r.saved.set(b, b.quaternion.clone()); b.quaternion.slerp(q, w); b.updateMatrix(); }
       r.root.updateMatrixWorld(true);
     },
-    // Two-bone arm IK: the hand lands on the target and the elbow bends toward the pole, so hands rest ON things instead of passing through them.
+    // two-bone arm IK: the hand lands on the target and the elbow bends toward the pole, so hands rest ON things instead of passing through them.
     // T is where the palm goes; the wrist stops `pull` short of it along the arm
     ik(r, side, T, pole, w = 1, pull = 0.06) {
       const up = r.bones[side + '_UpperArm'], fo = r.bones[side + '_Forearm'], hand = r.bones[side + '_Hand'];
@@ -175,7 +175,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const latT = GD.crossVectors(fa, cp); if (latT.dot(lat) < 0) latT.negate();
       const lp = GE.copy(lat).addScaledVector(fa, -lat.dot(fa)).normalize(), tp = latT.addScaledVector(fa, -latT.dot(fa)).normalize();
       const roll = Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp));
-      if (Math.abs(c.dot(fa)) < 0.95) r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll * w));   // (no roll to speak of when the palm should face along the forearm)
+      if (Math.abs(c.dot(fa)) < 0.95) r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll * w));   // no roll to speak of when the palm should face along the forearm
       for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
       i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
       const d = GA.copy(RA).sub(RH).normalize(), ax = GC.copy(RT).sub(RS).normalize();
@@ -194,7 +194,8 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       }
       this.legs(r, squat, kneel);
       if (lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], lean);
-      this.group.getWorldQuaternion(RQ); RF.set(0, 0, 1).applyQuaternion(RQ); const y = Math.atan2(RF.x, RF.z), left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));   // (world facing: the people can sit in a car that is turned)
+      // world facing: the people can sit in a car that is turned
+      this.group.getWorldQuaternion(RQ); RF.set(0, 0, 1).applyQuaternion(RQ); const y = Math.atan2(RF.x, RF.z), left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));
       const hands = p.hand || 'both';
       const facing = (q, def) => q === 'down' ? RG.set(0, -1, 0) : q === 'up' ? RG.set(0, 1, 0) : q === 'fwd' ? RG.copy(fwd) : def;
       for (const [s, sg] of [['L', 1], ['R', -1]]) {

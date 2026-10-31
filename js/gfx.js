@@ -111,7 +111,7 @@ export class Gfx {
       ao.setSize = (w, h) => baseSize(Math.max(2, Math.round(w * k)), Math.max(2, Math.round(h * k)));
       ao.setSize(innerWidth * dpr, innerHeight * dpr);
       const hide = ao.overrideVisibility.bind(ao);
-      let noAO = null;   // (the glass panes never change, so find them once)
+      let noAO = null;   // the glass panes never change, so find them once
       ao.overrideVisibility = function () {   // glass and light domes would read as solid walls to the AO pass
         hide(); if (!noAO) { noAO = []; scene.traverse((o) => { if (o.userData && o.userData.noAO) noAO.push(o); }); }
         for (const o of noAO) o.visible = false;

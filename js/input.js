@@ -64,7 +64,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover }) {
     const up = () => { tch[key] = false; b.classList.remove('down'); }; b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); };
   hold('t-run', 'run'); hold('t-breath', 'breath');
   $('t-act').addEventListener('pointerdown', (e) => { interact(); show(); e.preventDefault(); });
-  $('t-pause').addEventListener('click', (e) => { pause(); e.preventDefault(); });   // (on click: on pointerdown the tap's click then landed on the pause screen and resumed)
+  $('t-pause').addEventListener('click', (e) => { pause(); e.preventDefault(); });   // on click: on pointerdown the tap's click then landed on the pause screen and resumed
   $('t-light').addEventListener('pointerdown', (e) => { if (light) light(); e.preventDefault(); });
   input.setUse = (on) => $('t-act').classList.toggle('ready', !!on);
   input.setBreathVisible = (on) => $('t-breath').classList.toggle('show', !!on);
