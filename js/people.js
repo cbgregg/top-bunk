@@ -294,10 +294,11 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
 const WEAR = {
   dad: {
     skin: [0, 0.22, 0, 0.2, 0.78, 1, 0, 0.2], hue: 28,   // the uv rectangles that hold skin (his hands), and the warmest hue that still counts as skin there
-    boots: [0.22, 0.78, 0.0, 0.28],   // the uv rectangle with the boots in it
+    boots: [0.22, 0.40, 0.0, 0.30, 0.60, 0.78, 0.0, 0.30],   // two rectangles: the boots and their soles (the collar between them is not a boot)
     pants: [0, 0.3, 0.58, 1, 0.7, 1, 0.58, 1],   // the trouser legs
     classes: [
-      { is: (h, s, v, inBoots) => inBoots, col: (u, w, k) => [0.74 * k, 0.72 * k, 0.68 * k] },                                           // grey socks
+      { is: (h, s, v, inBoots) => inBoots, col: (u, w, k) => {                                                                            // grey socks: the laces, eyelets and sole edge flattened out, a fine rib instead
+        const f = 0.8 + 0.2 * k, rib = (w * 160) % 1 < 0.5 ? 1 : 0.9; return [0.44 * f * rib, 0.44 * f * rib, 0.47 * f * rib]; } },
       { is: (h, s, v, inBoots, inPants) => inPants, col: (u, w, k) => {                                                                   // flannel plaid
         const a = (u * 14) % 1 < 0.32, b = (w * 14) % 1 < 0.32, base = a && b ? [0.3, 0.42, 0.34] : a || b ? [0.22, 0.34, 0.3] : [0.15, 0.19, 0.3];
         return base.map((c) => c * k); } },
