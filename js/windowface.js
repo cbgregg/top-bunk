@@ -21,9 +21,9 @@ export class WindowFace {
     this.mouth.position.set(0, -0.62, 0.5); this.mouth.scale.set(1.1, 1, 0.3); this.root.add(this.mouth);
     // past the bedroom end window, then along the end wall and your side window, round the back corner and along the back wall
     // (past your back window, behind the top bunk), and on past the bathroom and kitchen
-    this.path = new THREE.CatmullRomCurve3([new V(9.3, 1.8, -4.8), new V(9.3, 1.8, -3.0), new V(9.3, 1.8, 0.4), new V(9.2, 1.8, 2.5), new V(8.6, 1.8, 4.6), new V(7.0, 1.8, 5.0), new V(5.0, 1.8, 5.1), new V(2.0, 1.8, 5.1), new V(-1.5, 1.8, 5.1), new V(-5.0, 1.8, 5.1), new V(-9.4, 1.8, 3.0)]);
+    this.path = new THREE.CatmullRomCurve3([new V(12.6, 1.8, -4.8), new V(12.6, 1.8, -2.8), new V(12.6, 1.8, 0.6), new V(12.5, 1.8, 3.0), new V(11.8, 1.8, 6.0), new V(9.8, 1.8, 6.2), new V(7.0, 1.8, 6.2), new V(3.0, 1.8, 6.2), new V(-1.5, 1.8, 6.2), new V(-5.5, 1.8, 6.2), new V(-9.4, 1.8, 4.0)]);
     this.carPath = new THREE.LineCurve3(new V(40, 0.75, -32), new V(-40, 0.75, -32));   // the far lane of the road out front (traffic.js drives the car itself)
-    this.look = new V(6.6, 1.6, 1.5);
+    this.look = new V(9.1, 1.6, 2.5);
   }
   face() { this.t = 0; this.root.visible = true; }
   carPass() { this.ct = 0; this.car.shadow.autoUpdate = true; }

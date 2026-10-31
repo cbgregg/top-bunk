@@ -275,7 +275,8 @@ async function main() {
   const t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 
   const srv = await serve(PORT, { root: ROOT });
-  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+  const gpu = ARGS.includes('--gpu');
+  const browser = await chromium.launch({ headless: !ARGS.includes('--headed'), args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--autoplay-policy=no-user-gesture-required'] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   let page = await openGame(browser, { port: PORT, size: SIZE, quality: QUALITY });
   log('game loaded, quality', QUALITY);
 
