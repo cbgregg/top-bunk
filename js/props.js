@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { shrinkTextures } from './pbr.js';
+import { PHONE } from './gfx.js';
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
@@ -30,6 +31,8 @@ function prepare(g, name) {
   shrinkTextures(g.scene);
   g.scene.updateMatrixWorld(true);
   g.box = new THREE.Box3().setFromObject(g.scene);
+  // on a phone only the big pieces throw a shadow (the sun map there is small and every caster is a draw)
+  if (PHONE) { const s = new THREE.Vector3(); g.box.getSize(s); const big = Math.max(s.x, s.z) > 1.2 || s.y > 1.5; g.scene.traverse((o) => { if (o.isMesh) o.castShadow = big; }); }
   return g;
 }
 export const loadProp = (name) => {
@@ -50,6 +53,8 @@ export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, wall = false,
     else m.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
     holder.add(m);
     for (const h of hide) h.visible = false;
+    // on a phone the small things (outlets, switches, a kettle) are not drawn from across the house: gfx.js hides the holder past this distance
+    if (PHONE && Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z) * s < 0.6 && !/teddy|phone|keys|flash/.test(name)) holder.userData.farCull = 9;
     if (onLoad) onLoad(holder, b, m);
   }).catch((e) => console.warn('prop failed, keeping the stand-in:', name, e));
   return holder;

@@ -3,6 +3,7 @@
 // one on cue (pass()), timed with the headlight sweep in windowface.js. The road runs along x; the lane nearest the house carries the +x traffic.
 import * as THREE from 'three';
 import { loadProp } from './props.js';
+import { PHONE } from './gfx.js';
 
 const MODELS = ['car_sedan', 'car_sedan2', 'car_pickup', 'car_wagon'];
 const LANE = { near: -29.0, far: -32.0 };
@@ -25,7 +26,7 @@ export function createTraffic(scene, sfx) {
   let lit = false, timer = 20;
 
   Promise.all(MODELS.map(loadProp)).then((gs) => {
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < (PHONE ? 1 : 6); i++) {   // a phone keeps one car; it is never on the road with another anyway
       const g = gs[i % gs.length], b = g.box, m = g.scene.clone(true);
       m.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
       // each copy its own paint: the body material (the one named after the car) is cloned and tinted

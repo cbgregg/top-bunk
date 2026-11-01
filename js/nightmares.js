@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
 import { swimFrame } from './swim.js';
 import { Shroud } from './shroud.js';
+import { PHONE } from './gfx.js';
 
 const V3 = THREE.Vector3;
 const TAU = Math.PI * 2;
@@ -82,7 +83,7 @@ export function createNightmares(ctx) {
     const anchors = [seg(pt(0, 0.6, 0), pt(0, 1.9, 0.05), 0.26, 5), seg(pt(0, 1.85, 0.08), pt(0, 2.1, 0.1), 0.12, 0.6),
       seg(pt(-0.3, 1.55, 0.04), pt(-0.33, 0.45, 0.04), 0.1, 1.5), seg(pt(0.3, 1.55, 0.04), pt(0.33, 0.45, 0.04), 0.1, 1.5),
       seg(pt(-0.1, 0.9, 0), pt(-0.1, 0.0, 0), 0.12, 1.6), seg(pt(0.1, 0.9, 0), pt(0.1, 0.0, 0), 0.12, 1.6)];
-    const shroud = new Shroud(g, anchors, { count: 200, rise: 0.14, life: 2.6, size: [0.12, 0.34], spread: 0.6, near: 0.4, opacity: 0 });
+    const shroud = new Shroud(g, anchors, { count: PHONE ? 60 : 200, rise: 0.14, life: 2.6, size: [0.12, 0.34], spread: 0.6, near: 0.4, opacity: 0 });
     let last = performance.now();
     // the uniforms follow mat.opacity / mat.tear on the smoke card, which is never culled, so a part out of view cannot freeze them
     for (const m of g.children) if (m.isMesh) m.frustumCulled = false;

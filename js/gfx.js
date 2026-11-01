@@ -22,11 +22,12 @@ const baseDpr = (p) => p.fixed ? p.dpr : Math.min(devicePixelRatio || 1, p.dpr);
 // a phone or a tablet: a screen with no mouse. It gets the lighter presets whatever it picks (its memory is the limit, not its taste):
 // no multisampling, no render above its own pixels, small shadow maps, and the textures load at half size (pbr.js, props.js)
 export const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
+// the phone preset: the scene drawn straight to the screen at the screen's own pixels with the canvas's own antialiasing, no
+// post-processing chain (the night look comes from a cheap overlay instead), a small hard-edged sun shadow, no other shadow maps.
+// On a phone every preset in the menu is this one, give or take the render scale: the memory is the limit there, not the taste
 if (PHONE) {
-  Object.assign(QUALITY.ultra, { dpr: 1.25, fixed: false, msaa: 0, ao: null, sun: 1024, spot: 512 });
-  Object.assign(QUALITY.high, { dpr: 1.25, fixed: false, msaa: 0, ao: null, sun: 1024, spot: 512 });
-  Object.assign(QUALITY.medium, { dpr: 1, msaa: 0, sun: 1024, spot: 512 });
-  Object.assign(QUALITY.low, { dpr: 1, sun: 512, spot: 256 });
+  QUALITY.phone = { dpr: 1, msaa: 0, ao: null, bloom: 0, grade: false, sun: 512, spot: 256, direct: true, overlay: true };
+  for (const k of ['ultra', 'high', 'medium', 'low']) Object.assign(QUALITY[k], QUALITY.phone, { dpr: k === 'ultra' ? 1.25 : 1 });
 }
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
@@ -65,7 +66,7 @@ export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
     const saved = store.get(KEY), q = quality || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('gfx')) || saved;   // ?gfx=low forces a preset from the address bar
-    this.autoQuality = PHONE ? 'medium' : 'high';   // phones start lighter
+    this.autoQuality = PHONE ? 'phone' : 'high';   // phones start lighter
     this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
     this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0; this.fast = 0; this.ceiling = null;   // res: dynamic resolution scale
@@ -75,6 +76,16 @@ export class Gfx {
   }
 
   loadEnv() {
+    if (PHONE) {   // no sky files on a phone: a small painted gradient stands in for each environment, and the day sky is only the colour
+      const grad = (top, mid, bot) => {
+        const w = 64, h = 32, d = new Uint8Array(w * h * 4), c = new THREE.Color(), a = new THREE.Color(top), b = new THREE.Color(mid), e = new THREE.Color(bot);
+        for (let y = 0; y < h; y++) { const t = y / (h - 1); if (t < 0.5) c.lerpColors(a, b, t * 2); else c.lerpColors(b, e, (t - 0.5) * 2); for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; d[i] = c.r * 255; d[i + 1] = c.g * 255; d[i + 2] = c.b * 255; d[i + 3] = 255; } }
+        const t = new THREE.DataTexture(d, w, h); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+        const env = this.pmrem.fromEquirectangular(t).texture; t.dispose(); return env;
+      };
+      this.env.day = grad(0x6d9bd6, 0xcfd9e6, 0x5a4a35); this.env.night = grad(0x0a1430, 0x101a30, 0x04060f); this.apply();
+      return;
+    }
     const rgbe = new RGBELoader();
     const mk = (url, key) => rgbe.load(url, (t) => {
       t.mapping = THREE.EquirectangularReflectionMapping;
@@ -96,6 +107,7 @@ export class Gfx {
     if (day || morn) {
       s.environment = this.env.day || null; s.environmentIntensity = day ? 0.5 : 0.4;
       if (this.daySky) { s.background = this.daySky; s.backgroundIntensity = day ? 1 : 0.9; }
+      else if (PHONE) { s.background = new THREE.Color(day ? 0x8fb3dc : 0xd9c7b0); s.backgroundIntensity = 1; }
     } else {
       s.environment = this.env.night || null; s.environmentIntensity = p === 'title' ? 0.35 : 0.42;
       s.background = new THREE.Color(0x020308); s.backgroundIntensity = 1;
@@ -109,7 +121,7 @@ export class Gfx {
     r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight);
     for (const l of scene.userData.shadowLights || []) { l.light.shadow.mapSize.set(l.sun ? p.sun : p.spot, l.sun ? p.sun : p.spot); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.autoUpdate = false; l.light.shadow.needsUpdate = true; }
     this.pass = {};
-    if (p.direct) return;
+    if (p.direct) { if (p.overlay && !this.overlay) this.buildOverlay(); return; }
     const c = this.composer = new EffectComposer(r);
     c.renderTarget1.samples = c.renderTarget2.samples = p.msaa;
     c.addPass(new RenderPass(scene, camera));
@@ -135,6 +147,28 @@ export class Gfx {
     if (p.grade) c.addPass(this.pass.grade = new ShaderPass(GradeShader));
     c.setPixelRatio(dpr); c.setSize(innerWidth, innerHeight);
     if (this.pass.grade) this.pass.grade.uniforms.res.value.set(innerWidth * dpr, innerHeight * dpr);
+  }
+
+  // the night look without a post-processing chain: one translucent quad over the picture, a blue-black wash that deepens toward
+  // the corners and at night, with grain in its alpha. It is drawn after the scene with the depth test off
+  buildOverlay() {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { time: { value: 0 }, night: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `
+        uniform float time, night; uniform vec2 res; varying vec2 vUv;
+        float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+        void main() {
+          vec2 d = vUv - 0.5;
+          float vig = 0.34 * smoothstep(0.28, 0.95, length(d) * 1.25);
+          float n = hash(vUv * res + fract(time) * 91.7) - 0.5;
+          vec3 c = mix(vec3(0.0), vec3(0.05, 0.1, 0.24), night);
+          gl_FragColor = vec4(c, clamp(vig + night * 0.16 + n * 0.07, 0.0, 1.0));
+        }`,
+      transparent: true, depthTest: false, depthWrite: false,
+    });
+    const scene = new THREE.Scene(); scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+    this.overlay = { scene, cam: new THREE.Camera(), mat };
   }
 
   resize() {
@@ -192,20 +226,37 @@ export class Gfx {
     if (this.ft < 12.5 && this.cool <= 0 && this.res < 1) { this.setRes(Math.min(1, +(this.res + 0.1).toFixed(2))); this.cool = 8; return; }
     this.slow = this.ft > 32 ? this.slow + dt : Math.max(0, this.slow - dt);
     const i = ORDER.indexOf(this.quality);
+    if (i < 0) return;   // the phone preset is the floor already
     if (this.slow > 3) {
       if (i < ORDER.length - 1) { console.info('graphics: stepping down to', ORDER[i + 1]); this.ceiling = i + 1; this.setQuality(ORDER[i + 1], { save: false }); }
       this.slow = 0; this.ft = 16;
       return;
     }
-    this.fast = this.ft < 9 && this.res >= 1 ? this.fast + dt : 0;
+    this.fast = this.ft < 9 && this.res >= 1 && !PHONE ? this.fast + dt : 0;
     if (this.fast > 10 && i > 0 && (this.ceiling === null || i > this.ceiling)) {
       console.info('graphics: stepping up to', ORDER[i - 1]); this.setQuality(ORDER[i - 1], { save: false }); this.fast = 0; this.ft = 16; this.age = 0;
     }
   }
 
+  // a phone leaves the small models out past a few metres (props.js marks them): the list is gathered again now and then, since models arrive late
+  cull(dt) {
+    this.cullT = (this.cullT ?? 0) - dt; if (this.cullT > 0) return; this.cullT = 0.3;
+    if (!this.cullList || (this.cullAge = (this.cullAge ?? 0) + 0.3) > 6) { this.cullList = []; this.cullAge = 0; this.scene.traverse((o) => { if (o.userData && o.userData.farCull) this.cullList.push(o); }); }
+    const c = this.camera.position, v = this._cv || (this._cv = new THREE.Vector3());
+    for (const o of this.cullList) { o.getWorldPosition(v); const want = v.distanceTo(c) < o.userData.farCull; if (o.visible !== want) o.visible = want; }
+  }
+
   render(dt) {
-    this.time += dt; this.watch(dt);
-    if (this.pass.grade) { const u = this.pass.grade.uniforms; u.time.value = this.time; this.night += ((this.nightGoal ?? 0) - this.night) * Math.min(1, dt * 1.2); u.night.value = this.night; }
-    if (this.composer) this.composer.render(dt); else this.r.render(this.scene, this.camera);
+    this.time += dt; this.watch(dt); if (PHONE) this.cull(dt);
+    this.night += ((this.nightGoal ?? 0) - this.night) * Math.min(1, dt * 1.2);
+    if (this.pass.grade) { const u = this.pass.grade.uniforms; u.time.value = this.time; u.night.value = this.night; }
+    if (this.composer) this.composer.render(dt);
+    else {
+      this.r.render(this.scene, this.camera);
+      if (this.overlay && QUALITY[this.quality].overlay) {
+        const u = this.overlay.mat.uniforms; u.time.value = this.time; u.night.value = this.night; u.res.value.set(innerWidth, innerHeight);
+        this.r.autoClear = false; this.r.render(this.overlay.scene, this.overlay.cam); this.r.autoClear = true;
+      }
+    }
   }
 }
