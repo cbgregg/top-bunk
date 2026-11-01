@@ -1968,8 +1968,8 @@ export function buildWorld(scene) {
       return (hash(i, j) * (1 - u) + hash(i + 1, j) * u) * (1 - v) + (hash(i, j + 1) * (1 - u) + hash(i + 1, j + 1) * u) * v;
     };
     // one texture: a dozen blades painted on a canvas, overlapping, tapering to a point, dark at the root and paler toward the tip
-    const c = document.createElement('canvas'); c.width = 128; c.height = 256; const ctx = c.getContext('2d');
-    ctx.clearRect(0, 0, 128, 256);
+    const c = document.createElement('canvas'); c.width = 256; c.height = 256; const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 256, 256);
     const blade = (x0, w, lean, h, hue, light) => {
       ctx.beginPath(); ctx.moveTo(x0 - w, 256);
       ctx.bezierCurveTo(x0 - w * 0.7 + lean * 0.2, 256 - h * 0.45, x0 + lean * 0.55 - w * 0.15, 256 - h * 0.85, x0 + lean, 256 - h);
@@ -1978,7 +1978,7 @@ export function buildWorld(scene) {
       gr.addColorStop(0, `hsl(${hue + 6}, 38%, ${light - 14}%)`); gr.addColorStop(0.45, `hsl(${hue}, 44%, ${light}%)`); gr.addColorStop(1, `hsl(${hue - 12}, 50%, ${light + 14}%)`);
       ctx.fillStyle = gr; ctx.fill();
     };
-    for (let i = 0; i < 16; i++) blade(6 + i * 7.5 + r() * 6, 2.4 + r() * 2.4, (r() - 0.5) * 56, 110 + r() * 140, 78 + r() * 14, 31 + r() * 9);
+    for (let i = 0; i < 22; i++) blade(8 + i * 11 + r() * 8, 2.6 + r() * 2.6, (r() - 0.5) * 60, 110 + r() * 140, 78 + r() * 14, 31 + r() * 9);
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
     const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.35, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.95, metalness: 0 });
     const time = { value: 0 };
@@ -2002,7 +2002,7 @@ export function buildWorld(scene) {
     };
     mat.customProgramCacheKey = () => 'lawn2';
     // three crossed cards per cluster, two segments tall so the wind bends the blade and not just its tip
-    const card = new THREE.PlaneGeometry(0.34, 0.3, 1, 3); card.translate(0, 0.15, 0);
+    const card = new THREE.PlaneGeometry(0.42, 0.34, 1, 2); card.translate(0, 0.17, 0);
     const geo = mergeGeometries([card, card.clone().rotateY(Math.PI / 3), card.clone().rotateY(-Math.PI / 3)], false);
     const onLawn = (x, z) => x > FX0 + 0.2 && x < FX1 - 0.2 && z > FZ0 + 0.2 && z < FZ1 - 0.2
       && !(x > HX0 - 0.3 && x < HX1 + 0.3 && z > HZ0 - 0.55 && z < HZ1 + 0.25) && !onDrive(x, z, 0.1) && !(x > 2.5 && x < 3.7 && z > -8 && z < -5.0)
@@ -2022,32 +2022,36 @@ export function buildWorld(scene) {
       (cells.get(key) || cells.set(key, []).get(key)).push([m4.clone().compose(new THREE.Vector3(x, y, z), q, sc.set(k, ky, k)), col.clone().setHSL(hue, sat, light)]);
       n++;
     };
-    for (let i = 0; i < 140000 && n < 30000; i++) {
+    for (let i = 0; i < 300000 && n < 66000; i++) {
       const x = FX0 + r() * (FX1 - FX0), z = FZ0 + r() * (FZ1 - FZ0);
-      const d = Math.hypot((x - 2) / 1.3, z + 4), far = d < 15 ? 1 : d < 22 ? 0.6 : 0.12;   // thick round the house
-      const cl = noise(x / 4.2 + 3, z / 4.2 + 9), keep = far * (0.55 + cl * 0.6);   // clumpy, never a grid
+      const cl = noise(x / 4.2 + 3, z / 4.2 + 9), keep = 0.7 + cl * 0.5;   // clumpy, never a grid
       if (r() > keep) continue;
       if (!onLawn(x, z) && !(((x > 1.75 && x < 2.65 && z > -26 && z < -9.6) || (z > -12.2 && z < -11.4 && x > -7.4 && x < 0.7)) && r() < 0.05)) continue;   // a little grass comes up through the gravel between the tracks
       if (yardTrunks.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1.5)) continue;
       const k = 0.55 + r() * 0.5, tone = noise(x / 9 + 1, z / 9 + 4);
-      put(x, z, -0.012, k, k * (0.36 + r() * 0.3 + tone * 0.14), 0.165 + tone * 0.04 + r() * 0.025, 0.26 + r() * 0.16, 0.6 + r() * 0.18);
+      put(x, z, -0.012, k, k * (0.4 + r() * 0.3 + tone * 0.14), 0.165 + tone * 0.04 + r() * 0.025, 0.26 + r() * 0.16, 0.6 + r() * 0.18);
     }
     const lawnCount = n;
     // the field grass just outside the fence: longer, drier, sparser, rooted on the rolling ground
-    for (let i = 0; i < 40000 && n < lawnCount + 7000; i++) {
+    for (let i = 0; i < 90000 && n < lawnCount + 12000; i++) {
       const x = FX0 - 14 + r() * (FX1 - FX0 + 28), z = FZ0 - 2 + r() * (FZ1 - FZ0 + 16);
       if (x > FX0 - 0.6 && x < FX1 + 0.6 && z > FZ0 - 0.6 && z < FZ1 + 0.6) continue;
       if (z < RZ1 + 2.6) continue;
-      const cl = noise(x / 6 + 11, z / 6 + 2); if (r() > 0.25 + cl * 0.7) continue;
+      const edge = Math.min(Math.abs(x - FX0), Math.abs(x - FX1), Math.abs(z - FZ0), Math.abs(z - FZ1)), cl = noise(x / 6 + 11, z / 6 + 2);
+      if (r() > (0.3 + cl * 0.7) * (edge < 5 ? 1 : 0.5)) continue;   // thickest along the fence
       if (trunks.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1.2)) continue;
       const k = 0.9 + r() * 0.5;
       put(x, z, fieldH(x, z) - 0.04, k, k * (0.95 + r() * 0.6), 0.14 + r() * 0.05, 0.28 + r() * 0.15, 0.62 + r() * 0.2);
     }
+    const meshes = [];
     for (const list of cells.values()) {
       const im = new THREE.InstancedMesh(geo, mat, list.length);
       list.forEach(([m, cc], i) => { im.setMatrixAt(i, m); im.setColorAt(i, cc); });
-      im.receiveShadow = true; im.computeBoundingSphere(); g.add(im);
+      im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); meshes.push(im);
     }
+    // the share of the blades drawn at each graphics preset (the instances in a cell are in random order, so a shorter count thins evenly)
+    const SHARE = { ultra: 1, high: 1, medium: 0.55, low: 0.3 }; let quality = 'high';
+    const setQuality = (q) => { if (q === quality || !(q in SHARE)) return; quality = q; for (const im of meshes) im.count = Math.round(im.instanceMatrix.count * SHARE[q]); };
     // the worn edges of the drive: gravel that fades into the grass; bare dirt where feet and tyres go; needles and bare ground under the trees
     {
       const ec = document.createElement('canvas'); ec.width = 16; ec.height = 128; const e = ec.getContext('2d'), gr = e.createLinearGradient(0, 0, 0, 128);
@@ -2066,7 +2070,7 @@ export function buildWorld(scene) {
       for (const [x, z, a, b, rot] of [[3.1, -6.4, 1.3, 0.8, 0.3], [-7.3, -4.6, 1.0, 0.7, 0.8], [8.2, -12.9, 0.9, 0.7, 1.2], [-10.9, -3.4, 1.2, 0.8, 0.5], [7.4, -20.5, 1.1, 0.7, 0.9], [-16, -16, 0.9, 0.7, 0.2]]) disc(pm, x, z, a, b, rot);
       for (const [x, z] of yardTrunks) disc(nm, x, z, 1.3 + r() * 0.5, 1.1 + r() * 0.5, r() * 3, fieldH(x, z) + 0.006);
     }
-    return { group: g, time, count: n };
+    return { group: g, time, count: n, lawnCount, setQuality, get quality() { return quality; } };
   })();
   lawn.group.traverse((o) => { if (o.isInstancedMesh) o.onBeforeRender = () => { lawn.time.value = performance.now() / 1000; }; });
   // invisible yard boundary

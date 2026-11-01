@@ -1357,7 +1357,7 @@ function update(dt) {
   WF.update(dt); dust.update(dt);
   { const room = roomAt(P.pos.x, P.pos.z, P.pos.y); weather.update(dt, room !== 'out' && room !== 'stoop', F.phase === 'night' || F.phase === 'title'); }
   traffic.update(dt, car.group.visible ? 'off' : F.phase); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, sfx);
-  E.update(dt, gfx.quality);
+  E.update(dt, gfx.quality); W.lawn.setQuality(gfx.quality);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
   achievements.tick();
   if (nights) nights.proof.hud(F.live && !F.dead && !F.script);   // not over a scripted scene: the vigil, the drive, a scare
@@ -1374,7 +1374,7 @@ function loop(now) {
     titleT += dt;
     camera.position.set(-6 + Math.sin(titleT * 0.05) * 3, 2.0 + Math.sin(titleT * 0.3) * 0.05, -22 + Math.cos(titleT * 0.05) * 2);
     camera.lookAt(1, 1.6, -4);
-    E.update(dt, gfx.quality);
+    E.update(dt, gfx.quality); W.lawn.setQuality(gfx.quality);
     weather.update(dt, false, true); traffic.update(dt, 'title'); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, null);
   }
   // the shadow maps are re-rendered only when something can have changed: the sun and moon every third frame (the people move slowly), the
