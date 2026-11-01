@@ -31,6 +31,7 @@
     <div id="subtitle"></div>
     <div id="stamina"><div></div></div>
     <div id="breath"><span>breath</span><div><i></i></div></div>
+    <button id="jbtn" type="button" aria-label="Journal"><i></i></button>
   </div>
   <div id="card"><div class="big"></div><div class="small"></div></div>
 
@@ -60,7 +61,45 @@
       <p id="endinfo" class="note"></p>
     </div>
   </div>
-  <div id="loading">Unpacking…</div>
+  <!-- the loading screen: shown from the first paint, before any script runs. every animation here is opacity or transform only, so
+       the browser keeps it moving even while the page is busy building the house -->
+  <div id="loading" role="status" aria-live="polite">
+    <div class="ld-draw" aria-hidden="true">
+      <svg viewBox="0 0 320 220" width="320" height="220">
+        <defs><filter id="ld-crayon"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter></defs>
+        <g filter="url(#ld-crayon)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <g stroke="#8a6a44" stroke-width="5">
+            <path d="M40 200 L42 40 M182 202 L180 38 M40 120 L182 118 M42 64 L180 62 M40 168 L183 166"/>
+            <path d="M196 200 L194 70 M222 200 L221 70 M195 92 L222 93 M195 120 L222 121 M195 148 L222 148 M195 176 L222 176"/>
+          </g>
+          <path stroke="#2b5e9e" stroke-width="9" d="M50 110 Q110 104 172 110 M50 158 Q110 152 172 158"/>
+          <circle cx="66" cy="96" r="9" stroke="#e9e2d0" stroke-width="3"/>
+          <g class="ld-thing" stroke="#111" stroke-width="5">
+            <circle cx="268" cy="70" r="15" fill="#111"/>
+            <path d="M268 86 L266 156 M266 156 L252 206 M266 156 L282 206 M266 100 L238 134 M266 100 L300 132"/>
+          </g>
+          <g class="ld-eyes" stroke="#f4efe2" stroke-width="2.5"><circle cx="262" cy="67" r="4"/><circle cx="274" cy="67" r="4"/><path d="M259 76 Q268 82 277 76"/></g>
+        </g>
+      </svg>
+    </div>
+    <h1 class="ld-title">TOP BUNK</h1>
+    <div class="ld-bar"><i></i><b></b></div>
+    <p class="ld-step">Unpacking the boxes</p>
+    <div class="ld-tips" aria-hidden="true">
+      <span>Don't look under the bunk.</span>
+      <span>Hold your breath when it's close.</span>
+      <span>Take a picture. They have to believe a picture.</span>
+      <span>If the TV is on, nobody turned it on.</span>
+      <span>It only looks like Dad.</span>
+      <span>Don't stare at it. It knows when you stare.</span>
+      <span>Count the doors in the hall. Then count them again.</span>
+      <span>Lights off when it's looking for you.</span>
+    </div>
+  </div>
+  <script>
+    // the bar moves from the first frame on: a module script cannot run before its imports are fetched
+    (function () { var b = document.querySelector('#loading .ld-bar i'); if (b) b.style.transform = 'scaleX(0.04)'; if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) document.getElementById('begin').textContent = 'Tap to begin'; })();
+  </script>
 
   <script type="module" src="js/main.js"></script>
 </body>

@@ -14,12 +14,14 @@ import { newSeed } from './rng.js';
 import { createCar } from './cars.js';
 import { createTraffic } from './traffic.js';
 import { createWeather } from './weather.js';
-import { weatherFor } from './director.js';
+import { weatherFor, nightTypes } from './director.js';
 import { createVigil } from './vigil.js';
 import { settings, flicker } from './settings.js';
 import { menu } from './menu.js';
 import { achievements } from './achievements.js';
 import { store } from './store.js';
+import { createHands } from './hands.js';
+import { createJournal } from './journal.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -54,12 +56,31 @@ let exposure = EXPOSURE.night;
 function setExposure(e = exposure) { exposure = e; renderer.toneMappingExposure = e * 2 ** settings.get('brightness'); }
 settings.on('brightness', () => setExposure());
 
+// ---------- loading: the screen in index.html, its bar driven by what is really left to do ----------
+// a yield is a timeout, not an animation frame: the trailer's renderer holds the frames back until it starts, and the boot must not wait on it
+const tick = () => new Promise((res) => setTimeout(res, 0));
+const LOAD = (() => {
+  const el = $('loading'), bar = el && el.querySelector('.ld-bar i'), step = el && el.querySelector('.ld-step');
+  let at = 0.04, files = { done: 0, total: 0, settled: 0 };
+  const set = (k, text) => { at = Math.max(at, Math.min(1, k)); if (bar) bar.style.transform = `scaleX(${at.toFixed(3)})`; if (text && step && step.textContent !== text) step.textContent = text; };
+  // every model, texture and sky the loaders fetch goes through three's default manager: its counts are the first part of the bar
+  THREE.DefaultLoadingManager.onProgress = (url, done, total) => { files = { done, total, settled: performance.now() }; set(0.12 + 0.48 * (done / Math.max(1, total)), 'Unpacking the boxes'); };
+  THREE.DefaultLoadingManager.onLoad = () => { files.settled = performance.now(); };
+  const reset = (k, text) => { at = 0; set(k, text); };
+  return { set, reset, files: () => files, get at() { return at; } };
+})();
+LOAD.set(0.08, 'Building the house');
+await tick();
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.08, 400);   // a near plane this far out keeps depth precise at room distances (door frames and walls stop fighting)
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
 const W = buildWorld(scene);
+const hands = createHands();   // the kid's hands, drawn over the frame (see the end of loop())
+LOAD.set(0.12, 'Unpacking the boxes');
+await tick();
 const E = new Entity(scene);
 const car = createCar(scene);
 const sfx = new Sound();
@@ -92,10 +113,20 @@ function grabPrint() {
 function takePhoto() {
   bulb.position.copy(camera.position); camera.getWorldDirection(tmp); bulb.position.addScaledVector(tmp, -0.25); bulb.intensity = 3.2;   // a cheap flash: bright up close, gone by the far wall
   let url = null;
-  try { camera.updateMatrixWorld(); gfx.render(0); url = grabPrint(); } catch (e) { url = null; }   // the frame the flash lit, read before the browser shows it
+  try { camera.updateMatrixWorld(); gfx.render(0); url = grabPrint(); } catch (e) { url = null; }   // the frame the flash lit, read before the browser shows it (the hands are drawn after it, so they are not in the print)
+  hands.snap();
   UI.flash(settings.get('reduceFlashing') ? 'rgba(255,250,240,0.45)' : 'rgba(255,250,240,0.95)', 0.5); sfx.shutter(); sfx.winder();
   setTimeout(() => { bulb.intensity = 0; }, 120);
   return url;
+}
+// the journal (js/journal.js): it writes itself from what happens; J, the right stick pressed in, the pause menu or the notebook on a touch screen
+const journal = createJournal({ RUN, save: () => saveRun(), sfx: { pageTurn: () => { sfx.noiseHit({ dur: 0.2, type: 'bandpass', f: 2200, gain: 0.16, wet: 0.04 }); sfx.noiseHit({ dur: 0.12, type: 'highpass', f: 4200, gain: 0.08, wet: 0.04, delay: 0.09 }); } },
+  proof: { tell: (k) => nights && nights.proof.tell(k), cap: (k) => nights && nights.proof.defs[k] && nights.proof.defs[k].cap } });
+journal.watch($('hint'));
+$('jbtn').addEventListener('click', (e) => { e.stopPropagation(); openJournal(); });
+function openJournal() {
+  if (uiMode === 'playing' && !F.dead && !F.cutscene) setPause(true);
+  if (uiMode === 'pause') setTimeout(() => { if (uiMode === 'pause') menu.open('journal'); }, 0);
 }
 // the photo board: from play it pauses and opens over the pause menu (Tab, the controller's Select, the camera on a touch screen)
 function openPhotos() {
@@ -166,6 +197,7 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (e.code === 'KeyE') pressE = true;
   if (e.code === 'Tab') { e.preventDefault(); openPhotos(); }
+  if (e.code === 'KeyJ') openJournal();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -194,7 +226,7 @@ function confirmPress() {
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
-initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos() });
+initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos(), journal: () => openJournal() });
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
   $('controls').innerHTML = controlsTable().map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
@@ -326,7 +358,7 @@ function sightBlocked(x, z, tx, tz) {
   return wallAhead(x, z, dx / d, dz / d, d, tx, tz) < d - 0.05;
 }
 function updateInteract() {
-  let label = null, act = null, extra = '';
+  let label = null, act = null, extra = '', at = null;
   if (!F.cutscene && !F.dead) {
     if (P.mode === 'car') {
       if (F.carPrompt) { label = F.carPrompt.label; act = F.carPrompt.act; }
@@ -347,15 +379,16 @@ function updateInteract() {
           tmp.sub(camera.position); const d = tmp.length(); if (d > it.r * REACH) continue;
           const dot = tmp.divideScalar(d).dot(fwd);
           const score = dot - d * 0.12;   // near things win over far ones in the same direction
-          if (dot > (d < 1.1 ? 0.55 : 0.82) && score > best && !sightBlocked(camera.position.x, camera.position.z, tx, tz)) { best = score; label = typeof it.label === 'function' ? it.label() : it.label; act = it.act; }
+          if (dot > (d < 1.1 ? 0.55 : 0.82) && score > best && !sightBlocked(camera.position.x, camera.position.z, tx, tz)) { best = score; label = typeof it.label === 'function' ? it.label() : it.label; act = it.act; at = it; }
         }
       }
     }
   }
   UI.prompt(label ? `<b>${L('interact')}</b> ${label}${extra}` : null); input.setUse(!!label);
-  if (pressE && act) act();
+  if (pressE && act) { if (at) { if (at.obj) at.obj.getWorldPosition(reachW); else reachW.copy(at.p); hands.reach(reachW, camera); } act(); }
   pressE = false;
 }
+const reachW = new V3();
 
 // The held box is pulled back and down as a wall gets close, so it never pokes through (the player's circle is smaller than the box's reach).
 const BOX_HALF = 0.23, BOX_Z = 0.62;
@@ -424,6 +457,7 @@ function speak(id, { muffle = false, hold = 0.45 } = {}) {
   UI.subtitle(l.html, t, rec ? 'speech' : null);
   // who is speaking to whom, for the heads and the camera; nothing for a line heard through a wall
   const by = l.voice || (/^<b>(Mom|Dad):/.exec(l.html) || [])[1]?.toLowerCase();
+  if (!muffle && (by === 'mom' || by === 'dad') && /^b\d+$/.test(F.stage || '')) journal.said(+F.stage.slice(1), by === 'mom' ? 'Mom' : 'Dad', l.html);   // the morning, written down
   if (!muffle && (by === 'mom' || by === 'dad')) {
     talkNow.who = by; talkNow.to = LINE_TO[id] || 'you'; talkNow.until = gameTime + t;
     if (F.talkCam) lookAtTalk(by === 'mom' ? mom : dad);
@@ -596,7 +630,7 @@ function handheld(dt) {
 // ---------- getting caught, and starting over ----------
 async function caught(opts = {}) {   // opts.unseen: you are hurt by something you never see
   if (F.dead) return;
-  F.dead = true; F.live = false; F.script = false; RUN.deaths++; saveRun(); UI.pod(null); UI.clock(null);
+  F.dead = true; F.live = false; F.script = false; RUN.deaths++; if (/^n\d+$/.test(F.stage || '')) journal.note(F.stage, 'It found me. I had to start the night over.'); saveRun(); UI.pod(null); UI.clock(null);
   setTimeout(() => { if (F.dead && uiMode !== 'death') { uiMode = 'death'; unlock(); UI.fade(1, 0.05); UI.show('death'); } }, 6000);   // killAll() or a throw drops the awaits below without settling them, so a finally would not run
   killAll(); F.chase = false; F.breathCheck = false; F.echo = false; F.cutscene = true; F.breathUI = false;
   UI.blanket(false); UI.prompt(null); UI.breath(0, false); UI.objective(null); UI.hint(null); UI.stamina(1, false);
@@ -666,13 +700,16 @@ function titleScene() {
 
 // compile every shader variant (day, night, morning light setups) while the screen is black, so the phase changes later don't hitch
 async function warmShaders() {
-  const rt = gfx.composer && gfx.composer.renderTarget1;   // shaders differ for a render target and for the screen
-  try { for (const p of ['night', 'morning', 'day']) { setPhase(p, true); if (rt) renderer.setRenderTarget(rt); await renderer.compileAsync(scene, camera); renderer.setRenderTarget(null); } } catch (e) { renderer.setRenderTarget(null); /* compiled on first use instead */ }
+  if (window.__norender) return;   // nothing is drawn, so nothing to build (the tests)
+  const el = $('loading'); el.classList.add('again'); el.classList.remove('done');
+  LOAD.reset(0.1, 'Waiting for dark');
+  try { await compileSlices(['night', 'morning', 'day'], (k) => LOAD.set(0.1 + 0.9 * k)); } catch (e) { /* built on first draw */ }
+  el.classList.add('done');
 }
-const STAGES = { day: () => dayScript(), n1: () => nights.freeNight(1), b1: () => breakfast(1) };
+const STAGES = { day: () => dayScript(), n1: () => { journal.night(1, 'poltergeist'); return nights.freeNight(1); }, b1: () => breakfast(1) };
 const ORDER = ['day', 'n1', 'b1'];
 for (let n = 2; n <= 10; n++) {   // nights two to ten are seeded, free-roaming nights
-  STAGES['n' + n] = () => nights.freeNight(n); ORDER.push('n' + n);
+  STAGES['n' + n] = () => { journal.night(n, n === 10 ? 'finale' : nightTypes(RUN.seed)[n - 2]); return nights.freeNight(n); }; ORDER.push('n' + n);
   if (n < 10) { STAGES['b' + n] = () => breakfast(n); ORDER.push('b' + n); }
 }
 let playTok = 0;
@@ -1456,7 +1493,76 @@ function loop(now) {
   frameN++; W.sun.shadow.autoUpdate = false; W.bathSpot.shadow.autoUpdate = false;
   if (frameN % 3 === 0) W.sun.shadow.needsUpdate = true;
   if (W.bathSpot.intensity > 0) W.bathSpot.shadow.needsUpdate = true;
-  if (!window.__norender) gfx.render(dt);
+  handsTick(dt);
+  if (!window.__norender && booted) {
+    gfx.render(dt);
+    // the hands over the frame: the depth is cleared first, so a wall right in front of you never cuts through them
+    if (hands.visible()) { const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.clearDepth(); renderer.render(hands.scene, camera); renderer.autoClear = ac; }
+  }
+}
+let wasFake = false;
+function handsTick(dt) {
+  if (started && nights && F.live) {
+    if (P.mode === 'hide' && P.pod && nights.hunter.busy && nights.hunter.state === 'search') journal.learn('still');
+    if (wasFake && !dad.fake) journal.learn('dad'); wasFake = !!dad.fake;
+  }
+  const holding = P.mode === 'hide' && (!!keys.Space || input.breath || breathLatch);
+  const hidden = !started || paused || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || (uiMode !== 'playing' && uiMode !== 'test');
+  const walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0;
+  hands.update(dt, camera, { mode: P.mode, pod: P.pod, flashOn: F.flashOn && flash.intensity > 0, holding, fear: F.fear, walk, bob: P.bob, hidden: hidden && !hands.busy, ambient: F.phase === 'night' ? 0.32 : 0.75, night: F.phase === 'night' });
+  // the beam comes out of the torch in the hand when it shows, else from beside the eye
+  if (F.flashOn && hands.visible()) hands.lens(flash.position); else flash.position.set(0.12, -0.14, 0);
+}
+
+// ---------- the boot, behind the loading screen ----------
+// nothing is drawn until the files are in, the textures are on the card and every shader is built, a slice at a time, so the first frame
+// does not freeze the page for seconds; then the screen fades onto the title, whose own "click to begin" unlocks the sound
+let booted = false;
+// build the programs for the given light setups one mesh at a time, yielding between them, so no single task holds the page for long.
+// shaders differ for the post-processing target and for the screen; the composer's target is what the game draws into
+async function compileSlices(phases, progress = () => {}) {
+  const rt = gfx.composer && gfx.composer.renderTarget1, meshes = [];
+  scene.traverse((o) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material) meshes.push(o); });
+  let n = 0, t = performance.now();
+  for (let p = 0; p < phases.length; p++) {
+    if (phases[p] === 'title') titleScene(); else setPhase(phases[p], true);
+    for (let i = 0; i < meshes.length; i++) {
+      try { if (rt) renderer.setRenderTarget(rt); await renderer.compileAsync(meshes[i], camera, scene); } catch (e) { /* built on first draw */ } finally { renderer.setRenderTarget(null); }
+      // yield every few meshes or 30 ms (counted too: the trailer's renderer stops the clock)
+      if (++n % 12 === 0 || performance.now() - t > 30) { progress((p + i / meshes.length) / phases.length); await tick(); t = performance.now(); }
+    }
+  }
+  progress(1);
+}
+async function boot() {
+  // 1. the files: done when three's manager has nothing in flight and nothing new has started for a moment (a model's textures come after it)
+  // (counted in polls, not by the clock: the trailer's renderer stops the clocks)
+  let idle = 0, last = -1;
+  for (let poll = 0; poll < 1000; poll++) {   // 1000 polls of 120 ms: a file that never answers must not keep the game shut
+    const f = LOAD.files(), quiet = f.total === 0 || f.done >= f.total;
+    idle = quiet && f.done === last ? idle + 1 : 0; last = f.done;
+    if (idle >= 4) break;
+    await new Promise((res) => setTimeout(res, 120));
+  }
+  LOAD.set(0.6, 'Turning on the lights');
+  if (!window.__norender) {
+    // 2. the textures onto the card, a few at a time
+    const texs = new Set();
+    scene.traverse((o) => { for (const m of [].concat(o.material || [])) for (const k in m) { const v = m[k]; if (v && v.isTexture && v.image) texs.add(v); } });
+    let i = 0;
+    for (const t of texs) { try { renderer.initTexture(t); } catch (e) { /* drawn on first use instead */ } if (++i % 4 === 0) { LOAD.set(0.6 + 0.1 * (i / texs.size)); await tick(); } }
+    // 3. the shaders the title draws, a mesh at a time (the other light setups are built when the game starts, behind this same screen)
+    LOAD.set(0.7, 'Waiting for dark');
+    await compileSlices(['title'], (k) => LOAD.set(0.7 + 0.22 * k));
+    titleScene();
+  }
+  // 4. the grass, which grows in slices of its own
+  LOAD.set(0.92, 'Mowing the lawn');
+  if (W.lawn && W.lawn.ready) await W.lawn.ready;
+  LOAD.set(1, 'Ready');
+  booted = true;
+  await tick();
+  $('loading').classList.add('done');
 }
 
 // the power is out (the vigil): every light in the house goes, and the fog takes the rest
@@ -1495,6 +1601,8 @@ function newRun(seed) {   // New game: a run from moving day on the seed it was 
 const jumped = !!DEBUG || ['proof', 'type', 'night'].some((k) => HPARAM[k] !== undefined);
 // before menu.init: it adds its panel to the title and pause menus
 menu.panel('photos', { title: 'Photos', render: (body) => { if (nights) nights.proof.board(body); } });
+menu.panel('journal', { title: 'Journal', render: (body) => journal.render(body) });
+menu.add('pause', { id: 'journal', label: 'Journal', panel: 'journal' }, { after: 'resume' });
 menu.add('pause', { id: 'photos', label: 'Photos', panel: 'photos', when: () => !!nights && (nights.proof.count() > 0 || nights.proof.kinds().length > 0) }, { after: 'resume' });
 achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter, test: () => uiMode === 'test' || jumped });
 menu.init({
@@ -1510,6 +1618,6 @@ menu.init({
 try { if (sessionStorage.getItem('topbunk.next') === 'new') { sessionStorage.removeItem('topbunk.next'); menu.newGame(); } } catch (e) { /* ignore */ }
 titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
-$('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { speak, caught, openPhotos, takePhoto, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+boot();
+window.__game = { speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

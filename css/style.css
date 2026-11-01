@@ -67,8 +67,30 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 button { font-family: 'Special Elite', monospace; font-size: 18px; letter-spacing: 3px; padding: 12px 28px; color: var(--ink); background: transparent; border: 1px solid rgba(233,226,208,0.5); cursor: pointer; }
 button:hover { background: rgba(233,226,208,0.08); }
 
-#loading { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: #000; font-family: 'Special Elite', monospace; letter-spacing: 4px; color: var(--dim); transition: opacity 0.8s; }
+/* the loading screen: opacity and transform animations only, which the browser runs off the main thread, so nothing on it ever stops */
+#loading { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000; color: var(--dim); transition: opacity 0.8s; padding: 16px; box-sizing: border-box; text-align: center; }
 #loading.done { opacity: 0; pointer-events: none; }
+#loading .ld-draw { width: min(320px, 70vw); animation: ld-flicker 7s steps(1) infinite; will-change: opacity; }
+#loading .ld-draw svg { width: 100%; height: auto; display: block; }
+#loading .ld-thing, #loading .ld-eyes { animation: ld-there 11s ease-in-out infinite; will-change: opacity; }
+#loading .ld-eyes { animation-name: ld-eyes; }
+@keyframes ld-flicker { 0%, 100% { opacity: 0.78 } 12% { opacity: 0.2 } 13% { opacity: 0.8 } 47% { opacity: 0.72 } 48% { opacity: 0.08 } 50% { opacity: 0.7 } 81% { opacity: 0.82 } }
+@keyframes ld-there { 0%, 40% { opacity: 0 } 52%, 86% { opacity: 0.9 } 100% { opacity: 0 } }
+@keyframes ld-eyes { 0%, 58% { opacity: 0 } 62%, 84% { opacity: 1 } 86%, 100% { opacity: 0 } }
+#loading .ld-title { margin: 0; font-family: 'Permanent Marker', 'Special Elite', cursive; font-weight: 400; font-size: clamp(38px, 8vw, 74px); letter-spacing: 6px; color: #b3241d; transform: rotate(-2deg); text-shadow: 0 0 24px rgba(179,36,29,0.25); }
+#loading .ld-bar { position: relative; width: min(360px, 72vw); height: 6px; background: rgba(233,226,208,0.08); overflow: hidden; border-radius: 3px; }
+#loading .ld-bar i { position: absolute; inset: 0; background: rgba(233,226,208,0.55); transform-origin: left center; transform: scaleX(0); transition: transform 0.9s ease-out; }
+/* a faint glint that crosses the bar all the time, so it is plainly alive while the page is busy */
+#loading .ld-bar b { position: absolute; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: ld-sweep 1.6s linear infinite; will-change: transform; }
+@keyframes ld-sweep { from { transform: translateX(-110%) } to { transform: translateX(560%) } }
+#loading .ld-step { margin: 0; font-family: 'Special Elite', monospace; font-size: 13px; letter-spacing: 3px; color: var(--dim); }
+#loading .ld-tips { position: relative; height: 2.4em; width: min(520px, 90vw); }
+#loading .ld-tips span { position: absolute; inset: 0; font-family: 'Gloria Hallelujah', cursive; font-size: clamp(15px, 2.4vw, 19px); color: #d9d1bd; opacity: 0; animation: ld-tip 40s linear infinite; will-change: opacity; }
+#loading .ld-tips span:nth-child(2) { animation-delay: 5s } #loading .ld-tips span:nth-child(3) { animation-delay: 10s } #loading .ld-tips span:nth-child(4) { animation-delay: 15s }
+#loading .ld-tips span:nth-child(5) { animation-delay: 20s } #loading .ld-tips span:nth-child(6) { animation-delay: 25s } #loading .ld-tips span:nth-child(7) { animation-delay: 30s } #loading .ld-tips span:nth-child(8) { animation-delay: 35s }
+@keyframes ld-tip { 0% { opacity: 0 } 2% { opacity: 1 } 11% { opacity: 1 } 12.5%, 100% { opacity: 0 } }
+#loading.ready .ld-bar b { display: none; }
+@media (max-height: 460px) { #loading .ld-draw { width: min(200px, 40vw); } #loading { gap: 8px; } }
 
 .note.gfx { margin: 0.6em 0 0; letter-spacing: 0.08em; }
 .note.gfx select { background: #0d0d0d; color: #cfc8b8; border: 1px solid #4a4538; font: inherit; padding: 0.15em 0.4em; margin-left: 0.6em; cursor: pointer; }
@@ -247,3 +269,33 @@ body[data-scheme="touch"] #proof.show { pointer-events: auto; cursor: pointer; p
 #card .proof { margin-top: 12px; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--dim); }
 #card .proof:empty { display: none; }
 @media (max-height: 520px) { #proof { font-size: 13px; } }
+
+/* ---------- the journal: a composition notebook, lined paper, his handwriting ---------- */
+.nb { outline: none; }
+.menu-panel:has(.nb) { width: min(920px, 96vw); }
+.nb-pages { display: grid; grid-template-columns: 1fr 1fr; gap: 0; width: min(880px, 92vw); margin: 0 auto; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
+.nb-page { position: relative; height: min(440px, 58vh); overflow-y: auto; box-sizing: border-box; padding: 30px 26px 26px 54px; text-align: left; color: #2a2a35; font-family: 'Gloria Hallelujah', cursive; font-size: 15px; line-height: 28px;
+  background: #f3efe2 repeating-linear-gradient(to bottom, transparent 0 27px, rgba(70,110,170,0.32) 27px 28px); background-position: 0 22px; }
+.nb-page::before { content: ''; position: absolute; top: 0; bottom: 0; left: 40px; width: 1px; background: rgba(200,60,60,0.55); }
+.nb-page + .nb-page { border-left: 2px solid rgba(0,0,0,0.12); }
+.nb-page h3 { margin: 30px 0 10px; font-family: 'Permanent Marker', cursive; font-weight: 400; font-size: 34px; color: #1d1d27; transform: rotate(-2deg); letter-spacing: 2px; }
+.nb-page h4 { margin: 0; font-family: 'Permanent Marker', cursive; font-weight: 400; font-size: 21px; color: #1d1d27; line-height: 28px; }
+.nb-t { margin: 0 0 4px; color: #a0261f; }
+.nb-l, .nb-page li { margin: 0; }
+.nb-page ol { margin: 0; padding-left: 20px; }
+.nb-m { margin: 6px 0 0; font-family: 'Permanent Marker', cursive; font-size: 15px; color: #2b5e9e; }
+.nb-dim { color: #8a8476; }
+.nb-doodle { width: 150px; margin: 24px 0 0 30px; opacity: 0.85; }
+.nb-photos { display: flex; gap: 10px; margin: 8px 0 4px; flex-wrap: wrap; }
+.nb-tape { position: relative; margin: 0; width: 104px; padding: 5px 5px 18px; background: #fbfaf5; box-shadow: 0 2px 6px rgba(0,0,0,0.35); transform: rotate(var(--r, 0deg)); }
+.nb-tape::before { content: ''; position: absolute; top: -8px; left: 32px; width: 40px; height: 14px; background: rgba(240,230,170,0.75); transform: rotate(-3deg); }
+.nb-tape img { display: block; width: 100%; height: auto; }
+.nb-tape figcaption { position: absolute; left: 0; right: 0; bottom: 1px; text-align: center; font-size: 11px; line-height: 16px; color: #2a2a35; }
+.nb-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 12px 0 0; }
+.nb-nav button { padding: 4px 18px; font-size: 20px; }
+.nb-n { font-family: 'Courier Prime', monospace; font-size: 13px; color: var(--dim); letter-spacing: 1px; }
+#jbtn { position: absolute; top: 70px; right: 22px; width: 38px; height: 44px; padding: 0; border: none; background: transparent; display: none; pointer-events: auto; opacity: 0.85; }
+#jbtn i { position: absolute; inset: 4px 6px; background: #1e2532; border: 2px solid var(--ink); border-radius: 2px 5px 5px 2px; }
+#jbtn i::after { content: ''; position: absolute; left: 5px; top: 6px; right: 5px; height: 8px; background: #f3efe2; }
+body[data-scheme="touch"] #jbtn { display: block; }
+@media (max-width: 700px) { .nb-pages { grid-template-columns: 1fr; } .nb-page { padding: 22px 14px 18px 46px; } .nb-page + .nb-page { display: none; } }
