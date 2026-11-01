@@ -73,7 +73,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     //   reach / reachLocal: a world or body-space point for the palm; hand: 'L' | 'R' | 'both'; palm: 'in' | 'down' | 'up'; grip: how far the fingers close
     //   L / R: { reach | reachLocal, palm, grip } for one hand on its own (the other follows hold / reach, or the clip)
     pose: null,
-    ikW: 0, leanNow: 0, squatNow: 0, kneelNow: 0, snap: new Map(),   // the hands and the body ease in and out of a pose instead of snapping: letting go blends the last solved arm rotations back to the clip
+    ikW: 0, leanNow: 0, squatNow: 0, kneelNow: 0, duck: 0, snap: new Map(),   // the hands and the body ease in and out of a pose instead of snapping: letting go blends the last solved arm rotations back to the clip
     update(t, dt = 0.016) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
@@ -84,7 +84,13 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       if (p && p.sleep) this.applyPose(r, p, 1, 0);
       else {
         const k = Math.min(1, dt * 7), want = p && (p.hold || p.reach || p.reachLocal || p.L || p.R) ? 1 : 0;
-        this.leanNow += ((p && p.lean || 0) - this.leanNow) * k; this.squatNow += ((p && p.squat || 0) - this.squatNow) * k; this.kneelNow += ((p && p.kneel || 0) - this.kneelNow) * k;
+        // ducking under something low: this.duck is how many metres the head must come down; a little from the waist, the rest from the knees
+        let dl = 0, ds = 0;
+        if (this.duck > 0.005) {
+          dl = Math.min(0.55, this.duck * 2.2); const rest = Math.max(0, this.duck - 0.72 * (1 - Math.cos(dl)));
+          ds = Math.min(0.9, Math.acos(Math.max(-1, 1 - rest / (r.legLen || 0.9))) / 1.1);
+        }
+        this.leanNow += (Math.max(p && p.lean || 0, dl) - this.leanNow) * k; this.squatNow += (Math.max(p && p.squat || 0, ds) - this.squatNow) * k; this.kneelNow += ((p && p.kneel || 0) - this.kneelNow) * k;
         if (want) {
           // solve the arms fully, then move only part of the way from last frame's solution: the hands settle onto a thing in a few frames and never flail
           const prevW = this.ikW; this.ikW = 1; this.applyPose(r, p, 1, this.leanNow, this.squatNow, this.kneelNow); this.smoothSnap(r, Math.min(1, dt * 12), prevW);

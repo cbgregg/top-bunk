@@ -2,6 +2,7 @@
 // the house, with traffic. Used for the road-trip dream, and for driving away at the end. Car-local axes: +x forward, +y up, +z right.
 import * as THREE from 'three';
 import { loadProp } from './props.js';
+import { carFit } from './traffic.js';
 
 const std = (c, r = 0.8, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 const NPC_MODELS = ['car_sedan', 'car_pickup', 'car_sedan2', 'car_wagon'];
@@ -17,10 +18,10 @@ function makeNpcCar(color, i) {
   const tails = [add(new THREE.BoxGeometry(0.06, 0.16, 0.5), tail, -2.26, 0.78, 0.55), add(new THREE.BoxGeometry(0.06, 0.16, 0.5), tail, -2.26, 0.78, -0.55)];
   g.userData.tail = tail;
   loadProp(NPC_MODELS[i % NPC_MODELS.length]).then((p) => {
-    const b = p.box, m = p.scene.clone(true); m.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+    const b = p.box, m = p.scene.clone(true), fit = carFit(p); m.position.set(-(b.min.x + b.max.x) / 2, -fit.floor - 0.005, -(b.min.z + b.max.z) / 2);   // tyres on the road, not the model's box
     m.traverse((o) => { if (o.isMesh && /bodymat/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.set(color).multiplyScalar(1.6); } });
     for (const s of standIn) s.visible = false;
-    for (const t of tails) { t.position.x = b.min.x - (b.min.x + b.max.x) / 2 + 0.02; t.position.y = 0.74; t.position.z = Math.sign(t.position.z) * ((b.max.z - b.min.z) / 2 - 0.32); t.scale.set(1, 0.9, 0.5); }
+    for (const t of tails) { t.position.x = b.min.x - (b.min.x + b.max.x) / 2 + 0.02; t.position.y = fit.tail; t.position.z = Math.sign(t.position.z) * ((b.max.z - b.min.z) / 2 - 0.32); t.scale.set(1, 0.9, 0.5); }
     g.add(m);
   }).catch(() => { /* the stand-in stays */ });
   return g;

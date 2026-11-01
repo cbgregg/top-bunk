@@ -18,6 +18,19 @@ function glowTexture() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+// the models' own bounds start well below their tyres (up to 0.6 m), so a car stood on its box floats: find the lowest vertex of the
+// actual meshes once per model, and the lamps' heights from the lamp meshes themselves. returns { floor, head, tail } in model space
+export function carFit(g) {
+  if (g.userData.fit) return g.userData.fit;
+  g.scene.updateMatrixWorld(true);
+  const v = new THREE.Vector3(), lamp = (re) => { const b = new THREE.Box3(); g.scene.traverse((o) => { if (o.isMesh && re.test(o.name) && !/glass/i.test(o.name)) b.expandByObject(o, true); }); return b.isEmpty() ? null : b; };
+  let floor = Infinity;
+  g.scene.traverse((o) => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); if (v.y < floor) floor = v.y; } });
+  if (!isFinite(floor)) floor = g.box.min.y;
+  const hb = lamp(/headlight/i), tb = lamp(/brakelight|taillight|tail_light/i);
+  return (g.userData.fit = { floor, head: hb ? (hb.min.y + hb.max.y) / 2 - floor : 0.7, tail: tb ? (tb.min.y + tb.max.y) / 2 - floor : 0.74 });
+}
+
 export function createTraffic(scene, sfx) {
   const root = new THREE.Group(); scene.add(root);
   const cars = [], glow = glowTexture();
@@ -27,15 +40,15 @@ export function createTraffic(scene, sfx) {
 
   Promise.all(MODELS.map(loadProp)).then((gs) => {
     for (let i = 0; i < (PHONE ? 1 : 6); i++) {   // a phone keeps one car; it is never on the road with another anyway
-      const g = gs[i % gs.length], b = g.box, m = g.scene.clone(true);
-      m.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+      const g = gs[i % gs.length], b = g.box, m = g.scene.clone(true), fit = carFit(g);
+      m.position.set(-(b.min.x + b.max.x) / 2, -fit.floor - 0.005, -(b.min.z + b.max.z) / 2);   // tyres on the asphalt (its top is at -0.005)
       // each copy its own paint: the body material (the one named after the car) is cloned and tinted
       m.traverse((o) => { if (o.isMesh && /bodymat/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.set(COLORS[i % COLORS.length]).multiplyScalar(1.6); } });
       const holder = new THREE.Group(); holder.add(m); holder.visible = false; root.add(holder);
       const L = (b.max.x - b.min.x) / 2, Wd = (b.max.z - b.min.z) / 2, lights = [], sprites = [];
       for (const s of [-1, 1]) {   // lamps: a disc each side at both ends, and a glow sprite over each
-        const h = new THREE.Mesh(new THREE.CircleGeometry(0.11, 12), headOff); h.position.set(L - 0.03, 0.7, s * (Wd - 0.36)); h.rotation.y = Math.PI / 2; holder.add(h);
-        const t = new THREE.Mesh(new THREE.CircleGeometry(0.09, 12), tailOff); t.position.set(-L + 0.03, 0.74, s * (Wd - 0.32)); t.rotation.y = -Math.PI / 2; holder.add(t);
+        const h = new THREE.Mesh(new THREE.CircleGeometry(0.11, 12), headOff); h.position.set(L - 0.03, fit.head, s * (Wd - 0.36)); h.rotation.y = Math.PI / 2; holder.add(h);
+        const t = new THREE.Mesh(new THREE.CircleGeometry(0.09, 12), tailOff); t.position.set(-L + 0.03, fit.tail, s * (Wd - 0.32)); t.rotation.y = -Math.PI / 2; holder.add(t);
         const hs = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffe9c0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.9 })); hs.scale.set(1.6, 1.6, 1); hs.position.copy(h.position).x += 0.1; holder.add(hs);
         const ts = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xff3020, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 })); ts.scale.set(0.7, 0.7, 1); ts.position.copy(t.position).x -= 0.1; holder.add(ts);
         lights.push(h, t); sprites.push(hs, ts);

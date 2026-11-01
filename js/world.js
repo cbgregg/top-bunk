@@ -360,7 +360,7 @@ export function buildWorld(scene) {
       if (g0 > cur) segs.push([cur, g0, 0, H]);
       if (gp.arch) { /* filled by archFill */ }
       else if (gp.sill !== undefined) { segs.push([g0, g1, 0, gp.sill]); segs.push([g0, g1, gp.sill + gp.h, H]); }   // a window: wall below and above
-      else segs.push([g0, g1, gp.top ?? 2.1, H]);                                                                    // a door: wall above
+      else segs.push([g0, g1, gp.door ? Math.max(gp.top ?? 2.1, 2.076) : (gp.top ?? 2.1), H]);                       // a door: wall above (a hung door's starts over its frame's head)
       cur = g1;
     }
     if (cur < a1) segs.push([cur, a1, 0, H]);
@@ -503,13 +503,14 @@ export function buildWorld(scene) {
     const fr = new THREE.Group(); fr.position.set(hx, y0, hz); fr.rotation.y = ry; house.add(fr);
     const g = new THREE.Group(); g.position.set(hx, y0, hz); g.rotation.y = ry; house.add(g);
     // the frame: hinge jamb, latch jamb, head, and the casing a hair proud of the wall on both faces
-    lbox(fr, -J, 0, 0, HT + J, -hd, hd, M.doorW); lbox(fr, w, w + J, 0, HT + J, -hd, hd, M.doorW); lbox(fr, -J, w + J, HT, HT + J, -hd, hd, M.doorW);
+    const jd = hd + 0.003;   // the jambs stand 3 mm proud of each wall face, so no face of theirs lies in the wall's planes
+    lbox(fr, -J, 0, 0, HT + J, -jd, jd, M.doorW); lbox(fr, w, w + J, 0, HT + J, -jd, jd, M.doorW); lbox(fr, -J, w + J, HT, HT + J, -jd, jd, M.doorW);
     for (const side of [-1, 1]) {
       const z0 = Math.min(side * hd, side * (hd + E)), z1 = Math.max(side * hd, side * (hd + E));
       lbox(fr, -J - C, -J + E, 0, HT + J + C - E, z0, z1, M.white, false); lbox(fr, w + J - E, w + J + C, 0, HT + J + C - E, z0, z1, M.white, false);
-      lbox(fr, -J - C, w + J + C, HT + J - E, HT + J + C, z0, z1, M.white, false);
+      lbox(fr, -J - C, w + J + C, HT + J - E, HT + J + C, z0 - (side < 0 ? 0.002 : 0), z1 + (side > 0 ? 0.002 : 0), M.white, false);   // 2 mm prouder than the sides it laps
     }
-    lbox(fr, -J, w + J, 0, 0.016, -hd - 0.02, hd + 0.02, M.oak, false);                                              // threshold
+    lbox(fr, -J, w + J, 0.002, 0.018, -hd - 0.02, hd + 0.02, M.oak, false);                                              // threshold
     for (const y of [0.28, 1.02, 1.76]) lbox(fr, -0.006, 0.006, y - 0.045, y + 0.045, openSide * (T / 2 + 0.002), openSide * (T / 2 + 0.014), M.brass);   // hinge knuckles
     lbox(fr, w - 0.001, w + 0.002, 0.94, 1.07, -0.014, 0.014, M.brass);                                               // strike plate
     // the leaf (a 3 mm reveal to the jambs and the head, 2 cm over the threshold) and its panels (two columns of three on each face,
@@ -1047,11 +1048,11 @@ export function buildWorld(scene) {
   {
     cardboardBox(6.1, 0, -4.15, 0.6, 0.5, 0.55, 0, 0.1); cardboardBox(6.1, 0.5, -4.15, 0.5, 0.42, 0.5, 2, -0.2); cardboardBox(6.75, 0, -4.1, 0.55, 0.45, 0.5, 3, 0.3);
     cardboardBox(6.3, 0, -2.05, 0.5, 0.44, 0.5, 1, -0.1); cardboardBox(6.25, 0.44, -2.05, 0.45, 0.4, 0.45, 2, 0.25);
-    const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.5, 14), M.rug); rug.rotation.z = Math.PI / 2; rug.position.set(6.75, 0.12, -1.75); rug.castShadow = rug.receiveShadow = true; house.add(rug);
+    const rug = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.0, 14), M.rug); rug.rotation.z = Math.PI / 2; rug.position.set(6.42, 0.12, -1.69);   // short of the door, which swings in over the floor beside it rug.castShadow = rug.receiveShadow = true; house.add(rug);
     M.sheet = std({ color: 0xe9e4d8, roughness: 1 }); M.sheet.envMapIntensity = 0.15;
     const sheet = rbox(6.06, 6.72, 0.3, 1.74, -3.28, -2.72, M.sheet, 0.08);   // the mirror model stands inside it, facing the room
     const hem = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.1, 0.66), M.sheet); hem.position.set(6.39, 0.33, -3.0); hem.rotation.y = 0.15; house.add(hem);
-    solid(5.85, 6.4, -4.45, -3.85); solid(6.45, 7.05, -4.45, -3.85); solid(6.0, 6.75, -3.32, -2.68); solid(6.0, 6.55, -2.3, -1.8); solid(5.95, 7.55, -1.95, -1.55);
+    solid(5.85, 6.4, -4.45, -3.85); solid(6.45, 7.05, -4.45, -3.85); solid(6.0, 6.75, -3.32, -2.68); solid(6.0, 6.55, -2.3, -1.8); solid(5.9, 6.95, -1.83, -1.55);
     spare = { mirror: { sheet, hem, pos: new THREE.Vector3(6.36, 0.9, -3.0) }, bounds: [5.8, 8.1, -4.5, -1.5] };
     fixups.push(() => { const m = spare.mirror.pos; m.x = SX(m.x); m.z = SZ(m.z); spare.bounds = rect(spare.bounds); });
   }
@@ -1256,7 +1257,7 @@ export function buildWorld(scene) {
     defParent = null; }
   const kidTv = prop('tv', { x: 5.33, y: 0.55, z: 0.95, rot: PI / 2 }, { tag: 'kidtv', after: () => plainTv(kidTv) });
   // kitchen appliances (doors face -x), the toilet (tank on the west wall)
-  prop('fridge', { x: 2.845, z: 0.46, rot: -PI / 2, s: 0.98 }, { tag: 'fridge' });
+  prop('fridge', { x: 2.845, z: 0.46, rot: -PI, s: 0.98 }, { tag: 'fridge' });   // its doors face the kitchen, its back on the hall wall
   prop('stove', { x: 2.865, z: 1.33, rot: -PI / 2, s: 0.0095 }, { tag: 'stove' });
   prop('toilet', { x: 3.72, z: 1.9, rot: PI / 2, s: 1.05 }, { tag: 'toilet' });
   // Mom and Dad's dresser on their front wall and the lamp on the nightstand
@@ -1266,7 +1267,7 @@ export function buildWorld(scene) {
   const office = (() => {
     const deskTop = 2.98 * 0.26;
     const desk = prop('desk', { x: 4.5, z: -4.08, rot: 0, s: 0.26 });
-    const pc = prop('crt_pc', { x: 4.42, y: deskTop, z: -4.12, rot: PI, s: 1 });   // its screen is its -z side: turned to face the chair
+    const pc = prop('crt_pc', { x: 4.42, y: deskTop, z: -4.06, rot: -PI / 2, s: 1 });   // turned so the screen faces the chair
     const chair = prop('office_chair', { x: 4.5, z: -3.35, rot: PI, s: 0.008 });
     prop('filing', { x: 3.62, z: -4.15, rot: 0, s: 1 });
     prop('bookcase', { x: 5.54, z: -3.3, rot: -PI / 2, s: 1 });
