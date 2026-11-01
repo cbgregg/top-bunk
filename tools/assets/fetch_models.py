@@ -21,7 +21,7 @@ MODELS = {
     'table': ('WoodenTable_01', 512), 'plant1': ('potted_plant_01', 512), 'plant2': ('potted_plant_02', 512), 'clock_wall': ('wall_clock', 512),
     'kettle': ('vintage_electric_kettle', 512), 'pot': ('brass_pot_01', 512),
     # outdoors (the conifer models are photogrammetry-grade and don't survive simplification, so the forest stays procedural)
-    'tree_small': ('tree_small_02', 1024, 0.015), 'grass1': ('grass_medium_01', 512, 0.05), 'grass2': ('grass_medium_02', 512, 0.15),
+    'grass1': ('grass_medium_01', 512, 0.05), 'grass2': ('grass_medium_02', 512, 0.15),
     'rock1': ('boulder_01', 512, 0.08), 'rock2': ('rock_07', 512, 0.1),
 }
 

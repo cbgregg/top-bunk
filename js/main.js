@@ -642,8 +642,8 @@ async function startGame() {
 // ---------- the family at work: Dad carries boxes in from the truck and unpacks them, Mom unpacks the kitchen ----------
 const chore = { run: 0, stop: false, dadHome: false };
 const dressing = [];                                    // everything they set down (cleared when the day restarts)
-// Dad stands on the truck bed, 0.66 up; the next box sits on top of the stack in front of him
-const TRUCK_PICK = new V3(2.35, 0.66, -15.25), TRUCK_BOX = new V3(2.35, 1.82, -15.8), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(3.1, 0, -6.5), DOOR_IN = new V3(3.1, 0, -3.6), DOOR_OUT = new V3(3.1, 0, -5.4);
+// Dad stands on the truck bed, 1.3 up (W.TRUCK); the next box sits on top of the stack in front of him
+const TRUCK_PICK = new V3(2.35, 1.3, -15.25), TRUCK_BOX = new V3(2.35, 2.46, -15.8), RAMP_FOOT = new V3(2.3, 0, -10.1), PORCH = new V3(3.1, 0, -6.5), DOOR_IN = new V3(3.1, 0, -3.6), DOOR_OUT = new V3(3.1, 0, -5.4);
 const LIVING_SPOTS = [new V3(1.92, 0, -3.66), new V3(0.75, 0, -3.77), new V3(1.36, 0, -2.48)];
 const KITCHEN_BOX = new V3(2.32, 0, 2.2), DAD_HOME = new V3(1.2, 0, 1.31), ARCH = new V3(2.88, 0, -0.54), ARCH_IN = new V3(2.88, 0, 0.97);
 // where Mom puts things (the east counter, then the back counter by the corner) and where she stands for each, COUNTER_OFF back from it
@@ -652,7 +652,7 @@ const COUNTER = [
   ...[2.65, 2.99, 3.32, 3.66].map((z) => ({ at: [4.11, COUNTER_Y, z], stand: [4.11 - COUNTER_OFF, z] })),
   ...[3.38, 3.77].map((x) => ({ at: [x, COUNTER_Y, 4.13], stand: [x, 4.13 - COUNTER_OFF] })),
 ];
-const rampY = (x, z) => (z < -14.5 ? 0.66 : clamp((-11.4 - z) * 0.18, 0, 0.58)) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // the ramp, then the bed's floor; fades out at the ramp's sides (no step up or down)
+const rampY = (x, z) => (z < -14.5 ? 1.3 : clamp((-10.2 - z) * (1.3 / 4.3), 0, 1.3)) * clamp(1 - (Math.abs(x - 2.3) - 0.5) / 0.3, 0, 1);   // the ramp (4.3 m, from the sill at z -14.5 to the gravel), then the bed's floor; fades out at the ramp's sides (no step up or down)
 const stillOn = (run) => run === chore.run;
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
@@ -716,6 +716,7 @@ function makeThing(kind) {
   else if (kind === 'books') [[0x8a3a32, 0.24, 0.04], [0x3a5a7a, 0.22, 0.035], [0x6a7a4a, 0.2, 0.03]].forEach(([c, w, hh], i) => add(new THREE.BoxGeometry(w, hh, 0.17), mat(c, 0.8), 0.01 * i, 0.02 + i * 0.037, 0).rotation.y = i * 0.2);
   else if (kind === 'lamp') { add(new THREE.CylinderGeometry(0.06, 0.07, 0.04, 14), mat(0x3a2e24), 0, 0.02, 0); add(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 8), mat(0x3a2e24), 0, 0.19, 0); add(new THREE.CylinderGeometry(0.1, 0.16, 0.16, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0xe8dcb4, roughness: 0.9, side: THREE.DoubleSide }), 0, 0.4, 0); }
   else if (kind === 'pot') { add(new THREE.CylinderGeometry(0.1, 0.09, 0.12, 16), mat(0x56595c, 0.4), 0, 0.06, 0); add(new THREE.CylinderGeometry(0.105, 0.105, 0.012, 16), mat(0x56595c, 0.4), 0, 0.126, 0); }
+  else if (kind === 'spoon') { add(new THREE.CylinderGeometry(0.008, 0.01, 0.22, 8), mat(0xb08a56, 0.7), 0, -0.07, 0); add(new THREE.SphereGeometry(0.03, 10, 8), mat(0xb08a56, 0.7), 0, -0.19, 0).scale.set(0.8, 0.35, 1.2); }
   else { add(new THREE.BoxGeometry(0.16, 0.12, 0.12), mat(0xb98a5a, 0.8), 0, 0.06, 0); }
   return g;
 }
@@ -976,13 +977,49 @@ const MORN = {
   9: [['mom', 'm9_a'], ['dad', 'm9_a'], ['you', 'm9_a'], ['mom', 'm9_b']],
 };
 const TYPE_LINE = { thirst: ['mom', 't_thirst'], ring: ['dad', 't_ring'], static: ['dad', 't_static'], mimic: ['mom', 't_mimic'], blackout: ['dad', 't_blackout'], hunted: ['mom', 't_hunted'], paralysis: ['mom', 't_paralysis'], teddy: ['mom', 't_teddy'], parents: ['mom', 't_parents'], quiet: ['dad', 't_quiet'], car: ['mom', 't_car'] };
+// the kitchen in the morning: Mom stirs a pan on the stove with a wooden spoon, her other hand on the counter; Dad stands at the
+// sink with his coffee and takes a sip now and then. Both stop and turn when the talk starts; the mug stays in Dad's hand.
+const kitchen = { run: 0, things: [] };
+function kitchenLife() {
+  const run = ++kitchen.run, t0 = gameTime, on = () => kitchen.run === run && F.stage.startsWith('b');
+  for (const o of kitchen.things) if (o.parent) o.parent.remove(o); kitchen.things.length = 0;
+  const spoon = makeThing('spoon'), mug = makeThing('mug'); scene.add(spoon, mug); kitchen.things.push(spoon, mug);
+  mom.grab(spoon, 'R', { down: 0.03 }); dad.grab(mug, 'R', { down: HOLD.mug.down });
+  mom.busy = dad.busy = true; kitchen.talking = false;
+  let sipAt = 3 + Math.random() * 4, sip = 0;
+  const loop = async () => {
+    while (on()) {
+      const t = gameTime - t0, bm = bscale(mom), bd = bscale(dad);
+      if (!kitchen.talking) {
+        // the spoon goes round the pan, a slow oval at burner height, with a pause and a tap on the rim every few rounds
+        const ph = t * 2.4, round = Math.floor(ph / (Math.PI * 2)) % 4 === 3, k = round ? 0.2 : 1;
+        mom.pose = { lean: 0.12, R: { reachLocal: new V3((0.06 + Math.cos(ph) * 0.06 * k) * bm, (0.99 + (round ? 0.05 : 0)) * bm, (0.52 + Math.sin(ph) * 0.05 * k) * bm), palm: 'down', grip: 0.75 },
+          L: { reachLocal: new V3(-0.3 * bm, 0.93 * bm, 0.38 * bm), palm: 'down', grip: 0.25 } };
+        // the mug rests at his chest; a sip lifts it to his mouth for a second
+        if (t > sipAt && sip === 0) { sip = 1e-3; sipAt = t + 7 + Math.random() * 6; }
+        let lift = 0;
+        if (sip > 0) { sip += 0.016; const d = 2.2; lift = sip < 0.5 ? sip / 0.5 : sip < 1.5 ? 1 : Math.max(0, 1 - (sip - 1.5) / 0.6); if (sip > d) sip = 0; }
+        dad.pose = { R: { reachLocal: new V3(lerp(-0.1, -0.05, lift) * bd, lerp(1.08, 1.4, lift) * bd, lerp(0.3, 0.17, lift) * bd), palm: 'in', grip: 0.7 } };
+      } else {
+        // turned to you: the spoon is down on the counter, the mug held low in both hands
+        if (spoon.parent !== scene) { scene.attach(spoon); spoon.position.copy(mom.group.localToWorld(new V3(0.1 * bm, 0.95 * bm, 0.5 * bm))); spoon.rotation.set(0, mom.group.rotation.y + 0.4, 0); }
+        mom.pose = null;
+        dad.pose = { R: { reachLocal: new V3(-0.06 * bd, 1.0 * bd, 0.26 * bd), palm: 'in', grip: 0.7 }, L: { reachLocal: new V3(0.08 * bd, 0.98 * bd, 0.26 * bd), palm: 'in', grip: 0.5 } };
+      }
+      await wait(0.03);
+    }
+    if (kitchen.run === run) { mom.pose = dad.pose = null; for (const o of kitchen.things) if (o.parent) o.parent.remove(o); kitchen.things.length = 0; }
+  };
+  loop();
+}
 async function breakfast(n) {
   F.stage = 'b' + n; setPhase('morning'); resetNight();
   E.visible = false; F.chase = false;
   toBunk(); P.yaw = HIDE_YAW + 0.15; P.pitch = -0.12;
   sleepers(false); mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = false;
   mom.group.position.set(3.21, 0, 2.13); mom.group.rotation.y = Math.PI / 2;        // at the stove
-  dad.group.position.set(1.98, 0, 3.21); dad.group.rotation.y = Math.PI;              // at the sink
+  dad.group.position.set(1.98, 0, 3.62); dad.group.rotation.y = Math.PI;              // leaning back on the counter by the sink
+  kitchenLife();
   F.birds = true;
   UI.card('6:58 AM', n === 1 ? 'Morning' : `Morning ${n}`, 3.5);
   if (n >= 2 && nights) cardProof(`Night ${n} · proof ${nights.proof.count()} / ${nights.proof.total}`, 3.5);
@@ -992,8 +1029,9 @@ async function breakfast(n) {
   F.morningReady = true;
   await waitFor(() => P.mode === 'walk' && Math.hypot(P.pos.x - mom.group.position.x, P.pos.z - mom.group.position.z) < 3.4);
   UI.objective(null); F.cutscene = true; P.vel.set(0, 0, 0);
-  // walk you to your mark between them, then the conversation
+  // walk you to your mark between them, then the conversation; they put down what they are doing and turn to you
   { const x0 = P.pos.x, z0 = P.pos.z; await tween(1.2, (k) => { P.pos.set(lerp(x0, 1.98, k), 0, lerp(z0, 1.25, k)); }); }
+  kitchen.talking = true; mom.busy = dad.busy = false;
   await wait(0.5);
   const lines = [...(MORN[n] || MORN[3])];
   const tl = n >= 2 && nights && TYPE_LINE[nights.plan(n).type]; if (tl) lines.push(tl);
@@ -1001,6 +1039,7 @@ async function breakfast(n) {
   await conversation(lines);
   UI.fade(1, 2.5); await wait(3);
   F.birds = false; F.cutscene = false; F.morningReady = false;
+  kitchen.run++; mom.pose = dad.pose = null; for (const o of kitchen.things) if (o.parent) o.parent.remove(o); kitchen.things.length = 0;
   mom.group.visible = dad.group.visible = false;
 }
 // a third line on the morning card (ui.js fills only two); it goes when the card does
@@ -1396,4 +1435,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
