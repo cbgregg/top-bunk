@@ -78,8 +78,9 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
       r.update(dt);
+      const p = this.pose, idleA = r.actions.idle;
+      r.life(dt, { still: idleA ? idleA.getEffectiveWeight() : 1, talking: !!r.env, asleep: !!(p && p.sleep) });
       this.relaxHands(r);
-      const p = this.pose;
       if (p && p.sleep) this.applyPose(r, p, 1, 0);
       else {
         const k = Math.min(1, dt * 7), want = p && (p.hold || p.reach || p.reachLocal || p.L || p.R) ? 1 : 0;
@@ -233,8 +234,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     applyPose(r, p, w = 1, lean = p.lean || 0, squat = p.squat || 0, kneel = p.kneel || 0) {
       if (p.sleep) {   // asleep on the back: the head turned toward the room, the feet flat, a slow breath in the chest
         r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * p.sleep);
-        r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.25);   // toes pointed along the bed, so they stay under the quilt
-        r.bend(['Spine1', 'Spine2'], [0.5, 0.5], [1, 0, 0], 0.03 + Math.sin(performance.now() * 0.0011) * 0.025);
+        r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.25);   // toes pointed along the bed, so they stay under the quilt (the breath is the life layer's)
         return;
       }
       this.legs(r, squat, kneel);
