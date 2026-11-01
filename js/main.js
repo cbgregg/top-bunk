@@ -160,7 +160,7 @@ function pauseInfo() {
 }
 // pause / resume without the mouse (controller Start, the touch pause button)
 function setPause(on) {
-  if (on && uiMode === 'playing') { uiMode = 'pause'; paused = true; pauseInfo(); UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; if (document.pointerLockElement) document.exitPointerLock(); }
+  if (on && uiMode === 'playing') { uiMode = 'pause'; paused = true; pauseInfo(); UI.show('pause'); sfx.suspend(); for (const k in keys) keys[k] = false; if (document.pointerLockElement) unlock(); }
   else if (!on && uiMode === 'pause') { uiMode = 'playing'; paused = false; UI.hide('pause'); sfx.resume(); if (input.scheme === 'kb') lock(); }
 }
 // the A button on a menu screen is a click on its button
@@ -177,6 +177,8 @@ function renderControls() {
   $('resume').textContent = input.scheme === 'touch' ? 'Tap to resume' : input.scheme === 'pad' ? 'Press A to resume' : 'Click to resume';
 }
 input.onScheme = renderControls; renderControls();
+// phones have no pointer lock: document.exitPointerLock is missing there, and calling it threw before the death screen could show
+function unlock() { try { if (document.exitPointerLock) document.exitPointerLock(); } catch (err) { /* ignore */ } }
 function lock() { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* ignore */ } }
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
@@ -569,7 +571,7 @@ function handheld(dt) {
 async function caught(opts = {}) {   // opts.unseen: you are hurt by something you never see
   if (F.dead) return;
   F.dead = true; F.live = false; F.script = false; RUN.deaths++; saveRun(); UI.pod(null); UI.clock(null);
-  setTimeout(() => { if (F.dead && uiMode !== 'death') { uiMode = 'death'; document.exitPointerLock(); UI.fade(1, 0.05); UI.show('death'); } }, 6000);   // killAll() or a throw drops the awaits below without settling them, so a finally would not run
+  setTimeout(() => { if (F.dead && uiMode !== 'death') { uiMode = 'death'; unlock(); UI.fade(1, 0.05); UI.show('death'); } }, 6000);   // killAll() or a throw drops the awaits below without settling them, so a finally would not run
   killAll(); F.chase = false; F.breathCheck = false; F.echo = false; F.cutscene = true; F.breathUI = false;
   UI.blanket(false); UI.prompt(null); UI.breath(0, false); UI.objective(null); UI.hint(null); UI.stamina(1, false);
   P.mode = 'cine'; P.cam.copy(camera.position);
@@ -587,7 +589,7 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
   UI.fade(1, 0.05);
   E.visible = false; sfx.drone(0, 1); sfx.tension(0, 0.3); sfx.bed('music/chase', 0, 0.3);
   await wait(1.1);
-  uiMode = 'death'; document.exitPointerLock(); UI.show('death');
+  uiMode = 'death'; unlock(); UI.show('death');
 }
 
 function resetNight() {
@@ -1311,7 +1313,7 @@ function endScreen(id) {
   const [title, line] = ENDINGS[id];
   $('endtitle').textContent = title; $('endtitle').classList.toggle('red', id !== 'ENDING_BELIEVED'); $('endtag').textContent = line;
   $('endinfo').textContent = `Seed ${RUN.seed}  ·  proof ${proofCount()} / ${nights.proof.total}`;
-  uiMode = 'end'; document.exitPointerLock(); UI.show('end'); achievements.ending(id);
+  uiMode = 'end'; unlock(); UI.show('end'); achievements.ending(id);
   store.remove('topbunk.run');
 }
 
@@ -1489,4 +1491,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { speak, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { speak, caught, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
