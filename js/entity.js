@@ -10,7 +10,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _x = new THREE.Vector3
 const _lat = new THREE.Vector3(), _palm = new THREE.Vector3(), _p2 = new THREE.Vector3(), _cax = new THREE.Vector3(), _cr = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 // the shroud: how many wisps per graphics preset
-const WISPS = { ultra: 520, high: 400, medium: 220, low: 0 };
+const WISPS = { ultra: 720, high: 560, medium: 300, low: 0 };
 // the hands: the clips come in with the wrists bent and turned in, so every frame the hand is brought back near the forearm's line
 // and the long fingers are set a little curled, more toward the little finger, the thumb out
 const WRIST_FLEX = 0.12;
@@ -156,14 +156,16 @@ export class Entity {
     this.body.visible = false;
     rig.play('idle', { fade: 0, speed: 0.3 });
     this.rig = rig;
-    // the shroud hangs on the bones: thick round the torso and the limbs, thin at the head so the eyes and the grin stay clear
+    // the shroud hangs on the bones, the whole body from the shoulders down to the feet; nothing on the head, and the smoke is cut
+    // at the neck line as it drifts, so the eyes and the grin are always clear
     const B = rig.bones, seg = (a, b, r, w) => ({ a: B[a], b: B[b] || null, r, w });
     this.shroud = new Shroud(this.root, [
-      seg('Pelvis', 'Spine', 0.24, 3), seg('Spine', 'Spine1', 0.26, 3.4), seg('Spine1', 'Spine2', 0.27, 3.4), seg('Spine2', 'Neck', 0.24, 2.4), seg('Neck', 'Head', 0.1, 0.4),
-      seg('L_Clavicle', 'L_UpperArm', 0.13, 0.6), seg('R_Clavicle', 'R_UpperArm', 0.13, 0.6),
-      seg('L_UpperArm', 'L_Forearm', 0.11, 2.4), seg('R_UpperArm', 'R_Forearm', 0.11, 2.4), seg('L_Forearm', 'L_Hand', 0.09, 1.8), seg('R_Forearm', 'R_Hand', 0.09, 1.8),
-      seg('L_Thigh', 'L_Calf', 0.14, 3.4), seg('R_Thigh', 'R_Calf', 0.14, 3.4), seg('L_Calf', 'L_Foot', 0.1, 2.6), seg('R_Calf', 'R_Foot', 0.1, 2.6),
-    ], { count: WISPS.ultra, rise: 0.3, life: 1.4, size: [0.14, 0.52], spread: 1.25, near: 0.6, opacity: 1 });
+      // shares are per segment, so the long leg bones get the most: the legs are half the figure
+      seg('Pelvis', 'Spine', 0.24, 2.4), seg('Spine', 'Spine1', 0.26, 2.6), seg('Spine1', 'Spine2', 0.27, 2.6), seg('Spine2', 'Neck', 0.24, 1.8),
+      seg('L_Clavicle', 'L_UpperArm', 0.13, 0.8), seg('R_Clavicle', 'R_UpperArm', 0.13, 0.8),
+      seg('L_UpperArm', 'L_Forearm', 0.11, 2.4), seg('R_UpperArm', 'R_Forearm', 0.11, 2.4), seg('L_Forearm', 'L_Hand', 0.09, 2.0), seg('R_Forearm', 'R_Hand', 0.09, 2.0),
+      seg('L_Thigh', 'L_Calf', 0.16, 7.5), seg('R_Thigh', 'R_Calf', 0.16, 7.5), seg('L_Calf', 'L_Foot', 0.12, 6), seg('R_Calf', 'R_Foot', 0.12, 6),
+    ], { count: WISPS.ultra, rise: 0.16, life: 1.4, size: [0.14, 0.52], spread: 1.25, near: 0.6, opacity: 1 });
     this.setQuality(this.quality, true);
   }
 
@@ -247,7 +249,7 @@ export class Entity {
       r.bend(['Neck'], [1], [0, 1, 0], 0.03 * k);
     }
     this.head.update(dt, { target: this.lookTarget, smile: this.smileScale });
-    if (this.shroud) { this.root.updateMatrixWorld(true); this.shroud.update(dt, this.root.getWorldPosition(_v)); }
+    if (this.shroud) { this.root.updateMatrixWorld(true); this.shroud.update(dt, this.root.getWorldPosition(_v), this.rig.bones.Neck); }
   }
 
   update(dt, quality = this.quality) {

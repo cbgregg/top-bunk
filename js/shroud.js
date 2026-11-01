@@ -27,7 +27,7 @@ function smoke() {
 
 const VERT = `
   attribute vec3 aPos; attribute vec4 aSeed; attribute vec3 aDir;
-  uniform float uTime, uRise, uLife, uSizeMin, uSizeMax, uSpread, uNear;
+  uniform float uTime, uRise, uLife, uSizeMin, uSizeMax, uSpread, uNear, uTop;
   uniform vec3 uVel;
   varying vec2 vUv; varying float vAlpha;
   float h(float n) { return fract(sin(n) * 43758.5453); }
@@ -48,7 +48,9 @@ const VERT = `
     // born faint, full in the middle of the life, gone at the end; thin out close to the lens so the face stays clear at the scare
     float life = smoothstep(0.0, 0.18, age) * (1.0 - smoothstep(0.55, 1.0, age));
     float near = smoothstep(uNear * 0.5, uNear * 1.6, -mv.z);
-    vAlpha = life * near * aSeed.y * 0.5 + life * near * 0.5;
+    // nothing above the neck line: the smoke stays off the face wherever it drifts
+    float top = 1.0 - smoothstep(uTop - 0.22, uTop, p.y);
+    vAlpha = (life * near * aSeed.y * 0.5 + life * near * 0.5) * top;
     gl_Position = projectionMatrix * mv;
   }`;
 const FRAG = `
@@ -83,7 +85,7 @@ export class Shroud {
     geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(this.seed, 4));
     geo.instanceCount = count;
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { uTex: { value: smoke() }, uTime: { value: 0 }, uRise: { value: rise }, uLife: { value: life }, uSizeMin: { value: size[0] }, uSizeMax: { value: size[1] }, uSpread: { value: spread }, uNear: { value: near }, uVel: { value: new THREE.Vector3() }, uOpacity: { value: opacity }, uColor: { value: new THREE.Color(color) } },
+      uniforms: { uTex: { value: smoke() }, uTime: { value: 0 }, uRise: { value: rise }, uLife: { value: life }, uSizeMin: { value: size[0] }, uSizeMax: { value: size[1] }, uSpread: { value: spread }, uNear: { value: near }, uTop: { value: 1e6 }, uVel: { value: new THREE.Vector3() }, uOpacity: { value: opacity }, uColor: { value: new THREE.Color(color) } },
       vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide, fog: false,
     });
     this.mesh = new THREE.Mesh(geo, this.mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = 5; this.mesh.name = 'shroud';
@@ -94,11 +96,13 @@ export class Shroud {
   }
   setCount(n) { this.geo.instanceCount = Math.max(0, Math.min(this.count, n | 0)); this.mesh.visible = this.geo.instanceCount > 0; }
   // every frame after the bones moved: the particles' birth points follow their limbs; positions are in the mesh parent's space
-  update(dt, rootPos = null) {
+  // top: an object (the neck) above which no smoke shows, so the face stays clear; null for no ceiling
+  update(dt, rootPos = null, top = null) {
     if (!this.mesh.visible) return;
     this.time += dt; this.mat.uniforms.uTime.value = this.time;
     const P = this.pos, D = this.dir, A = this.anchors;
     this.parent.updateWorldMatrix(true, false); _inv.copy(this.parent.matrixWorld).invert();
+    this.mat.uniforms.uTop.value = top ? top.getWorldPosition(_o).applyMatrix4(_inv).y : 1e6;
     // the figure's speed, in the parent's own frame, so the wisps stream behind it whichever way it faces
     if (rootPos) { if (!this.first && dt > 0) this.vel.copy(rootPos).sub(this.last).divideScalar(dt).clampLength(0, 3); this.last.copy(rootPos); this.first = false; this.mat.uniforms.uVel.value.lerp(_o.copy(this.vel).transformDirection(_inv).multiplyScalar(this.vel.length()), Math.min(1, dt * 4)); }
     const n = this.geo.instanceCount;
