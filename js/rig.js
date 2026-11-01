@@ -2,9 +2,10 @@
 // animation set (assets/models/anims.glb: Mixamo idle/walk/run/etc. retargeted onto that skeleton).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { shrinkTextures } from './pbr.js';
 
 const loader = new GLTFLoader();
-const load = (url) => new Promise((res, rej) => loader.load(url, res, undefined, rej));
+const load = (url) => new Promise((res, rej) => loader.load(url, res, undefined, rej)).then((g) => { shrinkTextures(g.scene); return g; });
 let animsP = null;
 export const loadAnims = () => (animsP ||= load('assets/models/anims.glb').then((g) => { for (const c of g.animations) if (/^(walk|run|idle)$/.test(c.name)) seamless(c); return g.animations; }));
 

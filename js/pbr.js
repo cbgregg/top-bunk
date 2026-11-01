@@ -1,8 +1,23 @@
 // PBR materials: colour + normal + packed AO/roughness/metal maps (assets/pbr, made by tools/assets/fetch_pbr.py).
 // The canvas textures stay on the materials until these arrive, so nothing flashes and a missing file just keeps the canvas look.
 import * as THREE from 'three';
+import { PHONE } from './gfx.js';
 
 const loader = new THREE.TextureLoader();
+// on a phone every texture is held at half size (a quarter of the memory): the picture is drawn into a canvas and that replaces the image
+const PHONE_MAX = 512;
+export function shrinkTexture(t) {
+  const im = t && t.image; if (!PHONE || !im || !(im.width > PHONE_MAX || im.height > PHONE_MAX)) return;
+  const k = Math.min(1, PHONE_MAX / Math.max(im.width, im.height)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k));
+  try { c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); } catch (e) { return; }
+  t.image = c; t.needsUpdate = true; if (im.close) im.close();
+}
+// every texture on every material under root
+export function shrinkTextures(root) {
+  if (!PHONE) return;
+  root.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const v = m[k]; if (v && v.isTexture) shrinkTexture(v); } });
+}
 const metaP = fetch('assets/pbr/pbr.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const cache = new Map();
 const aniso = 8;
@@ -12,8 +27,8 @@ const ROUGH_SCALE = { tile: 7, pine: 2.2, darkwood: 1.5 };
 function tex(url, srgb, rep) {
   const key = url + '@' + rep;
   if (cache.has(key)) return cache.get(key);
-  const t = loader.load(url);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); t.anisotropy = aniso;
+  const t = loader.load(url, PHONE ? shrinkTexture : undefined);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); t.anisotropy = PHONE ? 2 : aniso;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   cache.set(key, t); return t;
 }

@@ -19,6 +19,15 @@ export const QUALITY = {
   low:    { dpr: 1,    msaa: 0, ao: null,                          bloom: 0,    grade: false, sun: 1024, spot: 512, direct: true },
 };
 const baseDpr = (p) => p.fixed ? p.dpr : Math.min(devicePixelRatio || 1, p.dpr);
+// a phone or a tablet: a screen with no mouse. It gets the lighter presets whatever it picks (its memory is the limit, not its taste):
+// no multisampling, no render above its own pixels, small shadow maps, and the textures load at half size (pbr.js, props.js)
+export const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
+if (PHONE) {
+  Object.assign(QUALITY.ultra, { dpr: 1.25, fixed: false, msaa: 0, ao: null, sun: 1024, spot: 512 });
+  Object.assign(QUALITY.high, { dpr: 1.25, fixed: false, msaa: 0, ao: null, sun: 1024, spot: 512 });
+  Object.assign(QUALITY.medium, { dpr: 1, msaa: 0, sun: 1024, spot: 512 });
+  Object.assign(QUALITY.low, { dpr: 1, sun: 512, spot: 256 });
+}
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
 
@@ -55,8 +64,8 @@ const GradeShader = {
 export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
-    const saved = store.get(KEY), q = quality || saved;
-    this.autoQuality = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches ? 'medium' : 'high';   // phones start lighter
+    const saved = store.get(KEY), q = quality || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('gfx')) || saved;   // ?gfx=low forces a preset from the address bar
+    this.autoQuality = PHONE ? 'medium' : 'high';   // phones start lighter
     this.quality = QUALITY[q] ? q : this.autoQuality; this.auto = !(QUALITY[saved] || quality);
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
     this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0; this.fast = 0; this.ceiling = null;   // res: dynamic resolution scale

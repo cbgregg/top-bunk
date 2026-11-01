@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { shrinkTextures } from './pbr.js';
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
@@ -26,6 +27,7 @@ function prepare(g, name) {
     for (const m of [].concat(o.material)) matte(m, name);
     for (const m of [].concat(o.material)) if (m.map && (m.transparent || m.alphaTest > 0)) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; m.depthWrite = true; }   // leaf cards
   });
+  shrinkTextures(g.scene);
   g.scene.updateMatrixWorld(true);
   g.box = new THREE.Box3().setFromObject(g.scene);
   return g;
