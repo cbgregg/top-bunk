@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import * as TX from './textures.js';
 import { applyPBR } from './pbr.js';
+import { PHONE } from './gfx.js';
 import { place, scatter } from './props.js';
 import { flicker } from './settings.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -2050,7 +2051,7 @@ export function buildWorld(scene) {
       im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); meshes.push(im);
     }
     // the share of the blades drawn at each graphics preset (the instances in a cell are in random order, so a shorter count thins evenly)
-    const SHARE = { ultra: 1, high: 1, medium: 0.55, low: 0.3 }; let quality = 'high';
+    const SHARE = PHONE ? { ultra: 0.3, high: 0.25, medium: 0.16, low: 0.08 } : { ultra: 1, high: 1, medium: 0.55, low: 0.3 }; let quality = 'high';
     const setQuality = (q) => { if (q === quality || !(q in SHARE)) return; quality = q; lawn.share = SHARE[q]; };
     // the worn edges of the drive: gravel that fades into the grass; bare dirt where feet and tyres go; needles and bare ground under the trees
     {

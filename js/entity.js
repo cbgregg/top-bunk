@@ -5,12 +5,13 @@ import { createFace, headGeometry, skinMaterial, tuckIntoNeck, RIM_COL, RX, RY, 
 import { smoothstep as ss, lerp, hash } from './mathx.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
 import { Shroud } from './shroud.js';
+import { PHONE } from './gfx.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _k = new THREE.Vector3(), _ax = new THREE.Vector3(), _hq = new THREE.Quaternion();
 const _lat = new THREE.Vector3(), _palm = new THREE.Vector3(), _p2 = new THREE.Vector3(), _cax = new THREE.Vector3(), _cr = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 // the shroud: how many wisps per graphics preset
-const WISPS = { ultra: 820, high: 640, medium: 340, low: 0 };
+const WISPS = PHONE ? { ultra: 260, high: 220, medium: 160, low: 0 } : { ultra: 820, high: 640, medium: 340, low: 0 };
 // the hands: the clips come in with the wrists bent and turned in, so every frame the hand is brought back near the forearm's line
 // and the long fingers are set a little curled, more toward the little finger, the thumb out
 const WRIST_FLEX = 0.12;
