@@ -2051,7 +2051,7 @@ export function buildWorld(scene) {
     }
     // the share of the blades drawn at each graphics preset (the instances in a cell are in random order, so a shorter count thins evenly)
     const SHARE = { ultra: 1, high: 1, medium: 0.55, low: 0.3 }; let quality = 'high';
-    const setQuality = (q) => { if (q === quality || !(q in SHARE)) return; quality = q; for (const im of meshes) im.count = Math.round(im.instanceMatrix.count * SHARE[q]); };
+    const setQuality = (q) => { if (q === quality || !(q in SHARE)) return; quality = q; lawn.share = SHARE[q]; };
     // the worn edges of the drive: gravel that fades into the grass; bare dirt where feet and tyres go; needles and bare ground under the trees
     {
       const ec = document.createElement('canvas'); ec.width = 16; ec.height = 128; const e = ec.getContext('2d'), gr = e.createLinearGradient(0, 0, 0, 128);
@@ -2070,9 +2070,19 @@ export function buildWorld(scene) {
       for (const [x, z, a, b, rot] of [[3.1, -6.4, 1.3, 0.8, 0.3], [-7.3, -4.6, 1.0, 0.7, 0.8], [8.2, -12.9, 0.9, 0.7, 1.2], [-10.9, -3.4, 1.2, 0.8, 0.5], [7.4, -20.5, 1.1, 0.7, 0.9], [-16, -16, 0.9, 0.7, 0.2]]) disc(pm, x, z, a, b, rot);
       for (const [x, z] of yardTrunks) disc(nm, x, z, 1.3 + r() * 0.5, 1.1 + r() * 0.5, r() * 3, fieldH(x, z) + 0.006);
     }
-    return { group: g, time, count: n, lawnCount, setQuality, get quality() { return quality; } };
+    return { group: g, time, count: n, lawnCount, setQuality, share: 1, get quality() { return quality; } };
   })();
-  lawn.group.traverse((o) => { if (o.isInstancedMesh) o.onBeforeRender = () => { lawn.time.value = performance.now() / 1000; }; });
+  // each cell draws all of its blades when it is near, a share of them further off (they are shrinking into the ground out there anyway), and
+  // a handful at the far end: the blades in a cell are in random order, so a shorter count thins evenly
+  lawn.group.traverse((o) => {
+    if (!o.isInstancedMesh) return;
+    const full = o.instanceMatrix.count, c = o.boundingSphere ? o.boundingSphere.center : null;   // the cell's own sphere, over all its blades
+    o.onBeforeRender = (renderer, scene, camera) => {
+      lawn.time.value = performance.now() / 1000;
+      const d = c ? Math.hypot(camera.position.x - c.x, camera.position.z - c.z) : 0, lod = d < 17 ? 1 : d < 27 ? 0.4 : 0.1;
+      o.count = Math.max(1, Math.round(full * lawn.share * lod));
+    };
+  });
   // invisible yard boundary
   solid(-70, 60, -60, -58); solid(-70, 60, 30, 32); solid(-72, -70, -60, 32); solid(60, 62, -60, 32);
 
