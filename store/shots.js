@@ -151,6 +151,7 @@ function installHelpers(quality) {
   await page.evaluate(installHelpers, QUALITY);
   // the character models, the sky and the surface textures all stream in after the page is up
   await page.waitForFunction(() => { const g = window.__game; return g.E.rig && g.mom.rig && g.dad.rig; }, null, { timeout: 180000 }).catch(() => log('warning: character rigs did not load, the simple bodies will show'));
+  await page.evaluate(() => window.__game.W.lawn && window.__game.W.lawn.ready);   // the grass grows in after load
   await page.waitForFunction(() => { const g = window.__game; return g.gfx.env.night && g.gfx.env.day && g.gfx.daySky; }, null, { timeout: 180000 }).catch(() => log('warning: sky did not load'));
   await page.waitForLoadState('networkidle', { timeout: 180000 }).catch(() => {});
   await page.waitForTimeout(2000);

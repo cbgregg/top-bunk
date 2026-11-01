@@ -290,6 +290,7 @@ export function attach(game, opts = {}) {
     // one-time: the test mode, the graphics knobs, the shaders for every lighting phase
     async begin({ quality, shadow, res, ss, letterbox, ca } = {}) {
       if (began) return; began = true;
+      if (game.W.lawn && game.W.lawn.ready) await game.W.lawn.ready;   // the grass grows in after load
       game.start(); game.gfx.auto = false;
       if (quality) game.gfx.setQuality(quality, { save: false });
       if (shadow) for (const l of game.scene.userData.shadowLights) { const sz = l.sun ? shadow : shadow / 2; l.light.shadow.mapSize.set(sz, sz); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.needsUpdate = true; }
