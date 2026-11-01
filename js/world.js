@@ -1487,9 +1487,27 @@ export function buildWorld(scene) {
   // ---------- yard ----------
   // the road surface and its markings, the gravel of the shoulders and the drive, and the ground that goes dark when it rains (weather.js)
   M.asphalt = std({ color: 0x2b2b2d, roughness: 0.92 }); M.asphalt.userData.worldUV = true; applyPBR(M.asphalt, 'asphalt', { tint: 0xa6a6a4, anti: { scale: 0.025, strength: 0.2 } });
-  M.gravel = std({ color: 0x8a8378, roughness: 1 }); M.gravel.userData.worldUV = true; applyPBR(M.gravel, 'gravel', { tint: 0xa89d8c, anti: true, flat: 0.92 });
-  M.rut = std({ color: 0x7a6a58, roughness: 1 }); M.rut.userData.worldUV = true; applyPBR(M.rut, 'dirt', { tint: 0xa8947c, anti: true, flat: 0.9 });
+  M.gravel = std({ color: 0xc8c4ba, roughness: 1 }); M.gravel.userData.worldUV = true; applyPBR(M.gravel, 'gravel', { tint: 0xe6e2d8, anti: { scale: 0.05, strength: 0.22 }, flat: 0.9 });
+  M.rut = std({ color: 0x6e604f, roughness: 1 }); M.rut.userData.worldUV = true; applyPBR(M.rut, 'dirt', { tint: 0x8a7862, anti: true, flat: 0.9 });
   M.grassDry = std({ color: 0xb8a870, roughness: 1 }); M.grassDry.userData.worldUV = true; applyPBR(M.grassDry, 'grass', { tint: 0xc2b07a, anti: true, tile: 2.4, flat: 0.95 });
+  // the lawn inside the fence: the leafy grass set, with broad patches drifting over it in the shader (worn ground browner and darker, lush
+  // spots greener, a slow shift in tone), so it reads as one lawn and never as tiles. It is laid on after the anti-tiling, which gives the
+  // shader its noise and the world position
+  M.lawn = std({ color: 0xc4c8ae, roughness: 1 }); M.lawn.userData.worldUV = true;
+  applyPBR(M.lawn, 'lawn', { tint: 0xc4c8ae, anti: { scale: 0.09, strength: 0.16 }, tile: 1.6, flat: 0.93 }).then(() => {
+    const prev = M.lawn.onBeforeCompile;
+    M.lawn.onBeforeCompile = (sh) => {
+      prev(sh);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        { float p1 = vn(vWp.xz * 0.045 + 3.1), p2 = vn(vWp.xz * 0.11 + 7.7), p3 = vn(vWp.xz * 0.4 + 1.3);
+          float worn = smoothstep(0.6, 0.8, p1 * 0.7 + p2 * 0.3), lush = smoothstep(0.55, 0.78, (1.0 - p1) * 0.6 + p3 * 0.4);
+          vec3 c = diffuseColor.rgb;
+          c = mix(c, c * vec3(1.0, 0.86, 0.66) * 0.82, worn * 0.75);
+          c = mix(c, c * vec3(0.78, 1.0, 0.7) * 0.96, lush * 0.6);
+          diffuseColor.rgb = c * (0.92 + 0.16 * p3); }`);
+    };
+    M.lawn.customProgramCacheKey = () => 'lawnground'; M.lawn.needsUpdate = true;
+  });
   M.paintY = std({ color: 0xb59b3c, roughness: 0.75 }); M.paintW = std({ color: 0xc9c6bb, roughness: 0.75 }); M.tar = std({ color: 0x1c1c1d, roughness: 0.8 });
   const wetMats = [M.asphalt, M.gravel, M.dirt, M.rut, M.concrete, M.tar, M.paintY, M.paintW];
   const RZ0 = -33.8, RZ1 = -27.2;   // the road's edges: two 3.3 m lanes, the near one for the +x traffic (traffic.js)
@@ -1499,6 +1517,8 @@ export function buildWorld(scene) {
   {   // the ground: a thin slab in pieces over the flat part, around the hole where the cellar stairs go down and the ditch across the road (thin, so its underside stays above the laundry's ceiling)
     const { x0, xEnd, z0, z1 } = STAIR, hx0 = xEnd - 0.25, hx1 = x0, hz0 = z0 + 0.02, hz1 = z1 + 0.25;
     for (const [a, b, c, d] of [[-260, 260, -40, -38], [-30, 30, -35.2, hz0], [-30, 30, hz1, 31], [-30, hx0, hz0, hz1], [hx1, 30, hz0, hz1]]) box(a, b, -0.05, -0.02, c, d, M.grass, { cast: false, parent: yard });
+    // the lawn inside the fence lies a centimetre over the field, in pieces round the stairwell
+    for (const [a, b, c, d] of [[-27, 27, -26, hz0], [-27, 27, hz1, 28], [-27, hx0, hz0, hz1], [hx1, 27, hz0, hz1]]) box(a, b, -0.045, -0.015, c, d, M.lawn, { cast: false, parent: yard });
   }
   // the field: past the flat ground it rolls, two octaves of value noise under two metres, blended in over fourteen metres from each flat edge
   const fieldH = (() => {
@@ -1930,75 +1950,119 @@ export function buildWorld(scene) {
     }
     const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [14, -23.5, 1.6], [-12.5, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
     scatter(yard, 'rock1', rocks);
-    const small = []; for (let i = 0; i < 40; i++) { const x = -20 + r() * 60, z = -35 + r() * 50; if (!ok(x, z, 2)) continue; q.setFromAxisAngle(up, r() * 6.28); const k = 1 + r() * 2.5; small.push(m4.clone().compose(new THREE.Vector3(x, -0.03, z), q, sc.set(k, k, k))); }
+    // field stones, none on the lawn round the house and none big enough to read as a boulder by the step
+    const small = []; for (let i = 0; i < 40; i++) { const x = -20 + r() * 60, z = -35 + r() * 50; if (!ok(x, z, 2) || (Math.abs(x - 1.6) < 16 && Math.abs(z - 0.1) < 11)) continue; q.setFromAxisAngle(up, r() * 6.28); const k = 0.8 + r() * 1.0; small.push(m4.clone().compose(new THREE.Vector3(x, -0.03, z), q, sc.set(k, k, k))); }
     scatter(yard, 'rock2', small);
   }
-  // the lawn: blades of grass in their tens of thousands, instanced in cells so only the ones in view are drawn, swaying in the wind in the
-  // vertex shader; thick near the house, thinning toward the fence, none on the house, the drive, the garage or the road. The drive's edge is
-  // worn into the grass with a strip of dirt that fades out, and a few bare patches sit where feet and tyres go.
+  // the lawn: blades of grass in their tens of thousands, instanced in cells so only the ones in view are drawn, bending in the wind in the
+  // vertex shader (slow gusts rolling across the yard, a flutter on top), lying down where feet and tyres go and shrinking into the ground
+  // past twelve metres so the lawn texture takes over without a line. Thick near the house, thinning toward the fence, clumpy from a noise
+  // field, none on the house, the lot, the garage, the walks or under the trees; longer, drier grass just outside the fence.
   const lawn = (() => {
     const r = TX.rng(8080), g = new THREE.Group(); g.userData.noAO = true; yard.add(g);   // blades get no ambient occlusion pass: it costs a draw of all of them and shows nothing
-    // one blade texture: a few blades painted on a canvas, alpha-tested
-    const c = document.createElement('canvas'); c.width = 64; c.height = 128; const ctx = c.getContext('2d');
-    ctx.clearRect(0, 0, 64, 128);
-    for (let i = 0; i < 7; i++) {
-      const x0 = 6 + i * 8 + r() * 4, w = 3 + r() * 3, lean = (r() - 0.5) * 22, h = 70 + r() * 56;
-      ctx.beginPath(); ctx.moveTo(x0 - w, 128); ctx.quadraticCurveTo(x0 + lean * 0.4, 128 - h * 0.6, x0 + lean, 128 - h); ctx.quadraticCurveTo(x0 + lean * 0.5, 128 - h * 0.55, x0 + w, 128); ctx.closePath();
-      const gr = ctx.createLinearGradient(0, 128, 0, 128 - h); gr.addColorStop(0, `hsl(${92 + r() * 16}, 45%, ${34 + r() * 8}%)`); gr.addColorStop(1, `hsl(${78 + r() * 16}, 55%, ${52 + r() * 12}%)`);
-      ctx.fillStyle = gr; ctx.fill();
-    }
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, metalness: 0 });
-    const time = { value: 0 };
-    mat.onBeforeCompile = (sh) => {   // the wind: the top of each blade sways by where it stands and the time, the roots stay put
-      sh.uniforms.uTime = time;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;')
-        .replace('#include <begin_vertex>', `#include <begin_vertex>
-        { vec3 root = instanceMatrix[3].xyz; float k = uv.y * uv.y; float ph = root.x * 0.9 + root.z * 0.7;
-          transformed.x += k * (0.05 * sin(uTime * 1.3 + ph) + 0.025 * sin(uTime * 2.9 + ph * 1.7)); transformed.z += k * 0.035 * sin(uTime * 1.1 + ph * 0.8 + 1.0); }`);
+    const hash = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
+    const noise = (x, z) => {
+      const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+      return (hash(i, j) * (1 - u) + hash(i + 1, j) * u) * (1 - v) + (hash(i, j + 1) * (1 - u) + hash(i + 1, j + 1) * u) * v;
     };
-    mat.customProgramCacheKey = () => 'lawn';
-    // two crossed cards per blade cluster, the bottom at the origin
-    const card = new THREE.PlaneGeometry(0.16, 0.34); card.translate(0, 0.17, 0);
-    const cross = card.clone().rotateY(Math.PI / 2), geo = mergeGeometries([card, cross], false);
-    const onLawn = (x, z) => x > FX0 + 0.3 && x < FX1 - 0.3 && z > RZ1 + 1.6 && z < FZ1 - 0.3
-      && !(x > HX0 - 0.35 && x < HX1 + 0.35 && z > HZ0 - 0.6 && z < HZ1 + 0.3) && !(x > -9.4 && x < 6.2 && z > -29.5 && z < -7.6) && !(x > 2.4 && x < 3.8 && z > -8 && z < -5.0)
-      && !(x > PLACES.garage[0] - 0.3 && x < PLACES.garage[1] + 0.3 && z > PLACES.garage[2] - 0.3 && z < PLACES.garage[3] + 0.3) && !(x > -8.7 && x < -5.9 && z > -14 && z < -3.9)
+    // one texture: a dozen blades painted on a canvas, overlapping, tapering to a point, dark at the root and paler toward the tip
+    const c = document.createElement('canvas'); c.width = 128; c.height = 256; const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 128, 256);
+    const blade = (x0, w, lean, h, hue, light) => {
+      ctx.beginPath(); ctx.moveTo(x0 - w, 256);
+      ctx.bezierCurveTo(x0 - w * 0.7 + lean * 0.2, 256 - h * 0.45, x0 + lean * 0.55 - w * 0.15, 256 - h * 0.85, x0 + lean, 256 - h);
+      ctx.bezierCurveTo(x0 + lean * 0.55 + w * 0.15, 256 - h * 0.85, x0 + w * 0.7 + lean * 0.2, 256 - h * 0.45, x0 + w, 256); ctx.closePath();
+      const gr = ctx.createLinearGradient(0, 256, 0, 256 - h);
+      gr.addColorStop(0, `hsl(${hue + 6}, 38%, ${light - 14}%)`); gr.addColorStop(0.45, `hsl(${hue}, 44%, ${light}%)`); gr.addColorStop(1, `hsl(${hue - 12}, 50%, ${light + 14}%)`);
+      ctx.fillStyle = gr; ctx.fill();
+    };
+    for (let i = 0; i < 16; i++) blade(6 + i * 7.5 + r() * 6, 2.4 + r() * 2.4, (r() - 0.5) * 56, 110 + r() * 140, 78 + r() * 14, 31 + r() * 9);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.35, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.95, metalness: 0 });
+    const time = { value: 0 };
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = time;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+        uniform float uTime;
+        float lh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float ln(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(lh(i), lh(i + vec2(1, 0)), f.x), mix(lh(i + vec2(0, 1)), lh(i + vec2(1, 1)), f.x), f.y); }`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+        { vec3 root = instanceMatrix[3].xyz; float k = uv.y * uv.y;
+          // the wind: a gust field drifting over the yard sets how far each blade leans, a small flutter sits on top; the lean is a fixed
+          // direction in the world, so it is turned into the blade's own frame
+          float gust = ln(root.xz * 0.045 + vec2(uTime * 0.32, uTime * 0.11)) * 0.7 + ln(root.xz * 0.16 - vec2(uTime * 0.5, 0.0)) * 0.3;
+          float flutter = sin(uTime * 2.3 + root.x * 1.7 + root.z * 1.1) * 0.6 + sin(uTime * 3.9 + root.z * 2.3 - root.x) * 0.4;
+          float lean = 0.04 + 0.22 * gust * gust + 0.03 * flutter * gust;
+          vec3 w = normalize(vec3(0.75, 0.0, 0.55)) * mat3(instanceMatrix);
+          transformed.xz += normalize(w.xz) * lean * k; transformed.y -= lean * lean * k * 1.2;
+          float d = distance(root, cameraPosition); transformed.y *= 1.0 - smoothstep(12.0, 21.0, d); }`);
+    };
+    mat.customProgramCacheKey = () => 'lawn2';
+    // three crossed cards per cluster, two segments tall so the wind bends the blade and not just its tip
+    const card = new THREE.PlaneGeometry(0.34, 0.3, 1, 3); card.translate(0, 0.15, 0);
+    const geo = mergeGeometries([card, card.clone().rotateY(Math.PI / 3), card.clone().rotateY(-Math.PI / 3)], false);
+    const onLawn = (x, z) => x > FX0 + 0.2 && x < FX1 - 0.2 && z > FZ0 + 0.2 && z < FZ1 - 0.2
+      && !(x > HX0 - 0.3 && x < HX1 + 0.3 && z > HZ0 - 0.55 && z < HZ1 + 0.25) && !(x > -9.4 && x < 6.2 && z > -29.5 && z < -7.6) && !(x > 2.5 && x < 3.7 && z > -8 && z < -5.0)
+      && !(x > PLACES.garage[0] - 0.25 && x < PLACES.garage[1] + 0.25 && z > PLACES.garage[2] - 0.25 && z < PLACES.garage[3] + 0.25) && !(x > -8.7 && x < -5.9 && z > -14 && z < -3.9)
       && !(x > -7.8 && x < -1.1 && z > 3.5 && z < 6.3) && !(x > 12.0 && x < 14.1 && z > -5.3 && z < 7.3) && !(x > -1.3 && x < 1.3 && z > -5.9 && z < -4.4);   // the stoop and stairwell, the shrubs, the front step
-    const cells = new Map(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    // where the grass lies flat: the bare patches, the ends of the walk, the gate, and a ring under each tree inside the fence
+    const worn = [[3.1, -6.4, 1.6], [-7.3, -4.6, 1.3], [8.2, -12.9, 1.2], [-10.9, -3.4, 1.5], [7.4, -20.5, 1.4], [3.1, -4.9, 1.1], [-16, -16, 1.2]];
+    const yardTrunks = trunks.filter(([x, z]) => x > FX0 && x < FX1 && z > FZ0 && z < FZ1);
+    const cells = new Map(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), ax = new THREE.Vector3(), col = new THREE.Color();
     let n = 0;
-    for (let i = 0; i < 90000 && n < 34000; i++) {
-      const x = FX0 + r() * (FX1 - FX0), z = RZ1 + 1.6 + r() * (FZ1 - RZ1 - 1.6);
-      const d = Math.hypot((x - 2) / 1.3, z + 4), keep = d < 16 ? 1 : d < 24 ? 0.45 : 0.18;   // thick round the house
-      if (r() > keep) continue;
-      if (!onLawn(x, z) && !(x > -4.4 && x < 0.4 && z > -25 && z < -7.6 && r() < 0.12)) continue;   // a little grass comes up through the gravel between the tracks
-      const k = 0.6 + r() * 0.55;
+    const put = (x, z, y, k, ky, hue, sat, light) => {
       q.setFromAxisAngle(up, r() * 6.28);
+      let flat = 0, fx = 0, fz = 0;   // how far down it is pressed, and which way
+      for (const [wx, wz, wr] of worn) { const d = Math.hypot(x - wx, z - wz); if (d < wr) { const f = 1 - d / wr; if (f > flat) { flat = f; fx = x - wx; fz = z - wz; } } }
+      if (flat > 0) { ax.set(-fz, 0, fx).normalize(); q2.setFromAxisAngle(ax, -0.5 - 0.9 * flat); q.premultiply(q2); ky *= 1 - 0.45 * flat; }
       const key = Math.floor(x / 14) + ',' + Math.floor(z / 14);
-      (cells.get(key) || cells.set(key, []).get(key)).push([m4.clone().compose(new THREE.Vector3(x, -0.012, z), q, sc.set(k, k * (0.75 + r() * 0.6), k)), col.clone().setHSL(0.2 + r() * 0.08, 0.22 + r() * 0.28, 0.6 + r() * 0.3)]);
+      (cells.get(key) || cells.set(key, []).get(key)).push([m4.clone().compose(new THREE.Vector3(x, y, z), q, sc.set(k, ky, k)), col.clone().setHSL(hue, sat, light)]);
       n++;
+    };
+    for (let i = 0; i < 140000 && n < 30000; i++) {
+      const x = FX0 + r() * (FX1 - FX0), z = FZ0 + r() * (FZ1 - FZ0);
+      const d = Math.hypot((x - 2) / 1.3, z + 4), far = d < 15 ? 1 : d < 22 ? 0.6 : 0.12;   // thick round the house
+      const cl = noise(x / 4.2 + 3, z / 4.2 + 9), keep = far * (0.55 + cl * 0.6);   // clumpy, never a grid
+      if (r() > keep) continue;
+      if (!onLawn(x, z) && !(x > -4.4 && x < 0.4 && z > -25 && z < -7.6 && r() < 0.1)) continue;   // a little grass comes up through the gravel between the tracks
+      if (yardTrunks.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1.5)) continue;
+      const k = 0.55 + r() * 0.5, tone = noise(x / 9 + 1, z / 9 + 4);
+      put(x, z, -0.012, k, k * (0.36 + r() * 0.3 + tone * 0.14), 0.165 + tone * 0.04 + r() * 0.025, 0.26 + r() * 0.16, 0.6 + r() * 0.18);
+    }
+    const lawnCount = n;
+    // the field grass just outside the fence: longer, drier, sparser, rooted on the rolling ground
+    for (let i = 0; i < 40000 && n < lawnCount + 7000; i++) {
+      const x = FX0 - 14 + r() * (FX1 - FX0 + 28), z = FZ0 - 2 + r() * (FZ1 - FZ0 + 16);
+      if (x > FX0 - 0.6 && x < FX1 + 0.6 && z > FZ0 - 0.6 && z < FZ1 + 0.6) continue;
+      if (z < RZ1 + 2.6) continue;
+      const cl = noise(x / 6 + 11, z / 6 + 2); if (r() > 0.25 + cl * 0.7) continue;
+      if (trunks.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1.2)) continue;
+      const k = 0.9 + r() * 0.5;
+      put(x, z, fieldH(x, z) - 0.04, k, k * (0.95 + r() * 0.6), 0.14 + r() * 0.05, 0.28 + r() * 0.15, 0.62 + r() * 0.2);
     }
     for (const list of cells.values()) {
       const im = new THREE.InstancedMesh(geo, mat, list.length);
       list.forEach(([m, cc], i) => { im.setMatrixAt(i, m); im.setColorAt(i, cc); });
       im.receiveShadow = true; im.computeBoundingSphere(); g.add(im);
     }
-    // the worn edge of the drive: dirt that fades into the grass, and bare patches by the porch walk and under the truck's ramp
+    // the worn edge of the lot: gravel that fades into the grass; bare dirt where feet and tyres go; needles and bare ground under the trees
     {
       const ec = document.createElement('canvas'); ec.width = 16; ec.height = 128; const e = ec.getContext('2d'), gr = e.createLinearGradient(0, 0, 0, 128);
-      gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); e.fillStyle = gr; e.fillRect(0, 0, 16, 128);
+      gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.6)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); e.fillStyle = gr; e.fillRect(0, 0, 16, 128);
       const alpha = new THREE.CanvasTexture(ec);
-      alpha.repeat.set(1 / 19.2, 1 / 1.8);   // the strips' uvs are in metres, like the lot's; the short strip just repeats a little
-      const em = std({ roughness: 1, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); applyPBR(em, 'gravel', { tint: 0xa89d8c, anti: true, flat: 0.92 });
-      for (const [cx, cz, len, yaw] of [[-9.2 - 0.9, -17.4, 19.2, -Math.PI / 2], [6.0 + 0.9, -17.4, 19.2, Math.PI / 2], [-1.6, -7.8 + 0.9, 15.2, 0]]) {   // the solid edge lies on the lot's edge and fades out into the lawn
-        const sg = new THREE.PlaneGeometry(len, 1.8); { const uv = sg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * len, uv.getY(i) * 1.8); }
+      alpha.repeat.set(1 / 19.2, 1 / 2.2);   // the strips' uvs are in metres, like the lot's; the short strip just repeats a little
+      const em = std({ roughness: 1, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); applyPBR(em, 'gravel', { tint: 0xe6e2d8, anti: true, flat: 0.92 });
+      for (const [cx, cz, len, yaw] of [[-9.2 - 1.1, -17.4, 19.2, -Math.PI / 2], [6.0 + 1.1, -17.4, 19.2, Math.PI / 2], [-1.6, -7.8 + 1.1, 15.2, 0]]) {   // the solid edge lies on the lot's edge and fades out into the lawn
+        const sg = new THREE.PlaneGeometry(len, 2.2); { const uv = sg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * len, uv.getY(i) * 2.2); }
         const strip = new THREE.Mesh(sg, em); strip.rotation.x = -Math.PI / 2; strip.rotation.z = yaw;
         strip.position.set(cx, 0.004, cz); strip.renderOrder = 1; strip.receiveShadow = true; g.add(strip);
       }
-      const pm = std({ roughness: 1, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); applyPBR(pm, 'dirt', { anti: true, flat: 0.95 });
-      for (const [x, z, a, b, rot] of [[3.1, -6.4, 1.3, 0.8, 0.3], [-7.3, -4.6, 1.0, 0.7, 0.8], [8.2, -12.9, 0.9, 0.7, 1.2], [-10.9, -3.4, 1.2, 0.8, 0.5], [7.4, -20.5, 1.1, 0.7, 0.9]]) {
-        const p = new THREE.Mesh(new THREE.CircleGeometry(1, 22), pm); p.rotation.x = -Math.PI / 2; p.rotation.z = rot; p.scale.set(a, b, 1); p.position.set(x, 0.005, z); p.renderOrder = 1; p.receiveShadow = true; g.add(p);
-      }
+      const soft = (name, tint, opacity) => { const m = std({ roughness: 1, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); applyPBR(m, name, { tint, anti: true, flat: 0.95 }); return m; };
+      const pm = soft('dirt', 0xb8a48c, 0.85), nm = soft('dirt', 0x6e5a44, 0.8);
+      const disc = (m, x, z, a, b, rot, y = 0.005) => { const p = new THREE.Mesh(new THREE.CircleGeometry(1, 26), m); p.rotation.x = -Math.PI / 2; p.rotation.z = rot; p.scale.set(a, b, 1); p.position.set(x, y, z); p.renderOrder = 1; p.receiveShadow = true; g.add(p); };
+      for (const [x, z, a, b, rot] of [[3.1, -6.4, 1.3, 0.8, 0.3], [-7.3, -4.6, 1.0, 0.7, 0.8], [8.2, -12.9, 0.9, 0.7, 1.2], [-10.9, -3.4, 1.2, 0.8, 0.5], [7.4, -20.5, 1.1, 0.7, 0.9], [-16, -16, 0.9, 0.7, 0.2]]) disc(pm, x, z, a, b, rot);
+      for (const [x, z] of yardTrunks) disc(nm, x, z, 1.3 + r() * 0.5, 1.1 + r() * 0.5, r() * 3, fieldH(x, z) + 0.006);
     }
     return { group: g, time, count: n };
   })();

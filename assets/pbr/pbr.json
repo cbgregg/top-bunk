@@ -14,5 +14,6 @@
  "tile": 0.9,
  "carpet": 0.8,
  "asphalt": 3.0,
- "gravel": 2.0
+ "gravel": 2.0,
+ "lawn": 2.0
 }
