@@ -1,0 +1,72 @@
+{
+  "title": "Little Window",
+  "bpm": 92,
+  "key": "C",
+  "time": "3/4",
+  "voice": [
+    { "note": "E4", "beats": 1, "syl": "dh uh" }, { "note": "G4", "beats": 2, "syl": "s t ah r z" },
+    { "note": "A4", "beats": 1, "syl": "ah r" }, { "note": "G4", "beats": 2, "syl": "ah u t" },
+    { "note": "E4", "beats": 1, "syl": "dh uh" }, { "note": "D4", "beats": 2, "syl": "l ae m p" },
+    { "note": "C4", "beats": 3, "syl": "ih z" }, { "note": "D4", "beats": 3, "syl": "l o u" },
+    { "note": "E4", "beats": 1, "syl": "dh uh" }, { "note": "G4", "beats": 2, "syl": "h ah u s" },
+    { "note": "A4", "beats": 1, "syl": "ih z" }, { "note": "G4", "beats": 2, "syl": "s t ih l" },
+    { "note": "E4", "beats": 1, "syl": "ae n d" }, { "note": "D4", "beats": 2, "syl": "n o u" },
+    { "note": "C4", "beats": 1, "syl": "w uh n" }, { "note": "D4", "beats": 2, "syl": "n i d z" },
+    { "note": "C4", "beats": 3, "syl": "t u" }, { "note": "C4", "beats": 3, "syl": "n o u" },
+    { "note": null, "beats": 3 },
+
+    { "note": "G4", "beats": 2, "syl": "l ih t" }, { "note": "G4", "beats": 1, "syl": "t uh l" },
+    { "note": "A4", "beats": 2, "syl": "w ih n" }, { "note": "G4", "beats": 1, "syl": "d o u" },
+    { "note": "E4", "beats": 2, "syl": "k i p" }, { "note": "D4", "beats": 1, "syl": "dh uh" },
+    { "note": "C4", "beats": 3, "syl": "n ah i t" }, { "note": "D4", "beats": 3, "syl": "ah u t" },
+    { "note": "G4", "beats": 2, "syl": "l ih t" }, { "note": "G4", "beats": 1, "syl": "t uh l" },
+    { "note": "A4", "beats": 2, "syl": "w ih n" }, { "note": "G4", "beats": 1, "syl": "d o u" },
+    { "note": "E4", "beats": 2, "syl": "h o u l d" }, { "note": "D4", "beats": 1, "syl": "dh uh" },
+    { "note": "C4", "beats": 6, "syl": "l ah i t" },
+    { "note": null, "beats": 3 },
+
+    { "note": "E4", "beats": 1, "syl": "dh uh" }, { "note": "G4", "beats": 2, "syl": "h aw l" },
+    { "note": "A4", "beats": 1, "syl": "ih z" }, { "note": "G4", "beats": 2, "syl": "l aw ng" },
+    { "note": "E4", "beats": 1, "syl": "dh uh" }, { "note": "D4", "beats": 2, "syl": "d o r" },
+    { "note": "C4", "beats": 3, "syl": "ih z" }, { "note": "D4", "beats": 3, "syl": "sh uh t" },
+    { "note": "E4", "beats": 1, "syl": "ae n d" }, { "note": "G4", "beats": 2, "syl": "ih f" },
+    { "note": "A4", "beats": 1, "syl": "y u" }, { "note": "G4", "beats": 2, "syl": "h i r" },
+    { "note": "E4", "beats": 1, "syl": "m i" }, { "note": "D4", "beats": 2, "syl": "h uh m" },
+    { "note": "C4", "beats": 1, "syl": "m ih ng" }, { "note": "D4", "beats": 2, "syl": "d u" },
+    { "note": "C4", "beats": 3, "syl": "n aw t" }, { "note": "C4", "beats": 3, "syl": "w e i k" },
+    { "note": null, "beats": 3 },
+
+    { "note": "G4", "beats": 2, "syl": "l ih t" }, { "note": "G4", "beats": 1, "syl": "t uh l" },
+    { "note": "A4", "beats": 2, "syl": "w ih n" }, { "note": "G4", "beats": 1, "syl": "d o u" },
+    { "note": "E4", "beats": 2, "syl": "k i p" }, { "note": "D4", "beats": 1, "syl": "dh uh" },
+    { "note": "C4", "beats": 3, "syl": "n ah i t" }, { "note": "D4", "beats": 3, "syl": "ah u t" },
+    { "note": "G4", "beats": 2, "syl": "l ih t" }, { "note": "G4", "beats": 1, "syl": "t uh l" },
+    { "note": "A4", "beats": 2, "syl": "w ih n" }, { "note": "G4", "beats": 1, "syl": "d o u" },
+    { "note": "E4", "beats": 2, "syl": "h o u l d" }, { "note": "D4", "beats": 1, "syl": "dh uh" },
+    { "note": "C4", "beats": 9, "syl": "l ah i t" }
+  ],
+  "chords": [
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["F3", "A3", "C4"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["F3", "A3", "C4"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 6, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["G2", "B2", "D3"] },
+
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["C3", "E3", "G3"] },
+
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["F3", "A3", "C4"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["F3", "A3", "C4"] },
+    { "beats": 3, "notes": ["C3", "E3", "G3"] }, { "beats": 3, "notes": ["G2", "B2", "D3"] }, { "beats": 9, "notes": ["C3", "E3", "G3"] }
+  ]
+}

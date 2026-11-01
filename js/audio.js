@@ -101,6 +101,34 @@ export class Sound {
     this.humGain = ctx.createGain(); this.humGain.gain.value = 0;
     const hm = ctx.createOscillator(); hm.type = 'sine'; hm.frequency.value = 60; hm.connect(this.humGain); hm.start();
     this.humGain.connect(this.buses.sfx);
+    // rain: a wide hiss, through a low-pass that eases (the heavier the rain, the more of the low patter comes through), and a slow swell
+    this.rainGain = ctx.createGain(); this.rainGain.gain.value = 0;
+    const rn = ctx.createBufferSource(); rn.buffer = this.noise; rn.loop = true; rn.playbackRate.value = 0.93;
+    const rhp = ctx.createBiquadFilter(); rhp.type = 'highpass'; rhp.frequency.value = 900; rhp.Q.value = 0.4;
+    this.rainLp = ctx.createBiquadFilter(); this.rainLp.type = 'lowpass'; this.rainLp.frequency.value = 2600; this.rainLp.Q.value = 0.3;
+    const rl = ctx.createOscillator(); rl.frequency.value = 0.11; const rlg = ctx.createGain(); rlg.gain.value = 500; rl.connect(rlg).connect(this.rainLp.frequency); rl.start();
+    rn.connect(rhp).connect(this.rainLp).connect(this.rainGain).connect(this.buses.sfx); rn.start();
+    // the street light's ballast: a 120 Hz buzz with its harmonics, heard only close to the pole
+    this.buzzGain = ctx.createGain(); this.buzzGain.gain.value = 0;
+    const bz = ctx.createOscillator(); bz.type = 'sawtooth'; bz.frequency.value = 120;
+    const bzf = ctx.createBiquadFilter(); bzf.type = 'bandpass'; bzf.frequency.value = 1900; bzf.Q.value = 1.2;
+    bz.connect(bzf).connect(this.buzzGain).connect(this.buses.sfx); bz.start();
+  }
+  // v: 0 dry .. 1 a downpour; `inside` muffles it (heard through the walls and the glass)
+  rain(v, inside = false, t = 2) {
+    if (!this.ctx) return;
+    this.set(this.rainGain.gain, v * (inside ? 0.11 : 0.3), t);
+    this.set(this.rainLp.frequency, inside ? 700 : 1800 + 2400 * v, t);
+  }
+  buzz(v, t = 0.3) { this.ctx && this.set(this.buzzGain.gain, v * 0.05, t); }
+  // a roll of thunder: a low noise swell that breaks up as it dies, `delay` seconds after the flash (the distance), and a rumble under it
+  thunder(delay = 2, gain = 1) {
+    if (!this.ctx) return;
+    const near = Math.max(0, 1 - delay / 6);
+    this.noiseHit({ dur: 2.2 + delay * 0.4, type: 'lowpass', f: 160 + near * 400, f2: 60, q: 0.8, gain: 0.9 * gain, attack: 0.08 + (1 - near) * 0.5, wet: 0.6, delay });
+    this.noiseHit({ dur: 3.5, type: 'lowpass', f: 90, q: 1.2, gain: 0.6 * gain, attack: 0.9, wet: 0.7, delay: delay + 0.6 });
+    for (let i = 0; i < 4; i++) this.noiseHit({ dur: 0.5 + Math.random() * 0.8, type: 'bandpass', f: 120 + Math.random() * 200, q: 1.5, gain: 0.3 * gain * (1 - i * 0.18), attack: 0.1, wet: 0.6, delay: delay + 1 + i * 0.7 + Math.random() * 0.4 });
+    this.tone({ type: 'sine', f: 42, f2: 30, dur: 3.5 + delay * 0.3, gain: 0.35 * gain * (0.4 + near * 0.6), attack: 0.3, wet: 0.5, delay });
   }
   set(param, v, time = 1.5) { if (!this.ctx) return; const p = param; p.cancelScheduledValues(this.now); p.setTargetAtTime(v, this.now, time / 3); }
   wind(v, t) { this.ctx && this.set(this.windGain.gain, v, t); }
@@ -298,6 +326,23 @@ export class Sound {
     for (let i = 0; i < n; i++) this.tone({ f: base, f2: base * (1.2 + Math.random() * 0.4), dur: 0.06, gain: 0.04, attack: 0.005, pan, wet: 0.05, delay: i * 0.11 });
   }
   thump() { this.tone({ f: 90, f2: 40, dur: 0.15, gain: 0.5, wet: 0.2 }); this.noiseHit({ dur: 0.08, f: 600, gain: 0.35 }); }
+  // the grandfather clock: a dry wooden tick (the tock a shade lower), and the hour struck on a soft bell after the four-note phrase
+  clockTick(gain = 0.2, pan = 0, tock = false) {
+    this.noiseHit({ dur: 0.012, type: 'bandpass', f: tock ? 1700 : 2300, q: 1.2, gain: gain * 1.6, pan, wet: 0.08, attack: 0.001 });
+    this.tone({ type: 'triangle', f: tock ? 520 : 640, f2: tock ? 260 : 330, dur: 0.035, gain: gain * 0.5, pan, wet: 0.1, attack: 0.001 });
+  }
+  chime(count = 1, gain = 0.25, pan = 0) {
+    const bell = (f, at, g, dur) => {
+      this.tone({ f, dur, gain: g, pan, wet: 0.45, attack: 0.004, delay: at });
+      this.tone({ f: f * 2.76, dur: dur * 0.5, gain: g * 0.22, pan, wet: 0.45, attack: 0.002, delay: at });
+      this.tone({ f: f * 5.4, dur: dur * 0.25, gain: g * 0.08, pan, wet: 0.4, attack: 0.001, delay: at });
+    };
+    let t = 0;
+    for (const f of [659.3, 587.3, 523.3, 392]) { bell(f, t, gain * 0.55, 1.6); t += 0.55; }
+    t += 1.2;
+    for (let i = 0; i < count; i++) { bell(261.6, t, gain, 3.2); t += 1.5; }
+    return t;
+  }
   // doors: a long hinge creak and a latch click when one opens, a thud when it shuts
   doorOpen(pan = 0, gain = 0.4) { this.creak(gain, pan, 0); this.noiseHit({ dur: 0.03, type: 'highpass', f: 2500, gain: gain * 0.5, pan, wet: 0.1 }); }
   doorClose(pan = 0, gain = 0.6) { this.tone({ f: 100, f2: 45, dur: 0.18, gain: gain * 0.9, pan, wet: 0.3 }); this.noiseHit({ dur: 0.1, f: 800, gain: gain * 0.5, pan, wet: 0.3 }); this.noiseHit({ dur: 0.02, type: 'highpass', f: 3500, gain: gain * 0.4, pan, wet: 0.05, delay: 0.12 }); }

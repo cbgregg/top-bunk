@@ -1,18 +1,28 @@
 // The family car, seen from the back seat: a 90s sedan interior (seats, dash, wheel, glove box, mirror) that drives along the real road in front of
 // the house, with traffic. Used for the road-trip dream, and for driving away at the end. Car-local axes: +x forward, +y up, +z right.
 import * as THREE from 'three';
+import { loadProp } from './props.js';
 
 const std = (c, r = 0.8, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
+const NPC_MODELS = ['car_sedan', 'car_pickup', 'car_sedan2', 'car_wagon'];
 
-function makeNpcCar(color) {
+// the other cars on the road: a box stand-in that the real model (assets/props/car_*.glb, the same cars traffic.js drives past the house)
+// replaces when it has loaded; both face +x. The tail lights are the one part kept, since they go bright when the traffic brakes
+function makeNpcCar(color, i) {
   const g = new THREE.Group(), body = std(color, 0.45, 0.2), dark = std(0x1a1d22, 0.2, 0.4);
   const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
-  add(new THREE.BoxGeometry(4.5, 0.75, 1.8), body, 0, 0.62, 0);
-  add(new THREE.BoxGeometry(2.3, 0.62, 1.62), dark, -0.2, 1.28, 0);
-  for (const [x, z] of [[1.4, 0.9], [1.4, -0.9], [-1.4, 0.9], [-1.4, -0.9]]) { const w = add(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 14), std(0x0d0d0e, 1), x, 0.32, z); w.rotation.x = Math.PI / 2; }
+  const standIn = [add(new THREE.BoxGeometry(4.5, 0.75, 1.8), body, 0, 0.62, 0), add(new THREE.BoxGeometry(2.3, 0.62, 1.62), dark, -0.2, 1.28, 0)];
+  for (const [x, z] of [[1.4, 0.9], [1.4, -0.9], [-1.4, 0.9], [-1.4, -0.9]]) { const w = add(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 14), std(0x0d0d0e, 1), x, 0.32, z); w.rotation.x = Math.PI / 2; standIn.push(w); }
   const tail = new THREE.MeshBasicMaterial({ color: 0x4a0000, fog: false });
-  add(new THREE.BoxGeometry(0.06, 0.16, 0.5), tail, -2.26, 0.78, 0.55); add(new THREE.BoxGeometry(0.06, 0.16, 0.5), tail, -2.26, 0.78, -0.55);
+  const tails = [add(new THREE.BoxGeometry(0.06, 0.16, 0.5), tail, -2.26, 0.78, 0.55), add(new THREE.BoxGeometry(0.06, 0.16, 0.5), tail, -2.26, 0.78, -0.55)];
   g.userData.tail = tail;
+  loadProp(NPC_MODELS[i % NPC_MODELS.length]).then((p) => {
+    const b = p.box, m = p.scene.clone(true); m.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+    m.traverse((o) => { if (o.isMesh && /bodymat/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.set(color).multiplyScalar(1.6); } });
+    for (const s of standIn) s.visible = false;
+    for (const t of tails) { t.position.x = b.min.x - (b.min.x + b.max.x) / 2 + 0.02; t.position.y = 0.74; t.position.z = Math.sign(t.position.z) * ((b.max.z - b.min.z) / 2 - 0.32); t.scale.set(1, 0.9, 0.5); }
+    g.add(m);
+  }).catch(() => { /* the stand-in stays */ });
   return g;
 }
 
@@ -81,7 +91,7 @@ export function createCar(scene) {
   // ---- outside: the street ----
   const traffic = []; const colors = [0x2a4a7a, 0x8a8f96, 0x7a1f1f, 0xd9d3c2, 0x2d5a3d, 0x1f1f24, 0xb08a2a];
   const sceneRoot = new THREE.Group(); scene.add(sceneRoot);
-  for (let i = 0; i < 9; i++) { const c = makeNpcCar(colors[i % colors.length]); sceneRoot.add(c); traffic.push({ g: c, lane: i < 6 ? 1 : -1, off: 0, v: 0, rel: 0 }); c.visible = false; }
+  for (let i = 0; i < 9; i++) { const c = makeNpcCar(colors[i % colors.length], i); sceneRoot.add(c); traffic.push({ g: c, lane: i < 6 ? 1 : -1, off: 0, v: 0, rel: 0 }); c.visible = false; }
 
   const car = {
     group: G, glovePivot, wheelG, traffic, hood, mirror, drawMirror,

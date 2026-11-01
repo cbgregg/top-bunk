@@ -12,6 +12,9 @@ import { input, label as L, initInput, controlsTable } from './input.js';
 import { createNights } from './nights.js';
 import { newSeed } from './rng.js';
 import { createCar } from './cars.js';
+import { createTraffic } from './traffic.js';
+import { createWeather } from './weather.js';
+import { weatherFor } from './director.js';
 import { createVigil } from './vigil.js';
 import { settings, flicker } from './settings.js';
 import { menu } from './menu.js';
@@ -62,9 +65,11 @@ const car = createCar(scene);
 const sfx = new Sound();
 for (const b of ['master', 'music', 'sfx', 'voice']) { sfx.setVolume(b, settings.get(b)); settings.on(b, (v) => sfx.setVolume(b, v)); }
 const WF = new WindowFace(scene, W.faceLight, W.carLight);
+const traffic = createTraffic(scene, sfx);
+const weather = createWeather(scene, camera, W, sfx);
 const mom = makePerson({ model: 'mom', height: 1.66, shirt: '#7b8f6c', pants: '#3a3f52', hair: '#5b3a22', longHair: true });
 const dad = makePerson({ model: 'dad', height: 1.84, shirt: '#7a4636', pants: '#2c3646', hair: '#2a221c', cap: '#2d4a2a' });
-mom.group.position.set(0.6, 0, 1.6); dad.group.position.set(4.3, 0, -13.4);   // where the day starts them
+mom.group.position.set(1.77, 0, 2.43); dad.group.position.set(4.3, 0, -13.4);   // where the day starts them
 scene.add(mom.group, dad.group);
 
 const gfx = new Gfx(renderer, scene, camera);
@@ -83,12 +88,12 @@ addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !e.repeat) toggleL
 
 // ---------- constants ----------
 const EYE = 1.32, R = 0.28;
-const BUNK_SEAT = new V3(6.03, 2.24, 3.02);
-const BUNK_LIE = new V3(6.13, 1.9, 3.02);
-const LADDER_MID = new V3(7.48, 1.55, 3.02);
-const LADDER_FLOOR = new V3(7.68, 0, 3.02);
+const BUNK_SEAT = new V3(8.28, 2.24, 4.0);
+const BUNK_LIE = new V3(8.38, 1.9, 4.0);
+const LADDER_MID = new V3(9.2, 1.55, 3.48);   // the ladder hangs on the room side of the bunk at its foot
+const LADDER_FLOOR = new V3(9.2, 0, 3.18);
 const HIDE_YAW = 0;                         // lying on the top bunk you face the room (toward the front of the house, -z)
-const LADDER_YAW = Math.PI / 2;             // on the ladder you face the bunk (west)
+const LADDER_YAW = Math.PI;                 // on the ladder you face the bunk (the back wall, +z)
 
 // ---------- helpers ----------
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
@@ -118,7 +123,7 @@ function panFor(pos) {
 
 // ---------- state ----------
 const P = {
-  pos: new V3(2.2, 0, -9.0), vel: new V3(), yaw: Math.PI, pitch: 0, roll: 0, mode: 'walk',
+  pos: new V3(3.1, 0, -9.0), vel: new V3(), yaw: Math.PI, pitch: 0, roll: 0, mode: 'walk',
   cam: new V3(), stamina: 1, exhausted: false, carrying: null, stepAcc: 0, bob: 0, speed: 0,
   breath: 1, breathT: 0, inhale: true, pod: null, podYaw: 0,
 };
@@ -188,7 +193,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // two of the director's night events (director.js): a car goes by out front and its light slides through the windows, and something huge
 // and pale drifts past them
-function carPass() { WF.carPass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); }
+function carPass() { WF.carPass(); traffic.pass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); }
 function faceAtWindow() {
   WF.face(); sfx.moving('sfx/face_wail', { gain: 0.8, from: 0.6, to: -0.8, dur: 13 });
 }
@@ -207,7 +212,7 @@ function nlMult(m, flick = true) {
 // Mom and Dad sleep in their bed at night (flat on their backs: the standing model laid down); they are awake and upright otherwise.
 function sleepers(on) {
   for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
-    p.sleeping = on; p.busy = on || p.busy && false; p.pose = null;
+    p.sleeping = on; p.busy = on || p.busy && false; p.pose = null; p.setNight(on);
     // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
     if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, spot.yaw ?? Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
     else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
@@ -220,7 +225,7 @@ function setPhase(p, silent = false) {
   F.phase = p; W.sun.shadow.needsUpdate = true;
   const day = p === 'day', night = p === 'night' || p === 'title', morn = p === 'morning';
   gfx.setPhase(p);
-  scene.fog = day ? new THREE.FogExp2(0xbccddc, 0.03) : p === 'title' ? new THREE.FogExp2(0x02040c, 0.03) : night ? new THREE.FogExp2(0x040818, 0.062) : new THREE.FogExp2(0xe8d9c2, 0.032);   // the fog swallows everything past the property lines
+  scene.fog = day ? new THREE.FogExp2(0xbccddc, 0.013) : p === 'title' ? new THREE.FogExp2(0x02040c, 0.03) : night ? new THREE.FogExp2(0x040818, 0.062) : new THREE.FogExp2(0xe8d9c2, 0.016);   // the fog swallows everything past the property lines
   W.hemi.color.set(day ? 0xcfe0ff : night ? 0x2d4c9c : 0xffe6c4);
   W.hemi.groundColor.set(day ? 0x5a4a35 : night ? 0x04060f : 0x6a5238);
   W.hemi.intensity = day ? 0.55 : p === 'title' ? 0.28 : night ? 0.3 : 0.8;
@@ -240,6 +245,10 @@ function setPhase(p, silent = false) {
   for (const n of W.nightLights) n.light.visible = night;
   W.faceLight.visible = W.carLight.visible = night;
   W.porchLight.intensity = p === 'title' ? 7 : 0; W.porchBulb.material.emissiveIntensity = p === 'title' ? 4 : 0;
+  W.streetLight.set(night && !F.blackout); W.farLights.visible = night;
+  // the weather of the night from the seed; the morning after a wet night the ground is still dark; the title and the day are clear
+  const wx = p === 'night' ? weatherFor(RUN.seed, F.night) : morn && weatherFor(RUN.seed, F.night) !== 'clear' ? 'wet' : 'clear';
+  weather.set(wx); if (silent || p !== 'night') weather.jump();
   W.bathSpot.intensity = 0;
   W.frontDoor.setOpen(day);
   W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
@@ -265,7 +274,7 @@ W.pickups.forEach((b) => addI({ obj: b, r: 2.2, label: 'Pick up the box', when: 
 addI({ obj: W.drawingMesh, r: 2.3, label: 'Look at the drawing', when: () => F.phase !== 'morning' && roomAt(P.pos.x, P.pos.z) === 'hall', act: lookDrawing });
 addI({ obj: mom.head, r: 2.6, label: 'Talk to Mom', when: () => F.phase === 'day' && mom.group.visible, act: talkMom });
 addI({ obj: dad.head, r: 2.6, label: 'Talk to Dad', when: () => F.phase === 'day' && dad.group.visible, act: talkDad });
-addI({ p: new V3(7.33, 1.3, 3.02), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
+addI({ p: new V3(9.2, 1.3, 3.43), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
 for (const d of Object.values(W.doors)) {   // the interior doors
   addI({ p: d.mid, r: 1.55, label: () => (d.name === 'parents' && F.phase === 'night' && !d.target ? 'Try the handle' : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (d.name === 'parents' && F.phase === 'night' && !d.target ? lockedDoor(d) : toggleDoor(d)) });
 }
@@ -389,7 +398,7 @@ function speak(id, { muffle = false, hold = 0.45 } = {}) {
 }
 const say = async (id, o) => { await wait(speak(id, o)); };
 function talkMom() {
-  if (!F.momReady) { talkTo(mom, 'mom/boxes_first'); return; }
+  if (!F.momReady) { talkTo(mom, F.askedMom ? 'mom/boxes_again' : 'mom/boxes_first'); F.askedMom = true; return; }
   if (!F.talkedMom) F.talkedMom = true;
 }
 const dadLines = ['dad/line_1', 'dad/line_2', 'dad/line_3'];
@@ -435,7 +444,7 @@ function toBunk() { bunkSince = gameTime; P.mode = 'bunk'; P.cam.copy(BUNK_SEAT)
 function enteredHide() { breathPrev = true; breathLatch = false; if (F.flashOn) { F.flashOn = false; flash.intensity = 0; } }
 
 // ---------- player ----------
-// a collider counts only on the floor you are on: the laundry is under the utility room, and the outside stairs pass both
+// a collider counts only on the floor you are on: the laundry is under Mom and Dad's room, and the outside stairs pass both
 const onFloor = (c) => !(P.pos.y + 0.5 < (c.minY ?? -0.3) || P.pos.y > (c.maxY ?? 3));
 function collide() {
   for (const c of W.colliders) {
@@ -478,7 +487,7 @@ function movePlayer(dt) {
   UI.stamina(P.stamina, P.stamina < 0.99);
 }
 function playerStep(sprint) {
-  const room = roomAt(P.pos.x, P.pos.z, P.pos.y), vol = sprint ? 0.42 : 0.26, hard = ['bath', 'kitchen', 'dining', 'utility', 'stoop', 'laundry', 'garage'].includes(room);
+  const room = roomAt(P.pos.x, P.pos.z, P.pos.y), vol = sprint ? 0.42 : 0.26, hard = ['bath', 'kitchen', 'dining', 'stoop', 'laundry', 'garage'].includes(room);
   if (room === 'out') sfx.grassStep(vol); else sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'laundry' ? 0.3 : 0.15, hard ? 'tile' : 'carpet');
   if (F.echo) echoes.push(gameTime + 0.27 + Math.random() * 0.06);
 }
@@ -634,20 +643,20 @@ async function startGame() {
 const chore = { run: 0, stop: false, dadHome: false };
 const dressing = [];                                    // everything they set down (cleared when the day restarts)
 // Dad stands on the truck bed, 0.66 up; the next box sits on top of the stack in front of him
-const TRUCK_PICK = new V3(2.35, 0.66, -15.25), TRUCK_BOX = new V3(2.35, 1.82, -15.8), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(1.9, 0, -6.5), DOOR_IN = new V3(1.9, 0, -3.7), DOOR_OUT = new V3(1.9, 0, -5.4);
-const LIVING_SPOTS = [new V3(0.85, 0, -3.75), new V3(-0.2, 0, -3.85), new V3(0.35, 0, -2.7)];
-const KITCHEN_BOX = new V3(1.2, 0, 1.4), DAD_HOME = new V3(0.2, 0, 0.6), ARCH = new V3(1.7, 0, -1.0), ARCH_IN = new V3(1.7, 0, 0.3);
+const TRUCK_PICK = new V3(2.35, 0.66, -15.25), TRUCK_BOX = new V3(2.35, 1.82, -15.8), RAMP_FOOT = new V3(2.3, 0, -11.3), PORCH = new V3(3.1, 0, -6.5), DOOR_IN = new V3(3.1, 0, -3.6), DOOR_OUT = new V3(3.1, 0, -5.4);
+const LIVING_SPOTS = [new V3(1.92, 0, -3.66), new V3(0.75, 0, -3.77), new V3(1.36, 0, -2.48)];
+const KITCHEN_BOX = new V3(2.32, 0, 2.2), DAD_HOME = new V3(1.2, 0, 1.31), ARCH = new V3(2.88, 0, -0.54), ARCH_IN = new V3(2.88, 0, 0.97);
 // where Mom puts things (the east counter, then the back counter by the corner) and where she stands for each, COUNTER_OFF back from it
 const COUNTER_OFF = 0.48, COUNTER_Y = 0.95;
 const COUNTER = [
-  ...[1.8, 2.1, 2.4, 2.7].map((z) => ({ at: [2.8, COUNTER_Y, z], stand: [2.8 - COUNTER_OFF, z] })),
-  ...[2.15, 2.5].map((x) => ({ at: [x, COUNTER_Y, 3.12], stand: [x, 3.12 - COUNTER_OFF] })),
+  ...[2.65, 2.99, 3.32, 3.66].map((z) => ({ at: [4.11, COUNTER_Y, z], stand: [4.11 - COUNTER_OFF, z] })),
+  ...[3.38, 3.77].map((x) => ({ at: [x, COUNTER_Y, 4.13], stand: [x, 4.13 - COUNTER_OFF] })),
 ];
 const rampY = (x, z) => (z < -14.5 ? 0.66 : clamp((-11.4 - z) * 0.18, 0, 0.58)) * clamp(1 - (Math.abs(x - 2.3) - 0.6) / 0.3, 0, 1);   // the ramp, then the bed's floor; fades out at the ramp's sides (no step up or down)
 const stillOn = (run) => run === chore.run;
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
-  const room = roomAt(g.x, g.z), hard = room === 'kitchen' || room === 'dining' || room === 'bath' || room === 'utility';
+  const room = roomAt(g.x, g.z), hard = room === 'kitchen' || room === 'dining' || room === 'bath';
   if (room === 'out') sfx.grassStep(0.3 / (1 + d * 0.35), panFor(tmp2.set(g.x, 1, g.z))); else sfx.footstep(0.3 / (1 + d * 0.3), panFor(tmp2.set(g.x, 1, g.z)), 0.25, hard ? 'tile' : 'carpet');
 }
 const idle = (who) => { if (who.rig) who.rig.play('idle', { fade: 0.3, speed: 1 }); };
@@ -815,7 +824,7 @@ async function dadChores() {
     if (chore.stop) break;
   }
   if (!stillOn(run)) return;
-  if (!(await walkTo(dad, [new V3(g.x, 0, Math.max(g.z, -3.7)), ARCH, ARCH_IN, DAD_HOME]))) return;
+  if (!(await walkTo(dad, [new V3(g.x, 0, Math.max(g.z, -3.6)), ARCH, ARCH_IN, DAD_HOME]))) return;
   await turnToward(dad, 0.6, 1.6, 0.6);
   chore.dadHome = true;
 }
@@ -852,9 +861,9 @@ async function momChores() {
   }
   while (stillOn(run)) {   // wipe the counter until the chores are cancelled
     const t0 = gameTime;
-    if (!(await walkTo(mom, [new V3(2.32, 0, 2.25)]))) return;
+    if (!(await walkTo(mom, [new V3(3.57, 0, 3.16)]))) return;
     await turnToward(mom, 2.8, 2.25, 0.4);
-    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, R: { reach: new V3(2.74, 0.96, 2.25 + Math.sin(t * 2.2) * 0.3), palm: 'down', grip: 0.4 } }; await wait(0.03); if (t > 30) break; }
+    while (stillOn(run)) { const t = gameTime - t0; mom.pose = { lean: 0.3, R: { reach: new V3(4.04, 0.96, 3.16 + Math.sin(t * 2.2) * 0.3), palm: 'down', grip: 0.4 } }; await wait(0.03); if (t > 30) break; }
   }
 }
 function startChores() {
@@ -871,8 +880,8 @@ function endChores() {
 
 async function dayScript() {
   F.stage = 'day'; setPhase('day');
-  P.pos.set(2.2, 0, -9.0); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
-  mom.group.position.set(0.6, 0, 1.6); mom.group.rotation.y = -Math.PI / 2;
+  P.pos.set(3.1, 0, -9.0); P.yaw = Math.PI; P.pitch = 0.02; P.mode = 'walk';
+  mom.group.position.set(1.77, 0, 2.43); mom.group.rotation.y = -Math.PI / 2;
   dad.group.position.set(4.3, 0, -13.4); dad.group.rotation.y = -0.5;
   await wait(0.3);
   UI.fade(0, 2.5); UI.card('Saturday', 'Moving day', 3.5);
@@ -895,7 +904,7 @@ async function dayScript() {
   F.cutscene = true; P.vel.set(0, 0, 0);
   faceParent(mom);
   UI.objective(null);
-  await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('mom/teeth');
+  await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('dad/leftovers'); await say('mom/teeth');
   UI.fade(1, 2.5); await wait(3);
   F.birds = false; F.cutscene = false; endChores();
   RUN.dayDone = true; saveRun();
@@ -972,8 +981,8 @@ async function breakfast(n) {
   E.visible = false; F.chase = false;
   toBunk(); P.yaw = HIDE_YAW + 0.15; P.pitch = -0.12;
   sleepers(false); mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = false;
-  mom.group.position.set(2.0, 0, 1.33); mom.group.rotation.y = Math.PI / 2;        // at the stove
-  dad.group.position.set(0.9, 0, 2.3); dad.group.rotation.y = Math.PI;               // at the sink
+  mom.group.position.set(3.21, 0, 2.13); mom.group.rotation.y = Math.PI / 2;        // at the stove
+  dad.group.position.set(1.98, 0, 3.21); dad.group.rotation.y = Math.PI;              // at the sink
   F.birds = true;
   UI.card('6:58 AM', n === 1 ? 'Morning' : `Morning ${n}`, 3.5);
   if (n >= 2 && nights) cardProof(`Night ${n} · proof ${nights.proof.count()} / ${nights.proof.total}`, 3.5);
@@ -984,7 +993,7 @@ async function breakfast(n) {
   await waitFor(() => P.mode === 'walk' && Math.hypot(P.pos.x - mom.group.position.x, P.pos.z - mom.group.position.z) < 3.4);
   UI.objective(null); F.cutscene = true; P.vel.set(0, 0, 0);
   // walk you to your mark between them, then the conversation
-  { const x0 = P.pos.x, z0 = P.pos.z; await tween(1.2, (k) => { P.pos.set(lerp(x0, 0.9, k), 0, lerp(z0, 0.55, k)); }); }
+  { const x0 = P.pos.x, z0 = P.pos.z; await tween(1.2, (k) => { P.pos.set(lerp(x0, 1.98, k), 0, lerp(z0, 1.25, k)); }); }
   await wait(0.5);
   const lines = [...(MORN[n] || MORN[3])];
   const tl = n >= 2 && nights && TYPE_LINE[nights.plan(n).type]; if (tl) lines.push(tl);
@@ -1109,7 +1118,7 @@ async function carLeaving() {
   UI.fade(0, 2); await wait(1.5); F.cutscene = false;
   // from the back seat, looking back through the rear window
   P.yaw = Math.PI * 0.95; P.pitch = 0.02;
-  E.visible = true; E.mode = 'idle'; E.root.position.set(1.9, 0, -5.6); E.root.rotation.y = Math.PI; E.lookTarget = camera.position; E.tilt = 0.4; E.smileScale = 1.25;
+  E.visible = true; E.mode = 'idle'; E.root.position.set(3.1, 0, -5.6); E.root.rotation.y = Math.PI; E.lookTarget = camera.position; E.tilt = 0.4; E.smileScale = 1.25;
   await tween(7, (k) => { car.speed = lerp(0, 7, ease.inOut(k)); sfx.engine(1, 0.2 + k * 0.4); });
   await wait(2.5); E.reach = 0.6;
   await wait(5); UI.fade(1, 3); await wait(3.4);
@@ -1127,23 +1136,23 @@ async function finaleScene() {
   sfx.violins(0.3, 2); sfx.tension(0.05, 2); sfx.hush(4);
   P.mode = 'cine'; const from = camera.position.clone(), y0 = P.yaw, p0 = P.pitch;
   P.cam.copy(from);
-  await tween(2.6, (k) => { P.cam.set(lerp(from.x, 6.5, k), lerp(from.y, EYE, k), lerp(from.z, -0.9, k)); P.yaw = lerpAngle(y0, Math.PI / 2, k); P.pitch = lerp(p0, 0.02, k); });
-  P.pos.set(6.5, 0, -0.9);
+  await tween(2.6, (k) => { P.cam.set(lerp(from.x, 8.96, k), lerp(from.y, EYE, k), lerp(from.z, -0.42, k)); P.yaw = lerpAngle(y0, Math.PI / 2, k); P.pitch = lerp(p0, 0.02, k); });
+  P.pos.set(8.96, 0, -0.42);
   // at the far end of the hall, lit from behind by the living room, standing very still
   W.setDoor('kid', true, true); W.setDoor('bath', true, true);
   E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.3; E.smileScale = 1; E.lookTarget = camera.position;
-  E.root.position.set(3.95, 0, -0.9); E.root.rotation.y = Math.PI / 2; W.bathSpot.intensity = BATH_I * 0.8; F.flicker = true;
+  E.root.position.set(5.48, 0, -0.42); E.root.rotation.y = Math.PI / 2; W.bathSpot.intensity = BATH_I * 0.8; F.flicker = true;
   sfx.stab(); sfx.violins(1, 0.5); shake = 0.5;
   await wait(3.2);
   // it comes down the hall, slowly
-  E.mode = 'walk'; E.speed = 0.55; { const x0 = 3.95; let st = 0; await tween(7, (k) => { E.root.position.x = lerp(x0, 5.2, k); st += 0.03; if (st > 1.1) { st = 0; sfx.heavyStep(0.9, panFor(E.root.position)); } shake = Math.max(shake, 0.12 + k * 0.3); }, ease.lin); }
+  E.mode = 'walk'; E.speed = 0.55; { const x0 = 5.48; let st = 0; await tween(7, (k) => { E.root.position.x = lerp(x0, 7.07, k); st += 0.03; if (st > 1.1) { st = 0; sfx.heavyStep(0.9, panFor(E.root.position)); } shake = Math.max(shake, 0.12 + k * 0.3); }, ease.lin); }
   E.mode = 'idle'; sfx.giggle(panFor(E.root.position)); await wait(1.6);
   await say('you/f_a'); sfx.scream(); UI.flash('rgba(255,255,255,0.55)', 0.4); shake = 1;
   if (end === 'ENDING_ALONE') { await finaleNeverBelieved(); return true; }
-  // their door bangs open and they are standing there
+  // their door bangs open and they are standing in the mouth of the hall, behind it
   W.setDoor('parents', true); sfx.slamFar(0.5); sleepers(false);
   mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = true; mom.lookAt = dad.lookAt = null;
-  dad.group.position.set(7.5, 0, -1.75); dad.group.rotation.y = Math.PI; mom.group.position.set(7.9, 0, -1.7); mom.group.rotation.y = Math.PI;
+  dad.group.position.set(3.7, 0, -0.6); dad.group.rotation.y = Math.PI / 2; mom.group.position.set(3.25, 0, -0.2); mom.group.rotation.y = Math.PI / 2;
   await wait(0.4);
   await Promise.all([lookAtPerson(dad, 0.9), say('dad/f_a')]);
   sfx.scream(); await say('mom/f_a');
@@ -1188,7 +1197,7 @@ async function finaleGruesome() {
 }
 async function finaleNeverBelieved() {
   UI.subtitle("<i>Their door stays shut. Nobody is coming.</i>", 4); await wait(4);
-  E.visible = true; E.mode = 'idle'; E.root.position.set(6.4, 0, 1.6); E.faceTowards(6.03, 3.02);
+  E.visible = true; E.mode = 'idle'; E.root.position.set(8.81, 0, 2.43); E.faceTowards(8.28, 4.0);
   E.reach = 0.5; E.smileScale = 1.6; E.tilt = 0.4; sfx.stab(); shake = 1; await wait(2);
   sfx.scream(); UI.flash('rgba(255,255,255,0.6)', 0.4); await wait(1.5);
   await endGame('ENDING_ALONE');
@@ -1307,6 +1316,8 @@ function update(dt) {
   W.tick(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt);
   if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
   WF.update(dt); dust.update(dt);
+  { const room = roomAt(P.pos.x, P.pos.z, P.pos.y); weather.update(dt, room !== 'out' && room !== 'stoop', F.phase === 'night' || F.phase === 'title'); }
+  traffic.update(dt, car.group.visible ? 'off' : F.phase); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, sfx);
   E.update(dt, gfx.quality);
   UI.crosshair(P.mode === 'walk' && !F.cutscene);
   achievements.tick();
@@ -1325,6 +1336,7 @@ function loop(now) {
     camera.position.set(-6 + Math.sin(titleT * 0.05) * 3, 2.0 + Math.sin(titleT * 0.3) * 0.05, -22 + Math.cos(titleT * 0.05) * 2);
     camera.lookAt(1, 1.6, -4);
     E.update(dt, gfx.quality);
+    weather.update(dt, false, true); traffic.update(dt, 'title'); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, null);
   }
   // the shadow maps are re-rendered only when something can have changed: the sun and moon every third frame (the people move slowly), the
   // bathroom spot only while it is lit, the headlights only while the car passes (see windowface.js)
@@ -1337,7 +1349,7 @@ function loop(now) {
 // the power is out (the vigil): every light in the house goes, and the fog takes the rest
 function powerOut(on) {
   F.blackout = on; nlMult(on ? 0 : 1, false);
-  if (on) { W.hemi.intensity = 0.02; W.sun.intensity = 0; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; scene.fog = new THREE.FogExp2(0x010206, 0.09); }
+  if (on) { W.hemi.intensity = 0.02; W.sun.intensity = 0; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; W.streetLight.set(false); W.farLights.visible = false; scene.fog = new THREE.FogExp2(0x010206, 0.09); }
   else setPhase('night');
 }
 const vigil = createVigil({
@@ -1384,4 +1396,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

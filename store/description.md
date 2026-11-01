@@ -29,7 +29,7 @@ It's bigger and faster than you, and you can't fight it. Break its line of sight
 You've got a flashlight and doors you can shut behind you. Sprinting wears you out fast, so learn the house.
 
 [h2]The house[/h2]
-A single-storey farmhouse from the early 2000s, with brown carpet, a white kitchen, a narrow hall of family photos, a box TV and a phone on the dining-room wall. The utility wing has a back door onto a stoop, and beside it the stairs down to a basement laundry room. The breaker panel is out in the detached garage, and the moving truck is still parked on the gravel.
+A single-storey farmhouse from the early 2000s, with brown carpet, a white kitchen, a narrow hall of family photos, a box TV and a phone on the dining-room wall. The dining room has a back door onto a stoop, and beside it the stairs down to a basement laundry room under Mom and Dad's wing. The breaker panel is out in the detached garage, and the moving truck is still parked on the gravel.
 
 [h2]Nobody believes you[/h2]
 You tell them at breakfast and they explain it away. The tap was left running. The breaker tripped. You must have dropped the bear in the hall. Most nights the house leaves something behind, and if you find it, you've got something to show them. Show them enough and they start to listen.

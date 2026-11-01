@@ -61,13 +61,13 @@ export function createNightmares(ctx) {
     return g;
   }
   function corner() {
-    const cands = [[-2.95, -0.8], [2.95, -0.8], [-2.95, -3.95], [2.95, -3.95]];
+    const cands = [[-2.33, -0.3], [4.28, -0.3], [-2.33, -3.88], [4.28, -3.88]];
     const free = (x, z) => !W.colliders.some((c) => c.on && x > c.minX - 0.35 && x < c.maxX + 0.35 && z > c.minZ - 0.35 && z < c.maxZ + 0.35 && !(c.door));
     return cands.find(([x, z]) => free(x, z)) || cands[0];
   }
   async function shadow(t) {
     const sh = makeShadow(), [x, z] = corner(), mat = sh.userData.mat;
-    sh.position.set(x, 0, z); sh.lookAt(0, 0, -2.4); sh.rotation.x = 0; sh.visible = true;
+    sh.position.set(x, 0, z); sh.lookAt(0.97, 0, -2.15); sh.rotation.x = 0; sh.visible = true;
     const dir = new V3(), to = new V3();
     let lookT = 0, gone = false;
     const until = Date.now() + SHADOW_LIFE;
@@ -117,13 +117,13 @@ export function createNightmares(ctx) {
     while (ctx.alive(t) && Date.now() < until) {
       await wait(0.1);
       if (F.script || F.cutscene || hunter.busy || P.mode !== 'walk' || ctx.roomAt(P.pos.x, P.pos.z) !== 'hall' || busy) continue;
-      const west = P.pos.x < 3.95, east = P.pos.x > 7.75;
+      const west = P.pos.x < 5.48, east = P.pos.x > 10.84;
       if (!west && !east) continue;
       if (passes < 3) {
         // the far end of the hall is the end you started from; the pictures on the wall are not the same ones
         busy = true; passes++;
         UI.fade(1, 0.12); await wait(0.15);
-        P.pos.x = west ? 7.3 : 4.4; P.vel.set(0, 0, 0); F.drawingLevel = (F.drawingLevel || 0) + 1; D.flicker(0.5); sfx.stab(); sfx.heavyStep(0.4, 0);
+        P.pos.x = west ? 10.16 : 6.04; P.vel.set(0, 0, 0); F.drawingLevel = (F.drawingLevel || 0) + 1; D.flicker(0.5); sfx.stab(); sfx.heavyStep(0.4, 0);
         UI.fade(0, 0.2); busy = false; F.fear = Math.max(F.fear, 0.5 + passes * 0.12);
       } else {
         // the fourth time the hall ends, and something is standing there
@@ -156,10 +156,10 @@ export function createNightmares(ctx) {
     W.setDoor('basement', false); sfx.slamFar(0.3); sfx.thump(); ctx.addShake(0.9);   // the door shuts behind you
     await wait(0.8);
     L.sink.set(true); if (L.sink.stream && L.sink.stream.material) L.sink.stream.material.color.set(0x000000);   // the water runs black
-    L.bulb.set(false); sfx.faucet(6, ctx.pan(-5.65, 0.1));
+    L.bulb.set(false); sfx.faucet(6, ctx.pan(-5.36, 0.7));
     await wait(1.6);
-    sfx.lurk(ctx.pan(-7.67, 1.62), 1, 3.2); await wait(3.4);                                 // a voice, inside the washer
-    sfx.lurk(ctx.pan(-7.67, 1.62), 1, 2.4); L.washer.open(1); sfx.slamFar(-0.4); ctx.addShake(1.6); sfx.appear(1.2);   // the lid bangs open
+    sfx.lurk(ctx.pan(-7.62, 2.45), 1, 3.2); await wait(3.4);                                 // a voice, inside the washer
+    sfx.lurk(ctx.pan(-7.62, 2.45), 1, 2.4); L.washer.open(1); sfx.slamFar(-0.4); ctx.addShake(1.6); sfx.appear(1.2);   // the lid bangs open
     await wait(0.5);
     F.script = false; pullUnder();
     await swim(4, P.pitch, P.yaw);
@@ -172,7 +172,7 @@ export function createNightmares(ctx) {
   async function mirror(t) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(0.74, 0.66), new THREE.MeshBasicMaterial({ transparent: true, toneMapped: false, fog: false, opacity: 0 }));
     const cv = document.createElement('canvas'); cv.width = MIRROR_W; cv.height = MIRROR_H; const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; m.material.map = tex;
-    m.rotation.y = -Math.PI / 2; m.position.set(4.838, 1.6, 0.9); W.house.add(m);
+    m.rotation.y = -Math.PI / 2; m.position.set(6.584, 1.6, 1.64); W.house.add(m);
     const paint = (face) => {   // the room behind you, empty, and you in front of it, standing exactly where you were
       const gr = g.createLinearGradient(0, 0, MIRROR_W, MIRROR_H); gr.addColorStop(0, '#20262c'); gr.addColorStop(1, '#0d1013'); g.fillStyle = gr; g.fillRect(0, 0, MIRROR_W, MIRROR_H);
       g.fillStyle = '#050607'; g.beginPath(); g.ellipse(74, 118, 40, 34, 0, 0, TAU); g.fill(); g.beginPath(); g.ellipse(74, 56, 22, 27, 0, 0, TAU); g.fill();
@@ -183,7 +183,7 @@ export function createNightmares(ctx) {
     while (ctx.alive(t) && Date.now() < until) {
       await wait(0.1);
       if (F.script || F.cutscene || P.mode !== 'walk' || hunter.busy) continue;
-      const d = Math.hypot(P.pos.x - 4.84, P.pos.z - 0.9);
+      const d = Math.hypot(P.pos.x - 6.59, P.pos.z - 1.64);
       if (ctx.roomAt(P.pos.x, P.pos.z) !== 'bath' || d > 1.7) continue;
       shown = true; break;
     }
@@ -193,7 +193,7 @@ export function createNightmares(ctx) {
     for (let k = 0; k <= 1 && ctx.alive(t); k += 0.1) { m.material.opacity = k; await wait(0.08); }
     await wait(2.4);
     // you move and it does not
-    sfx.breath(true, 0.6); sfx.lurk(ctx.pan(3.9, 0.9), 0.9, 2.4);
+    sfx.breath(true, 0.6); sfx.lurk(ctx.pan(5.42, 1.64), 0.9, 2.4);
     let moved = 0; const x0 = P.pos.x, z0 = P.pos.z;
     F.script = false;
     const t0 = Date.now();

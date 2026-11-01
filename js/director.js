@@ -38,6 +38,20 @@ export function nightTypes(seed) {
   const out = { 1: 'poltergeist', 10: 'finale' }; ['thirst', 'static', 'ring', 'blackout', 'car', 'mimic', 'vigil', 'hunted'].forEach((t, i) => { out[i + 2] = t; }); return out;
 }
 
+// the weather of a night, from the seed: 'clear' | 'rain' | 'storm' (rain with lightning). Night one is always clear, the last night is
+// more often not. A seed with no rain at all gets one wet night in the middle.
+export function weatherFor(seed, n) {
+  const r = rng('weather:' + seed), out = { 1: 'clear' };
+  let wet = 0;
+  for (let i = 2; i <= 10; i++) {
+    const k = r(), chance = i === 10 ? 0.6 : 0.33;
+    out[i] = k < chance * 0.4 ? 'storm' : k < chance ? 'rain' : 'clear';
+    if (out[i] !== 'clear') wet++;
+  }
+  if (!wet) out[5] = 'rain';
+  return out[n] || 'clear';
+}
+
 // a night's plan: the type, the starting time, when things happen. Nights are rebuilt from the seed whenever they are played, so a run keeps
 // the planner version it was started with: version 1 is the planner from before proofTopUp(), kept for runs saved back then.
 export const PLAN_VERSION = 3;
@@ -194,6 +208,8 @@ const EVENT_LIST = [
   { id: 'tvStatic', safe: true, w: 2, minN: 2, ok: (D) => room(D) !== 'living' && !D.W.tvFx.on, run: (D) => D.tvBlip() },
   { id: 'faucet', safe: true, w: 2, run: (D) => D.sfx.faucet(4, D.randPan()) },
   { id: 'clockGlitch', safe: true, w: 2, minN: 2, run: (D) => D.clockGlitch() },
+  // the grandfather clock strikes thirteen
+  { id: 'thirteen', safe: true, w: 1.5, minN: 3, once: true, ok: (D) => D.calm() && !D.W.clock.silent, run: (D) => D.chime(13) },
   { id: 'drawing', safe: true, w: 1, minN: 3, run: (D) => D.drawingChange() },
   { id: 'parentsMutter', safe: true, w: 2, run: (D) => D.mutter() },
   // somebody close by that you cannot see, speaking low

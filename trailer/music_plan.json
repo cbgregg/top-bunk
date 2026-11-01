@@ -1,27 +1,195 @@
 {
-  "_comment": "How the song is laid under each cut. Times are seconds in the trailer (out) and in the song (src). rate < 1 slows the record and drops its pitch (asetrate), lp / hp are a low-pass / high-pass in Hz, vib is tape wow depth (0..1), mono folds it to one channel, room is a small room around it (wet, 0..1), gain is linear. mute windows silence the whole mix (the hard cut before the scare); muteFloor (dBFS) leaves the tape's own hiss under them at that level instead of digital silence. duck lowers the song to gain under every voice line (the assets/audio/vo cues), ramping over ramp seconds, so the lines read over it.",
+  "_comment": "How the song is laid under each cut. Times are seconds in the trailer (out) and in the song (src). rate < 1 slows the record and drops its pitch (asetrate), lp / hp are a low-pass / high-pass in Hz, vib is tape wow depth (0..1), mono folds it to one channel, room is a small room around it (wet, 0..1), gain is linear. mute windows silence the whole mix (the hard cut before the scare); muteFloor (dBFS) leaves the tape's own hiss under them at that level instead of digital silence. duck lowers the song to gain under every voice line (the assets/audio/vo cues), ramping over ramp seconds, so the lines read over it. Times may be numbers or strings in the landscape cut's marks (TURN, DROP, DURATION, ACT2 = DROP-TURN; trailer.js) so the plan moves with them.",
   "landscape": {
+    "_comment": "Clean to the turn and a bar past it (the night pan starts on the sweet song), then warped harder with every band of the second act, out at the drop, back faint under the cards.",
     "segments": [
-      { "out": [0, 56], "src": 0, "rate": 1, "gain": 1, "fadeIn": 0.02 },
-      { "out": [56, 68], "src": 56, "rate": 1, "lp": 6000, "vib": 0.08, "gain": 1 },
-      { "out": [68, 80], "src": 68, "rate": 0.97, "lp": 2800, "vib": 0.15, "gain": 0.95 },
-      { "out": [80, 94], "src": 80, "rate": 0.93, "lp": 1500, "vib": 0.25, "gain": 0.9 },
-      { "out": [94, 108], "src": 94, "rate": 0.86, "lp": 800, "vib": 0.35, "gain": 0.85 },
-      { "out": [113, 139], "src": 113, "rate": 1, "lp": 500, "vib": 0.1, "gain": 0.16, "fadeIn": 1.5, "fadeOut": 9 }
+      {
+        "out": [
+          0,
+          "TURN"
+        ],
+        "src": 0,
+        "rate": 1,
+        "gain": 1,
+        "fadeIn": 0.02
+      },
+      {
+        "out": [
+          "TURN",
+          "TURN+2.5"
+        ],
+        "src": "TURN",
+        "rate": 1,
+        "gain": 1
+      },
+      {
+        "out": [
+          "TURN+2.5",
+          "TURN+0.19*ACT2"
+        ],
+        "src": "TURN+2.5",
+        "rate": 1,
+        "lp": 6000,
+        "vib": 0.08,
+        "gain": 1
+      },
+      {
+        "out": [
+          "TURN+0.19*ACT2",
+          "TURN+0.4*ACT2"
+        ],
+        "src": "TURN+0.19*ACT2",
+        "rate": 0.97,
+        "lp": 2800,
+        "vib": 0.15,
+        "gain": 0.95
+      },
+      {
+        "out": [
+          "TURN+0.4*ACT2",
+          "TURN+0.63*ACT2"
+        ],
+        "src": "TURN+0.4*ACT2",
+        "rate": 0.93,
+        "lp": 1500,
+        "vib": 0.25,
+        "gain": 0.9
+      },
+      {
+        "out": [
+          "TURN+0.63*ACT2",
+          "TURN+0.855*ACT2"
+        ],
+        "src": "TURN+0.63*ACT2",
+        "rate": 0.86,
+        "lp": 800,
+        "vib": 0.35,
+        "gain": 0.85
+      },
+      {
+        "out": [
+          "TURN+0.855*ACT2",
+          "DROP"
+        ],
+        "src": "TURN+0.855*ACT2",
+        "rate": 0.8,
+        "lp": 500,
+        "vib": 0.4,
+        "gain": 0.8
+      },
+      {
+        "out": [
+          "DROP+2",
+          "DURATION"
+        ],
+        "src": "DROP+2",
+        "rate": 1,
+        "lp": 500,
+        "vib": 0.1,
+        "gain": 0.16,
+        "fadeIn": 1.5,
+        "fadeOut": 9
+      }
     ],
-    "mute": [[108, 110]],
-    "duck": { "gain": 0.3, "ramp": 0.3 }
+    "mute": [
+      [
+        "DROP",
+        "DROP+0.7"
+      ]
+    ],
+    "duck": {
+      "gain": 0.3,
+      "ramp": 0.3
+    }
   },
   "portrait": {
     "_comment": "The song comes in on the first daylight shot, warps through the TV, cuts out when the set switches off, and comes back slower from beyond the door until the latch shuts it out. After that: tape hiss before the scare, a dropout as the camera hits the floor, and the record again, faint, under the title. Mono and in a small room throughout, as the camcorder's mic would hear it. loudness (LUFS) and truePeak (dBTP) are the targets the finished mix is mastered to, the levels Shorts, Reels and TikTok play at.",
     "segments": [
-      { "out": [2.55, 6.25], "src": 8, "rate": 1, "lp": 5000, "mono": true, "room": 0.5, "gain": 0.4, "fadeIn": 0.02 },
-      { "out": [6.25, 8.3], "src": 11.9, "rate": 0.98, "lp": 3500, "vib": 0.08, "mono": true, "room": 0.5, "gain": 0.24 },
-      { "out": [8.3, 9.07], "src": 14.84, "rate": 0.95, "lp": 2200, "vib": 0.15, "mono": true, "room": 0.5, "gain": 0.18, "fadeOut": 0.02 },
-      { "out": [10.2, 10.56], "src": 16.3, "rate": 0.88, "lp": 1200, "vib": 0.3, "mono": true, "room": 0.5, "gain": 0.34, "fadeIn": 0.05, "fadeOut": 0.02 },
-      { "out": [18.6, 20.6], "src": 113, "rate": 1, "lp": 900, "hp": 250, "mono": true, "room": 0.5, "gain": 0.1, "fadeIn": 0.1, "fadeOut": 0.3 }
+      {
+        "out": [
+          2.55,
+          6.25
+        ],
+        "src": 8,
+        "rate": 1,
+        "lp": 5000,
+        "mono": true,
+        "room": 0.5,
+        "gain": 0.4,
+        "fadeIn": 0.02
+      },
+      {
+        "out": [
+          6.25,
+          8.3
+        ],
+        "src": 11.9,
+        "rate": 0.98,
+        "lp": 3500,
+        "vib": 0.08,
+        "mono": true,
+        "room": 0.5,
+        "gain": 0.24
+      },
+      {
+        "out": [
+          8.3,
+          9.07
+        ],
+        "src": 14.84,
+        "rate": 0.95,
+        "lp": 2200,
+        "vib": 0.15,
+        "mono": true,
+        "room": 0.5,
+        "gain": 0.18,
+        "fadeOut": 0.02
+      },
+      {
+        "out": [
+          10.2,
+          10.56
+        ],
+        "src": 16.3,
+        "rate": 0.88,
+        "lp": 1200,
+        "vib": 0.3,
+        "mono": true,
+        "room": 0.5,
+        "gain": 0.34,
+        "fadeIn": 0.05,
+        "fadeOut": 0.02
+      },
+      {
+        "out": [
+          18.6,
+          20.6
+        ],
+        "src": 113,
+        "rate": 1,
+        "lp": 900,
+        "hp": 250,
+        "mono": true,
+        "room": 0.5,
+        "gain": 0.1,
+        "fadeIn": 0.1,
+        "fadeOut": 0.3
+      }
     ],
-    "mute": [[4.97, 5.25], [16.4, 16.87], [17.6, 17.67]],
+    "mute": [
+      [
+        4.97,
+        5.25
+      ],
+      [
+        16.4,
+        16.87
+      ],
+      [
+        17.6,
+        17.67
+      ]
+    ],
     "muteFloor": -52,
     "loudness": -14,
     "truePeak": -1

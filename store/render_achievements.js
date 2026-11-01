@@ -29,14 +29,14 @@ const opt = (name, def) => { const i = ARGS.indexOf('--' + name); return i >= 0 
 const SCENES = [
   { id: 'box', fov: 40, what: 'A moving box in the yard, the truck behind it',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('day'); S.look([0.7, 0.95, -11.35], [1.32, 0.24, -12.3]); } },
+      g.setPhase('day'); S.look([1.9, 0.95, -11.35], [2.52, 0.24, -12.3]); } },
   { id: 'dawn', fov: 50, what: 'Your window at first light, from the middle of your room',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('morning'); S.look([6.6, 1.45, 1.6], [8.1, 1.45, 2.85]); } },
+      g.setPhase('morning'); S.look([8.85, 1.45, 2.58], [11.36, 1.45, 3.83]); } },
   { id: 'drawing', fov: 40, what: 'The crayon drawing in the hall, by flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true, 1.2); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;
-      S.look([5.6, 1.1, -1.0], [5.6, 1.08, -0.32]); } },
+      S.look([7.63, 1.1, -0.54], [7.63, 1.08, 0.28]); } },
   { id: 'covers', fov: 56, what: 'Looking out from under the covers on the top bunk, at the open door',
     // the blanket's peephole is sized for a wide screen; here it is opened up to fill a square
     css: `#blanket{background:radial-gradient(ellipse 42% 36% at 50% 50%,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 55%,rgba(16,20,36,0.96) 100%),
@@ -44,60 +44,60 @@ const SCENES = [
       background-color:rgba(12,15,28,0.97);-webkit-mask:radial-gradient(ellipse 42% 36% at 50% 50%,transparent 60%,#000 100%);mask:radial-gradient(ellipse 42% 36% at 50% 50%,transparent 60%,#000 100%)}`,
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.UI.blanket(true); g.W.setDoor('kid', true, true); g.W.bathSpot.intensity = g.BATH_I * 0.8;
-      S.look([6.13, 1.9, 3.02], [7.05, 1.3, -0.3]); } },
+      S.look([8.38, 1.9, 4], [9.79, 1.3, 0.3]); } },
   { id: 'closet', fov: 60, what: 'From inside your closet, through the louvres, the thing standing in your room',
     // the slats scaled down to the square, with a gap across the middle where its eyes are
     css: '#pod.louvers{background:repeating-linear-gradient(180deg,rgba(7,7,9,0.985) 0 12px,rgba(7,7,9,0) 12px 24px);background-position:0 -6px;box-shadow:inset 0 0 50px 14px #000}',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('night'); g.UI.pod('louvers'); S.thing([5.95, 0, 1.9], [5.85, 0.04], { tilt: 0.25, lean: 0.2 });
-      S.look([5.85, 1.05, 0.04], [5.93, 2.15, 1.9]); } },
+      g.setPhase('night'); g.UI.pod('louvers'); S.thing([8.2, 0, 2.88], [7.99, 0.68], { tilt: 0.25, lean: 0.2 });
+      S.look([7.99, 1.05, 0.68], [8.18, 2.15, 2.88]); } },
   { id: 'breath', fov: 60, hud: true, what: 'Under the covers, holding your breath, the meter run red',
     css: '#breath{bottom:12%} #breath span{font-size:22px;letter-spacing:5px} #breath div{width:200px;height:16px}',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.nlMult(0.3, false); g.UI.blanket(true);
-      S.thing([6.03, 0, 1.55], [6.03, 3.02], { lean: 0.4, tilt: -0.35, smile: 1.18 }); S.look([6.13, 1.9, 3.02], [6.05, 2.4, 1.6]); g.F.breathUI = true; },
+      S.thing([8.28, 0, 2.53], [8.28, 4], { lean: 0.4, tilt: -0.35, smile: 1.18 }); S.look([8.38, 1.9, 4], [8.3, 2.4, 2.58]); g.F.breathUI = true; },
     after: () => { const g = window.__game; window.__freeze = true; g.UI.breath(0.2, true, true); } },
   { id: 'stare', fov: 40, what: 'It creeping up the hall toward you, in the flashlight',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true, 12);
-      S.thing([5.3, 0, -0.9], [7.9, -0.9], { tilt: 0.4, lean: 0.5 }); S.look([7.9, 1.35, -0.9], [5.3, 1.55, -0.9]); } },
+      S.thing([7.21, 0, -0.42], [11.06, -0.42], { tilt: 0.4, lean: 0.5 }); S.look([11.06, 1.35, -0.42], [7.21, 1.55, -0.42]); } },
   { id: 'photo', fov: 40, what: 'The photo in the hall coming off the wall',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); S.flash(true, 4); if (g.W.hallFrame) g.W.hallFrame.pose(0.55);
-      S.look([5.45, 1.25, -0.55], [4.85, 1.2, -1.3]); } },
+      S.look([7.42, 1.25, 0], [6.61, 1.2, -0.9]); } },
   { id: 'tv', fov: 40, what: 'The living room TV on by itself, and someone like Dad in front of it',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.tvFx.set(true); g.W.tvFx.figure = 1;
       const d = g.dad; g.mom.group.visible = true; d.sleeping = false; d.busy = true; d.pose = null; d.lookAt = null; d.group.rotation.order = 'XYZ';
-      d.group.rotation.set(0, Math.PI / 2, 0); d.group.position.set(2.3, 0, -3.5); d.group.visible = true;
+      d.group.rotation.set(0, Math.PI / 2, 0); d.group.position.set(3.55, 0, -3.38); d.group.visible = true;
       if (d.rig) d.rig.play('idle', { fade: 0, speed: 0.6 }); g.W.bedSleepers.one('dad', false);
-      g.P.pos.set(-30, 0, -30); S.look([0.5, 1.35, -2.75], [2.7, 1.05, -3.3]); } },
+      g.P.pos.set(-30, 0, -30); S.look([1.53, 1.35, -2.54], [4, 1.05, -3.16]); } },
   { id: 'bear', fov: 38, what: 'The bear on the bottom bunk in the morning',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('morning'); g.W.moveTeddy(5.75, 0.55, 3.15); S.look([6.4, 0.95, 2.1], [5.78, 0.72, 3.12]); } },
+      g.setPhase('morning'); g.W.moveTeddy(8, 0.55, 4.13); S.look([8.65, 0.95, 3.08], [8.03, 0.72, 4.1]); } },
   { id: 'reach', fov: 72, what: 'Caught: it lunges, arms out, and the screen goes red',
     css: '#flash{display:block !important;background:rgb(150,0,0) !important;opacity:0.16 !important;transition:none !important}',
     // placed the way caught() in main.js places it: its head at your eye height, an arm's length away
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('night'); S.flash(true, 16); S.look([6.5, 1.32, 2.4], [6.5, 1.25, 1.0]);
-      S.thing([6.5, 1.32 - 2.4, 0.5], [6.5, 2.4], { reach: 1, lean: 0.12, smile: 1.3, tilt: 0.3 }); } },
+      g.setPhase('night'); S.flash(true, 16); S.look([8.75, 1.32, 3.38], [8.96, 1.25, 1.76]);
+      S.thing([6.5, 1.32 - 2.4, 0.5], [8.75, 3.38], { reach: 1, lean: 0.12, smile: 1.3, tilt: 0.3 }); } },
   { id: 'taken', fov: 50, what: 'Night ten: it reaches for Dad outside their door',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('night'); g.W.setDoor('parents', true, true); g.W.bathSpot.intensity = g.BATH_I * 0.8; g.sleepers(false);
-      const d = g.dad; d.group.visible = true; d.busy = true; d.lookAt = null; d.pose = null; d.group.rotation.order = 'XYZ'; d.group.rotation.set(0, -Math.PI / 2, 0); d.group.position.set(6.85, 0, -0.9);
+      const d = g.dad; d.group.visible = true; d.busy = true; d.lookAt = null; d.pose = null; d.group.rotation.order = 'XYZ'; d.group.rotation.set(0, -Math.PI / 2, 0); d.group.position.set(9.49, 0, -0.42);
       if (d.rig) d.rig.play('idle', { fade: 0, speed: 1 });
-      S.thing([7.5, 0, -0.9], [5.0, -0.9], { reach: 1, lean: 0.35, smile: 1.45, tilt: 0.6 }); S.flash(true, 8); S.look([5.0, 1.45, -0.9], [7.1, 1.65, -0.9]); } },
+      S.thing([10.46, 0, -0.42], [6.79, -0.42], { reach: 1, lean: 0.35, smile: 1.45, tilt: 0.6 }); S.flash(true, 8); S.look([6.79, 1.45, -0.42], [9.86, 1.65, -0.42]); } },
   { id: 'alone', fov: 52, what: 'Night ten, nobody coming: it at the foot of the top bunk',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('night'); S.thing([6.4, 0, 1.6], [6.03, 3.02], { reach: 0.5, smile: 1.6, tilt: 0.4 });
-      S.look([6.03, 2.24, 3.02], [6.35, 2.2, 1.6]); } },
+      g.setPhase('night'); S.thing([8.65, 0, 2.58], [8.28, 4], { reach: 0.5, smile: 1.6, tilt: 0.4 });
+      S.look([8.28, 2.24, 4], [8.6, 2.2, 2.58]); } },
   { id: 'porch', fov: 30, what: 'The last morning: it stands on the porch and waves',
     setup: () => { const g = window.__game, S = window.__shot;
       g.setPhase('morning'); g.W.frontDoor.setOpen(false);
-      S.thing([1.9, 0.14, -5.6], [2.3, -10], { reach: 0.6, tilt: 0.4, smile: 1.25 }); S.look([2.25, 1.3, -10.5], [1.95, 1.5, -5.6]); } },
+      S.thing([3.1, 0.14, -5.6], [3.5, -10], { reach: 0.6, tilt: 0.4, smile: 1.25 }); S.look([3.45, 1.3, -10.5], [3.15, 1.5, -5.6]); } },
   { id: 'grin', fov: 26, what: 'Its face in the dark, nothing else',
     setup: () => { const g = window.__game, S = window.__shot;
-      g.setPhase('night'); g.nlMult(0, false); S.thing([6.5, -0.85, 0.6], [6.5, 2.0], { smile: 1.35, tilt: 0.15 }); S.look([6.5, 1.55, 2.0], [6.5, 1.55, 0.6]); } },
+      g.setPhase('night'); g.nlMult(0, false); S.thing([8.96, -0.85, 1.31], [8.75, 2.98], { smile: 1.35, tilt: 0.15 }); S.look([8.75, 1.55, 2.98], [8.96, 1.55, 1.31]); } },
   { id: 'grandpa', fresh: true, fov: 40, what: 'The vigil: grandpa in his chair, turned round with the thing\'s face',
     setup: async () => { const g = window.__game, before = new Set(g.scene.children);
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -106,7 +106,7 @@ const SCENES = [
       const set = g.scene.children.find((o) => !before.has(o) && o.isGroup);
       const turned = () => { let on = false; if (set) set.traverse((o) => { const m = o.material; if (m && m.emissiveMap && m.emissive && m.emissive.r > 0.5) on = true; }); return on; };
       await sleep(5000);
-      Object.assign(g.P, { yaw: Math.PI / 2, pitch: 0, mode: 'walk' }); g.P.pos.set(4.4, 0, -0.95); g.F.cutscene = false;
+      Object.assign(g.P, { yaw: Math.PI / 2, pitch: 0, mode: 'walk' }); g.P.pos.set(6.04, 0, -0.48); g.F.cutscene = false;
       for (const t0 = performance.now(); !turned() && performance.now() - t0 < 90000;) await sleep(50);
       if (!turned()) console.warn('grandpa never turned round; rendering him from behind');
       for (const t0 = g.gameTime; g.gameTime < t0 + 0.4;) await sleep(20);   // the last of the turn
@@ -167,7 +167,7 @@ function installHelpers(quality) {
       g.W.tvFx.set(false); g.W.bathSpot.intensity = 0; g.W.porchLight.intensity = 0; this.flash(false);
       for (const k in g.W.doors) g.W.setDoor(k, false, true);
       if (g.W.hallFrame) g.W.hallFrame.reset();
-      g.W.moveTeddy(6.83, 0.55, 3.0); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;
+      g.W.moveTeddy(9.08, 0.55, 3.98); g.W.drawingMat.map = g.W.T.drawing0; g.W.drawingMat.needsUpdate = true;
       g.camera.fov = fov0; g.camera.updateProjectionMatrix();
       this.hud(false); this.css('');
     },
@@ -275,7 +275,8 @@ async function main() {
   const t0 = Date.now(), log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 
   const srv = await serve(PORT, { root: ROOT });
-  const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+  const gpu = ARGS.includes('--gpu');
+  const browser = await chromium.launch({ headless: !ARGS.includes('--headed'), args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--autoplay-policy=no-user-gesture-required'] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   let page = await openGame(browser, { port: PORT, size: SIZE, quality: QUALITY });
   log('game loaded, quality', QUALITY);
 

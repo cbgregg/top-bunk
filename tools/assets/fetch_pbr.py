@@ -33,6 +33,8 @@ SETS = {
     'grass':    ('acg', 'Grass004', 1024, 2.0),
     'tile':     ('acg', 'Tiles105', 512, 0.9),
     'carpet':   ('acg', 'Carpet012', 512, 0.8),
+    'asphalt':  ('ph', 'asphalt_02', 1024, None),
+    'gravel':   ('ph', 'gravel_road', 512, None),
 }
 
 

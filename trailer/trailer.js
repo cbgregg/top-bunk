@@ -7,99 +7,170 @@ import { V3, EYE_KID, BATH_I, clamp, lerp, ease, mix3, xyz, aim, lerpAngle, wobb
 import { PORTRAIT_SHOTS, PORTRAIT_DURATION } from './shots_portrait.js';
 
 export const LANDSCAPE_DURATION = 139;   // 2:19, the length of the recording the cut is timed to
-const T = (list) => { let t = 0; for (const s of list) { s.t = +t.toFixed(3); t += s.dur; } return list; };   // sequential shots: fill in t
+// The three marks the landscape cut hangs on, in seconds of the recording. Everything else is a fraction of the act between two marks,
+// so moving a mark re-times the whole cut and nothing overlaps.
+//   TURN  the first beat of "the colors of the rainbow": the day ends on it. In the recording this cut is made for, the song goes from the
+//         first "what a wonderful world" straight into that bridge, so it lands near 0:34. The common single has a "skies of blue" verse
+//         first and its bridge nearer 56.5. Nudge it to the recording.
+//   DROP  "yes I think to myself": the hard cut to black and silence, then the face.
+export const TURN = 34.5;
+export const DROP = 107;
+// lays a list of shots over [t0, t1]: each shot's `w` is its share of the span (written as the seconds it gets at the marks above);
+// a shot with `fix: true` keeps exactly w seconds, and the rest share what is left
+const act = (t0, t1, list) => {
+  const fixed = list.reduce((s, x) => s + (x.fix ? x.w : 0), 0), flex = list.reduce((s, x) => s + (x.fix ? 0 : x.w), 0), span = t1 - t0 - fixed;
+  let t = t0;
+  list.forEach((s, i) => { s.t = +t.toFixed(3); const end = i === list.length - 1 ? t1 : t + (s.fix ? s.w : span * s.w / flex); s.dur = +(end - s.t).toFixed(3); t = end; });
+  return list;
+};
+// the shadow from the nightmare (nightmares.js makeShadow): a figure with no face, black on a dark wall
+function shadowFigure(house) {
+  const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color: 0x010102, transparent: true, opacity: 0, depthWrite: false, fog: true });
+  const part = (geo, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); g.add(m); };
+  part(new THREE.CapsuleGeometry(0.2, 0.95, 6, 12), 0, 1.0, 0, 0.18); part(new THREE.SphereGeometry(0.15, 14, 10), 0, 1.74, 0.1);
+  part(new THREE.CapsuleGeometry(0.045, 0.95, 4, 8), -0.3, 0.95, 0.04, 0, 0.07); part(new THREE.CapsuleGeometry(0.045, 0.95, 4, 8), 0.3, 0.95, 0.04, 0, -0.07);
+  part(new THREE.CapsuleGeometry(0.07, 0.8, 4, 8), -0.1, 0.4, 0); part(new THREE.CapsuleGeometry(0.07, 0.8, 4, 8), 0.1, 0.4, 0);
+  g.userData.mat = mat; house.add(g); return g;
+}
+const ROAD = { from: [10.9, 1.5, -25.5], to: [10.2, 1.45, -24], look: [3.4, 1.7, -5.5] };   // the house from the road, the truck on the left: act 1 opens on it, act 2 cuts back to it at night
 
-// ---------- the landscape cut: 2:19, cut on the phrases of the song (intro 0:00-0:08, verses 0:08-0:32 and 0:32-0:56, bridge 0:56-1:20, verse 1:20-1:48, outro 1:48-2:19) ----------
-export const SHOTS = T([
-  // INTRO: the house at dusk, one porch light on, the moving truck still in the drive
-  { id: 'porch', dur: 8, fadeIn: 1.6,
-    setup(c) { c.g.dusk(); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); },
-    update(c, k) { c.cam.pos = mix3([-3.2, 1.45, -14.5], [-1.2, 1.35, -10.8], ease.inOut(k)); c.cam.look = [1.7, 1.75, -4.6]; c.cam.fov = 48; } },
-  // VERSE 1: moving day. boxes, the drawing, the bunk, breakfast. The song is clean.
-  { id: 'boxes', dur: 6,
-    // Mom is in the kitchen: the family only animates while she is on screen
-    setup(c) { c.g.phase('day'); c.g.person('mom', { x: 0.6, z: 1.6, yaw: -Math.PI / 2 }); c.g.person('dad', { x: 1.35, z: -13.6, yaw: Math.PI }); },
-    update(c, k) { c.cam.pos = mix3([4.0, 0.85, -9.3], [3.5, 0.8, -9.9], ease.inOut(k)); c.cam.look = [2.35, 0.45, -12.6]; c.cam.fov = 46; } },
-  { id: 'drawing', dur: 6,
-    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.drawingMat.map = c.W.T.drawing0; c.W.drawingMat.needsUpdate = true; },
-    update(c, k) { c.cam.pos = mix3([5.55, 1.18, -1.3], [5.6, 1.1, -0.9], ease.inOut(k)); c.cam.look = [5.6, 1.06, -0.38]; c.cam.fov = lerp(44, 36, ease.inOut(k)); } },
-  { id: 'bunk', dur: 6,
+// ---------- the landscape cut ----------
+// ACT 1, 0 to TURN: a sunny moving day and the song, clean. The only wrong note is the drawing.
+const ACT1 = [
+  { id: 'road', w: 6, fadeIn: 1.6,
     setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); },
-    update(c, k) { c.cam.pos = mix3([7.6, 0.72, 0.95], [7.45, 0.86, 1.35], ease.inOut(k)); c.cam.look = [6.25, 1.6, 3.05]; c.cam.fov = 56; } },
-  { id: 'breakfast', dur: 6,
+    update(c, k) { c.cam.pos = mix3(ROAD.from, ROAD.to, ease.inOut(k)); c.cam.look = ROAD.look; c.cam.fov = 58; } },
+  // the boxes on the walk, Dad at the truck (the family only animates while one of them is on screen)
+  { id: 'truck', w: 5,
+    setup(c) { c.g.phase('day'); c.g.person('mom', { x: 1.64, z: 2.43, yaw: -Math.PI / 2 }); c.g.person('dad', { x: 2.55, z: -13.6, yaw: Math.PI }); },
+    update(c, k) { c.cam.pos = mix3([5.2, 0.85, -9.3], [4.7, 0.8, -9.9], ease.inOut(k)); c.cam.look = [3.55, 0.45, -12.6]; c.cam.fov = 46; } },
+  // Dad brings a box up the walk and in at the front door, past you on the stoop
+  { id: 'dad_box', w: 4.5,
     setup(c) {
-      c.g.phase('morning'); c.P.pos.set(0.9, 0, 0.55);
-      c.g.person('mom', { x: 2.0, z: 1.33, yaw: Math.PI / 2, busy: true }); c.g.person('dad', { x: 0.9, z: 2.3, yaw: 0, busy: true });
+      c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { x: 3.8, z: -10.5, yaw: 0 });
+      c.box = c.W.cardboardBox(0, 0, 0, 0.5, 0.44, 0.5, 2, 0, c.dad.group); c.box.position.set(0, 1.05, 0.315); c.box.castShadow = false;
+      if (c.dad.rig) c.dad.rig.play('walk', { fade: 0.2, speed: 0.85 });
+      c.from = [3.8, -10.5]; c.to = [3.15, -5.2];
     },
     update(c, k) {
-      // she is at the stove; a third of the way in she stops and turns to look at you, and keeps looking (the game turns them to you once you are near)
-      c.P.pos.set(k > 0.3 ? 0.9 : -8, 0, 0.55); if (k > 0.3) c.mom.busy = false;
-      c.cam.pos = mix3([0.9, EYE_KID, 0.55], [1.0, EYE_KID - 0.02, 0.7], ease.inOut(k)); c.cam.look = [2.0, 1.52, 1.33]; c.cam.fov = lerp(52, 46, ease.inOut(k));
-    } },
-  // VERSE 2: night. Things are wrong, the song keeps playing.
-  { id: 'covers', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.UI.blanket(true); c.P.pos.set(6.03, 0, 3.02); },
+      const w = clamp(k * 1.12, 0, 1); c.dad.group.position.set(lerp(c.from[0], c.to[0], w), 0, lerp(c.from[1], c.to[1], w)); c.dad.pose = { hold: c.box, holdW: 0.5 };
+      c.cam.pos = mix3([1.75, 1.22, -5.9], [1.95, 1.2, -5.95], ease.inOut(k)); c.cam.look = [c.dad.group.position.x, 1.35, c.dad.group.position.z + 0.2]; c.cam.fov = 50;
+    },
+    end(c) { if (c.box) { c.box.parent.remove(c.box); c.box = null; } c.dad.pose = null; } },
+  // Mom at the stove; half way in she looks up at you (the game turns them to you once you are near)
+  { id: 'kitchen', w: 5,
+    setup(c) { c.g.phase('day'); c.P.pos.set(-5.2, 0, 3.2); c.g.person('mom', { x: 3.21, z: 2.13, yaw: Math.PI / 2, busy: true }); c.g.person('dad', { visible: false }); },
     update(c, k) {
-      const t = c.st; c.cam.pos = [6.13, 1.9 + Math.sin(t * 2.2) * 0.008, 3.02]; c.cam.yaw = -0.27 + wobble(t * 0.4, 1) * 0.03; c.cam.pitch = -0.06 + Math.sin(t * 2.2) * 0.004; c.cam.fov = 60;
+      c.P.pos.set(k > 0.5 ? 0.9 : -8, 0, 0.55); if (k > 0.5) c.mom.busy = false;
+      c.cam.pos = mix3([0.9, EYE_KID, 0.55], [1.0, EYE_KID - 0.02, 0.7], ease.inOut(k)); c.cam.look = [3.21, 1.52, 2.13]; c.cam.fov = lerp(52, 46, ease.inOut(k));
     } },
-  { id: 'hall_long', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.g.flashlight(true); c.P.pos.set(7.9, 0, -0.9); },
-    update(c, k) { c.cam.pos = mix3([7.95, 1.22, -0.9], [7.55, 1.2, -0.9], ease.inOut(k)); c.cam.look = [-2, 0.95, -0.95]; c.cam.fov = 30; } },
-  { id: 'tv', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.W.tvFx.set(true); c.P.pos.set(0.5, 0, -3.0); },
-    update(c, k) { if (k > 0.62) c.W.tvFx.figure = 1; c.cam.pos = mix3([0.3, 0.95, -2.95], [0.8, 0.92, -3.1], ease.inOut(k)); c.cam.look = [2.71, 0.82, -3.27]; c.cam.fov = lerp(44, 38, k); } },
-  { id: 'door', dur: 6,
-    setup(c) { c.g.night({ lights: 1, spot: 32 }); c.g.door('kid', true); c.P.pos.set(7.35, 0, 1.75); c.closed = false; },
+  { id: 'bunk', w: 5,
+    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); },
+    update(c, k) { c.cam.pos = mix3([10.61, 0.72, 1.7], [9.7, 0.86, 2.33], ease.inOut(k)); c.cam.look = [8.5, 1.6, 4.03]; c.cam.fov = 56; } },
+  { id: 'drawing', w: 4.5,
+    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.drawingMat.map = c.W.T.drawing0; c.W.drawingMat.needsUpdate = true; },
+    update(c, k) { c.cam.pos = mix3([7.56, 1.18, -0.9], [7.63, 1.1, -0.42], ease.inOut(k)); c.cam.look = [7.63, 1.06, 0.2]; c.cam.fov = lerp(44, 36, ease.inOut(k)); } },
+  // the sun through the curtains of your window, from the top bunk; the one caption of the cut
+  { id: 'curtains', w: 4.5,
+    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.g.sunPatch(14, [8.75, 0.3, 3.28]); c.P.pos.set(8.28, 0, 4); },
+    update(c, k) {
+      c.cam.pos = mix3([8.55, 1.98, 3.68], [8.7, 1.96, 3.78], ease.inOut(k)); c.cam.look = [11.36, 1.7, 3.83]; c.cam.fov = lerp(50, 46, ease.inOut(k));
+      c.ui.caption('The rent was cheap.', c.ramp(c.st, 0.7, 1.3, c.shot.dur - 0.55, c.shot.dur - 0.15));
+    } },
+];
+// ACT 2, TURN to DROP: the same road at night, one pan through the house while the song is still sweet, then shorter and shorter shots as it warps
+const ACT2 = [
+  // the hard cut: the same angle, night, the porch light on
+  { id: 'road_night', w: 3.5,
+    setup(c) { c.g.night({ lights: 1 }); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.frontDoor.setOpen(false); c.W.porchLight.distance = 16; },
+    update(c, k) { c.W.porchLight.intensity = 40; c.W.porchBulb.material.emissiveIntensity = 6; c.cam.pos = mix3(ROAD.to, [10, 1.45, -23.7], k); c.cam.look = ROAD.look; c.cam.fov = 58; },
+    end(c) { c.W.porchLight.distance = 6; c.W.porchLight.intensity = 0; c.W.porchBulb.material.emissiveIntensity = 0; } },
+  // one continuous move: in at the front door, across the living room past the TV, into the hall and down it toward your door
+  { id: 'pan', w: 9.5,
+    setup(c) {
+      c.g.night({ lights: 1 }); c.W.frontDoor.setOpen(true); c.W.tvFx.set(true); c.P.pos.set(3.1, 0, -2.82);
+      c.route = path([[3.1, 1.32, -6.3], [3.1, 1.3, -4.28], [2.43, 1.26, -2.26], [3.77, 1.22, -0.84], [5.92, 1.2, -0.44], [8.21, 1.18, -0.42]]);
+      c.looks = path([[3.1, 1.35, -4.5], [1.42, 1.2, -1.25], [4.01, 0.9, -3.12], [7.49, 1.0, -0.42], [11.21, 0.95, -0.42], [9.64, 1.0, 0.3]]);
+    },
+    update(c, k) {
+      c.W.porchLight.intensity = 9; const e = k < 0.5 ? 2 * k * k : 1 - 2 * (1 - k) * (1 - k);   // a slow start, no stop
+      const p = c.route.at(lerp(0, 1, 0.3 * e + 0.7 * k)), l = c.looks.at(clamp(k * 1.05, 0, 1)); c.cam.pos = [p.x, p.y, p.z]; c.cam.look = [l.x, l.y, l.z]; c.cam.fov = 54; c.g.fear(0.15);
+    } },
+  { id: 'tv', w: 5.5,
+    setup(c) { c.g.night({ lights: 1 }); c.W.tvFx.set(true); c.P.pos.set(1.53, 0, -2.82); },
+    update(c, k) { if (k > 0.62) c.W.tvFx.figure = 1; c.cam.pos = mix3([1.31, 0.95, -2.76], [1.87, 0.92, -2.93], ease.inOut(k)); c.cam.look = [4.01, 0.82, -3.12]; c.cam.fov = lerp(44, 38, k); } },
+  { id: 'door', w: 5,
+    setup(c) { c.g.night({ lights: 1, spot: 32 }); c.g.door('kid', true); c.P.pos.set(9.6, 0, 2.73); c.closed = false; },
     update(c, k) {
       if (k > 0.18 && !c.closed) { c.closed = true; c.g.door('kid', false); }
       if (k > 0.62) c.W.bathSpot.intensity = 0;
-      c.cam.pos = mix3([7.35, 1.08, 1.8], [7.3, 1.05, 1.6], ease.inOut(k)); c.cam.look = [6.95, 1.0, -0.28]; c.cam.fov = 54;
+      c.cam.pos = mix3([9.6, 1.08, 2.78], [9.55, 1.05, 2.58], ease.inOut(k)); c.cam.look = [9.64, 1.0, 0.32]; c.cam.fov = 54;
     } },
-  // BRIDGE: the song starts to warp. The photo on the floor, the face at the window, the closet, the thing at the end of the hall.
-  { id: 'frame_floor', dur: 6,
-    setup(c) { c.g.night({ lights: 0.6 }); c.W.hallFrame.fall(); c.g.flashlight(true); c.P.pos.set(5.9, 0, -0.6); },
-    update(c, k) { c.cam.pos = mix3([5.95, 0.78, -0.55], [5.65, 0.62, -0.7], ease.inOut(k)); c.cam.look = [4.98, 0.08, -1.08]; c.cam.fov = 50; c.g.fear(0.25); } },
-  { id: 'window_face', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.g.windowFace(0.23); c.P.pos.set(6.03, 0, 3.02); },
-    // the face is driven by hand: it slides into the window and hangs there
-    update(c, k) { c.WF.t = 0.23 + 0.08 * k; c.cam.pos = [6.3, 2.14, 2.95]; c.cam.look = [8.1, 1.78, 2.85]; c.cam.fov = 50; c.g.fear(0.4); } },
+  // the thing at the end of the hall: still, then one step
+  { id: 'hall_thing', w: 6,
+    setup(c) { c.g.night({ lights: 0.25, spot: BATH_I, flicker: true }); c.g.thing({ x: 2.76, z: -0.42, yaw: Math.PI / 2, tilt: 0 }); c.P.pos.set(9.56, 0, -0.42); },
+    update(c, k) {
+      const step = clamp((k - 0.58) / 0.1, 0, 1); c.E.root.position.x = 2.76 + 0.62 * ease.inOut(step); c.E.mode = step > 0 && step < 1 ? 'walk' : 'idle'; if (step > 0) c.E.faceTowards(9.56, -0.42, 1);
+      c.E.tilt = 0.55 * ease.inOut(clamp(k * 1.6, 0, 1)); c.cam.pos = mix3([9.64, 1.22, -0.42], [8.89, 1.2, -0.44], ease.inOut(k)); c.cam.look = [2.76, 1.35, -0.42]; c.cam.fov = 44; c.g.fear(0.8);
+    } },
+  { id: 'window_face', w: 5,
+    setup(c) { c.g.night({ lights: 1 }); c.g.windowFace(0.23); c.P.pos.set(8.28, 0, 4); },
+    update(c, k) { c.WF.t = 0.245 + 0.05 * k; c.cam.pos = [8.55, 2.14, 3.93]; c.cam.look = [11.36, 1.78, 3.83]; c.cam.fov = 50; c.g.fear(0.4); } },
   // the game's hiding camera sits inside the closet body (the leaves are solid, the slats are the overlay), so this one stands a hand's width
-  // outside the leaves, as store screenshot 07 does, and keeps the thing's head between the slats while it comes in
-  { id: 'closet', dur: 6,
-    // your torch is on in there: it is what lights its face through the slats
-    setup(c) { c.g.night({ lights: 1 }); c.UI.pod('louvers'); c.g.flashlight(true); c.P.pos.set(5.95, 0, 0.52); c.g.thing({ x: 7.45, z: 2.2, face: [6.1, 1.45], mode: 'walk', speed: 0.2, tilt: 0.25, look: false }); c.walkFrom = [7.45, 0, 2.2]; c.walkTo = [6.1, 0, 1.45]; c.head = new V3(); },
+  // outside the leaves, as store screenshot 07 does, and keeps the thing's head between the slats while it comes in. Your torch lights its face.
+  { id: 'closet', w: 6,
+    setup(c) { c.g.night({ lights: 1 }); c.UI.pod('louvers'); c.g.flashlight(true); c.P.pos.set(8.14, 0, 1.22); c.g.thing({ x: 9.7, z: 3.18, face: [8.35, 2.43], mode: 'walk', speed: 0.2, tilt: 0.25, look: false }); c.walkFrom = [9.7, 0, 3.18]; c.walkTo = [8.35, 0, 2.43]; c.head = new V3(); },
     update(c, k) {
       const w = clamp((k - 0.08) / 0.6, 0, 1), p = mix3(c.walkFrom, c.walkTo, w); c.E.root.position.copy(p);
       if (w < 1) { c.E.mode = 'walk'; c.E.faceTowards(c.walkTo[0], c.walkTo[2], 1); c.E.lookTarget = null; }
-      else { c.E.mode = 'idle'; c.E.faceTowards(5.95, 0.52, 0.12); c.E.lookTarget = c.camera.position; c.E.tilt = 0.5; c.E.smileScale = 1.1; }
+      else { c.E.mode = 'idle'; c.E.faceTowards(8.14, 1.22, 0.12); c.E.lookTarget = c.camera.position; c.E.tilt = 0.5; c.E.smileScale = 1.1; }
       c.E.headWorld(c.head);
-      c.cam.pos = [5.95, 1.6 + wobble(c.st * 0.5, 2) * 0.01, 0.52]; c.cam.look = [c.head.x, c.head.y - 0.12, c.head.z]; c.cam.fov = 58; c.g.fear(0.6);
+      c.cam.pos = [8.14, 1.6 + wobble(c.st * 0.5, 2) * 0.01, 1.22]; c.cam.look = [c.head.x, c.head.y - 0.12, c.head.z]; c.cam.fov = 58; c.g.fear(0.6);
     } },
-  { id: 'hall_stand', dur: 6,
-    setup(c) { c.g.night({ lights: 0.25, spot: BATH_I, flicker: true }); c.g.thing({ x: 1.6, z: -0.9, yaw: Math.PI / 2, tilt: 0 }); c.P.pos.set(6.9, 0, -0.9); },
-    update(c, k) { c.E.tilt = 0.55 * ease.inOut(clamp(k * 1.6, 0, 1)); c.cam.pos = mix3([6.95, 1.22, -0.9], [6.35, 1.2, -0.92], ease.inOut(k)); c.cam.look = [1.6, 1.35, -0.9]; c.cam.fov = 44; c.g.fear(0.8); } },
-  // VERSE 3: the song is badly warped. The vigil, the parents, the grin, the chase.
-  { id: 'vigil', dur: 7,
-    setup(c) { c.g.night({ lights: 1 }); c.g.vigil(true); c.P.pos.set(7.6, 0, -0.9); },
-    update(c, k) { c.cam.pos = mix3([7.7, 0.62, -0.95], [6.5, 0.72, -0.9], ease.inOut(k)); c.cam.look = [3.5, 0.85, -0.6]; c.cam.fov = 40; c.g.fear(0.3); },
+  // grandpa in his chair, turning
+  { id: 'vigil', w: 6,
+    setup(c) { c.g.night({ lights: 1 }); c.g.vigil(true); c.P.pos.set(10.61, 0, -0.42); },
+    update(c, k) { c.cam.pos = mix3([10.76, 0.62, -0.48], [8.96, 0.72, -0.42], ease.inOut(k)); c.cam.look = [4.92, 0.85, -0.06]; c.cam.fov = 40; c.g.fear(0.3); },
     end(c) { c.g.vigil(false); } },
-  { id: 'parents_bed', dur: 6,
-    setup(c) { c.g.night({ lights: 1 }); c.g.door('parents', true); c.g.flashlight(true); c.P.pos.set(7.55, 0, -1.2); },
-    update(c, k) { c.cam.pos = mix3([7.6, 1.12, -1.15], [7.5, 1.05, -1.7], ease.inOut(k)); c.cam.look = [7.0, 0.72, -3.6]; c.cam.fov = 54; c.g.fear(0.3); } },
-  { id: 'grin', dur: 7,
-    setup(c) { c.g.night({ lights: 0.15, spot: BATH_I * 0.6, flicker: true }); c.g.thing({ x: 5.4, z: -0.9, yaw: Math.PI / 2, tilt: 0.2 }); c.P.pos.set(6.2, 0, -0.9); c.head = new V3(); },
+  // the shadow in the corner of the living room: there at the edge of the frame, gone when the camera turns to it
+  { id: 'shadow', w: 5.5,
+    setup(c) { c.g.night({ lights: 0.35 }); c.P.pos.set(-0.37, 0, -0.54); c.sh = shadowFigure(c.W.house); c.sh.position.set(4.28, 0, -3.88); c.sh.lookAt(0, 0, -2.4); c.sh.rotation.x = 0; c.sh.visible = true; },
     update(c, k) {
-      c.E.smileScale = lerp(1, 1.35, ease.inOut(k)); c.E.tilt = 0.2 + Math.sin(c.st * 0.9) * 0.3; c.E.lean = 0.2 * k;
-      c.E.headWorld(c.head);
-      c.cam.pos = [c.head.x + lerp(0.95, 0.7, ease.inOut(k)), c.head.y - 0.08, c.head.z + 0.05]; c.cam.look = [c.head.x, c.head.y + 0.02, c.head.z]; c.cam.fov = 36; c.g.fear(1);
-    } },
-  { id: 'chase', dur: 8, teaser: 2.5,   // the ten-second teaser: the run, the cut, the scare and the first of the title
+      const turn = ease.inOut(clamp((k - 0.68) / 0.22, 0, 1));
+      c.sh.userData.mat.opacity = Math.min(ease.out(clamp(k / 0.35, 0, 1)), 1 - ease.in(clamp((turn - 0.45) / 0.45, 0, 1)));
+      c.cam.pos = mix3([-0.37, 1.18, -0.54], [-0.15, 1.16, -0.66], ease.inOut(k)); c.cam.look = mix3([1.98, 1.0, -3.83], [4.28, 1.1, -3.88], turn); c.cam.fov = 48; c.g.fear(0.5);
+    },
+    end(c) { if (c.sh) { c.W.house.remove(c.sh); c.sh = null; } } },
+  // the laundry under the house: the washer's lid bangs open on its own
+  { id: 'washer', w: 5,
+    setup(c) { c.g.night({ lights: 0.5 }); c.W.laundry.bulb.set(true); c.W.laundry.bulb.swing = 0.16; c.W.laundry.washer.open(0); c.P.pos.set(-5.6, c.W.laundry.floor, 1.0); },
+    update(c, k) {
+      const B = c.W.laundry.floor, bang = clamp((c.st - 2.7) / 0.1, 0, 1); c.W.laundry.washer.open(Math.min(1, bang * 1.15) - (bang >= 1 ? 0.06 * Math.abs(Math.sin((c.st - 2.8) * 18)) * Math.exp(-(c.st - 2.8) * 3) : 0));
+      if (bang > 0 && bang < 1) c.g.shake(0.5);
+      c.cam.pos = mix3([-5.7, B + 1.15, 0.95], [-6.1, B + 1.1, 1.1], ease.inOut(k)); c.cam.look = [-7.7, B + 0.85, 1.62]; c.cam.fov = 50; c.g.fear(0.6);
+    },
+    end(c) { c.W.laundry.bulb.set(false); c.W.laundry.bulb.swing = 0.08; c.W.laundry.washer.open(0); } },
+  // from the top bunk: it is standing at the foot of the bed
+  { id: 'bunk_foot', w: 4.5,
+    setup(c) { c.g.night({ lights: 0.3 }); c.P.pos.set(8.28, 0, 4); c.g.thing({ x: 9.85, z: 2.7, face: [8.4, 3.98], tilt: 0.45, smile: 1.15 }); c.head = new V3(); },
+    update(c, k) { c.E.tilt = 0.45 + Math.sin(c.st * 0.7) * 0.15; c.E.lean = 0.15 * k; c.E.headWorld(c.head); c.cam.pos = [8.35, 1.95 + Math.sin(c.st * 2.2) * 0.006, 4.03]; c.cam.look = [c.head.x, c.head.y - 0.15, c.head.z]; c.cam.fov = 56; c.g.fear(0.9); } },
+  // under the covers, holding your breath
+  { id: 'covers', w: 4.5,
+    // the HUD is hidden for the trailer; this one shot brings the breath meter back (nothing else on the HUD is set)
+    setup(c) { c.g.night({ lights: 0.6 }); c.UI.blanket(true); c.P.pos.set(8.28, 0, 4); const h = document.getElementById('hud'), b = document.getElementById('breath'); if (h) h.style.setProperty('display', 'block', 'important'); if (b) b.style.transition = 'none'; },
+    update(c, k) {
+      const t = c.st, br = 1 - 0.85 * ease.in(k); c.UI.breath(br, true, br < 0.3);
+      c.cam.pos = [8.38, 1.9 + Math.sin(t * 2.2) * 0.008, 4.0]; c.cam.yaw = -0.27 + wobble(t * 0.4, 1) * 0.03; c.cam.pitch = -0.06 + Math.sin(t * 2.2) * 0.004; c.cam.fov = 60; c.g.fear(0.9);
+    },
+    end(c) { c.UI.breath(1, false); const h = document.getElementById('hud'); if (h) h.style.removeProperty('display'); } },
+  // the sprint down the hall with it behind you; the look back, and it is on you: the cut
+  { id: 'sprint', w: 7.5, teaser: 2.5,   // the ten-second teaser: the run, the cut, the scare and the first of the title
     setup(c) {
       c.g.night({ lights: 0.4, spot: BATH_I * 0.5, flicker: true }); c.g.door('kid', true);
       // the route: from the living room into the hall, down it, through your door and up to the foot of the bunk. The thing runs the same route behind you.
-      c.route = path([[-1.6, EYE_KID, -1.15], [0.2, EYE_KID, -1.1], [2.2, EYE_KID, -1.0], [3.6, EYE_KID, -0.9], [6.4, EYE_KID, -0.9], [7.05, EYE_KID, -0.1], [7.3, EYE_KID, 1.2], [7.45, EYE_KID, 2.3]]);
+      c.route = path([[-1.6, EYE_KID, -1.15], [0.2, EYE_KID, -1.1], [2.2, EYE_KID, -1.0], [3.6, EYE_KID, -0.9], [6.4, EYE_KID, -0.6], [8.8, EYE_KID, -0.45], [9.5, EYE_KID, 0.15], [9.5, EYE_KID, 1.3], [9.45, EYE_KID, 2.4]]);
       c.K0 = 0.12;   // where you start on it (the thing starts at 0, a couple of metres behind)
-      c.g.thing({ x: -1.6, z: -1.15, mode: 'run', speed: 1.1, tilt: 0.2, smile: 1.1 });
+      c.g.thing({ x: -0.82, z: -0.72, mode: 'run', speed: 1.1, tilt: 0.2, smile: 1.1 });
       c.ep = new V3(); c.head = new V3();
     },
     update(c, k) {
@@ -123,17 +194,20 @@ export const SHOTS = T([
       c.cam.roll = running ? Math.sin(st * 6.5) * 0.02 : 0;
       c.cam.fov = lerp(74, 82, run); c.g.fear(1); if (st > 5.6 && st < 5.75) c.g.shake(0.7);
     } },
-  // OUTRO: the hard cut. Silence. Then it has you. Then the title.
-  { id: 'black1', dur: 2.0, black: true, noRender: true, setup() {}, update() {} },
-  { id: 'scare', dur: 1.3,
-    setup(c) { c.g.night({ lights: 0, spot: BATH_I, flicker: true }); c.g.thing({ x: 6.45, z: -0.9, yaw: -Math.PI / 2, tilt: 0.35, lean: 0.4, reach: 1, smile: 1.5 }); c.P.pos.set(5.9, 0, -0.9); c.head = new V3(); },
-    update(c, k) { c.E.headWorld(c.head); c.cam.pos = [5.95, 1.35, -0.9]; c.cam.look = [c.head.x, c.head.y - 0.1, c.head.z]; c.cam.fov = 68; c.ui.flash(k < 0.12 ? 1 - k / 0.12 : 0); c.g.shake(1); c.g.fear(1); } },
-  { id: 'title', dur: 8.7, black: true, noRender: true, setup() {}, update(c, k) { c.ui.card({ big: 'TOP BUNK', alpha: c.fadeInOut(0.6, 1.4, 0.8) }); } },
-  { id: 'tagline', dur: 6, black: true, noRender: true, setup() {},
-    update(c) { const st = c.st; c.ui.card(st < 2.8 ? { line: 'Ten nights.', alpha: c.ramp(st, 0.2, 0.6, 2.4, 2.8) } : { line: 'Nobody believed you.', alpha: c.ramp(st, 3.0, 3.5, 5.6, 6.0) }); } },
-  { id: 'wishlist', dur: 7, black: true, noRender: true, setup() {}, update(c) { c.ui.card({ line: 'Wishlist on Steam', small: 'a first-person horror game for PC', alpha: c.fadeInOut(0.4, 0.8, 1.0) }); } },
-  { id: 'warning', dur: 6, black: true, noRender: true, setup() {}, update(c) { c.ui.card({ small: 'Contains jump scares and flashing lights', alpha: c.fadeInOut(0.3, 0.6, 1.4) }); } },
-]);
+];
+// DROP to the end: black and nothing, the face, the title
+const CARDS = [
+  { id: 'black1', w: 0.7, fix: true, black: true, noRender: true, setup() {}, update() {} },
+  { id: 'scare', w: 1.3, fix: true,
+    setup(c) { c.g.night({ lights: 0, spot: BATH_I, flicker: true }); c.g.thing({ x: 8.89, z: -0.42, yaw: -Math.PI / 2, tilt: 0.35, lean: 0.4, reach: 1, smile: 1.5 }); c.P.pos.set(8.06, 0, -0.42); c.head = new V3(); },
+    update(c, k) { c.E.headWorld(c.head); c.cam.pos = [8.14, 1.35, -0.42]; c.cam.look = [c.head.x, c.head.y - 0.1, c.head.z]; c.cam.fov = 68; c.ui.flash(k < 0.12 ? 1 - k / 0.12 : 0); c.g.shake(1); c.g.fear(1); } },
+  { id: 'title', w: 8.7, black: true, noRender: true, setup() {}, update(c, k) { c.ui.card({ big: 'TOP BUNK', alpha: c.fadeInOut(0.6, 1.4, 0.8) }); } },
+  { id: 'tagline', w: 6, black: true, noRender: true, setup() {},
+    update(c) { const st = c.st, d = c.shot.dur / 6; c.ui.card(st < 2.8 * d ? { line: 'Ten nights.', alpha: c.ramp(st, 0.2 * d, 0.6 * d, 2.4 * d, 2.8 * d) } : { line: 'Nobody believed you.', alpha: c.ramp(st, 3.0 * d, 3.5 * d, 5.6 * d, 6.0 * d) }); } },
+  { id: 'wishlist', w: 7, black: true, noRender: true, setup() {}, update(c) { c.ui.card({ line: 'Wishlist on Steam', small: 'a first-person horror game for PC', alpha: c.fadeInOut(0.4, 0.8, 1.0) }); } },
+  { id: 'warning', w: 8.3, black: true, noRender: true, setup() {}, update(c) { c.ui.card({ small: 'Contains jump scares and flashing lights', alpha: c.fadeInOut(0.3, 0.6, 1.4) }); } },
+];
+export const SHOTS = [...act(0, TURN, ACT1), ...act(TURN, DROP, ACT2), ...act(DROP, LANDSCAPE_DURATION, CARDS)];
 
 // ---------- the player ----------
 // opts: { fps, aspect: 'landscape' | 'portrait', shots, duration, shutter, linkInBio, cta }
@@ -147,7 +221,7 @@ export function attach(game, opts = {}) {
   const c = {   // the context a shot sees
     game, g, ui, THREE, V3, EYE_KID, P: game.P, F: game.F, W: game.W, E: game.E, UI: game.UI, camera, mom: game.mom, dad: game.dad, WF: game.WF,
     portrait, fps, opts, t: 0, st: 0, k: 0, shot: null,
-    cam: { pos: [0, 1.3, 0], look: null, yaw: 0, pitch: 0, roll: 0, fov: 60, sway: portrait ? 1 : 0 },
+    cam: { pos: [0.97, 1.3, 0.64], look: null, yaw: 0, pitch: 0, roll: 0, fov: 60, sway: portrait ? 1 : 0 },
     ramp: (st, a, b, cc, d) => (st < a ? 0 : st < b ? (st - a) / (b - a) : st < cc ? 1 : st < d ? 1 - (st - cc) / (d - cc) : 0),
     fadeInOut(delay, fin, fout) { const st = this.st, dur = this.shot.dur; return this.ramp(st, delay, delay + fin, dur - fout, dur); },
     rnd: rng(7),
@@ -212,14 +286,15 @@ export function attach(game, opts = {}) {
   }
 
   const api = {
-    SHOTS: shots, duration, fps, portrait, ctx: c,
+    SHOTS: shots, duration, fps, portrait, ctx: c, marks: { TURN, DROP, DURATION: duration },
     // one-time: the test mode, the graphics knobs, the shaders for every lighting phase
-    async begin({ quality, shadow, res, letterbox, ca } = {}) {
+    async begin({ quality, shadow, res, ss, letterbox, ca } = {}) {
       if (began) return; began = true;
       game.start(); game.gfx.auto = false;
       if (quality) game.gfx.setQuality(quality, { save: false });
       if (shadow) for (const l of game.scene.userData.shadowLights) { const sz = l.sun ? shadow : shadow / 2; l.light.shadow.mapSize.set(sz, sz); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.needsUpdate = true; }
-      if (res && res !== 1) game.gfx.setRes(res);
+      // ss: render at exactly that many pixels per output pixel (the frame grab scales it down); res alone is the preset's own scale times res
+      if (ss) game.gfx.setRes((res || 1) * ss / game.gfx.baseDpr()); else if (res && res !== 1) game.gfx.setRes(res);
       if (game.gfx.pass && game.gfx.pass.grade) game.gfx.pass.grade.uniforms.ca.value = ca ?? (portrait ? 0.002 : 0.0011);
       ui.letterbox(!!letterbox && !portrait);
       // the bottom bunk is for boxes (the story's own dressing)

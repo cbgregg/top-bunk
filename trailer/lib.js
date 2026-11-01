@@ -338,7 +338,7 @@ export function gameHelpers(game) {
       WF.t = -1; WF.root.visible = false; W.faceLight.intensity = 0;
       H.flashlight(false); W.bathSpot.intensity = 0;
       W.setDoor('kid', true, true); W.setDoor('bath', true, true); W.setDoor('parents', false, true); W.setDoor('room2', false, true);
-      W.moveTeddy(6.83, 0.55, 3.0); if (W.teddy) W.teddy.visible = true;
+      W.moveTeddy(9.08, 0.55, 3.98); if (W.teddy) W.teddy.visible = true;
       mom.busy = dad.busy = true; mom.lookAt = dad.lookAt = null; mom.pose = dad.pose = null;
     },
     // lighting phases (setPhase recompiles shaders when the set of lights changes, so only call it on a change)
@@ -384,7 +384,7 @@ export function gameHelpers(game) {
     // the eyes' brightness (1 as built): for eyes that switch on in the dark
     eyes(k) { if (eyeMat) eyeMat.color.copy(eye0).multiplyScalar(k); },
     // daylight through the kid's window: the hall spot, moved outside the glass and warmed
-    sunPatch(i, at = [6.5, 0.3, 2.3]) { bs.position.set(7.95, 2.15, 2.85); bs.target.position.set(...at); bs.target.updateMatrixWorld(); bs.color.set(0xffd9a0); bs.angle = 0.5; bs.penumbra = 0.6; bs.intensity = i; },
+    sunPatch(i, at = [8.75, 0.3, 3.28]) { bs.position.set(11.14, 2.15, 3.83); bs.target.position.set(...at); bs.target.updateMatrixWorld(); bs.color.set(0xffd9a0); bs.angle = 0.5; bs.penumbra = 0.6; bs.intensity = i; },
     fear(v) { F.fear = Math.max(F.fear, v); },
     shake(v) { nights.D.shake(v); },
     door: (name, open) => W.setDoor(name, open, true),

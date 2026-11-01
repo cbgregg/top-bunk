@@ -481,8 +481,8 @@ function teethMaterial() {
 // the moving body), less sheen at facing angles than three's default (on black that reads as grey plastic under the flashlight), and a
 // faint cold rim so the outline comes off a dark room, weaker on undersides. on the face the skin darkens into the eye sockets and
 // takes the light of the eyes round them and of the teeth inside the mouth. 'low' gets a plain lambert with the rim and the face light
-const SKIN = new THREE.Color(0x060508);
-export const RIM_COL = new THREE.Color(0.019, 0.023, 0.036);
+const SKIN = new THREE.Color(0x0d0c11);
+export const RIM_COL = new THREE.Color(0.05, 0.06, 0.09);
 const NOISE = `
   float skinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
   float skinNoise( vec3 x ) {
@@ -499,7 +499,7 @@ const NOISE = `
 // rimFade: [axis, from, to] in rest units; the rim is full where the rest position's coordinate along axis is at from and gone at to
 // the body fades it out going up into the collar, the face going down the jaw, so the join has none on either side
 export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null } = {}) {
-  const m = low ? new THREE.MeshLambertMaterial({ color: SKIN }) : new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.78, metalness: 0, envMapIntensity: 0.25 });
+  const m = low ? new THREE.MeshLambertMaterial({ color: SKIN }) : new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.6, metalness: 0, envMapIntensity: 0.6 });
   m.name = 'creatureSkin';
   const fade = new THREE.Vector4(0, 0, 0, 1);
   if (rimFade) { const [axis, from, to] = rimFade, k = -1 / (to - from); fade.set(axis.x * k, axis.y * k, axis.z * k, to / (to - from)); }
@@ -528,10 +528,10 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
         float fineK = 1.0 - smoothstep( 0.25, 0.6, length( fwidth( vRest * 150.0 ) ) );
         diffuseColor.rgb *= ( 0.88 + 0.24 * grain ) * ( 0.88 + 0.24 * broad );`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), 0.55, 0.95 );`)
+        roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), 0.42, 0.9 );`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         normal = skinBump( - vViewPosition, normal, 0.0011 * grain + 0.00032 * fine * fineK + 0.0025 * broad );`)
-        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', 'vec3( 0.005 * skinOcc )').replaceAll('material.specularF90 = 1.0;', 'material.specularF90 = 0.35;'));
+        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', 'vec3( 0.022 * skinOcc )').replaceAll('material.specularF90 = 1.0;', 'material.specularF90 = 0.6;'));
     }
     // the rim: a fresnel, faded along uRimFade and weaker on surfaces that face down, since the light that would catch an edge comes
     // from above; the eyes light the skin out from the socket's edge

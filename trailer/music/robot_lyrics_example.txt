@@ -1,0 +1,19 @@
+# Words for tools/sing.js, one syllable per melody note, in order. "Little Window", the demo lullaby in robot_song.json.
+#
+# Syllables are separated by spaces and hyphens: "lit-tle win-dow" is four notes. Rests in the melody take no syllable.
+# "_" holds the last syllable over the next note (a tie, or the vowel again on a new pitch). A "-" on its own is skipped.
+# A syllable in square brackets is given as sounds instead of spelling, for words the spelling would get wrong:
+# [dh uh] is "the", [n ah i t] is "night". The sounds are listed at the top of tools/sing.js.
+# Everything after a "#" is a comment.
+
+[dh uh] stars are out, [dh uh] lamp is low
+[dh uh] house is still and no one needs to know
+
+lit-tle win-dow, keep [dh uh] night out
+lit-tle win-dow, hold [dh uh] light
+
+[dh uh] hall is long, [dh uh] door is shut
+and if you hear me hum-ming, do not wake
+
+lit-tle win-dow, keep [dh uh] night out
+lit-tle win-dow, hold [dh uh] light

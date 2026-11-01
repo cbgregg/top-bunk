@@ -137,4 +137,64 @@ export class Rig {
     this.saved.clear();
     this.t += dt; this.mixer.update(dt); this.root.updateMatrixWorld(true);
   }
+
+  // ---- life: what a standing body does on its own. The baked idle clip holds one pose (its bones move under a degree), so
+  // breathing, the slow sway, shifts of weight, the head wandering, blinks and the nods of someone talking are laid on here,
+  // after the mixer and before the hands and the look. `still` is how much of the body is on the idle clip (0 while walking:
+  // the walk has its own motion, only the breath and the blinks stay); `talking` adds the nods; `asleep` keeps only a slow breath.
+  life(dt, { still = 1, talking = false, asleep = false } = {}) {
+    const L = this.lifeState || (this.lifeState = { seed: Math.random() * 100, breath: Math.random() * 7, shiftT: 2 + Math.random() * 4, shift: 0, shiftTo: 0, blinkT: 1 + Math.random() * 3, blink: 0, wander: 0, nod: 0, nodV: 0 });
+    const B = this.bones, s = L.seed, t = this.t;
+    const rate = asleep ? 0.19 : talking ? 0.3 : 0.24;   // breaths a second
+    L.breath += dt * rate * Math.PI * 2;
+    const br = 0.5 - 0.5 * Math.cos(L.breath), brAmp = asleep ? 0.04 : 0.045;
+    // breath: the chest lifts and the shoulders rise a touch, the head nods back by a hair to keep the eyes level
+    this.bend(['Spine1', 'Spine2'], [0.45, 0.55], [1, 0, 0], -brAmp * br);
+    this.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 0, 1], 0.02 * br);
+    this.bend(['Neck'], [1], [1, 0, 0], brAmp * 0.5 * br);
+    // blinks: the lids drop for 140 ms, every 2-6 s, in a pair now and then
+    L.blinkT -= dt;
+    if (L.blinkT <= 0) { L.blink = 0.14; L.blinkT = Math.random() < 0.25 ? 0.25 : 2 + Math.random() * 4; }
+    if (L.blink > 0) { L.blink -= dt; const k = Math.sin(Math.PI * Math.max(0, Math.min(1, 1 - L.blink / 0.14))); this.lids(k); }
+    if (asleep) { this.lids(1); return; }
+    if (still < 0.02) return;
+    // the slow sway of someone standing: the hips roll a little from side to side and the torso answers above them
+    const sway = Math.sin(t * 0.55 + s) * 0.028 + Math.sin(t * 0.23 + s * 2) * 0.016;
+    this.bend(['Pelvis'], [1], [0, 0, 1], sway * still);
+    this.bend(['Spine', 'Spine1'], [0.5, 0.5], [0, 0, 1], -sway * 0.8 * still);
+    // weight shifts: every few seconds the weight goes onto the other foot, which reads as a lean of the whole upper body
+    L.shiftT -= dt;
+    if (L.shiftT <= 0) { L.shiftTo = (Math.random() - 0.5) * 0.18; L.shiftT = 4 + Math.random() * 6; }
+    L.shift += (L.shiftTo - L.shift) * Math.min(1, dt * 1.2);
+    this.bend(['Spine', 'Spine1', 'Spine2'], [0.4, 0.35, 0.25], [0, 0, 1], L.shift * still);
+    this.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], -L.shift * 0.7 * still);
+    // the arms drift with the breath and the sway, never quite still
+    this.bend(['L_UpperArm'], [1], [1, 0, 0], (0.02 * br + 0.012 * Math.sin(t * 0.7 + s)) * still);
+    this.bend(['R_UpperArm'], [1], [1, 0, 0], (0.02 * br + 0.012 * Math.sin(t * 0.7 + s + 2)) * still);
+    // the head wanders when nothing holds its attention (the look layer takes over from this when there is a target)
+    // ...and now and then turns to look at something for a second or two
+    L.glanceT = (L.glanceT ?? 3 + Math.random() * 6) - dt;
+    if (L.glanceT <= 0) { L.glance = 2.2; L.glanceTo = (Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.3); L.glancePitch = (Math.random() - 0.6) * 0.15; L.glanceT = 7 + Math.random() * 9; }
+    let gl = 0;
+    if (L.glance > 0) { L.glance -= dt; const u = 1 - L.glance / 2.2; gl = u < 0.25 ? u / 0.25 : u < 0.7 ? 1 : (1 - u) / 0.3; gl = gl * gl * (3 - 2 * gl); }
+    if (this.lookW < 0.05) {
+      const yaw = Math.sin(t * 0.21 + s) * 0.16 + Math.sin(t * 0.47 + s * 3) * 0.07 + gl * (L.glanceTo || 0), pitch = Math.sin(t * 0.31 + s * 5) * 0.05 + gl * (L.glancePitch || 0);
+      this.bend(['Neck', 'Head'], [0.35, 0.65], [0, 1, 0], yaw * still);
+      this.bend(['Neck', 'Head'], [0.35, 0.65], [1, 0, 0], pitch * still);
+      this.bend(['Spine2'], [1], [0, 1, 0], gl * (L.glanceTo || 0) * 0.25 * still);   // the shoulders follow a little
+    }
+    // talking: small nods on the stresses of the voice, from its loudness envelope
+    const want = talking && this.env ? (this.env[Math.max(0, Math.min(this.env.length - 1, Math.floor((t - this.envT0) * 30)))] || 0) : 0;
+    L.nodV += ((want * 0.13 - L.nod) * 40 - L.nodV * 9) * dt; L.nod += L.nodV * dt;
+    if (Math.abs(L.nod) > 1e-4) { this.bend(['Head'], [1], [1, 0, 0], L.nod); this.bend(['Head'], [1], [0, 0, 1], L.nod * 0.3 * Math.sin(t * 1.7 + s)); }
+  }
+  // the eyelids, k 0 open .. 1 shut (the lid bones hinge about their local x)
+  lids(k) {
+    const B = this.bones; if (!B.LEyeBlinkTop) return;
+    for (const [n, a] of [['LEyeBlinkTop', 1.15], ['REyeBlinkTop', 1.15], ['LEyeBlinkBottom', -0.35], ['REyeBlinkBottom', -0.35]]) {
+      const b = B[n]; if (!b) continue;
+      if (!this.saved.has(b)) this.saved.set(b, b.quaternion.clone());
+      b.quaternion.copy(this.restLocal[n]).multiply(_q.setFromAxisAngle(_a.set(1, 0, 0), a * k)); b.updateMatrix();
+    }
+  }
 }

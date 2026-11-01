@@ -46,6 +46,18 @@ const RQ = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qu = new THREE
 const GA = new THREE.Vector3(), GB = new THREE.Vector3(), GC = new THREE.Vector3(), GD = new THREE.Vector3(), GE = new THREE.Vector3(), GF = new THREE.Vector3();
 const RA = new THREE.Vector3(), RB = new THREE.Vector3(), RS = new THREE.Vector3(), RE = new THREE.Vector3(), RH = new THREE.Vector3(), RD = new THREE.Vector3(), RP = new THREE.Vector3(), RT = new THREE.Vector3(), RL = new THREE.Vector3(), RF = new THREE.Vector3(), RC = new THREE.Vector3(), RPole = new THREE.Vector3(), RDown = new THREE.Vector3(0, -1, 0), RG = new THREE.Vector3();
 const IA = new THREE.Vector3(), IB = new THREE.Vector3(), IC = new THREE.Vector3(), IW = new THREE.Vector3(), IL = new THREE.Vector3(), IX = new THREE.Vector3();
+
+// finger curl, radians at the knuckle, middle and end joints, index to pinky then the thumb. The clips leave every finger
+// straight and splayed (a blade), so a hand is never shown without at least the relaxed curl; more toward the pinky, the thumb
+// turned in. grip blends relaxed -> grip by how far the fingers close; flat is a palm pressed on the side of a box.
+const FINGERS = ['Finger1', 'Finger2', 'Finger3', 'Finger4', 'Finger0'];
+const CURL = {
+  relaxed: [[0.32, 0.42, 0.24], [0.38, 0.48, 0.28], [0.44, 0.54, 0.32], [0.5, 0.6, 0.36], [0.22, 0.18, 0.14]],
+  grip:    [[0.95, 1.2, 0.6], [1.0, 1.25, 0.65], [1.05, 1.3, 0.7], [1.1, 1.3, 0.7], [0.5, 0.45, 0.35]],
+  flat:    [[0.12, 0.18, 0.1], [0.14, 0.2, 0.12], [0.16, 0.22, 0.14], [0.18, 0.24, 0.14], [0.2, 0.15, 0.1]],
+};
+const WRIST_FLEX = 0.2;     // the relaxed wrist: this far off the forearm's line (the clips come in with the hands bent nearly 60 degrees at the wrist)
+const WRIST_ROLL = 1.1;     // how far grip may turn the hand about the forearm
 const HINGE = { L: new THREE.Vector3(0, -0.135, -0.991), R: new THREE.Vector3(0, 0.135, -0.991) };   // the elbow axis in upper-arm space when the clip's own bend is too small to read it
 const legNames = (s) => [s + '_Thigh', s + '_Calf', s + '_Foot'];
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
@@ -66,7 +78,9 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
       r.update(dt);
-      const p = this.pose;
+      const p = this.pose, idleA = r.actions.idle;
+      r.life(dt, { still: idleA ? idleA.getEffectiveWeight() : 1, talking: !!r.env, asleep: !!(p && p.sleep) });
+      this.relaxHands(r);
       if (p && p.sleep) this.applyPose(r, p, 1, 0);
       else {
         const k = Math.min(1, dt * 7), want = p && (p.hold || p.reach || p.reachLocal || p.L || p.R) ? 1 : 0;
@@ -163,33 +177,64 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const y = r.rootY0 - (drop > 1e-4 ? drop : 0);
       if (r.root.position.y !== y) { r.root.position.y = y; r.root.updateMatrixWorld(true); }
     },
-    // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), then curl every finger toward it.
-    grip(r, side, c, amount, w = 1) {
-      const B = r.bones, hand = B[side + '_Hand'], fo = B[side + '_Forearm'], i1 = B[side + '_Finger1'], i2 = B[side + '_Finger2'], i4 = B[side + '_Finger4'];
-      if (!hand || !fo || !i1 || !i2 || !i4) return;
-      for (const b of [fo, hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
+    // the axis the fingers of one hand close about (across the knuckles, signed so a positive turn goes toward the palm `cp`)
+    curlAxis(r, side, cp, out) {
+      const B = r.bones, hand = B[side + '_Hand'], i1 = B[side + '_Finger1'], i2 = B[side + '_Finger2'], i4 = B[side + '_Finger4'];
+      for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
+      i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
+      const d = GA.copy(RA).sub(RH).normalize(); out.copy(RT).sub(RS).normalize();
+      if (GF.crossVectors(out, d).dot(cp) < 0) out.negate();
+      return out;
+    },
+    // curl every finger by a table of joint angles (minus `from`, when that table is already on the hand), about `ax`
+    curl(r, side, ax, table, from = null, w = 1) {
+      for (let f = 0; f < 5; f++) {
+        const n = FINGERS[f], chain = [n, n + '1', n + '2'];
+        for (let i = 0; i < 3; i++) {
+          const b = r.bones[side + '_' + chain[i]]; if (!b) continue;
+          const a = (table[f][i] - (from ? from[f][i] : 0)) * w;
+          if (Math.abs(a) > 1e-4) r.rotateWorld(b, new THREE.Quaternion().setFromAxisAngle(ax, a));
+        }
+      }
+    },
+    // the resting hand, every frame on both sides: the clip's bent blade becomes a loose hand, the wrist brought back near the
+    // forearm's line, the fingers curled
+    relaxHands(r) {
+      for (const side of ['L', 'R']) {
+        const hand = r.bones[side + '_Hand'], fo = r.bones[side + '_Forearm'], th = r.bones[side + '_Finger0'], i1 = r.bones[side + '_Finger1'], i4 = r.bones[side + '_Finger4'];
+        if (!hand || !fo || !th || !i1 || !i4) continue;
+        const knuckles = () => { for (const b of [fo, hand, th, i1, i4]) b.updateWorldMatrix(true, false); fo.getWorldPosition(RE); hand.getWorldPosition(RH); i1.getWorldPosition(RS); i4.getWorldPosition(RT); th.getWorldPosition(RA); return GE.copy(RS).add(RT).multiplyScalar(0.5).sub(RH).normalize(); };
+        let along = knuckles();
+        const fa = GA.copy(RH).sub(RE).normalize(), flex = fa.angleTo(along);
+        if (flex > WRIST_FLEX + 0.02) { const axis = GF.crossVectors(along, fa); if (axis.lengthSq() > 1e-8) { r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(axis.normalize(), flex - WRIST_FLEX)); along = knuckles(); } }
+        // the palm side is the side the thumb's root sits on: its offset from the knuckle line with the across- and along-hand parts taken out
+        const lat = GD.copy(RT).sub(RS).normalize();
+        GB.copy(RA).sub(RS).lerp(GF.copy(RA).sub(RT), 0.5).addScaledVector(lat, -GB.dot(lat)).addScaledVector(along, -GB.dot(along)).normalize();
+        this.curl(r, side, this.curlAxis(r, side, GB, GC), CURL.relaxed);
+      }
+    },
+    // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), within the
+    // wrist's range, then close the fingers toward it: `amount` 0..1 blends the relaxed hand to a full grip; `flat` presses the palm open
+    grip(r, side, c, amount, w = 1, flat = false) {
+      const B = r.bones, hand = B[side + '_Hand'], fo = B[side + '_Forearm'], i1 = B[side + '_Finger1'], i4 = B[side + '_Finger4'];
+      if (!hand || !fo || !i1 || !i4) return;
+      for (const b of [fo, hand, i1, i4]) b.updateWorldMatrix(true, false);
       fo.getWorldPosition(RE); hand.getWorldPosition(RH);
       const fa = GA.copy(RH).sub(RE).normalize();
       const cp = GB.copy(c).addScaledVector(fa, -c.dot(fa)).normalize();
       i1.getWorldPosition(RS); i4.getWorldPosition(RT); const lat = GC.copy(RT).sub(RS).normalize();
       const latT = GD.crossVectors(fa, cp); if (latT.dot(lat) < 0) latT.negate();
       const lp = GE.copy(lat).addScaledVector(fa, -lat.dot(fa)).normalize(), tp = latT.addScaledVector(fa, -latT.dot(fa)).normalize();
-      const roll = Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp));
+      const roll = THREE.MathUtils.clamp(Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp)), -WRIST_ROLL, WRIST_ROLL);
       if (Math.abs(c.dot(fa)) < 0.95) r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll * w));   // no roll to speak of when the palm should face along the forearm
-      for (const b of [hand, i1, i2, i4]) b.updateWorldMatrix(true, false);
-      i1.getWorldPosition(RS); i4.getWorldPosition(RT); i2.getWorldPosition(RA); hand.getWorldPosition(RH);
-      const d = GA.copy(RA).sub(RH).normalize(), ax = GC.copy(RT).sub(RS).normalize();
-      if (GF.crossVectors(ax, d).dot(cp) < 0) ax.negate();
-      const total = amount * 1.7;
-      for (const [chain, k] of [[['Finger1', 'Finger11', 'Finger12'], 1], [['Finger2', 'Finger21', 'Finger22'], 1], [['Finger3', 'Finger31', 'Finger32'], 1], [['Finger4', 'Finger41', 'Finger42'], 1], [['Finger0', 'Finger01', 'Finger02'], 0.45]]) {
-        chain.forEach((n, i) => { const b = B[side + '_' + n]; if (b) r.rotateWorld(b, new THREE.Quaternion().setFromAxisAngle(ax, total * k * [0.35, 0.4, 0.25][i])); });
-      }
+      const ax = this.curlAxis(r, side, cp, GC);
+      const k = THREE.MathUtils.clamp(amount, 0, 1), to = flat ? CURL.flat : CURL.relaxed.map((f, i) => f.map((a, j) => a + (CURL.grip[i][j] - a) * k));
+      this.curl(r, side, ax, to, CURL.relaxed, w);
     },
     applyPose(r, p, w = 1, lean = p.lean || 0, squat = p.squat || 0, kneel = p.kneel || 0) {
       if (p.sleep) {   // asleep on the back: the head turned toward the room, the feet flat, a slow breath in the chest
         r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * p.sleep);
-        r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.25);   // toes pointed along the bed, so they stay under the quilt
-        r.bend(['Spine1', 'Spine2'], [0.5, 0.5], [1, 0, 0], 0.03 + Math.sin(performance.now() * 0.0011) * 0.025);
+        r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.25);   // toes pointed along the bed, so they stay under the quilt (the breath is the life layer's)
         return;
       }
       this.legs(r, squat, kneel);
@@ -201,7 +246,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       for (const [s, sg] of [['L', 1], ['R', -1]]) {
         const own = p[s];
         if (!own && hands !== 'both' && hands !== s) continue;
-        let T = null, palm = null, close = 0.75;
+        let T = null, palm = null, close = 0.75, flat = false;
         if (own) {
           T = own.reach ? own.reach.clone() : own.reachLocal ? this.group.localToWorld(own.reachLocal.clone()) : null;
           palm = facing(own.palm, RG.copy(left).multiplyScalar(-sg)); close = own.grip ?? 0.75;
@@ -209,7 +254,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
           p.hold.updateWorldMatrix(true, false); p.hold.getWorldPosition(RC);
           const hw = p.holdW !== undefined ? p.holdW / 2 : p.hold.geometry.parameters.width / 2 * p.hold.getWorldScale(RS).x;
           T = RC.clone().addScaledVector(left, sg * (hw + 0.03)); T.y += p.holdY ?? -0.03; T.addScaledVector(fwd, -0.04);
-          palm = RG.copy(left).multiplyScalar(-sg); close = 0.3;
+          palm = RG.copy(left).multiplyScalar(-sg); close = 0; flat = true;
         } else if (p.reach || p.reachLocal) {
           T = p.reach ? p.reach.clone() : this.group.localToWorld(p.reachLocal.clone());
           if (hands === 'both') T.addScaledVector(left, sg * 0.08);
@@ -217,10 +262,17 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         }
         if (!T || w <= 0.005) continue;
         this.ik(r, s, T, RPole.copy(left).multiplyScalar(sg * 0.7).addScaledVector(fwd, -0.3).add(RDown), w);
-        this.grip(r, s, palm, close * w, w);
+        this.grip(r, s, palm, close, w, flat);
       }
     },
     talk(env) { if (this.rig) this.rig.talk(env); },
+  };
+  // night clothes: the body material's map is swapped for the pajama repaint (made once, the first time it is asked for)
+  person.night = false; person.nightOf = null;
+  person.setNight = (on) => {
+    person.night = on; const b = person.body; if (!b || !b.map) return;
+    if (on && !person.nightMap) person.nightMap = pajamas(b.map, model);
+    b.map = on ? person.nightMap : person.dayMap; b.needsUpdate = true;
   };
   if (model) {
     Promise.all([loadModel(model), loadAnims()]).then(([gltf, clips]) => {
@@ -230,7 +282,104 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       rig.play('idle', { fade: 0, offset: Math.random() });
       rig.jawSign = person.jawSign || 1;
       person.rig = rig;
+      rig.root.traverse((o) => { if (o.isSkinnedMesh) for (const m of [].concat(o.material)) if (/_body$/.test(m.name) && m.map) { person.body = m; person.dayMap = m.map; } });
+      if (person.night) person.setNight(true);
     }).catch((e) => console.warn('person model failed, keeping the low-poly one:', e));
   }
   return person;
+}
+
+// the body texture repainted as pajamas in a canvas. skin is found by its colour and left alone; each garment is told apart by its own
+// colour and gets a new one scaled by the old luminance, so the folds and seams survive. black is unused atlas space.
+const WEAR = {
+  dad: {
+    skin: [0, 0.22, 0, 0.2, 0.78, 1, 0, 0.2], hue: 28,   // the uv rectangles that hold skin (his hands), and the warmest hue that still counts as skin there
+    boots: [0.22, 0.40, 0.0, 0.30, 0.60, 0.78, 0.0, 0.30],   // two rectangles: the boots and their soles (the collar between them is not a boot)
+    pants: [0, 0.3, 0.58, 1, 0.7, 1, 0.58, 1],   // the trouser legs
+    classes: [
+      { is: (h, s, v, inBoots) => inBoots, col: (u, w, k) => {                                                                            // grey socks: the laces, eyelets and sole edge flattened out, a fine rib instead
+        const f = 0.8 + 0.2 * k, rib = (w * 160) % 1 < 0.5 ? 1 : 0.9; return [0.44 * f * rib, 0.44 * f * rib, 0.47 * f * rib]; } },
+      { is: (h, s, v, inBoots, inPants) => inPants, col: (u, w, k) => {                                                                   // flannel plaid
+        const a = (u * 14) % 1 < 0.32, b = (w * 14) % 1 < 0.32, base = a && b ? [0.3, 0.42, 0.34] : a || b ? [0.22, 0.34, 0.3] : [0.15, 0.19, 0.3];
+        return base.map((c) => c * k); } },
+      { is: () => true, col: (u, w, k) => [0.52 * k, 0.52 * k, 0.55 * k] },                                                               // the sweater and vest: a worn grey t-shirt
+    ],
+  },
+  mom: {
+    skin: [0, 0.22, 0.45, 0.73, 0.78, 1, 0.45, 0.73, 0, 0.17, 0.72, 1, 0.83, 1, 0.72, 1, 0.44, 0.56, 0.45, 0.57], hue: 32,   // forearms, hands, the patch of neck
+    boots: [0.17, 0.33, 0.72, 1.0, 0.67, 0.83, 0.72, 1.0],   // two rectangles: the shoes
+    pants: [0, 0.3, 0, 0.42, 0.7, 1, 0, 0.42],   // the jeans
+    classes: [
+      { is: (h, s, v, inBoots) => inBoots, col: (u, w, k) => [0.82 * (0.55 + 0.45 * k), 0.62 * (0.55 + 0.45 * k), 0.5 * (0.55 + 0.45 * k)] },   // bare feet
+      { is: (h, s, v, inBoots, inPants) => inPants, col: (u, w, k) => { const st = (w * 60) % 1 < 0.5; return [(st ? 0.74 : 0.66) * k, (st ? 0.78 : 0.7) * k, (st ? 0.86 : 0.8) * k]; } },   // the jeans: striped cotton bottoms
+      { is: () => true, col: (u, w, k) => {                                                                                                // the blouse: cream with small rose sprigs
+        const fx = (u * 22) % 1 - 0.5, fy = (w * 22) % 1 - 0.5, d = Math.hypot(fx, fy), dot = d < 0.11 ? 1 : d < 0.15 ? 0.5 : 0;
+        return [(0.93 - 0.18 * dot) * k, (0.88 - 0.4 * dot) * k, (0.8 - 0.3 * dot) * k]; } },
+    ],
+  },
+};
+function pajamas(tex, model) {
+  const spec = WEAR[model] || WEAR.dad, img = tex.image, W = img.width, H = img.height;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+  const id = ctx.getImageData(0, 0, W, H), d = id.data, n = W * H;
+  const cls = new Int8Array(n), alt = new Int8Array(n), lum = new Float32Array(n), sk = new Uint8Array(n);   // cls: -1 unused, 0 skin, 1.. the garments; alt: the garment it would be if not skin
+  const quads = (a) => { const r = []; for (let i = 0; i + 3 < a.length; i += 4) r.push(a.slice(i, i + 4)); return r; };
+  const rects = quads(spec.boots), skinRects = quads(spec.skin), pantRects = quads(spec.pants || []), inside = (rs, u, w) => rs.some((q) => u >= q[0] && u < q[1] && w >= q[2] && w < q[3]);
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4] / 255, g = d[i * 4 + 1] / 255, b = d[i * 4 + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), v = mx, s = mx ? (mx - mn) / mx : 0;
+    lum[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (v < 0.06) { cls[i] = -1; continue; }
+    let h = 0; if (mx > mn) { h = mx === r ? (g - b) / (mx - mn) : mx === g ? 2 + (b - r) / (mx - mn) : 4 + (r - g) / (mx - mn); h = (h * 60 + 360) % 360; }
+    const u = (i % W) / W, w = Math.floor(i / W) / H, inBoots = inside(rects, u, w);
+    sk[i] = !inBoots && inside(skinRects, u, w) && h >= 3 && h <= spec.hue && s > 0.2 && s < 0.7 && v > 0.4 ? 1 : 0;
+    alt[i] = 1 + spec.classes.findIndex((k) => k.is(h, s, v, inBoots, inside(pantRects, u, w)));
+  }
+  // the skin mask cleaned up: a pixel goes with the majority of the 7x7 around it, so stray fold pixels do not swap sides
+  const tmp = new Uint16Array(n), R = 3;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let a = 0; for (let k = -R; k <= R; k++) { const xx = Math.min(W - 1, Math.max(0, x + k)); a += sk[y * W + xx]; } tmp[y * W + x] = a; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let a = 0; for (let k = -R; k <= R; k++) { const yy = Math.min(H - 1, Math.max(0, y + k)); a += tmp[yy * W + x]; }
+    const i = y * W + x; if (cls[i] < 0) continue;
+    cls[i] = a > (2 * R + 1) * (2 * R + 1) / 2 ? 0 : alt[i];
+  }
+  // the garment's own brightness is taken out with a wide local average of the luminance (unused atlas space left out), so a dark
+  // sweater and a light vest both come out as the same t-shirt and only the folds remain
+  const mean = (() => {
+    const B = 40, acc = new Float32Array(n), wgt = new Float32Array(n), acc2 = new Float32Array(n), wgt2 = new Float32Array(n);
+    for (let y = 0; y < H; y++) {
+      let a = 0, c = 0;
+      for (let x = -B; x < W + B; x++) {
+        const xi = x + B, xo = x - B - 1;
+        if (xi < W && cls[y * W + xi] >= 0) { a += lum[y * W + xi]; c++; }
+        if (xo >= 0 && cls[y * W + xo] >= 0) { a -= lum[y * W + xo]; c--; }
+        if (x >= 0 && x < W) { acc[y * W + x] = a; wgt[y * W + x] = c; }
+      }
+    }
+    for (let x = 0; x < W; x++) {
+      let a = 0, c = 0;
+      for (let y = -B; y < H + B; y++) {
+        const yi = y + B, yo = y - B - 1;
+        if (yi < H) { a += acc[yi * W + x]; c += wgt[yi * W + x]; }
+        if (yo >= 0) { a -= acc[yo * W + x]; c -= wgt[yo * W + x]; }
+        if (y >= 0 && y < H) { acc2[y * W + x] = a; wgt2[y * W + x] = c; }
+      }
+    }
+    for (let i = 0; i < n; i++) acc2[i] = wgt2[i] ? acc2[i] / wgt2[i] : 0.5;
+    return acc2;
+  })();
+  let skinPx = 0, used = 0;
+  for (let i = 0; i < n; i++) {
+    const k = cls[i]; if (k < 0) continue; used++;
+    if (k === 0) { skinPx++; continue; }
+    const f = Math.min(1.45, Math.max(0.35, lum[i] / Math.max(0.05, mean[i])));
+    const [r, g, b] = spec.classes[k - 1].col((i % W) / W, Math.floor(i / W) / H, f);
+    d[i * 4] = Math.min(255, r * 255); d[i * 4 + 1] = Math.min(255, g * 255); d[i * 4 + 2] = Math.min(255, b * 255);
+  }
+  ctx.putImageData(id, 0, 0);
+  console.info(`${model}: night clothes drawn, skin ${(100 * skinPx / Math.max(1, used)).toFixed(1)}% of the atlas`);
+  const t = new THREE.CanvasTexture(c);
+  t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; t.anisotropy = tex.anisotropy; t.channel = tex.channel;
+  t.minFilter = tex.minFilter; t.magFilter = tex.magFilter;
+  return t;
 }

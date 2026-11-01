@@ -9,8 +9,8 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
 
 // props that keep their metal and gloss; everything else is made matte
-const SHINY = new Set(['mirror', 'kettle', 'desk_lamp', 'washer', 'dryer', 'stove', 'fridge', 'tv', 'crt_pc', 'clock_wall', 'filing', 'office_chair', 'outlet', 'switch']);
-const METAL = new Set(['mirror', 'kettle', 'desk_lamp', 'washer', 'dryer', 'stove', 'filing', 'office_chair']);
+const SHINY = new Set(['mirror', 'kettle', 'desk_lamp', 'washer', 'dryer', 'stove', 'fridge', 'tv', 'crt_pc', 'clock_wall', 'filing', 'office_chair', 'outlet', 'switch', 'car_sedan', 'car_sedan2', 'car_pickup', 'car_wagon', 'mailbox', 'trash_can']);
+const METAL = new Set(['mirror', 'kettle', 'desk_lamp', 'washer', 'dryer', 'stove', 'filing', 'office_chair', 'car_sedan', 'car_sedan2', 'car_pickup', 'car_wagon', 'trash_can']);
 
 function matte(m, name) {
   if (!m.isMeshStandardMaterial) return;

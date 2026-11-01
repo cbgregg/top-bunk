@@ -32,12 +32,16 @@ artwork, the game's name and an official subtitle, so the capsules here carry th
 
 ## Regenerating
 
-Playwright with Chromium is needed (`npm install`, then `npx playwright install chromium` once). Rendering is headless on SwiftShader,
-so it needs no GPU.
+On a Windows PC with a graphics card, `store\render-windows.cmd` does the whole set (screenshots, capsule sources, capsules, achievement
+icons) in a few minutes; `render-windows.cmd shots`, `capsules` or `icons` does one part. It installs Playwright and its Chromium into the
+project folder the first time and needs only Node.js.
+
+By hand, Playwright with Chromium is needed (`npm install`, then `npx playwright install chromium` once). Without `--gpu --headed` the
+rendering is headless on SwiftShader, which needs no GPU and takes an hour or more for the full-size set.
 
 ```sh
 node store/shots.js                 # the eight screenshots -> store/screenshots/
-node store/shots.js --extra         # plus the capsule sources -> store/capsules/src/
+node store/shots.js --extra --gpu --headed   # plus the capsule sources -> store/capsules/src/, on the graphics card
 node store/shots.js --preview       # fast 960x540 framing pass into a temp folder (prints the path)
 node store/shots.js --only 05,07    # just some of them
 node store/render_capsules.js       # every template -> store/out/
