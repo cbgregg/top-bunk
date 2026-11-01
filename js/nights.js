@@ -526,12 +526,18 @@ export function createNights(env) {
       const t0 = env.time();
       await until(t, () => P.mode === 'hide' || env.time() - t0 > 55);
       if (!alive(t)) return;
-      if (P.mode !== 'hide') { env.caught({ unseen: true }); return; }
+      if (P.mode !== 'hide') {
+        // the first night never kills: if you stay out, it passes you in the dark, close enough to feel, and is gone
+        F.script = true; obj(null); sfx.heavyStep(1, 0); await wait(0.5); sfx.whisper(0, 0.6); env.addShake(0.8); F.fear = 1; sfx.gasp(); await wait(1.2);
+        sfx.ceilingThump(); F.flicker = false; env.nlMult(1, false); F.fear = 0.5; F.script = false;
+      } else {
       obj(`Hold <b>${L('breath')}</b> until it passes`); F.breathUI = true; F.script = true; await wait(1.4);
-      F.breathCheck = true; F.grace = 1.4; UI.hint(`Hold <b>${L('breath')}</b> (or tap it once) and don't let go`, 8);
+      // the first night only teaches it: letting go is answered by something at the bed, never by a death
+      F.breathTeach = true; F.breathCheck = true; F.grace = 2.4; UI.hint(`Hold <b>${L('breath')}</b> (or tap it once) and don't let go`, 8);
       for (let i = 0; i < 7; i++) { sfx.heavyStep(0.8, Math.sin(i * 0.9) * 0.8); if (i % 2) sfx.knock(Math.sin(i) * 0.7, 0.3); if (i === 3) sfx.scratch(0); if (i === 4) { env.addShake(0.5); sfx.creak(0.4, 0); } F.fear = 1; await wait(0.95); }
-      F.breathCheck = false; UI.hint(null); obj(null);
+      F.breathCheck = false; F.breathTeach = false; UI.hint(null); obj(null);
       sfx.violins(0, 0.05); sfx.ceilingThump(); await wait(0.4); sfx.whisper(0, 0.3); F.flicker = false; env.nlMult(1, false); F.fear = 0.4; F.script = false;
+      }
       await wait(4); F.clock = Math.max(F.clock, 350);
     },
     // the end: it comes down the hall, and they see it too

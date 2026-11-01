@@ -1314,8 +1314,15 @@ function update(dt) {
     const near = F.breathCheck || (nights && nights.hunter.busy && nights.hunter.state === 'search' && nights.hunter.gap() < 5);
     if (holding) P.breath -= dt / (F.breathCheck ? 11 : near ? 8.5 : 30); else P.breath = Math.min(1, P.breath + dt / 2.2);
     if (F.breathCheck) {
-      if (holding) F.grace = Math.max(F.grace, 0.45); else { F.grace -= dt; if (F.grace <= 0) { sfx.gasp(); caught(); } }
-      if (P.breath <= 0) { sfx.gasp(); caught(); }
+      if (holding) F.grace = Math.max(F.grace, 0.45); else F.grace -= dt;
+      if (F.grace <= 0 || P.breath <= 0) {
+        if (F.breathTeach) {
+          // the first night: it hears you. everything stops, something scratches the bed frame, and the hint comes back; you live
+          sfx.gasp(); sfx.scratch(0); sfx.creak(0.6, 0); shake = Math.max(shake, 0.6); F.fear = 1;
+          UI.hint(`It heard you. Hold <b>${L('breath')}</b>`, 4);
+          F.grace = 2.4; P.breath = Math.max(P.breath, 0.6);
+        } else { sfx.gasp(); caught(); }
+      }
     }
     if (!holding) { P.breathT -= dt; if (P.breathT <= 0) { sfx.breath(P.inhale, E.visible ? 0.14 : 0.08); P.inhale = !P.inhale; P.breathT = 1.25; } }
     if (E.visible && !F.chase) { P.hb = (P.hb ?? 0) - dt; if (P.hb <= 0) { sfx.heartbeat(0.6); P.hb = 0.42; } }
