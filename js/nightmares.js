@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { smile as smileTex } from './textures.js';
 import { swimFrame } from './swim.js';
+import { Shroud } from './shroud.js';
 
 const V3 = THREE.Vector3;
 const TAU = Math.PI * 2;
@@ -49,15 +50,49 @@ export function createNightmares(ctx) {
   }
 
   // ---------- the shadow ----------
-  // a figure with no face: black on a dark wall, there at the edge of sight and gone when you look straight at it
+  // a figure with no face: a hole in the room, a little too tall, black to the edge where it goes soft, wrapped in slow smoke, torn
+  // to pieces when you look straight at it (uTear) and gone when you keep looking. opacity on the material drives all of it.
+  const VOID_VERT = 'varying vec3 vN, vV, vW; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = -mv.xyz; vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * mv; }';
+  const VOID_FRAG = `uniform float uOpacity, uTear, uTime; varying vec3 vN, vV, vW;
+    float h(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    void main() {
+      float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.2);
+      float a = uOpacity * (1.0 - 0.35 * f);
+      // torn: cells of the body drop out at random, faster the harder you look; whole until then
+      float cell = h(floor(vW * 26.0) + floor(uTime * 16.0)) * 0.6 + h(floor(vW * 9.0 + 3.0) + floor(uTime * 7.0)) * 0.4;
+      a *= 1.0 - uTear * step(0.45 + 0.5 * (1.0 - uTear), cell);
+      a *= 1.0 - 0.3 * uTear * h(floor(vW * 40.0) + floor(uTime * 9.0));
+      if (a < 0.01) discard;
+      // black through and through, with the faintest cold line where it turns away, so the shape still reads on a dark wall
+      gl_FragColor = vec4(mix(vec3(0.004, 0.004, 0.008), vec3(0.05, 0.06, 0.09), f * f), a);
+    }`;
   function makeShadow() {
-    const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color: 0x010102, transparent: true, opacity: 0, depthWrite: false, fog: true });
-    const part = (geo, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); g.add(m); return m; };
-    part(new THREE.CapsuleGeometry(0.2, 0.95, 6, 12), 0, 1.0, 0, 0.18);          // a stooped body
-    part(new THREE.SphereGeometry(0.15, 14, 10), 0, 1.74, 0.1);                   // a head, nothing on it
-    part(new THREE.CapsuleGeometry(0.045, 0.95, 4, 8), -0.3, 0.95, 0.04, 0, 0.07); part(new THREE.CapsuleGeometry(0.045, 0.95, 4, 8), 0.3, 0.95, 0.04, 0, -0.07);   // long arms
-    part(new THREE.CapsuleGeometry(0.07, 0.8, 4, 8), -0.1, 0.4, 0); part(new THREE.CapsuleGeometry(0.07, 0.8, 4, 8), 0.1, 0.4, 0);
-    g.visible = false; g.userData.mat = mat; W.house.add(g);
+    const g = new THREE.Group();
+    const mat = new THREE.ShaderMaterial({ uniforms: { uOpacity: { value: 0 }, uTear: { value: 0 }, uTime: { value: 0 } }, vertexShader: VOID_VERT, fragmentShader: VOID_FRAG, transparent: true, depthWrite: false, fog: false });
+    mat.opacity = 0; mat.tear = 0;
+    // noAO: the occlusion pass would take the figure for a solid wall and light it (see gfx.js)
+    const part = (geo, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.renderOrder = 4; m.userData.noAO = true; g.add(m); return m; };
+    part(new THREE.CapsuleGeometry(0.21, 1.05, 6, 14), 0, 1.12, 0, 0.16);   // a stooped body
+    part(new THREE.SphereGeometry(0.14, 16, 12), 0, 1.98, 0.09);                          // a head, nothing on it
+    part(new THREE.CapsuleGeometry(0.045, 1.1, 4, 8), -0.31, 1.02, 0.04, 0, 0.06); part(new THREE.CapsuleGeometry(0.045, 1.1, 4, 8), 0.31, 1.02, 0.04, 0, -0.06);   // arms past the knees
+    part(new THREE.CapsuleGeometry(0.075, 0.9, 4, 8), -0.1, 0.45, 0); part(new THREE.CapsuleGeometry(0.075, 0.9, 4, 8), 0.1, 0.45, 0);
+    // the smoke hangs on invisible limb lines: heavier and slower than the thing's own
+    const pt = (x, y, z) => { const o = new THREE.Object3D(); o.position.set(x, y, z); g.add(o); return o; };
+    const seg = (a, b, r, w) => ({ a, b, r, w });
+    const anchors = [seg(pt(0, 0.6, 0), pt(0, 1.9, 0.05), 0.26, 5), seg(pt(0, 1.85, 0.08), pt(0, 2.1, 0.1), 0.12, 0.6),
+      seg(pt(-0.3, 1.55, 0.04), pt(-0.33, 0.45, 0.04), 0.1, 1.5), seg(pt(0.3, 1.55, 0.04), pt(0.33, 0.45, 0.04), 0.1, 1.5),
+      seg(pt(-0.1, 0.9, 0), pt(-0.1, 0.0, 0), 0.12, 1.6), seg(pt(0.1, 0.9, 0), pt(0.1, 0.0, 0), 0.12, 1.6)];
+    const shroud = new Shroud(g, anchors, { count: 200, rise: 0.14, life: 2.6, size: [0.12, 0.34], spread: 0.6, near: 0.4, opacity: 0 });
+    let last = performance.now();
+    // the uniforms follow mat.opacity / mat.tear on the smoke card, which is never culled, so a part out of view cannot freeze them
+    for (const m of g.children) if (m.isMesh) m.frustumCulled = false;
+    shroud.mesh.onBeforeRender = () => {
+      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+      mat.uniforms.uOpacity.value = mat.opacity; mat.uniforms.uTear.value = mat.tear; mat.uniforms.uTime.value += dt;
+      shroud.opacity = mat.opacity * 0.55; shroud.update(dt);
+    };
+    g.visible = false; g.userData.mat = mat; g.userData.shroud = shroud; W.house.add(g);
+    let top = W.house; while (top.parent) top = top.parent; top.userData.aoDirty = true;
     return g;
   }
   function corner() {
@@ -81,11 +116,12 @@ export function createNightmares(ctx) {
       const want = inLos && edge ? 1 : 0;
       if (inLos && cos >= 0.88) lookT += 0.05; else lookT = Math.max(0, lookT - 0.03);
       mat.opacity += (want - mat.opacity) * 0.12;
-      if (inLos && cos >= 0.88) mat.opacity *= 0.82;           // straight on, it thins to nothing
+      mat.tear = Math.min(1, lookT * 1.4);                        // straight on, it tears apart...
+      if (inLos && cos >= 0.88) mat.opacity *= 0.9;              // ...and thins to nothing
       if (lookT > 1.0) { gone = true; break; }                  // you looked: it was never there
       if (P.mode === 'walk' && !hunter.busy && d < 1.2) { await pulled(sh, t); sh.visible = false; return; }
     }
-    sh.visible = false; W.house.remove(sh);
+    sh.visible = false; W.house.remove(sh); sh.userData.shroud.dispose();
   }
   async function pulled(sh, t) {
     pullUnder(); sh.visible = false;
@@ -103,10 +139,10 @@ export function createNightmares(ctx) {
     if (!ctx.alive(t)) { await wake(); return; }
     // it is suddenly at the lens
     F.blackout = true; ctx.nlMult(0, false);
-    sh.position.set(camera.position.x + Math.sin(P.yaw) * -0.55, 0, camera.position.z + Math.cos(P.yaw) * -0.55); sh.rotation.y = P.yaw; sh.visible = true; sh.userData.mat.opacity = 1;
+    sh.position.set(camera.position.x + Math.sin(P.yaw) * -0.55, 0, camera.position.z + Math.cos(P.yaw) * -0.55); sh.rotation.y = P.yaw; sh.visible = true; sh.userData.mat.opacity = 1; sh.userData.mat.tear = 0;
     sfx.appear(1.3); ctx.addShake(1.5); UI.flash('rgba(255,255,255,0.8)', 0.4);
     await wait(0.45);
-    UI.fade(1, 0.15); await wait(0.5); sh.visible = false; W.house.remove(sh);
+    UI.fade(1, 0.15); await wait(0.5); sh.visible = false; W.house.remove(sh); sh.userData.shroud.dispose();
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmShadow');
   }
 
@@ -205,5 +241,5 @@ export function createNightmares(ctx) {
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmMirror');
   }
 
-  return { shadow, hall, basement, mirror, blackenPhotos };
+  return { shadow, hall, basement, mirror, blackenPhotos, makeShadow };
 }

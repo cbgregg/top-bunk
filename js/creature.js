@@ -498,13 +498,15 @@ const NOISE = `
   }`;
 // rimFade: [axis, from, to] in rest units; the rim is full where the rest position's coordinate along axis is at from and gone at to
 // the body fades it out going up into the collar, the face going down the jaw, so the join has none on either side
-export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null } = {}) {
-  const m = low ? new THREE.MeshLambertMaterial({ color: SKIN }) : new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.6, metalness: 0, envMapIntensity: 0.6 });
+// body: the rigged man's body keeps to near-black and matte, so the folds of his clothes do not catch a light; the head keeps its form
+const BODY = new THREE.Color(0x050407);
+export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null, body = false } = {}) {
+  const m = low ? new THREE.MeshLambertMaterial({ color: body ? BODY : SKIN }) : new THREE.MeshStandardMaterial({ color: body ? BODY : SKIN, roughness: body ? 0.92 : 0.6, metalness: 0, envMapIntensity: body ? 0.12 : 0.6 });
   m.name = 'creatureSkin';
   const fade = new THREE.Vector4(0, 0, 0, 1);
   if (rimFade) { const [axis, from, to] = rimFade, k = -1 / (to - from); fade.set(axis.x * k, axis.y * k, axis.z * k, to / (to - from)); }
   const u = { uUnit: { value: unit }, uRim: { value: rim }, uRimFade: { value: fade }, uEyeLight: { value: face ? face.eyes.material.color : new THREE.Color(0, 0, 0) }, uMouthLight: { value: face ? face.mouthLight : new THREE.Color(0, 0, 0) } };
-  m.customProgramCacheKey = () => 'creatureSkin' + (low ? 'L' : 'S') + (face ? 'F' : 'B');
+  m.customProgramCacheKey = () => 'creatureSkin' + (low ? 'L' : 'S') + (face ? 'F' : 'B') + (body ? 'Y' : '');
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
@@ -528,10 +530,10 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
         float fineK = 1.0 - smoothstep( 0.25, 0.6, length( fwidth( vRest * 150.0 ) ) );
         diffuseColor.rgb *= ( 0.88 + 0.24 * grain ) * ( 0.88 + 0.24 * broad );`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), 0.42, 0.9 );`)
+        roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), ${body ? '0.8, 0.98' : '0.42, 0.9'} );`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         normal = skinBump( - vViewPosition, normal, 0.0011 * grain + 0.00032 * fine * fineK + 0.0025 * broad );`)
-        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', 'vec3( 0.022 * skinOcc )').replaceAll('material.specularF90 = 1.0;', 'material.specularF90 = 0.6;'));
+        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', body ? 'vec3( 0.006 )' : 'vec3( 0.022 * skinOcc )').replaceAll('material.specularF90 = 1.0;', body ? 'material.specularF90 = 0.3;' : 'material.specularF90 = 0.6;'));
     }
     // the rim: a fresnel, faded along uRimFade and weaker on surfaces that face down, since the light that would catch an edge comes
     // from above; the eyes light the skin out from the socket's edge

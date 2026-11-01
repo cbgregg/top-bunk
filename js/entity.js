@@ -4,9 +4,18 @@ import * as THREE from 'three';
 import { createFace, headGeometry, skinMaterial, tuckIntoNeck, RIM_COL, RX, RY, RZ } from './creature.js';
 import { smoothstep as ss, lerp, hash } from './mathx.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
+import { Shroud } from './shroud.js';
 
-const _v = new THREE.Vector3();
+const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _k = new THREE.Vector3(), _ax = new THREE.Vector3(), _hq = new THREE.Quaternion();
+const _lat = new THREE.Vector3(), _palm = new THREE.Vector3(), _p2 = new THREE.Vector3(), _cax = new THREE.Vector3(), _cr = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
+// the shroud: how many wisps per graphics preset
+const WISPS = { ultra: 520, high: 400, medium: 220, low: 0 };
+// the hands: the clips come in with the wrists bent and turned in, so every frame the hand is brought back near the forearm's line
+// and the long fingers are set a little curled, more toward the little finger, the thumb out
+const WRIST_FLEX = 0.12;
+const FINGERS = ['Finger1', 'Finger2', 'Finger3', 'Finger4', 'Finger0'];
+const CURL = [[0.22, 0.3, 0.2], [0.26, 0.34, 0.22], [0.3, 0.38, 0.24], [0.34, 0.42, 0.26], [0.12, 0.1, 0.08]];
 const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
 const BODY_RIM = RIM_COL.clone().multiplyScalar(2.6);   // stronger on the body, so the arms come off the dark
 
@@ -129,7 +138,7 @@ export class Entity {
     const skel = body.skeleton, hi = skel.bones.indexOf(hb), bind = skel.boneInverses[hi].clone().invert().multiply(this.head.matrix);
     // the body's rim fades out going up into the collar (rest space is z up, in metres once scaled), as the face's does down the jaw
     const zAt = (y) => new THREE.Vector3(0, y, 0).applyMatrix4(bind).z * rig.scale;
-    this.rigSkin = { unit: rig.scale, rim: BODY_RIM, rimFade: [new THREE.Vector3(0, 0, 1), zAt(-0.55), zAt(-0.4)] };
+    this.rigSkin = { unit: rig.scale, rim: BODY_RIM, rimFade: [new THREE.Vector3(0, 0, 1), zAt(-0.55), zAt(-0.4)], body: true };
     this.skins.rig = { high: skinMaterial(this.rigSkin) };
     for (const o of this.rigMeshes) o.material = this.skins.rig.high;
     const geo = headGeometry({ neck: true });
@@ -147,7 +156,39 @@ export class Entity {
     this.body.visible = false;
     rig.play('idle', { fade: 0, speed: 0.3 });
     this.rig = rig;
+    // the shroud hangs on the bones: thick round the torso and the limbs, thin at the head so the eyes and the grin stay clear
+    const B = rig.bones, seg = (a, b, r, w) => ({ a: B[a], b: B[b] || null, r, w });
+    this.shroud = new Shroud(this.root, [
+      seg('Pelvis', 'Spine', 0.24, 3), seg('Spine', 'Spine1', 0.26, 3.4), seg('Spine1', 'Spine2', 0.27, 3.4), seg('Spine2', 'Neck', 0.24, 2.4), seg('Neck', 'Head', 0.1, 0.4),
+      seg('L_Clavicle', 'L_UpperArm', 0.13, 0.6), seg('R_Clavicle', 'R_UpperArm', 0.13, 0.6),
+      seg('L_UpperArm', 'L_Forearm', 0.11, 2.4), seg('R_UpperArm', 'R_Forearm', 0.11, 2.4), seg('L_Forearm', 'L_Hand', 0.09, 1.8), seg('R_Forearm', 'R_Hand', 0.09, 1.8),
+      seg('L_Thigh', 'L_Calf', 0.14, 3.4), seg('R_Thigh', 'R_Calf', 0.14, 3.4), seg('L_Calf', 'L_Foot', 0.1, 2.6), seg('R_Calf', 'R_Foot', 0.1, 2.6),
+    ], { count: WISPS.ultra, rise: 0.3, life: 1.4, size: [0.14, 0.52], spread: 1.25, near: 0.6, opacity: 1 });
     this.setQuality(this.quality, true);
+  }
+
+  // the hand correction, after the clip and the reach: wrist back toward the forearm's line, fingers long and a little curled
+  relaxHands(r) {
+    for (const side of ['L', 'R']) {
+      const hand = r.bones[side + '_Hand'], fo = r.bones[side + '_Forearm'], th = r.bones[side + '_Finger0'], i1 = r.bones[side + '_Finger1'], i2 = r.bones[side + '_Finger2'], i4 = r.bones[side + '_Finger4'];
+      if (!hand || !fo || !th || !i1 || !i2 || !i4) continue;
+      const knuckles = () => { for (const b of [fo, hand, th, i1, i2, i4]) b.updateWorldMatrix(true, false); fo.getWorldPosition(_w); hand.getWorldPosition(_x); i1.getWorldPosition(_y); i4.getWorldPosition(_z); th.getWorldPosition(_k); return _v.copy(_y).add(_z).multiplyScalar(0.5).sub(_x).normalize(); };
+      let along = knuckles();
+      const fa = _ax.copy(_x).sub(_w).normalize(), flex = fa.angleTo(along);
+      if (flex > WRIST_FLEX + 0.02) {
+        _cr.crossVectors(along, fa);
+        if (_cr.lengthSq() > 1e-8) { r.rotateWorld(hand, _hq.setFromAxisAngle(_cr.normalize(), flex - WRIST_FLEX)); along = knuckles(); }
+      }
+      // the palm side is where the thumb's root sits, with the across- and along-hand parts taken out; the fingers close about the knuckle line toward it
+      _lat.copy(_z).sub(_y).normalize();
+      _palm.copy(_k).sub(_y).lerp(_p2.copy(_k).sub(_z), 0.5); _palm.addScaledVector(_lat, -_palm.dot(_lat)).addScaledVector(along, -_palm.dot(along)).normalize();
+      i2.getWorldPosition(_v); const mid = _v.sub(_x).normalize();
+      _cax.copy(_lat); if (_cr.crossVectors(_cax, mid).dot(_palm) < 0) _cax.negate();
+      for (let f = 0; f < 5; f++) {
+        const n = FINGERS[f], chain = [n, n + '1', n + '2'];
+        for (let i = 0; i < 3; i++) { const b = r.bones[side + '_' + chain[i]]; if (b) r.rotateWorld(b, _hq.setFromAxisAngle(_cax, CURL[f][i])); }
+      }
+    }
   }
 
   // 'low' swaps the skin for the cheaper material (the face's own skull follows)
@@ -158,6 +199,7 @@ export class Entity {
     const cylSkin = pick(this.skins, {});
     for (const o of this.cyls) o.material = cylSkin;
     if (this.rig) { const m = pick(this.skins.rig, this.rigSkin); for (const o of this.rigMeshes) o.material = m; }
+    if (this.shroud) this.shroud.setCount(WISPS[this.gfxQuality] ?? WISPS.high);
     this.head.setQuality(q);
   }
 
@@ -194,6 +236,7 @@ export class Entity {
         r.aim(r.bones[s + '_Forearm'], r.bones[s + '_Hand'], dir, this.reach);
       }
     }
+    this.relaxHands(r);
     r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 6 });
     // now and then, while it stands, it cocks its head: quick over, held a moment, eased back. at most once per 11 s, timed from the
     // clock alone so a replay matches (after the look, which would straighten it out)
@@ -204,10 +247,12 @@ export class Entity {
       r.bend(['Neck'], [1], [0, 1, 0], 0.03 * k);
     }
     this.head.update(dt, { target: this.lookTarget, smile: this.smileScale });
+    if (this.shroud) { this.root.updateMatrixWorld(true); this.shroud.update(dt, this.root.getWorldPosition(_v)); }
   }
 
   update(dt, quality = this.quality) {
     if (!this.root.visible) return;
+    if (quality !== this.gfxQuality) { this.gfxQuality = quality; if (this.shroud) this.shroud.setCount(WISPS[quality] ?? WISPS.high); }
     this.setQuality(quality === 'low' ? 'low' : 'high');
     this.t += dt; const t = this.t;
     if (this.rig) { this.updateRig(dt); return; }

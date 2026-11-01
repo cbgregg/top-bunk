@@ -114,9 +114,9 @@ export class Gfx {
       ao.setSize = (w, h) => baseSize(Math.max(2, Math.round(w * k)), Math.max(2, Math.round(h * k)));
       ao.setSize(innerWidth * dpr, innerHeight * dpr);
       const hide = ao.overrideVisibility.bind(ao);
-      let noAO = null;   // the glass panes never change, so find them once
-      ao.overrideVisibility = function () {   // glass and light domes would read as solid walls to the AO pass
-        hide(); if (!noAO) { noAO = []; scene.traverse((o) => { if (o.userData && o.userData.noAO) noAO.push(o); }); }
+      let noAO = null;   // the glass panes never change, so find them once; anything added later sets scene.userData.aoDirty
+      ao.overrideVisibility = function () {   // glass, light domes and smoke would read as solid walls to the AO pass
+        hide(); if (!noAO || scene.userData.aoDirty) { noAO = []; scene.traverse((o) => { if (o.userData && o.userData.noAO) noAO.push(o); }); scene.userData.aoDirty = false; }
         for (const o of noAO) o.visible = false;
       };
       c.addPass(ao);
