@@ -401,7 +401,7 @@ export function createNights(env) {
       await wait(5); if (!alive(t)) return;
       env.say('dad/lure_a', { muffle: true }); obj("The TV's on and Dad is up. Turn it off");
       mom.group.visible = true;
-      dad.sleeping = false; dad.busy = true; dad.group.rotation.order = 'XYZ'; dad.group.rotation.set(0, 0, 0); dad.group.position.set(3.21, 0, -2.37); dad.group.rotation.y = Math.atan2(4.22 - 3.21, -3.04 + 2.37);   // standing in front of the TV, his back to you
+      dad.sleeping = false; dad.busy = true; dad.pose = null; dad.group.rotation.order = 'XYZ';   // out of the sleeping pose (it points the feet like a man lying down) dad.group.rotation.set(0, 0, 0); dad.group.position.set(3.21, 0, -2.37); dad.group.rotation.y = Math.atan2(4.22 - 3.21, -3.04 + 2.37);   // standing in front of the TV, his back to you
       dad.group.visible = true; dad.lookAt = null; dad.fake = true; W.bedSleepers.one('dad', false); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });   // and his side of the bed is empty
       let revealed = false, saidB = false; const t0 = env.time();
       const off = env.addI({ p: new V3(4.22, 1.0, -3.04), r: 1.7, label: 'Turn the TV off', when: () => alive(t) && !revealed && W.tvFx.on && P.mode === 'walk', act: () => { completeObjective(); revealed = true; } });
