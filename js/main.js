@@ -55,7 +55,7 @@ function setExposure(e = exposure) { exposure = e; renderer.toneMappingExposure 
 settings.on('brightness', () => setExposure());
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.03, 700);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.08, 400);   // a near plane this far out keeps depth precise at room distances (door frames and walls stop fighting)
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
@@ -394,7 +394,41 @@ function speak(id, { muffle = false, hold = 0.45 } = {}) {
     (l.voice === 'mom' ? mom : dad).talk(envl);
   }
   const t = Math.max(d + hold, 2.4 + text.length / 24);
-  UI.subtitle(l.html, t, rec ? 'speech' : null); return t;
+  UI.subtitle(l.html, t, rec ? 'speech' : null);
+  // who is speaking to whom, for the heads and the camera; nothing for a line heard through a wall
+  const by = l.voice || (/^<b>(Mom|Dad):/.exec(l.html) || [])[1]?.toLowerCase();
+  if (!muffle && (by === 'mom' || by === 'dad')) {
+    talkNow.who = by; talkNow.to = LINE_TO[id] || 'you'; talkNow.until = gameTime + t;
+    if (F.talkCam) lookAtTalk(by === 'mom' ? mom : dad);
+  }
+  return t;
+}
+// lines the parents say to each other rather than to you (the rest are to you)
+const LINE_TO = {
+  'dad/cheap': 'mom', 'dad/m4_a': 'mom', 'mom/m5_a': 'dad', 'dad/m5_b': 'mom', 'mom/m5_b': 'dad', 'dad/m6_a': 'mom', 'mom/m6_b': 'dad',
+  'mom/m7_a': 'dad', 'dad/m7_b': 'mom', 'dad/m8_a': 'mom', 'mom/m8_b': 'dad',
+};
+const talkNow = { who: null, to: null, until: 0 };
+// every frame: the speaker looks at whoever the line is for, the other parent looks at the speaker and turns a little toward them
+function talkGaze() {
+  const on = talkNow.who && gameTime < talkNow.until;
+  for (const p of [mom, dad]) { p.gazeAt = null; p.turnTo = null; p.turnK = 0; }
+  if (!on) { talkNow.who = null; return; }
+  const sp = talkNow.who === 'mom' ? mom : dad, other = sp === mom ? dad : mom;
+  if (other.group.visible && !other.sleeping) {
+    other.gazeAt = sp.head; other.turnTo = sp.group.position; other.turnK = 0.4;
+    if (talkNow.to !== 'you') { sp.gazeAt = other.head; sp.turnTo = other.group.position; sp.turnK = 0.65; }
+  }
+}
+// the view eases to the speaker (0.5 s); with both parents close together in view it holds a two-shot leaning toward the one talking
+let talkCamRun = 0;
+function lookAtTalk(sp) {
+  const run = ++talkCamRun, other = sp === mom ? dad : mom, a = sp.head.getWorldPosition(new V3()), b = other.head.getWorldPosition(new V3());
+  const yawTo = (v) => Math.atan2(-(v.x - P.pos.x), -(v.z - P.pos.z));
+  const target = other.group.visible && Math.abs(angDiff(yawTo(a), yawTo(b))) < 0.75 ? b.clone().lerp(a, 0.68) : a;
+  const want = yawTo(target), up = clamp(Math.atan2(target.y - EYE, Math.hypot(target.x - P.pos.x, target.z - P.pos.z)), -0.3, 0.4), y0 = P.yaw, p0 = P.pitch;
+  if (Math.abs(angDiff(y0, want)) < 0.04 && Math.abs(up - p0) < 0.03) return;
+  tween(0.5, (k) => { if (run !== talkCamRun) return; P.yaw = lerpAngle(y0, want, k); P.pitch = lerp(p0, up, k); }, ease.inOut);
 }
 const say = async (id, o) => { await wait(speak(id, o)); };
 function talkMom() {
@@ -654,6 +688,15 @@ const COUNTER = [
 ];
 const rampY = (x, z) => (z < -14.5 ? 1.3 : clamp((-10.2 - z) * (1.3 / 4.3), 0, 1.3)) * clamp(1 - (Math.abs(x - 2.3) - 0.5) / 0.3, 0, 1);   // the ramp (4.3 m, from the sill at z -14.5 to the gravel), then the bed's floor; fades out at the ramp's sides (no step up or down)
 const stillOn = (run) => run === chore.run;
+// the box truck's headroom (measured on the model): the rolled-up door hangs to 2.93 m just inside the sill, the roof inside is at 3.11.
+// how far a person's head has to come down at their spot, checking a stride either side since the head leads the feet when bent
+const TRUCK_ROLL = 2.93, TRUCK_ROOF = 3.11;
+function truckDuck(who) {
+  const T = W.TRUCK, g = who.group.position; if (!T || Math.abs(g.x - T.x) > 1.2 || g.z > T.z + 0.5 || g.z < T.z - 4) return 0;
+  const ceil = (z) => (z > T.z + 0.02 ? Infinity : z > T.z - 0.48 ? TRUCK_ROLL : TRUCK_ROOF), top = g.y + bodyH(who) * 1.02;
+  let need = 0; for (const dz of [-0.35, 0, 0.35]) need = Math.max(need, top - (ceil(g.z + dz) - 0.08));
+  return need;
+}
 function stepSound(g) {   // somebody else's footstep, quieter with distance and panned to where they are
   const d = Math.hypot(P.pos.x - g.x, P.pos.z - g.z); if (d > 14) return;
   const room = roomAt(g.x, g.z), hard = room === 'kitchen' || room === 'dining' || room === 'bath';
@@ -905,9 +948,10 @@ async function dayScript() {
   F.cutscene = true; P.vel.set(0, 0, 0);
   faceParent(mom);
   UI.objective(null);
+  F.talkCam = true;   // the view follows whoever is talking
   await say('mom/helper'); await say('mom/landlord'); await say('dad/cheap'); await say('dad/leftovers'); await say('mom/teeth');
   UI.fade(1, 2.5); await wait(3);
-  F.birds = false; F.cutscene = false; endChores();
+  F.talkCam = false; F.birds = false; F.cutscene = false; endChores();
   RUN.dayDone = true; saveRun();
 }
 function faceParent(who) {
@@ -948,7 +992,7 @@ async function conversation(lines) {
     if (typeof step === 'function') { await step(); continue; }   // a beat that runs its own shots
     const [who, key] = step, id = `${who}/${key}`;
     if (who === 'you') { await wideShot(); await lookDown(); await say(id); await wait(0.25); }
-    else { await closeOn(who === 'mom' ? mom : dad); await say(id); await wait(0.3); }
+    else { await closeOn(who === 'mom' ? mom : dad, 0.6); await say(id); await wait(0.3); }
   }
   P.mode = 'walk';
 }
@@ -1054,13 +1098,13 @@ async function proofBeat(id) {
   const c = nights.proof.count();
   await wideShot(); await lookDown(); await say(`<b>You:</b> ${nights.proof.tell(id)}`); await wait(0.25);
   if (c < 3) {
-    await closeOn(mom); await say('<b>Mom:</b> Not at breakfast. Please. Not today.'); await wait(0.3);
-    await closeOn(dad); await say("<b>Dad:</b> You need sleep, bud. That's all this is.");
+    await closeOn(mom, 0.6); await say('<b>Mom:</b> Not at breakfast. Please. Not today.'); await wait(0.3);
+    await closeOn(dad, 0.6); await say("<b>Dad:</b> You need sleep, bud. That's all this is.");
   } else if (c < 7) {
-    await closeOn(dad); await say('<b>Dad:</b> ...Show me after breakfast.'); await wait(0.3);
-    await closeOn(mom); await say("<b>Mom:</b> ...We'll call the landlord.");
+    await closeOn(dad, 0.6); await say('<b>Dad:</b> ...Show me after breakfast.'); await wait(0.3);
+    await closeOn(mom, 0.6); await say("<b>Mom:</b> ...We'll call the landlord.");
   } else {
-    await closeOn(dad); dad.gaze = mom.head.getWorldPosition(new V3());
+    await closeOn(dad, 0.6); dad.gaze = mom.head.getWorldPosition(new V3());
     UI.subtitle("<i>Dad doesn't say anything. He looks at Mom for a long time.</i>", 4.5); await wait(4.2);
     dad.gaze = null;
   }
@@ -1194,7 +1238,7 @@ async function finaleScene() {
   dad.group.position.set(3.7, 0, -0.6); dad.group.rotation.y = Math.PI / 2; mom.group.position.set(3.25, 0, -0.2); mom.group.rotation.y = Math.PI / 2;
   await wait(0.4);
   await Promise.all([lookAtPerson(dad, 0.9), say('dad/f_a')]);
-  sfx.scream(); await say('mom/f_a');
+  sfx.scream(); await Promise.all([lookAtPerson(mom, 0.5), say('mom/f_a')]);
   if (end === 'ENDING_BELIEVED') return finaleBelieved();
   return finaleGruesome();
 }
@@ -1348,13 +1392,16 @@ function update(dt) {
 
   // family idle
   if (mom.group.visible) {
+    mom.duck = truckDuck(mom); dad.duck = truckDuck(dad);
+    talkGaze();
     mom.update(gameTime, dt); dad.update(gameTime, dt);
     for (const p of [mom, dad]) {
       if (p.sleeping || p.inCar) continue;
       const g = p.group.position, near = Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5;
-      p.lookAt = p.gaze || (near ? camera.position : null);
+      p.lookAt = p.gaze || (p.gazeAt ? p.gazeAt.getWorldPosition(p._gv || (p._gv = new V3())) : null) || (near ? camera.position : null);
       if (near && (!p.busy || p.talking)) {
-        const want = Math.atan2(P.pos.x - g.x, P.pos.z - g.z);
+        let want = Math.atan2(P.pos.x - g.x, P.pos.z - g.z);
+        if (p.turnTo) want = lerpAngle(want, Math.atan2(p.turnTo.x - g.x, p.turnTo.z - g.z), p.turnK);   // partly toward whoever they are talking with
         p.group.rotation.y = lerpAngle(p.group.rotation.y, want, Math.min(1, dt * (p.talking ? 5 : 3)));
       }
     }
@@ -1442,4 +1489,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { speak, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
