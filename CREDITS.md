@@ -33,7 +33,10 @@
   - `mailbox`: [Home US Mailbox](https://sketchfab.com/3d-models/132c790ac74c42a0bb1a5fc7e3d43d7e) by [glowbox3d](https://sketchfab.com/glowbox3d), CC BY 4.0
   - `trash_can`: [Trash cans (low poly)](https://sketchfab.com/3d-models/69400e2f969f4c44882a398ef583334c) by [AndreyUEDev](https://sketchfab.com/AndreyUEDev), CC BY 4.0 (two of the three cans)
   - `barn`: [American Old Barn](https://sketchfab.com/3d-models/1d0b768a8e2449de990b3f69f94c5db6) by [andrewriddle](https://sketchfab.com/andrewriddle), CC BY 4.0
-  - `spruce`: [Spruce Tree - Low Poly](https://sketchfab.com/3d-models/b68f79aee62f4e849be265c903f724f5) by [nenjo](https://sketchfab.com/nenjo), CC BY 4.0
+  - `truck`: [LCT 3000 '95 - Low poly model](https://sketchfab.com/3d-models/663a0953c038434a918cb85725c88ffa) by [DanielZhabotinsky](https://sketchfab.com/DanielZhabotinsky), CC BY 4.0
+  - `shrub`: [Small bush](https://sketchfab.com/3d-models/f6ed4c70fc024ac88e8e6a19991695af) by [yanix](https://sketchfab.com/yanix), CC BY 4.0
+  - `fir1`, `fir2`, `fir1_far`, `fir2_far`: [Realistic fir trees pack (LODS, gameready)](https://sketchfab.com/3d-models/f58e8b6d733e4b0586e5b7db847b89e7) by [lolipop_1707](https://sketchfab.com/lolipop_1707), CC BY 4.0
+  - `maple`: [Maple trees pack (lowpoly, game ready, LODs)](https://sketchfab.com/3d-models/b5d2833c258f4054a01ee2b4ef85adf0) by [lolipop_1707](https://sketchfab.com/lolipop_1707), CC BY 4.0
   - `tree_bare`: [Dead Tree](https://sketchfab.com/3d-models/33ccce6111604656a4b5709483670ec3) by [MaX3Dd](https://sketchfab.com/MaX3Dd), CC BY 4.0
   - `grandfather`: [Grandfather Clock](https://sketchfab.com/3d-models/cef39f1bd3df43578236f273f273a873) by [longtail](https://sketchfab.com/longtail), CC BY 4.0 (the pendulum is cut free of the case in the game so it can swing)
 - **Photographs in the picture frames** (public domain, via Wikimedia Commons; `assets/photos/`, fetched by `tools/assets/fetch_photos.py`):

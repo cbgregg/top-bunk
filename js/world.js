@@ -137,8 +137,7 @@ export function buildWorld(scene) {
     pillow: std({ color: 0xe8e2d6, roughness: 1 }),
     rug: std({ map: T.rug, roughness: 1 }),
     concrete: std({ color: 0x77736b, roughness: 1 }),
-    truck: std({ color: 0xe8e6e0, roughness: 0.5 }),
-    truckCab: std({ color: 0xa1342a, roughness: 0.45 }), garageDoor: std({ color: 0xcfc9b8, roughness: 0.6 }),
+    garageDoor: std({ color: 0xcfc9b8, roughness: 0.6 }),
     tire: std({ color: 0x151515, roughness: 0.9 }),
     glassOut: std({ color: 0x1a222c, roughness: 0.08, metalness: 0.6 }),
     trunk: std({ color: 0x3b2c20, roughness: 1 }),
@@ -494,8 +493,8 @@ export function buildWorld(scene) {
   // rooms and 0.86 for the front door; the rough opening is w + 2 jambs. depth is the wall's thickness there. kind: 'six' (a six-panel
   // leaf), 'front' (six panels, a deadbolt, a peephole), 'back' (half glass over two panels). openSide: +1 or -1, the local z side
   // the leaf swings to, where the hinge knuckles show.
-  const lbox = (parent, x0, x1, y0, y1, z0, z1, mat, cast = true) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  const lbox = (parent, x0, x1, y0, y1, z0, z1, mat, cast = true) => {   // either order on each axis: a box drawn backwards would be inside out
+    const m = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)), mat); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     m.castShadow = cast; m.receiveShadow = true; parent.add(m); return m;
   };
   function door(hx, hz, dx, dz, { y0 = 0, kind = 'six', w = 0.81, depth = WT, openSide = -1 } = {}) {
@@ -512,10 +511,11 @@ export function buildWorld(scene) {
     lbox(fr, -J, w + J, 0, 0.016, -hd - 0.02, hd + 0.02, M.oak, false);                                              // threshold
     for (const y of [0.28, 1.02, 1.76]) lbox(fr, -0.006, 0.006, y - 0.045, y + 0.045, openSide * (T / 2 + 0.002), openSide * (T / 2 + 0.014), M.brass);   // hinge knuckles
     lbox(fr, w - 0.001, w + 0.002, 0.94, 1.07, -0.014, 0.014, M.brass);                                               // strike plate
-    // the leaf and its panels (two columns of three on each face), the knob and rose on both faces
-    const leaf = lbox(g, 0, w, 0, HT, -T / 2, T / 2, M.doorW);
+    // the leaf (a 3 mm reveal to the jambs and the head, 2 cm over the threshold) and its panels (two columns of three on each face,
+    // sunk 2 mm into the leaf so no face shares its plane), the knob and rose on both faces
+    const R = 0.003, leaf = lbox(g, R, w - R, 0.02, HT - R, -T / 2, T / 2, M.doorW);
     const panels = (rows) => { for (const side of [-1, 1]) for (const [px, pw] of [[w * 0.265, w * 0.345], [w * 0.735, w * 0.345]]) for (const [py, h] of rows) {
-      lbox(g, px - pw / 2, px + pw / 2, py - h / 2, py + h / 2, side * (T / 2), side * (T / 2 + 0.008), M.doorW, false);
+      lbox(g, px - pw / 2, px + pw / 2, py - h / 2, py + h / 2, side * (T / 2 - 0.002), side * (T / 2 + 0.008), M.doorW, false);
       lbox(g, px - pw / 2 + 0.035, px + pw / 2 - 0.035, py - h / 2 + 0.035, py + h / 2 - 0.035, side * (T / 2 + 0.008), side * (T / 2 + 0.012), M.doorInsetW, false);
     } };
     if (kind === 'back') {
@@ -550,10 +550,19 @@ export function buildWorld(scene) {
       d.apply = () => { g.position.x = d.hx + open[0] * opt.travel * d.a; g.position.z = d.hz + open[1] * opt.travel * d.a; c.on = d.a < 0.35; };
       fixups.push(() => { d.hx = SX(hx); d.hz = SZ(hz); });
     } else {
-      const rotC = Math.atan2(-closed[1], closed[0]), rotO = Math.atan2(-open[1], open[0]);
-      const depth = WT * (closed[1] === 0 ? SZ.scale(hz) : SX.scale(hx));   // the wall is thicker after the stretch across it
-      const { g } = door(hx, hz, closed[0], closed[1], { y0, depth, openSide: angDiff(rotC, rotO) > 0 ? -1 : 1, ...opt });
-      Object.assign(d, { g, rotC, rotO });
+      const rotC = Math.atan2(-closed[1], closed[0]), rotO = Math.atan2(-open[1], open[0]), alongX = closed[1] === 0, w = opt.w ?? 0.81;
+      // the wall is thicker after the stretch across it (its two faces map separately, since a wall line is where the factor changes),
+      // and the opening keeps its true width about its moved centre, so the frame is hung there in finished coordinates: the hinge
+      // pin a leaf's half-width from the opening's centre, on the warped wall's centre line
+      const depth = alongX ? SZ(hz + WT / 2) - SZ(hz - WT / 2) : SX(hx + WT / 2) - SX(hx - WT / 2);
+      const { g, fr } = door(hx, hz, closed[0], closed[1], { y0, depth, openSide: angDiff(rotC, rotO) > 0 ? -1 : 1, ...opt });
+      g.userData.noWarp = fr.userData.noWarp = true;
+      fixups.push(() => {
+        if (alongX) { d.hx = SX(hx + w / 2 * closed[0]) - w / 2 * closed[0]; d.hz = (SZ(hz - WT / 2) + SZ(hz + WT / 2)) / 2; }
+        else { d.hz = SZ(hz + w / 2 * closed[1]) - w / 2 * closed[1]; d.hx = (SX(hx - WT / 2) + SX(hx + WT / 2)) / 2; }
+        g.position.set(d.hx, y0, d.hz); fr.position.set(d.hx, y0, d.hz);
+      });
+      Object.assign(d, { g, fr, rotC, rotO });
       d.apply = () => { g.rotation.y = rotC + angDiff(rotC, rotO) * d.a; c.on = d.a < 0.35; };
     }
     fixups.push(() => { d.mid.x = SX(d.mid.x); d.mid.z = SZ(d.mid.z); });
@@ -1082,7 +1091,7 @@ export function buildWorld(scene) {
       const X0 = -0.31, X1 = 0.31, Z0 = -0.325, Z1 = 0.325, wg = new THREE.Group(); wg.position.set(-7.67, 0, 1.625); house.add(wg); const o = { parent: wg };
       rbox(X0, X1, B, B + 0.86, Z0, Z1, M.appW, 0.02, o); rbox(X0, X0 + 0.08, B + 0.86, B + 1.08, Z0 + 0.02, Z1 - 0.02, M.appW, 0.01, o);
       for (let i = 0; i < 3; i++) { const k = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 10), M.black); k.rotation.z = Math.PI / 2; k.position.set(X0 + 0.09, B + 1.0, Z0 + 0.14 + i * 0.18); wg.add(k); }
-      box(X0 + 0.1, X1 - 0.04, B + 0.84, B + 0.86, Z0 + 0.04, Z1 - 0.04, M.black, { uv: false, cast: false, parent: wg });
+      box(X0 + 0.103, X1 - 0.043, B + 0.86, B + 0.868, Z0 + 0.043, Z1 - 0.043, M.black, { uv: false, cast: false, parent: wg });   // the dark seam under the lid: on the top, a hair inside the lid's outline, stopping short of its underside
       const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.6, 20, 1, true), M.steelSink); drum.material = M.steelSink.clone(); drum.material.side = THREE.DoubleSide;
       drum.position.set(0.04, B + 0.54, 0); wg.add(drum);
       const pivot = new THREE.Group(); pivot.position.set(X0 + 0.1, B + 0.87, 0); wg.add(pivot);
@@ -1443,7 +1452,7 @@ export function buildWorld(scene) {
     const plate = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.12, 0.01), outletMat); plate.position.z = 0.005; g.add(plate);
     place(house, 'switch', { x: px, y, z: pz, rot: g.rotation.y, s: 0.01, wall: true, hide: [plate] });
   }
-  switchAt(7.7, -0.22, 0, 1); switchAt(4.75, -0.2, 0, 1); switchAt(6.9, -1.58, 0, -1); switchAt(4.5, -1.58, 0, -1);   // your room, bathroom, the spare room, the office
+  switchAt(7.7, -0.22, 0, 1); switchAt(4.75, -0.2, 0, 1); switchAt(8.02, -1.8, -1, 0); switchAt(4.5, -1.58, 0, -1);   // your room, bathroom, the spare room (on the end wall by the latch side of its door), the office
   switchAt(2.55, -4.42, 0, 1); switchAt(-3.38, 1.15, -1, 0); switchAt(-9.0, PLACES.garage[3] - 0.12, 0, -1);   // by the front door, inside Mom and Dad's door, the garage (inside, on the sheathing)
 
   // for the night event: the face's glow, and a passing car's headlights (a shadow-casting spot, so the light only comes in through the windows)
@@ -1517,9 +1526,14 @@ export function buildWorld(scene) {
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, M.grass); m.receiveShadow = true; yard.add(m);
   }
-  box(-6, 8.5, -0.02, -0.008, -29, -6.2, M.dirt, { cast: false, parent: yard });   // the gravel drive up from the road
-  for (const x of [0.3, 2.2]) box(x, x + 0.34, -0.0075, -0.007, -27.6, -7.0, M.rut, { cast: false, parent: yard });   // the ruts the truck and the car wore into it
-  box(-6.6, 9.1, -0.015, -0.009, -29.2, -26.6, M.gravel, { cast: false, parent: yard });   // where the drive fans out onto the shoulder
+  // the gravel lot: up from the road past the garage and round to the front of the house, the tracks worn into it (a pair to the garage, a
+  // pair to where the truck is parked), the gravel fanning out onto the shoulder, and a concrete walk from the lot to the front step
+  const LOT = [-9.2, 6.0, -29, -7.8];
+  box(LOT[0], LOT[1], -0.02, -0.008, LOT[2], LOT[3], M.gravel, { cast: false, parent: yard });
+  for (const x of [-8.4, -5.8]) box(x, x + 0.36, -0.0075, -0.007, -27.8, -9.0, M.rut, { cast: false, parent: yard });
+  for (const x of [1.3, 3.1]) box(x, x + 0.36, -0.0075, -0.007, -27.8, -20.6, M.rut, { cast: false, parent: yard });
+  box(-9.8, 6.6, -0.015, -0.009, -29.2, -26.6, M.gravel, { cast: false, parent: yard });
+  box(2.55, 3.65, -0.012, 0, LOT[3], -5.2, M.concrete, { cast: false, uv: true, parent: yard });
   box(-260, 260, -0.4, -0.005, RZ0, RZ1, M.asphalt, { cast: false, parent: yard });   // the road along the front of the property
   box(-260, 260, -0.03, -0.006, RZ0 - 1.4, RZ0, M.gravel, { cast: false, parent: yard }); box(-260, 260, -0.03, -0.006, RZ1, RZ1 + 1.0, M.gravel, { cast: false, parent: yard });   // gravel shoulders
   for (let x = -258; x < 258; x += 9) box(x, x + 3, -0.0045, -0.004, -30.55, -30.45, M.paintY, { cast: false, parent: yard });   // the centre line, faded
@@ -1531,28 +1545,43 @@ export function buildWorld(scene) {
     for (const s of [-1, 1]) { const geo = new THREE.BoxGeometry(520, 0.06, L); worldUV(geo); const m = new THREE.Mesh(geo, M.grass); m.receiveShadow = true; m.position.set(0, -0.3, -36.6 + s * 0.7); m.rotation.x = -s * a; yard.add(m); }
     box(-260, 260, -0.62, -0.56, -36.9, -36.3, M.dirt, { cast: false, parent: yard });   // the mud at the bottom
   }
-  // moving truck (parked on the gravel, backed toward the house)
-  const TG = new THREE.Group(); TG.position.set(-10.7, 0, 2.5); yard.add(TG);
-  // the cargo box is hollow with the back open, so the family can walk up the ramp and carry things out
-  box(11.8, 14.2, 0.55, 0.66, -24, -17, M.truck, { uv: false, parent: TG });                // floor
-  box(11.8, 11.88, 0.55, 3.15, -24, -17, M.truck, { uv: false, parent: TG }); box(14.12, 14.2, 0.55, 3.15, -24, -17, M.truck, { uv: false, parent: TG });   // sides
-  box(11.8, 14.2, 3.07, 3.15, -24, -17, M.truck, { uv: false, parent: TG }); box(11.8, 14.2, 0.55, 3.15, -24, -23.92, M.truck, { uv: false, parent: TG });   // roof and front wall
-  for (const x of [11.795, 14.2]) box(x, x + 0.005, 1.25, 1.55, -23.95, -17.05, std({ color: 0x2e6e8e, roughness: 0.5 }), { uv: false, parent: TG });   // stripe
-  {   // what is still in the back: a stack of boxes, a rolled mattress and a lamp, all of it where the family reaches in
-    const stack = [[12.4, 0.66, -18.3, 0.62, 0.5, 0.5, 0, 0.1], [13.1, 0.66, -18.3, 0.6, 0.46, 0.5, 1, -0.05], [13.8, 0.66, -18.2, 0.55, 0.5, 0.5, 2, 0.12], [12.7, 1.16, -18.3, 0.55, 0.46, 0.5, 3, 0.2], [13.4, 1.12, -18.3, 0.58, 0.5, 0.5, 0, -0.1],
-      [12.5, 0.66, -19.4, 0.6, 0.5, 0.55, 2, 0], [13.2, 0.66, -19.4, 0.6, 0.5, 0.55, 1, 0.1], [13.0, 1.16, -19.4, 0.6, 0.5, 0.55, 0, 0.05]];
-    for (const [x, y, z, w, h, d, mi, r] of stack) cardboardBox(x, y, z, w, h, d, mi, r, TG);
-    const mat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.7, 16), std({ color: 0xc9c2a8, roughness: 1 })); mat.rotation.z = Math.PI / 2; mat.position.set(13.2, 1.0, -21.6); TG.add(mat);
-  }
-  box(11.9, 14.1, 0.4, 2.3, -26.4, -24, M.truckCab, { uv: false, parent: TG });
-  { const ws = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.7), M.glassOut); ws.position.set(13, 1.85, -26.41); ws.rotation.y = Math.PI; TG.add(ws); }
-  for (const [x, z] of [[11.75, -25.4], [14.25, -25.4], [11.75, -22.6], [14.25, -22.6], [11.75, -18.2], [14.25, -18.2]]) {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 20), M.tire); w.rotation.z = Math.PI / 2; w.position.set(x, 0.42, z); w.castShadow = true; TG.add(w);
-  }
+  // the moving truck (assets/props/truck.glb, a cab-over box truck): backed up the drive toward the house with its roll-up door open and
+  // the ramp down, so the family can walk up into the box. TRUCK.z is the rear sill, TRUCK.bed the floor height (main.js walks Dad up the ramp)
+  const TRUCK = { x: 2.3, z: -14.5, bed: 1.3, s: 0.95, ramp: 4.3 };
   {
-    const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 3.05), M.metal); ramp.position.set(13, 0.28, -15.5); ramp.rotation.x = 0.18; ramp.castShadow = ramp.receiveShadow = true; TG.add(ramp);
+    const s = TRUCK.s, zc = TRUCK.z - 3.02 * s, W2 = 1.1 * s;   // the model is 6.04 long along its x; turned so its back faces the house (+z)
+    place(yard, 'truck', { x: TRUCK.x, z: zc, rot: Math.PI / 2, s, onLoad: (holder, b, m) => {
+      // open the back: the roll-up door is the rear wall of the box, so its triangles go (the model is two-sided, so the inside of the box shows)
+      holder.updateMatrixWorld(true);
+      m.traverse((o) => {
+        if (!o.isMesh || !/Body_lct|Bottom_UCB/.test(o.name)) return;
+        const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(), p = g.attributes.position, v = new THREE.Vector3(), keep = [];
+        for (let i = 0; i < p.count; i += 3) {
+          let back = 0; for (let k = 0; k < 3; k++) { v.fromBufferAttribute(p, i + k).applyMatrix4(o.matrixWorld); if (v.z > TRUCK.z - 0.12 && v.y > TRUCK.bed - 0.12) back++; }
+          if (back < 3) keep.push(i);
+        }
+        const out = new THREE.BufferGeometry();
+        for (const name of Object.keys(g.attributes)) { const a = g.attributes[name], arr = new a.array.constructor(keep.length * 3 * a.itemSize); keep.forEach((i, n) => { for (let k = 0; k < 3 * a.itemSize; k++) arr[n * 3 * a.itemSize + k] = a.array[i * a.itemSize + k]; }); out.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize, a.normalized)); }
+        out.computeBoundingSphere(); o.geometry = out;
+      });
+    } });
+    // the plywood floor of the box, the door rolled up under the roof, the ramp hooked on the sill
+    box(TRUCK.x - W2 + 0.06, TRUCK.x + W2 - 0.06, TRUCK.bed - 0.02, TRUCK.bed + 0.012, TRUCK.z - 3.5, TRUCK.z - 0.02, M.ply, { uv: true, parent: yard });
+    { const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 2 * W2 - 0.1, 14), M.steel); roll.rotation.z = Math.PI / 2; roll.position.set(TRUCK.x, 3.34 * s - 0.17, TRUCK.z - 0.22); roll.castShadow = true; yard.add(roll); }
+    {
+      const RL = TRUCK.ramp, L = Math.hypot(RL, TRUCK.bed), ramp = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, L), M.metal);
+      ramp.position.set(TRUCK.x, TRUCK.bed / 2 - 0.01, TRUCK.z + RL / 2); ramp.rotation.x = Math.atan2(TRUCK.bed, RL); ramp.castShadow = ramp.receiveShadow = true; yard.add(ramp);
+      for (const x of [-0.5, 0.5]) { const lip = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, L), M.steel); lip.position.set(TRUCK.x + x, TRUCK.bed / 2 + 0.02, TRUCK.z + RL / 2); lip.rotation.x = ramp.rotation.x; yard.add(lip); }
+    }
+    {   // what is still in the back: a stack of boxes, a rolled mattress and a lamp, all of it where the family reaches in
+      const y0 = TRUCK.bed + 0.012;
+      const stack = [[1.7, y0, -15.8, 0.62, 0.5, 0.5, 0, 0.1], [2.4, y0, -15.8, 0.6, 0.46, 0.5, 1, -0.05], [3.1, y0, -15.7, 0.55, 0.5, 0.5, 2, 0.12], [2.0, y0 + 0.5, -15.8, 0.55, 0.46, 0.5, 3, 0.2], [2.7, y0 + 0.46, -15.8, 0.58, 0.5, 0.5, 0, -0.1],
+        [1.8, y0, -16.9, 0.6, 0.5, 0.55, 2, 0], [2.5, y0, -16.9, 0.6, 0.5, 0.55, 1, 0.1], [2.3, y0 + 0.5, -16.9, 0.6, 0.5, 0.55, 0, 0.05]];
+      for (const [x, y, z, w, h, d, mi, r] of stack) cardboardBox(x, y, z, w, h, d, mi, r, yard);
+      const mat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.7, 16), std({ color: 0xc9c2a8, roughness: 1 })); mat.rotation.z = Math.PI / 2; mat.position.set(2.5, y0 + 0.3, -18.0); yard.add(mat);
+    }
+    solid(TRUCK.x - 1.4, TRUCK.x + 1.4, zc - 3.3 * s, TRUCK.z + 0.1);
   }
-  solid(1.05, 3.65, -24, -14.4);
   // pickup boxes
   const pickups = [
     cardboardBox(1.3, 0, -12.3, 0.5, 0.44, 0.5, 3, 0.15, yard),
@@ -1634,10 +1663,12 @@ export function buildWorld(scene) {
     defParent = null;
     garage = { door: doors.garage, light, panel: { group: pDoor, pos: breaker.pos, isOpen: false, open(k) { pDoor.rotation.y = k * 1.9; this.isOpen = k > 0.5; } }, pos: new THREE.Vector3(-10.8, 0, -10.3), bounds: PLACES.garage };
   }
-  {   // an arborvitae hedge along the east end of the house
-    const hx = SX(8.1) + 1.7, hedge = new THREE.InstancedMesh(new THREE.ConeGeometry(0.55, 3.6, 10), M.leaves, 13), m4 = new THREE.Matrix4();
-    for (let i = 0; i < 13; i++) { m4.makeTranslation(hx, 1.8, -5.5 + i * 1.0); hedge.setMatrixAt(i, m4); }
-    hedge.castShadow = true; yard.add(hedge); solid(hx - 0.6, hx + 0.6, -6, 7.0);
+  {   // shrubs (assets/props/shrub.glb, 0.5 m at scale 1): a loose row along the east end of the house, and the planter under the picture window
+    const r = TX.rng(31), hx = SX(8.1) + 1.8, mats = [], q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), m4 = new THREE.Matrix4(), sc = new THREE.Vector3();
+    const put = (x, z, k) => { q.setFromAxisAngle(up, r() * 6.28); mats.push(m4.clone().compose(new THREE.Vector3(x, -0.06, z), q, sc.set(k, k * (0.85 + r() * 0.3), k))); };
+    for (let i = 0; i < 10; i++) put(hx + (r() - 0.5) * 0.4, -4.6 + i * 1.25, 2.3 + r() * 0.9);
+    for (const x of [-1.4, -0.6, 0.1, 0.6]) put(SX(x), -5.05, 1.5 + r() * 0.4);
+    scatter(yard, 'shrub', mats); solid(hx - 0.8, hx + 0.8, -5.2, 7.2);
   }
   // utility poles along the road (they also give the road something to rush past when you are in a car)
   {
@@ -1646,22 +1677,37 @@ export function buildWorld(scene) {
     poles.count = arms.count = n; poles.castShadow = true; yard.add(poles, arms);
     const wire = new THREE.Mesh(new THREE.BoxGeometry(480, 0.02, 0.02), M.black); wire.position.set(0, 7.5, -26.2); yard.add(wire);
   }
-  // the property lines: a weathered wood fence along the west, back and east edges (the front is the road). Past it the fog takes over.
+  // the property lines: a post-and-board fence along the west, back and east edges (the front is the road); 4x4 posts every 2.4 m, two rails,
+  // boards with a gap between them, each a little off true. Past it the fog takes over.
   {
-    const FX0 = -27, FX1 = 27, FZ0 = -26, FZ1 = 28, mat = M.fence, G0 = -17.4, G1 = -14.6;   // G0..G1: the gate out to the barn track
-    box(FX0, FX0 + 0.06, 0, 1.8, FZ0, G0, mat, { parent: yard, uv: true }); box(FX0, FX0 + 0.06, 0, 1.8, G1, FZ1, mat, { parent: yard, uv: true }); box(FX1 - 0.06, FX1, 0, 1.8, FZ0, FZ1, mat, { parent: yard, uv: true });
-    box(FX0, FX1, 0, 1.8, FZ1 - 0.06, FZ1, mat, { parent: yard, uv: true });
+    const FX0 = -27, FX1 = 27, FZ0 = -26, FZ1 = 28, G0 = -17.4, G1 = -14.6, r = TX.rng(57);   // G0..G1: the gate out to the barn track
+    const runs = [[FX0, FZ0, FX0, G0], [FX0, G1, FX0, FZ1], [FX1, FZ0, FX1, FZ1], [FX0, FZ1, FX1, FZ1]];
+    const posts = [], rails = [], boards = [];
+    for (const [ax, az, bx, bz] of runs) {
+      const L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L, yaw = Math.atan2(ux, uz);
+      for (let d = 0; d <= L + 0.01; d += 2.4) { const t = Math.min(d, L); posts.push([ax + ux * t, az + uz * t, yaw]); }
+      for (let d = 0; d < L; d += 2.4) { const len = Math.min(2.4, L - d); for (const y of [0.5, 1.2]) rails.push([ax + ux * (d + len / 2), az + uz * (d + len / 2), yaw, len, y]); }
+      for (let d = 0.12; d < L - 0.08; d += 0.17) boards.push([ax + ux * d, az + uz * d, yaw + (r() - 0.5) * 0.02, 1.5 + (r() - 0.5) * 0.09, (r() - 0.5) * 0.035]);
+    }
+    const q = new THREE.Quaternion(), e = new THREE.Euler(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+    const mesh = (geo, mat, n) => { const im = new THREE.InstancedMesh(geo, mat, n); im.castShadow = true; im.receiveShadow = true; yard.add(im); return im; };
+    const pg = new THREE.BoxGeometry(0.1, 1.75, 0.1); pg.translate(0, 0.875, 0);
+    const pm = mesh(pg, M.darkWood, posts.length); posts.forEach(([x, z, yaw], i) => { q.setFromAxisAngle(up, yaw); pm.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 0, z), q, sc)); });
+    const rg = new THREE.BoxGeometry(0.04, 0.09, 1); rg.translate(0.06, 0, 0);
+    const rm = mesh(rg, M.fence, rails.length); rails.forEach(([x, z, yaw, len, y], i) => { q.setFromAxisAngle(up, yaw); rm.setMatrixAt(i, m4.compose(new THREE.Vector3(x, y, z), q, sc.set(1, 1, len))); });
+    sc.set(1, 1, 1);
+    const bg = new THREE.BoxGeometry(0.02, 1, 0.14); bg.translate(0.09, 0.5, 0);
+    { const uv = bg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.08, uv.getY(i) * 0.75); }   // the grain runs up the board, at the wood's own scale
+    const bm = mesh(bg, M.fence, boards.length); boards.forEach(([x, z, yaw, h, lean], i) => { q.setFromEuler(e.set(0, yaw, lean)); bm.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 0.08, z), q, sc.set(1, h, 1))); });
+    sc.set(1, 1, 1);
     solid(FX0 - 0.3, FX0 + 0.3, FZ0, G0); solid(FX0 - 0.3, FX0 + 0.3, G1, FZ1); solid(FX1 - 0.3, FX1 + 0.3, FZ0, FZ1); solid(FX0, FX1, FZ1 - 0.3, FZ1 + 0.3);
-    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 2.0, 0.14), M.darkWood, 60), mm = new THREE.Matrix4(); let n = 0;
-    for (let z = FZ0; z <= FZ1 && n < 60; z += 3) { mm.makeTranslation(FX0 + 0.03, 1.0, z); posts.setMatrixAt(n++, mm); mm.makeTranslation(FX1 - 0.03, 1.0, z); posts.setMatrixAt(n++, mm); }
-    posts.count = n; posts.castShadow = true; yard.add(posts);
   }
 
   // ---------- the end of the drive: the street light, the mailbox, the cans, the sign down the road, the reflector posts ----------
   // the street light: a wooden pole on the shoulder east of the drive, a steel arm out over the road and a cobra head on the end of it, the old
   // high-pressure sodium kind that comes up amber and buzzes. It is on the grid, so the blackout takes it too (main.js: streetLight.set).
   const streetLight = (() => {
-    const PX = 10.4, PZ = -26.3, PH = 8.0, HX = PX, HZ = -29.3, HY = 8.25;
+    const PX = 7.8, PZ = -26.3, PH = 8.0, HX = PX, HZ = -29.3, HY = 8.25;
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, PH, 10), M.darkWood); pole.position.set(PX, PH / 2, PZ); pole.castShadow = true; yard.add(pole);
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, Math.hypot(HZ - PZ, HY - (PH - 0.5)), 8), M.steel); arm.position.set(PX, (PH - 0.5 + HY) / 2, (PZ + HZ) / 2); arm.rotation.x = Math.atan2(HZ - PZ, HY - (PH - 0.5)); arm.castShadow = true; yard.add(arm);
     const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), M.steel); brace.position.set(PX, PH - 1.1, PZ - 0.8); brace.rotation.x = -0.95; yard.add(brace);
@@ -1706,8 +1752,8 @@ export function buildWorld(scene) {
       },
     };
   })();
-  place(yard, 'mailbox', { x: 9.4, z: -26.9, rot: Math.PI, s: 0.33 }); solid(9.15, 9.65, -27.15, -26.65);
-  place(yard, 'trash_can', { x: -7.6, z: -26.3, rot: 0.35 }); solid(-8.4, -6.8, -26.8, -25.8);
+  place(yard, 'mailbox', { x: -10.4, z: -26.9, rot: Math.PI, s: 0.33 }); solid(-10.65, -10.15, -27.15, -26.65);
+  place(yard, 'trash_can', { x: -11.6, z: -26.1, rot: 0.35 }); solid(-12.4, -10.8, -26.6, -25.6);
   {   // the speed limit sign a way down the road, for the +x traffic; the reflector posts along the far shoulder
     const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
     g.fillStyle = '#e9e6dc'; g.fillRect(0, 0, 128, 160); g.strokeStyle = '#1a1a1a'; g.lineWidth = 5; g.strokeRect(6, 6, 116, 148);
@@ -1722,14 +1768,14 @@ export function buildWorld(scene) {
   // puddles on the drive and the road, shown by weather.js once the ground is wet; dry patches in the grass where the summer burnt it
   const puddles = new THREE.Group(); puddles.visible = false; yard.add(puddles);
   {
-    const r = TX.rng(313), spots = [[-2.6, -17, 1.6, 0.9], [5.4, -23.5, 1.2, 0.7], [-2.4, -27.8, 2.2, 1.1], [6.5, -12.5, 1.0, 0.8], [14, -29.0, 2.6, 1.0], [-22, -32.2, 3.0, 1.2], [31, -32.6, 2.2, 0.9], [-9.3, -5.2, 1.3, 0.8], [-0.5, -9.6, 1.1, 0.7], [-13.5, -27.6, 1.8, 1.0]];   // clear of the truck
+    const r = TX.rng(313), spots = [[-2.6, -17, 1.6, 0.9], [4.6, -23.5, 1.2, 0.7], [-2.4, -27.8, 2.2, 1.1], [4.8, -12.5, 1.0, 0.8], [14, -29.0, 2.6, 1.0], [-22, -32.2, 3.0, 1.2], [31, -32.6, 2.2, 0.9], [-9.3, -5.2, 1.3, 0.8], [-0.5, -9.6, 1.1, 0.7], [-13.5, -27.6, 1.8, 1.0]];   // clear of the truck
     for (const [x, z, a, b] of spots) {
       const m = new THREE.Mesh(new THREE.CircleGeometry(1, 28), std({ color: 0x0a0d12, roughness: 0.04, metalness: 0.05, transparent: true, opacity: 0, depthWrite: false, envMapIntensity: 1.4 }));
       m.rotation.x = -Math.PI / 2; m.rotation.z = r() * 3; m.scale.set(a, b, 1); m.position.set(x, -0.002, z); m.renderOrder = 2; m.receiveShadow = true; puddles.add(m);
     }
     for (let i = 0; i < 14; i++) {
       const x = -24 + r() * 50, z = -26 + r() * 48, k = 2 + r() * 3.5;
-      if ((x > -11 && x < 12 && z > -8 && z < 7) || (x > -2 && x < 6 && z < -6 && z > -30) || (x > -15 && x < -5 && z > -15 && z < -6)) continue;
+      if ((x > -11 && x < 12 && z > -8 && z < 7) || (x > -9.4 && x < 6.2 && z < -7.6 && z > -30) || (x > -15 && x < -5 && z > -15 && z < -6)) continue;
       const geo = new THREE.CircleGeometry(1, 20); geo.rotateX(-Math.PI / 2); geo.scale(k, 1, k * (0.5 + r() * 0.6)); geo.rotateY(r() * 3); geo.translate(x, -0.016, z); worldUV(geo);
       const m = new THREE.Mesh(geo, M.grassDry); m.receiveShadow = true; yard.add(m);
     }
@@ -1797,36 +1843,69 @@ export function buildWorld(scene) {
     for (const y of [0.55, 1.1]) { for (let i = 1; i < posts.length; i++) if (posts[i][0] === 40 && posts[i - 1][0] === 40 || posts[i][1] === -48 && posts[i - 1][1] === -48) rail(posts[i - 1][0], posts[i - 1][1], posts[i][0], posts[i][1], y); }
   }
   M.leaves.map = TX.needles(); M.leaves.side = THREE.DoubleSide; M.leaves.color.set(0xd8e8d8); M.leaves.roughness = 0.95;
-  // the spruces (assets/props/spruce.glb, 9 m at scale 1): a few in the yard, clumps across the fields, a shelter belt along the back and the
-  // sides, and a treeline all round at the edge of the fog; dead trees here and there. All instanced, only the near ones cast shadows.
+  // the trees. Every trunk is checked before it goes in: nothing within 1.5 m of the house, the garage, the drive, the road, the truck, the
+  // fence, the track or the barn, no canopy over the house, and trunks at least 4 m apart (fir1/fir2: 9.3 m at scale 1, canopy 2.6 m;
+  // maple: 20.8 m at scale 1, canopy 9.3 m). All instanced; only the trees near the house cast shadows.
+  const HX0 = -8.1, HX1 = SX(8.1), HZ0 = -4.5, HZ1 = SZ(5.1), FX0 = -27, FX1 = 27, FZ0 = -26, FZ1 = 28;
+  const trunks = [];
+  const treeOk = (x, z, canopy) => {
+    const near = (x0, x1, z0, z1, pad) => x > x0 - pad && x < x1 + pad && z > z0 - pad && z < z1 + pad;
+    if (near(HX0, HX1, HZ0, HZ1 + 1.6, 1.5 + canopy)) return false;                      // the house and the back stoop, with the canopy clear of the roof
+    if (near(PLACES.garage[0], PLACES.garage[1], PLACES.garage[2], PLACES.garage[3], 1.5 + canopy * 0.6)) return false;
+    if (near(-9.4, 6.2, -30, -7.6, 1.5)) return false;                                   // the lot, the truck on it and the walk to the porch
+    if (near(-8.6, -5.8, -14, -3.9, 1.5)) return false;                                  // the garage apron and the side walk
+    if (z < RZ1 + 1.5 + 1.5 && z > RZ0 - 9) return false;                                // the road, its shoulders and the ditch
+    if (Math.abs(x - FX0) < 1.5 || Math.abs(x - FX1) < 1.5 || Math.abs(z - FZ1) < 1.5 || Math.abs(z - FZ0) < 1.5) return false;   // the fence lines
+    if (x < -27 && x > -70 && z > -22 && z < -8) return false;                             // the track out to the barn
+    if (Math.hypot(x - BARN.x, z - BARN.z) < 14) return false;
+    for (const [tx, tz] of trunks) if (Math.hypot(x - tx, z - tz) < 4) return false;
+    return true;
+  };
+  let treesRejected = 0;
   {
     const r = TX.rng(777), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3();
-    const clear = (x, z) => !(x > -34 && x < 34 && z > -42 && z < 34) && !(z > -42 && z < -22) && !(x > -80 && x < -48 && z > -38 && z < 4) && Math.hypot(x - BARN.x, z - BARN.z) > 12;   // off the yard, the road, the barn and its pad
-    const at = (x, z, k, rot) => { q.setFromAxisAngle(up, rot); return m4.clone().compose(new THREE.Vector3(x, fieldH(x, z) - 0.04, z), q, sc.set(k, k, k)); };
-    const spruce = [], bare = [];
-    const clump = (cx, cz, n, spread) => { for (let i = 0; i < n * 3 && n > 0; i++) { const x = cx + (r() - 0.5) * spread, z = cz + (r() - 0.5) * spread; if (!clear(x, z)) continue; spruce.push(at(x, z, 0.0072 + r() * 0.0032, r() * 6.28)); n--; } };
+    const at = (x, z, k, rot, lift = 0) => { q.setFromAxisAngle(up, rot); trunks.push([x, z]); return m4.clone().compose(new THREE.Vector3(x, fieldH(x, z) - 0.05 + lift, z), q, sc.set(k, k, k)); };
+    const fir = [[], []], bare = [], maple = [];
+    const tryFir = (x, z, k) => { if (!treeOk(x, z, 2.6 * k)) { treesRejected++; return false; } fir[r() < 0.5 ? 0 : 1].push(at(x, z, k, r() * 6.28)); return true; };
+    // the firs: clumps across the fields, a shelter belt just past the fence, and a treeline all round at the edge of the fog
+    const clump = (cx, cz, n, spread, k0 = 1.3, k1 = 2.3) => { for (let i = 0; i < n * 4 && n > 0; i++) if (tryFir(cx + (r() - 0.5) * spread, cz + (r() - 0.5) * spread, k0 + r() * (k1 - k0))) n--; };
     for (const [x, z, n, s] of [[-48, 24, 7, 14], [-70, 38, 9, 18], [52, 30, 8, 16], [60, -8, 6, 14], [-96, -4, 10, 20], [-56, -40, 5, 12], [30, -60, 8, 16], [-20, -62, 7, 16], [72, -52, 6, 14], [-110, 30, 8, 18], [4, 58, 9, 18], [-30, 50, 6, 14]]) clump(x, z, n, s);
-    for (let a = 0; a < Math.PI * 2; a += 0.045) {   // the treeline at the edge of sight, two deep, broken here and there
+    for (const [x, z] of [[-40, 36], [44, 24], [-38, -8], [-44, 14], [50, -2], [-60, 16], [34, 10], [-33, 30]]) tryFir(x, z, 1.8 + r() * 0.5);
+    for (let a = 0; a < Math.PI * 2; a += 0.04) {   // the treeline, two deep, broken here and there
       if (r() < 0.12) continue;
-      const d = 62 + r() * 30, x = Math.cos(a) * d, z = -8 + Math.sin(a) * d;
-      if (clear(x, z)) spruce.push(at(x, z, 0.0078 + r() * 0.004, r() * 6.28));
+      const d = 62 + r() * 30; tryFir(Math.cos(a) * d, -8 + Math.sin(a) * d, 1.6 + r() * 0.9);
     }
-    for (const [x, z] of [[-40, 36], [44, 24], [-38, -8], [-44, 14], [50, -2], [-60, 16]]) if (clear(x, z)) spruce.push(at(x, z, 0.0085 + r() * 0.002, r() * 6.28));   // the shelter belt just past the fence
-    for (let i = 0; i < 40 && bare.length < 14; i++) { const a = r() * 6.28, d = 36 + r() * 70, x = 5 + Math.cos(a) * d, z = -10 + Math.sin(a) * d; if (clear(x, z)) bare.push(at(x, z, 6 + r() * 3.5, r() * 6.28)); }
-    const near = (m) => Math.hypot(m.elements[12], m.elements[14]) < 48;
-    scatter(yard, 'spruce', spruce.filter(near)); scatter(yard, 'spruce', spruce.filter((m) => !near(m)), { cast: false });
-    scatter(yard, 'tree_bare', bare.filter(near)); scatter(yard, 'tree_bare', bare.filter((m) => !near(m)), { cast: false });
-    for (const m of [...spruce, ...bare]) if (Math.hypot(m.elements[12] - 5, m.elements[14] + 15) < 70) solid(m.elements[12] - 0.4, m.elements[12] + 0.4, m.elements[14] - 0.4, m.elements[14] + 0.4);
+    // a few firs inside the fence, in the corners of the yard, and the maples: by the house, along the drive and at the back
+    for (const [x, z] of [[-23, 24], [22, 25], [-22, -22], [24, -21], [-24, 8]]) tryFir(x, z, 1.5 + r() * 0.4);
+    for (const [x, z, k] of [[-17, 9, 0.62], [19, 12, 0.58], [-19, -5, 0.5], [21, -4, 0.55], [-14, -22, 0.45], [12, 22, 0.6], [-6, 22, 0.52], [8, -22, 0.4], [17, -23, 0.48], [-20, 20, 0.55]]) {
+      if (!treeOk(x, z, 9.3 * k)) { treesRejected++; continue; }
+      maple.push(at(x, z, k, r() * 6.28));
+    }
+    for (let i = 0; i < 40 && bare.length < 14; i++) { const a = r() * 6.28, d = 36 + r() * 70, x = 5 + Math.cos(a) * d, z = -10 + Math.sin(a) * d; if (treeOk(x, z, 2)) bare.push(at(x, z, 6 + r() * 3.5, r() * 6.28)); else treesRejected++; }
+    // the trees past 32 m are the pack's far models (a quarter of the triangles), cast no shadow and are left out of the ambient occlusion pass
+    const near = (m) => Math.hypot(m.elements[12], m.elements[14]) < 32, far = new THREE.Group(); far.userData.noAO = true; yard.add(far);
+    for (const [i, name] of [[0, 'fir1'], [1, 'fir2']]) { scatter(yard, name, fir[i].filter(near)); scatter(far, name + '_far', fir[i].filter((m) => !near(m)), { cast: false }); }
+    scatter(yard, 'maple', maple);
+    scatter(yard, 'tree_bare', bare.filter(near)); scatter(far, 'tree_bare', bare.filter((m) => !near(m)), { cast: false });
+    for (const m of [...fir[0], ...fir[1], ...maple, ...bare]) if (Math.hypot(m.elements[12] - 5, m.elements[14] + 15) < 70) solid(m.elements[12] - 0.4, m.elements[12] + 0.4, m.elements[14] - 0.4, m.elements[14] + 0.4);
+    // leaves under the maples, lying flat, and a mole hill or two in the lawn
+    {
+      const lg = new THREE.PlaneGeometry(0.11, 0.09); lg.rotateX(-Math.PI / 2);
+      const lm = new THREE.InstancedMesh(lg, std({ color: 0x8a6a3a, roughness: 1, side: THREE.DoubleSide }), maple.length * 60), c = new THREE.Color(); let n = 0;
+      for (const m of maple) for (let i = 0; i < 60; i++) {
+        const a = r() * 6.28, d = r() * 9.3 * m.elements[0] * 0.7, x = m.elements[12] + Math.cos(a) * d, z = m.elements[14] + Math.sin(a) * d;
+        if ((x > HX0 - 0.5 && x < HX1 + 0.5 && z > HZ0 - 0.5 && z < HZ1 + 1.6) || (x > -9.4 && x < 6.2 && z > -30 && z < -7.6)) continue;   // not on the house or the lot
+        q.setFromAxisAngle(up, r() * 6.28); lm.setMatrixAt(n, m4.compose(new THREE.Vector3(x, fieldH(x, z) + 0.006, z), q, sc.set(0.8 + r() * 0.6, 1, 0.8 + r() * 0.6)));
+        lm.setColorAt(n, c.setHSL(0.07 + r() * 0.05, 0.5 + r() * 0.3, 0.3 + r() * 0.2)); n++;
+      }
+      lm.count = n; lm.receiveShadow = true; yard.add(lm);
+      for (const [x, z] of [[-11, 12], [16, -11], [-16, -1]]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.dirt); h.scale.y = 0.45; h.position.set(x, -0.01, z); h.castShadow = h.receiveShadow = true; yard.add(h); }
+    }
   }
-  // trees (a deciduous model) around the house, ground-cover tufts, and rocks (instanced)
+  // ground-cover tufts and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < SX(8.1) + 1.6 + pad && z > -6.5 - pad && z < SZ(5.1) + 1.2 + pad) && !(x > -1 - pad && x < 5.5 + pad && z < -6 && z > -34) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -25.6 - pad && z > -38.5 + pad);   // not on the house, porch path, truck, garage, or the road and its ditch
-    const trees = [[-14, 7], [-19, -4], [-18, -19], [29, 9], [33, -6], [27, -24], [-12, -22], [31, -32], [8, 14], [20, 15], [-24, 13], [38, 2], [6, -8]];   // the last is the cherry tree by the front
-    const tm = trees.map(([x, z]) => { const k = 1.5 + r() * 1.1; q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.02, z), q, sc.set(k, k, k)); });
-    const near = tm.filter((m) => Math.hypot(m.elements[12], m.elements[14]) < 32);   // only the trees by the house cast shadows (the rest are too far to matter)
-    scatter(yard, 'tree_small', near); scatter(yard, 'tree_small', tm.filter((m) => !near.includes(m)), { cast: false });
-    trees.forEach(([x, z]) => solid(x - 0.5, x + 0.5, z - 0.5, z + 0.5));
+    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < SX(8.1) + 1.6 + pad && z > -6.5 - pad && z < SZ(5.1) + 1.2 + pad) && !(x > -9.4 - pad && x < 6.2 + pad && z < -7.6 && z > -34) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -25.6 - pad && z > -38.5 + pad);   // not on the house, porch path, truck, garage, or the road and its ditch
     const grass = (name, n, rmin, rmax, k0, k1) => {
       const ms = [];
       while (ms.length < n) {
@@ -1849,11 +1928,81 @@ export function buildWorld(scene) {
       for (const m of ms) { const key = Math.floor(m.elements[12] / 24) + ',' + Math.floor(m.elements[14] / 24); (cells.get(key) || cells.set(key, []).get(key)).push(m); }
       for (const list of cells.values()) scatter(yard, 'grass2', list, { cast: false });
     }
-    const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [14, -23.5, 1.6], [-6, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
+    const rocks = [[-10, 3, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [14, -23.5, 1.6], [-12.5, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
     scatter(yard, 'rock1', rocks);
     const small = []; for (let i = 0; i < 40; i++) { const x = -20 + r() * 60, z = -35 + r() * 50; if (!ok(x, z, 2)) continue; q.setFromAxisAngle(up, r() * 6.28); const k = 1 + r() * 2.5; small.push(m4.clone().compose(new THREE.Vector3(x, -0.03, z), q, sc.set(k, k, k))); }
     scatter(yard, 'rock2', small);
   }
+  // the lawn: blades of grass in their tens of thousands, instanced in cells so only the ones in view are drawn, swaying in the wind in the
+  // vertex shader; thick near the house, thinning toward the fence, none on the house, the drive, the garage or the road. The drive's edge is
+  // worn into the grass with a strip of dirt that fades out, and a few bare patches sit where feet and tyres go.
+  const lawn = (() => {
+    const r = TX.rng(8080), g = new THREE.Group(); g.userData.noAO = true; yard.add(g);   // blades get no ambient occlusion pass: it costs a draw of all of them and shows nothing
+    // one blade texture: a few blades painted on a canvas, alpha-tested
+    const c = document.createElement('canvas'); c.width = 64; c.height = 128; const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 64, 128);
+    for (let i = 0; i < 7; i++) {
+      const x0 = 6 + i * 8 + r() * 4, w = 3 + r() * 3, lean = (r() - 0.5) * 22, h = 70 + r() * 56;
+      ctx.beginPath(); ctx.moveTo(x0 - w, 128); ctx.quadraticCurveTo(x0 + lean * 0.4, 128 - h * 0.6, x0 + lean, 128 - h); ctx.quadraticCurveTo(x0 + lean * 0.5, 128 - h * 0.55, x0 + w, 128); ctx.closePath();
+      const gr = ctx.createLinearGradient(0, 128, 0, 128 - h); gr.addColorStop(0, `hsl(${92 + r() * 16}, 45%, ${34 + r() * 8}%)`); gr.addColorStop(1, `hsl(${78 + r() * 16}, 55%, ${52 + r() * 12}%)`);
+      ctx.fillStyle = gr; ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, metalness: 0 });
+    const time = { value: 0 };
+    mat.onBeforeCompile = (sh) => {   // the wind: the top of each blade sways by where it stands and the time, the roots stay put
+      sh.uniforms.uTime = time;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+        { vec3 root = instanceMatrix[3].xyz; float k = uv.y * uv.y; float ph = root.x * 0.9 + root.z * 0.7;
+          transformed.x += k * (0.05 * sin(uTime * 1.3 + ph) + 0.025 * sin(uTime * 2.9 + ph * 1.7)); transformed.z += k * 0.035 * sin(uTime * 1.1 + ph * 0.8 + 1.0); }`);
+    };
+    mat.customProgramCacheKey = () => 'lawn';
+    // two crossed cards per blade cluster, the bottom at the origin
+    const card = new THREE.PlaneGeometry(0.16, 0.34); card.translate(0, 0.17, 0);
+    const cross = card.clone().rotateY(Math.PI / 2), geo = mergeGeometries([card, cross], false);
+    const onLawn = (x, z) => x > FX0 + 0.3 && x < FX1 - 0.3 && z > RZ1 + 1.6 && z < FZ1 - 0.3
+      && !(x > HX0 - 0.35 && x < HX1 + 0.35 && z > HZ0 - 0.6 && z < HZ1 + 0.3) && !(x > -9.4 && x < 6.2 && z > -29.5 && z < -7.6) && !(x > 2.4 && x < 3.8 && z > -8 && z < -5.0)
+      && !(x > PLACES.garage[0] - 0.3 && x < PLACES.garage[1] + 0.3 && z > PLACES.garage[2] - 0.3 && z < PLACES.garage[3] + 0.3) && !(x > -8.7 && x < -5.9 && z > -14 && z < -3.9)
+      && !(x > -7.8 && x < -1.1 && z > 3.5 && z < 6.3) && !(x > 12.0 && x < 14.1 && z > -5.3 && z < 7.3) && !(x > -1.3 && x < 1.3 && z > -5.9 && z < -4.4);   // the stoop and stairwell, the shrubs, the front step
+    const cells = new Map(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    let n = 0;
+    for (let i = 0; i < 90000 && n < 34000; i++) {
+      const x = FX0 + r() * (FX1 - FX0), z = RZ1 + 1.6 + r() * (FZ1 - RZ1 - 1.6);
+      const d = Math.hypot((x - 2) / 1.3, z + 4), keep = d < 16 ? 1 : d < 24 ? 0.45 : 0.18;   // thick round the house
+      if (r() > keep) continue;
+      if (!onLawn(x, z) && !(x > -4.4 && x < 0.4 && z > -25 && z < -7.6 && r() < 0.12)) continue;   // a little grass comes up through the gravel between the tracks
+      const k = 0.6 + r() * 0.55;
+      q.setFromAxisAngle(up, r() * 6.28);
+      const key = Math.floor(x / 14) + ',' + Math.floor(z / 14);
+      (cells.get(key) || cells.set(key, []).get(key)).push([m4.clone().compose(new THREE.Vector3(x, -0.012, z), q, sc.set(k, k * (0.75 + r() * 0.6), k)), col.clone().setHSL(0.2 + r() * 0.08, 0.22 + r() * 0.28, 0.6 + r() * 0.3)]);
+      n++;
+    }
+    for (const list of cells.values()) {
+      const im = new THREE.InstancedMesh(geo, mat, list.length);
+      list.forEach(([m, cc], i) => { im.setMatrixAt(i, m); im.setColorAt(i, cc); });
+      im.receiveShadow = true; im.computeBoundingSphere(); g.add(im);
+    }
+    // the worn edge of the drive: dirt that fades into the grass, and bare patches by the porch walk and under the truck's ramp
+    {
+      const ec = document.createElement('canvas'); ec.width = 16; ec.height = 128; const e = ec.getContext('2d'), gr = e.createLinearGradient(0, 0, 0, 128);
+      gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); e.fillStyle = gr; e.fillRect(0, 0, 16, 128);
+      const alpha = new THREE.CanvasTexture(ec);
+      alpha.repeat.set(1 / 19.2, 1 / 1.8);   // the strips' uvs are in metres, like the lot's; the short strip just repeats a little
+      const em = std({ roughness: 1, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); applyPBR(em, 'gravel', { tint: 0xa89d8c, anti: true, flat: 0.92 });
+      for (const [cx, cz, len, yaw] of [[-9.2 - 0.9, -17.4, 19.2, -Math.PI / 2], [6.0 + 0.9, -17.4, 19.2, Math.PI / 2], [-1.6, -7.8 + 0.9, 15.2, 0]]) {   // the solid edge lies on the lot's edge and fades out into the lawn
+        const sg = new THREE.PlaneGeometry(len, 1.8); { const uv = sg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * len, uv.getY(i) * 1.8); }
+        const strip = new THREE.Mesh(sg, em); strip.rotation.x = -Math.PI / 2; strip.rotation.z = yaw;
+        strip.position.set(cx, 0.004, cz); strip.renderOrder = 1; strip.receiveShadow = true; g.add(strip);
+      }
+      const pm = std({ roughness: 1, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); applyPBR(pm, 'dirt', { anti: true, flat: 0.95 });
+      for (const [x, z, a, b, rot] of [[3.1, -6.4, 1.3, 0.8, 0.3], [-7.3, -4.6, 1.0, 0.7, 0.8], [8.2, -12.9, 0.9, 0.7, 1.2], [-10.9, -3.4, 1.2, 0.8, 0.5], [7.4, -20.5, 1.1, 0.7, 0.9]]) {
+        const p = new THREE.Mesh(new THREE.CircleGeometry(1, 22), pm); p.rotation.x = -Math.PI / 2; p.rotation.z = rot; p.scale.set(a, b, 1); p.position.set(x, 0.005, z); p.renderOrder = 1; p.receiveShadow = true; g.add(p);
+      }
+    }
+    return { group: g, time, count: n };
+  })();
+  lawn.group.traverse((o) => { if (o.isInstancedMesh) o.onBeforeRender = () => { lawn.time.value = performance.now() / 1000; }; });
   // invisible yard boundary
   solid(-70, 60, -60, -58); solid(-70, 60, 30, 32); solid(-72, -70, -60, 32); solid(60, 62, -60, 32);
 
@@ -1959,6 +2108,6 @@ export function buildWorld(scene) {
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
     groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry, office, spare,
-    streetLight, puddles, wetMats, farLights, clock,
+    streetLight, puddles, wetMats, farLights, clock, TRUCK, lawn, treesRejected,
   };
 }

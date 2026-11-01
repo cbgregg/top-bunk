@@ -50,9 +50,16 @@ MODELS = {
     'grandfather':  dict(uid='cef39f1bd3df43578236f273f273a873', by='longtail', title='Grandfather Clock', tex=1024, tris=9000),
     'mailbox':      dict(uid='132c790ac74c42a0bb1a5fc7e3d43d7e', by='glowbox3d', title='Home US Mailbox', tex=512, tris=2000),
     'trash_can':    dict(uid='69400e2f969f4c44882a398ef583334c', by='AndreyUEDev', title='Trash cans (low poly)', tex=512, tris=1800, keep='Object_2|Object_3'),
-    # the field: the barn out past the fence, the trees of the shelter belt and the treeline
+    # the yard: the moving truck on the drive, the shrubs along the house
+    'truck':        dict(uid='663a0953c038434a918cb85725c88ffa', by='DanielZhabotinsky', title="LCT 3000 '95 - Low poly model", tex=512, tris=14000),
+    'shrub':        dict(uid='f6ed4c70fc024ac88e8e6a19991695af', by='yanix', title='Small bush', tex=512, tris=400),
+    # the field: the barn out past the fence, the firs of the shelter belt and the treeline (two trees from one pack), the maples by the house
     'barn':         dict(uid='1d0b768a8e2449de990b3f69f94c5db6', by='andrewriddle', title='American Old Barn', tex=1024, tris=4600),
-    'spruce':       dict(uid='b68f79aee62f4e849be265c903f724f5', by='nenjo', title='Spruce Tree - Low Poly', tex=512, tris=1300),
+    'fir1':         dict(uid='f58e8b6d733e4b0586e5b7db847b89e7', by='lolipop_1707', title='Realistic fir trees pack (LODS, gameready)', tex=512, tris=9000, keep='Christmas tree_LOD0_'),
+    'fir2':         dict(uid='f58e8b6d733e4b0586e5b7db847b89e7', by='lolipop_1707', title='Realistic fir trees pack (LODS, gameready)', tex=512, tris=9000, keep='Christmas tree_2_LOD0_'),
+    'fir1_far':     dict(uid='f58e8b6d733e4b0586e5b7db847b89e7', by='lolipop_1707', title='Realistic fir trees pack (LODS, gameready)', tex=256, tris=2500, keep='Christmas tree_LOD2_'),
+    'fir2_far':     dict(uid='f58e8b6d733e4b0586e5b7db847b89e7', by='lolipop_1707', title='Realistic fir trees pack (LODS, gameready)', tex=256, tris=2500, keep='Christmas tree_2_LOD2_'),
+    'maple':        dict(uid='b5d2833c258f4054a01ee2b4ef85adf0', by='lolipop_1707', title='Maple trees pack (lowpoly, game ready, LODs)', tex=512, tris=10000, keep='Acer_large_1_LOD0_'),
     'tree_bare':    dict(uid='33ccce6111604656a4b5709483670ec3', by='MaX3Dd', title='Dead Tree', tex=512, tris=3300),
 }
 LICENSE_SLUG = 'by'
