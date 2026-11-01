@@ -259,7 +259,8 @@ async function main() {
   let mix = null;
   if (!has('--no-audio')) mix = buildMix({ music, cues, plan, duration, warp: !has('--no-warp'), outWav: path.join(scratch, 'mix.wav'), scratch });
   log('encoding', path.relative(ROOT, outFile));
-  const enc = ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-pattern_type', 'glob', '-i', path.join(framesDir, '*.' + FX), ...(mix ? ['-i', mix] : []),
+  // frames are numbered from 000000 without gaps, so a sequence pattern reads them on every ffmpeg build (the Windows builds have no glob)
+  const enc = ['-y', '-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-start_number', '0', '-i', path.join(framesDir, '%06d.' + FX), ...(mix ? ['-i', mix] : []),
     '-frames:v', String(total), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(fps), ...(mix ? ['-c:a', 'aac', '-b:a', '256k', '-ar', '44100', '-shortest'] : ['-an']), '-movflags', '+faststart', outFile];
   const r = spawnSync('ffmpeg', enc, { stdio: 'inherit' }); if (r.status !== 0) throw new Error('ffmpeg encode failed');
   // a ten-second teaser (the run, the cut, the scare) at gif size; a shot with `teaser: s` starts it s seconds into that shot
