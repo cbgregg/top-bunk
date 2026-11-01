@@ -2022,18 +2022,18 @@ export function buildWorld(scene) {
       (cells.get(key) || cells.set(key, []).get(key)).push([m4.clone().compose(new THREE.Vector3(x, y, z), q, sc.set(k, ky, k)), col.clone().setHSL(hue, sat, light)]);
       n++;
     };
-    for (let i = 0; i < 300000 && n < 66000; i++) {
+    for (let i = 0; i < 600000 && n < 130000; i++) {
       const x = FX0 + r() * (FX1 - FX0), z = FZ0 + r() * (FZ1 - FZ0);
-      const cl = noise(x / 4.2 + 3, z / 4.2 + 9), keep = 0.7 + cl * 0.5;   // clumpy, never a grid
+      const cl = noise(x / 4.2 + 3, z / 4.2 + 9), keep = 0.82 + cl * 0.4;   // clumpy, never a grid
       if (r() > keep) continue;
       if (!onLawn(x, z) && !(((x > 1.75 && x < 2.65 && z > -26 && z < -9.6) || (z > -12.2 && z < -11.4 && x > -7.4 && x < 0.7)) && r() < 0.05)) continue;   // a little grass comes up through the gravel between the tracks
       if (yardTrunks.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1.5)) continue;
-      const k = 0.55 + r() * 0.5, tone = noise(x / 9 + 1, z / 9 + 4);
+      const k = 0.62 + r() * 0.52, tone = noise(x / 9 + 1, z / 9 + 4);
       put(x, z, -0.012, k, k * (0.4 + r() * 0.3 + tone * 0.14), 0.165 + tone * 0.04 + r() * 0.025, 0.26 + r() * 0.16, 0.6 + r() * 0.18);
     }
     const lawnCount = n;
     // the field grass just outside the fence: longer, drier, sparser, rooted on the rolling ground
-    for (let i = 0; i < 90000 && n < lawnCount + 12000; i++) {
+    for (let i = 0; i < 160000 && n < lawnCount + 22000; i++) {
       const x = FX0 - 14 + r() * (FX1 - FX0 + 28), z = FZ0 - 2 + r() * (FZ1 - FZ0 + 16);
       if (x > FX0 - 0.6 && x < FX1 + 0.6 && z > FZ0 - 0.6 && z < FZ1 + 0.6) continue;
       if (z < RZ1 + 2.6) continue;
