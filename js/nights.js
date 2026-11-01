@@ -187,55 +187,71 @@ export function createNights(env) {
   }
   const director = createDirector(D);
 
-  // ---------- proof: what a night leaves behind, to show Mom and Dad ----------
+  // ---------- proof: what a night leaves behind, photographed with the kid's disposable camera, to show Mom and Dad ----------
   // Each kind comes from the night's own events or its type (PROOF_FROM in director.js says which). It shows only after one of them has fired,
-  // at a moment you are not looking at the spot. RUN.evidence holds the kinds found in this run, RUN.evidenceAt the night each was found on.
+  // at a moment you are not looking at the spot; then a sound gives it away every so often, and up close it catches the light.
+  // RUN.evidence holds the kinds photographed in this run, RUN.evidenceAt the night each was taken on, RUN.photos the prints (small jpegs).
   const WP = W.proof || {};
   const prop = (k) => (on) => { if (WP[k]) WP[k].show(on); };
+  // cap: the caption written on the print; clue: what the photo board says about one not taken yet; snd: the sound that gives it away
   const PROOF = {
-    SCRATCHES: { from: PROOF_FROM.SCRATCHES, keep: true, at: [8.44, 1.45, 1.14], p: [8.44, 1.35, 1.25], show: prop('SCRATCHES'),
-      cue: () => { sfx.scratch(D.pan(8.44, 1.14)); },
+    SCRATCHES: { from: PROOF_FROM.SCRATCHES, keep: true, at: [8.44, 1.45, 1.14], p: [8.44, 1.35, 1.25], show: prop('SCRATCHES'), cap: 'closet door', clue: 'something in my room', snd: 'scratch',
       tell: 'Come look at my closet door. Something clawed it.' },
-    FOOTPRINTS: { from: PROOF_FROM.FOOTPRINTS, at: [7.49, 0, -0.4], show: prop('FOOTPRINTS'),
-      cue: () => { for (let i = 0; i < 3; i++) later(i * 0.5, () => sfx.footstep(0.16, D.pan(6.29 + i * 1.2, -0.42), 0.35, 'tile')); },
+    FOOTPRINTS: { from: PROOF_FROM.FOOTPRINTS, at: [7.49, 0, -0.4], show: prop('FOOTPRINTS'), cap: 'wet footprints', clue: 'the hall floor', snd: 'drip',
       tell: 'There were wet footprints in the hall last night. Bare feet. Bigger than yours, Dad.' },
-    CABINETS: { from: PROOF_FROM.CABINETS, at: [4.2, 1.9, 3.55], p: [3.88, 1.85, 3.55], show: prop('CABINETS'),
-      cue: () => { sfx.cabinet(D.pan(4.0, 3.55), 0.8); },
+    CABINETS: { from: PROOF_FROM.CABINETS, at: [4.2, 1.9, 3.55], p: [3.88, 1.85, 3.55], show: prop('CABINETS'), cap: 'the cups', clue: 'the kitchen', snd: 'cabinet',
       tell: 'A cabinet in the kitchen was open, and all the cups were upside down.' },
-    STATIC: { from: PROOF_FROM.STATIC, at: [4.04, 0.815, -3.11], p: [4.03, 0.85, -3.11], show: (on) => W.tvFx.set(on), still: () => W.tvFx.on, took: () => { W.tvFx.set(false); sfx.click(); },
+    STATIC: { from: PROOF_FROM.STATIC, at: [4.04, 0.815, -3.11], p: [4.03, 0.85, -3.11], show: (on) => W.tvFx.set(on), still: () => W.tvFx.on, took: () => { W.tvFx.set(false); sfx.click(); }, cap: 'the TV', clue: 'the TV', snd: 'hiss',
       tell: 'The TV was on again last night. Nobody was watching it.' },
-    DRAWING: { from: PROOF_FROM.DRAWING, keep: true, at: [7.1, 0.45, 0.19], p: [7.19, 0.6, 0.08], show: prop('DRAWING'),
+    DRAWING: { from: PROOF_FROM.DRAWING, keep: true, at: [7.1, 0.45, 0.19], p: [7.19, 0.6, 0.08], show: prop('DRAWING'), cap: 'black crayon', clue: 'my drawing', snd: 'crayon',
       tell: "Somebody drew on the wall under the drawing. In black crayon. I don't have a black one." },
-    CHAIR: { from: PROOF_FROM.CHAIR, at: [-1.21, 0.5, 1.31], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, -1.21, 1.31, Math.PI / 2); else if (c) W.moveChair(2, c.x, c.z, c.rot); },
+    CHAIR: { from: PROOF_FROM.CHAIR, at: [-1.21, 0.5, 1.31], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, -1.21, 1.31, Math.PI / 2); else if (c) W.moveChair(2, c.x, c.z, c.rot); }, cap: 'the chair', clue: 'the dining room', snd: 'chair',
       tell: 'Somebody turned a chair in the dining room to face the wall. Right up against it.' },
-    PHONE: { from: PROOF_FROM.PHONE, at: [-0.82, 1.15, 1.63], p: [-0.78, 1.3, 1.64], show: (on) => (on ? W.phone.pickUp() : W.phone.hangUp()), still: () => W.phone.off, took: () => { W.phone.hangUp(); sfx.click(); },
+    PHONE: { from: PROOF_FROM.PHONE, at: [-0.82, 1.15, 1.63], p: [-0.78, 1.3, 1.64], show: (on) => (on ? W.phone.pickUp() : W.phone.hangUp()), still: () => W.phone.off, took: () => { W.phone.hangUp(); sfx.click(); }, cap: 'off the hook', clue: 'the phone', snd: 'dial',
       tell: 'The phone was off the hook. Somebody was still breathing on it.' },
-    HANDPRINT: { from: PROOF_FROM.HANDPRINT, keep: true, at: [-9.65, 1.47, -7.24], p: [-9.65, 1.45, -7.0], show: prop('HANDPRINT'),
+    HANDPRINT: { from: PROOF_FROM.HANDPRINT, keep: true, at: [-9.65, 1.47, -7.24], p: [-9.65, 1.45, -7.0], show: prop('HANDPRINT'), cap: 'handprint', clue: 'the garage', snd: 'metal',
       tell: 'There is a handprint on the breaker box. Go look at the fingers.' },
-    TEDDY: { from: PROOF_FROM.TEDDY, at: [0, 0, 0], show: prop('TEDDY'), place: (s) => { PROOF.TEDDY.at = [s[0], s[1], s[2]]; if (WP.TEDDY) WP.TEDDY.at(s[0], s[1], s[2]); },
+    TEDDY: { from: PROOF_FROM.TEDDY, at: [0, 0, 0], show: prop('TEDDY'), place: (s) => { PROOF.TEDDY.at = [s[0], s[1], s[2]]; if (WP.TEDDY) WP.TEDDY.at(s[0], s[1], s[2]); }, cap: 'my bear', clue: 'my bear', snd: 'tear',
       tell: 'Somebody pulled the stuffing out of my bear. Look at him.' },
-    PHOTO: { from: PROOF_FROM.PHOTO, at: [6.48, 1.5, -1.02], p: [6.48, 1.45, -0.9], show: (on) => nm.blackenPhotos(on),
+    PHOTO: { from: PROOF_FROM.PHOTO, at: [6.48, 1.5, -1.02], p: [6.48, 1.45, -0.9], show: (on) => nm.blackenPhotos(on), cap: 'no faces', clue: 'the pictures in the hall', snd: 'frame',
       tell: 'Every picture in the hall went black. The frames are fine. It is only the faces that are gone.' },
-    WASHER: { from: PROOF_FROM.WASHER, at: [-7.62, 0.95, 2.45], p: [-7.32, 0.9, 2.43], show: (on) => { if (W.laundry) W.laundry.washer.open(on ? 1 : 0); },
+    WASHER: { from: PROOF_FROM.WASHER, at: [-7.62, 0.95, 2.45], p: [-7.32, 0.9, 2.43], show: (on) => { if (W.laundry) W.laundry.washer.open(on ? 1 : 0); }, cap: 'the washer', clue: 'the basement', snd: 'lid',
       tell: 'The washing machine lid was open in the middle of the night. Something was drumming inside it.' },
-    CANDLE: { from: PROOF_FROM.CANDLE, at: [7.07, 0.03, -0.48], show: () => {},   // the vigil's own tea light, left on the floor until dawn
+    CANDLE: { from: PROOF_FROM.CANDLE, at: [7.07, 0.03, -0.48], show: () => {}, cap: 'the candle', clue: 'the hall floor at night', snd: 'match',   // the vigil's own tea light, left on the floor until dawn
       tell: 'There was a candle burning in the hall last night. None of us lit it.' },
   };
-  const found = () => (env.RUN.evidence ||= []), foundAt = () => (env.RUN.evidenceAt ||= {});
+  const found = () => (env.RUN.evidence ||= []), foundAt = () => (env.RUN.evidenceAt ||= {}), photos = () => (env.RUN.photos ||= {});
   const isFound = (k) => found().includes(k);
-  const pr = { n: 0, kinds: [], pending: new Map(), shown: new Set(), its: {}, hud: false };
+  const pr = { n: 0, kinds: [], pending: new Map(), shown: new Set(), its: {}, hud: false, next: {}, glints: {} };
   // what a night can leave (see proofSources: an event the director gave up on drops out of the total)
   function proofKinds(plan) {
     if (!plan || plan.n < 2 || plan.n > 9) return [];
     const src = proofSources(plan);
     return Object.keys(PROOF).filter((k) => PROOF[k].from.some((s) => src.has(s)) && (!isFound(k) || foundAt()[k] === plan.n));
   }
+  // the glint: a faint sparkle on the spot, seen only from close by and only when you face it
+  const glintTex = (() => {
+    if (typeof document === 'undefined') return null;
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,240,1)'); g.addColorStop(0.18, 'rgba(255,250,220,0.55)'); g.addColorStop(1, 'rgba(255,250,220,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    x.strokeStyle = 'rgba(255,255,240,0.7)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(32, 6); x.lineTo(32, 58); x.moveTo(6, 32); x.lineTo(58, 32); x.stroke();
+    return new THREE.CanvasTexture(c);
+  })();
+  function glintOn(k) {
+    if (pr.glints[k] || !glintTex || !env.scene) return;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glintTex, color: 0xfff6dc, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    const [x, y, z] = PROOF[k].at; s.position.set(x, Math.max(y, 0.06), z); s.scale.setScalar(0.13); s.userData.noAO = true; s.renderOrder = 3;
+    env.scene.add(s); pr.glints[k] = s;
+  }
+  function glintOff(k) { const s = pr.glints[k]; if (!s) return; s.parent && s.parent.remove(s); s.material.dispose(); delete pr.glints[k]; }
   // the house goes back to how it was, apart from what you found that stays (claw marks do not wash off)
   function proofSync() {
     for (const k of pr.shown) PROOF[k].show(false);
     for (const k in PROOF) if (PROOF[k].keep) PROOF[k].show(isFound(k));
-    pr.shown.clear(); pr.pending.clear();
+    pr.shown.clear(); pr.pending.clear(); pr.next = {};
     for (const k in pr.its) env.removeI(pr.its[k]);
+    for (const k of Object.keys(pr.glints)) glintOff(k);
     pr.its = {};
   }
   function proofStart(plan) { proofSync(); pr.n = plan.n; pr.kinds = proofKinds(plan); proofLine(); }
@@ -248,58 +264,99 @@ export function createNights(env) {
       pr.pending.set(k, env.time());
     }
   }
+  // the sound that gives a spot away: faint from across the house, plain within six metres
+  function cueFor(k) {
+    const d = PROOF[k], [x, y, z] = d.at, dist = Math.hypot(camera.position.x - x, camera.position.z - z);
+    const gain = dist < 6 ? 0.9 : 0.4 * clamp(1 - (dist - 6) / 22, 0.25, 1);
+    sfx.proofCue(d.snd, D.pan(x, z, Math.max(y, 0.4)), gain);
+  }
   function proofTick() {
+    const now = env.time(), quiet = !F.script && !F.cutscene && !hunter.busy;
     for (const [k, t0] of pr.pending) {
       const d = PROOF[k], [x, y, z] = d.at;
-      if (env.time() - t0 < 2.5 || (Math.hypot(camera.position.x - x, camera.position.z - z) < 10 && hunter.looking(x, z, 0.3, y))) continue;
-      pr.pending.delete(k); pr.shown.add(k); d.show(true);
-      if (d.cue && !F.script && !F.cutscene && !hunter.busy) d.cue();
+      if (now - t0 < 2.5 || (Math.hypot(camera.position.x - x, camera.position.z - z) < 10 && hunter.looking(x, z, 0.3, y))) continue;
+      pr.pending.delete(k); pr.shown.add(k); d.show(true); glintOn(k);
+      if (quiet) cueFor(k);
+      pr.next[k] = now + 20 + Math.random() * 15;
       const p = d.p || [x, Math.max(y + 0.25, 0.7), z];
-      pr.its[k] = env.addI({ p: new V3(...p), r: 1.4, label: 'Look closer', act: () => proofLook(k),
+      pr.its[k] = env.addI({ p: new V3(...p), r: 1.4, label: 'Take a photo', act: () => proofLook(k),
         when: () => F.live && P.mode === 'walk' && !F.cutscene && pr.shown.has(k) && !isFound(k) && hunter.state !== 'hunt' && hunter.state !== 'loom' });
     }
     // something else put it back (the TV switched off, the phone hung up): it turns up again later
     for (const k of pr.shown) {
-      const d = PROOF[k]; if (!d.still || isFound(k) || d.still()) continue;
-      pr.shown.delete(k); env.removeI(pr.its[k]); delete pr.its[k]; pr.pending.set(k, env.time());
+      const d = PROOF[k];
+      if (d.still && !isFound(k) && !d.still()) { pr.shown.delete(k); env.removeI(pr.its[k]); delete pr.its[k]; glintOff(k); pr.pending.set(k, now); continue; }
+      if (isFound(k)) continue;
+      // it calls again every so often until it is photographed
+      if (now >= (pr.next[k] || 0)) { if (quiet) cueFor(k); pr.next[k] = now + 20 + Math.random() * 15; }
+      const s = pr.glints[k]; if (!s) continue;
+      const [x, , z] = d.at, dx = s.position.x - camera.position.x, dy = s.position.y - camera.position.y, dz = s.position.z - camera.position.z, dist = Math.hypot(dx, dy, dz);
+      camera.getWorldDirection(tmp); const facing = (tmp.x * dx + tmp.y * dy + tmp.z * dz) / Math.max(dist, 0.01);
+      const vis = dist < 3 && facing > 0.55 ? (1 - dist / 3) * smooth(facing, 0.55, 0.85) : 0;
+      s.material.opacity += ((vis * (0.45 + 0.35 * Math.sin(now * 2.3 + x + z))) - s.material.opacity) * 0.15;
     }
   }
-  // look closer: the view leans in, the kid says what it is, and it is kept. Saved first, so getting caught right after still counts it.
+  const smooth = (v, a, b) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  // take a photo: the view leans in, the flash goes, the print slides out and is kept. Saved first, so getting caught right after still counts it.
   async function proofLook(k) {
     const d = PROOF[k]; if (F.cutscene || isFound(k)) return;
     found().push(k); foundAt()[k] = pr.n; env.saveRun(); proofLine();
-    env.removeI(pr.its[k]); delete pr.its[k];
+    env.removeI(pr.its[k]); delete pr.its[k]; glintOff(k);
     F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
     const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, at = new V3(...d.at), dist = from.distanceTo(at);
-    const to = from.clone().lerp(at, clamp((dist - 0.45) / Math.max(dist, 0.01), 0, 0.6)); to.y = Math.max(to.y, 0.45);
+    const to = from.clone().lerp(at, clamp((dist - 0.6) / Math.max(dist, 0.01), 0, 0.55)); to.y = Math.max(to.y, 0.45);
     const h = Math.hypot(at.x - to.x, at.z - to.z), yaw = h > 0.05 ? Math.atan2(-(at.x - to.x), -(at.z - to.z)) : y0, pitch = clamp(Math.atan2(at.y - to.y, h), -1.3, 1.3);
     sfx.creak(0.1, 0, 0.3);
-    await tween(1.2, (q) => { P.cam.lerpVectors(from, to, q); P.yaw = lerpAngle(y0, yaw, q); P.pitch = lerp(p0, pitch, q); });
+    await tween(1.0, (q) => { P.cam.lerpVectors(from, to, q); P.yaw = lerpAngle(y0, yaw, q); P.pitch = lerp(p0, pitch, q); });
+    await wait(0.25);
+    const url = env.photo ? env.photo() : null;
+    if (url) { photos()[k] = url; env.saveRun(); }
+    UI.print && UI.print(url, d.cap);
     if (d.took) d.took();
     await wait(1.1);
     const back = new V3(P.pos.x, env.EYE, P.pos.z);
     await tween(0.6, (q) => { P.cam.lerpVectors(to, back, q); P.pitch = lerp(pitch, clamp(pitch, -0.5, 0.5), q); });
     if (P.mode === 'cine' && !F.dead) { P.mode = 'walk'; F.cutscene = false; }
   }
-  // the line under the objective: how much of tonight's proof you have
+  // the line under the objective: a camera, and a print for each piece of proof tonight can leave (filled once it is taken); no numbers.
+  // On a touch screen it opens the photo board.
   const proofEl = (() => {
     const o = typeof document !== 'undefined' && document.getElementById('objective'); if (!o) return null;
     const el = document.createElement('div'); el.id = 'proof'; o.after(el);
+    el.addEventListener('click', () => { if (env.openPhotos) env.openPhotos(); });
     // under the objective while there is one, in its place while there is none
     const place = () => { const on = o.classList.contains('show'); el.classList.toggle('alone', !on); el.style.top = `${on ? o.offsetTop + o.offsetHeight + 10 : o.offsetTop}px`; };
     new MutationObserver(place).observe(o, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
     addEventListener('resize', place); place();
     return el;
   })();
-  function proofLine() { if (proofEl) proofEl.innerHTML = `Find proof <span>${pr.kinds.filter(isFound).length} / ${pr.kinds.length}</span>`; }
+  function proofLine() {
+    if (!proofEl) return;
+    proofEl.innerHTML = `<i class="cam" aria-hidden="true"></i>${pr.kinds.map((k) => `<b class="print${isFound(k) ? ' taken' : ''}"></b>`).join('')}`;
+    proofEl.setAttribute('aria-label', `Photos tonight: ${pr.kinds.filter(isFound).length} of ${pr.kinds.length}`);
+  }
   // main.js, every frame: shown while a night that can leave proof is being played
   function proofHud(on) {
     on = !!on && pr.kinds.length > 0 && F.stage === 'n' + pr.n;
     if (on !== pr.hud && proofEl) { pr.hud = on; proofEl.classList.toggle('show', on); }
   }
+  // the photo board (the pause menu's Photos): every print of the run pinned up, and an empty frame with a clue for each one tonight can still leave
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function board(body) {
+    const tilt = (i) => ((i * 37) % 9) - 4;
+    const pins = found().filter((k) => PROOF[k]).map((k, i) => {
+      const src = photos()[k];
+      return `<figure class="pin" style="--r:${tilt(i)}deg">${src ? `<img src="${src}" alt="">` : '<div class="blank"></div>'}<figcaption>${esc(PROOF[k].cap)}</figcaption></figure>`;
+    });
+    const open = F.stage === 'n' + pr.n ? pr.kinds.filter((k) => !isFound(k)) : [];
+    const blanks = open.map((k, i) => `<figure class="pin empty" style="--r:${tilt(i + 5)}deg"><div class="blank"></div><figcaption>${esc(PROOF[k].clue)}</figcaption></figure>`);
+    body.innerHTML = `<div class="board">${pins.length || blanks.length ? `<div class="pins">${pins.join('')}${blanks.join('')}</div>` : '<p class="board-none">No photos yet.</p>'}`
+      + '<p class="board-note">Mom and Dad will believe me if I show them enough.</p></div>';
+  }
   proofSync();
   const proof = {
     defs: PROOF, total: Object.keys(PROOF).length, count: () => found().length, on: (n) => found().filter((k) => foundAt()[k] === n), tell: (k) => PROOF[k] && PROOF[k].tell,
+    cap: (k) => PROOF[k] && PROOF[k].cap, photo: (k) => photos()[k] || null, board,
     kinds: () => pr.kinds.slice(), pending: () => [...pr.pending.keys()], shown: () => [...pr.shown], kindsFor: proofKinds, start: proofStart, fire: proofFire, sync: proofSync, hud: proofHud, look: proofLook,
   };
 
@@ -338,7 +395,12 @@ export function createNights(env) {
   async function briefing(n, t) {
     const R = env.RUN;
     await wait(11); if (!alive(t) || F.script || F.cutscene) return;
-    if (n === 2 && !R.briefed) { R.briefed = true; env.saveRun(); UI.hint('Find proof of what is in the house. Get to six. Hide and hold your breath when it comes.', 9); return; }
+    if (n === 2 && !R.briefed) {   // the kid's own reason for the camera, then how to use it
+      R.briefed = true; env.saveRun();
+      UI.subtitle("<i>If I get pictures, they'll have to believe me.</i>", 5);
+      later(5.5, () => UI.hint(`Something strange? Take a photo: <b>${L('interact')}</b>  ·  your photos: <b>${L('photos')}</b>  ·  when it comes, hide and hold <b>${L('breath')}</b>`, 9));
+      return;
+    }
     if (env.RUN.objDone[n - 1] === false && !R.skipTold) { R.skipTold = true; env.saveRun(); UI.hint('You skipped what it wanted last night. It is closer tonight.', 8); }
   }
 

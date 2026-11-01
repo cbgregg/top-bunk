@@ -41,6 +41,23 @@ export function flash(color = 'rgba(150,0,0,0.55)', dur = 0.9) {
   el.style.transition = 'opacity 0.15s ease-in'; el.style.opacity = FLASH_CAP;
   flashTimer = setTimeout(() => { el.style.transition = `opacity ${dur * 1.5}s ease-out`; el.style.opacity = 0; }, 150);
 }
+// a print out of the disposable camera: it slides out at the corner with its caption, then slides away
+let printTimer = 0;
+export function print(src, caption = '', dur = 2.6) {
+  const el = $('print'); if (!el) return; clearTimeout(printTimer);
+  el.querySelector('.ph').style.backgroundImage = src ? `url(${src})` : 'none'; el.querySelector('.cap').textContent = caption;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  printTimer = setTimeout(() => el.classList.remove('show'), dur * 1000);
+}
+// the photos laid on the breakfast table, one more each call (i: its place in the row); null clears the table
+export function tablePhoto(src, caption = '', i = 0) {
+  const el = $('table'); if (!el) return;
+  if (src === null && !caption) { el.classList.remove('show'); setTimeout(() => { if (!el.classList.contains('show')) el.innerHTML = ''; }, 900); return; }
+  el.classList.add('show');
+  const f = document.createElement('figure'); f.style.setProperty('--r', `${((i * 47) % 13) - 6}deg`); f.style.setProperty('--x', `${(i - 1.5) * 15}vw`);
+  f.innerHTML = `<div class="ph"${src ? ` style="background-image:url(${src})"` : ''}></div><figcaption></figcaption>`; f.querySelector('figcaption').textContent = caption;
+  el.appendChild(f); void f.offsetWidth; f.classList.add('down');
+}
 export function blur(px, dur = 1) { const c = document.querySelector('#game canvas'); if (!c) return; c.style.transition = `filter ${dur}s ease`; c.style.filter = px ? `blur(${px}px)` : 'none'; }
 export function show(id) { $(id).classList.remove('hidden'); }
 export function hide(id) { $(id).classList.add('hidden'); }

@@ -34,14 +34,14 @@ A single-storey farmhouse from the early 2000s, with brown carpet, a white kitch
 [h2]Nobody believes you[/h2]
 You tell them at breakfast and they explain it away. The tap was left running. The breaker tripped. You must have dropped the bear in the hall. Most nights the house leaves something behind, and if you find it, you've got something to show them. Show them enough and they start to listen.
 
-There are three endings. Which one you get depends on how much proof you've found by the tenth night, when it finally comes down the hall.
+There are three endings. Which one you get depends on how many photos you've shown them by the tenth night, when it finally comes down the hall.
 
 [h2]Features[/h2]
 [list]
 [*] A short horror story over ten nights in one house
 [*] Seeded runs: the same seed replays the same ten nights, and a new seed shuffles them
 [*] Hiding spots, a breath meter, a flashlight, stamina and doors that shut
-[*] A dozen kinds of proof to find, from scratches to a handprint on the breaker box: what you turn up changes breakfast and decides which of three endings you get
+[*] A dozen kinds of proof to find and photograph with a disposable camera, from scratches to a handprint on the breaker box: the photos go on the breakfast table, and how many you show them decides which of three endings you get
 [*] Four nightmares that pull you under and leave something behind
 [*] The house gets worse each night: night lights die, the drawing in the hall changes, the clock lies
 [*] Every line is subtitled, and Mom, Dad and grandpa are voiced throughout. The kid is text only
@@ -148,10 +148,9 @@ icons exist.
 | English | yes | no | yes |
 
 English only. Every line is subtitled. `assets/audio/lines.json` holds every line, and `assets/audio/manifest.json` lists the ones that have
-a recording: every line Mom, Dad and grandpa speak. The kid's lines are text only,
-as are the lines of the proof scene at breakfast (what you tell them, and their answers), which are written into the game code.
+a recording: every line Mom, Dad and grandpa speak, their answers to the photos at breakfast included. The kid's lines are text only.
 
-Leave *Full audio* unticked: the kid and the proof scene are not voiced.
+Leave *Full audio* unticked: the kid is not voiced.
 
 ## Tags
 
