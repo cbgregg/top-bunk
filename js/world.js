@@ -1967,7 +1967,7 @@ export function buildWorld(scene) {
   // field, none on the house, the drive, the garage, the walks or under the trees; longer, drier grass just outside the fence.
   const lawn = (() => {
     const r = TX.rng(8080), g = new THREE.Group(); g.userData.noAO = true; yard.add(g);   // blades get no ambient occlusion pass: it costs a draw of all of the
-    if (PHONE) return { group: g, time: { value: 0 }, count: 0, lawnCount: 0, setQuality() {}, share: 0, quality: 'phone' };   // a phone keeps the lawn texture and no bladesm and shows nothing
+    if (PHONE) return { group: g, time: { value: 0 }, count: 0, lawnCount: 0, setQuality() {}, share: 0, quality: 'phone', ready: Promise.resolve(0) };   // a phone keeps the lawn texture and no bladesm and shows nothing
     const hash = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
     const noise = (x, z) => {
       const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
@@ -2028,7 +2028,11 @@ export function buildWorld(scene) {
       (cells.get(key) || cells.set(key, []).get(key)).push([m4.clone().compose(new THREE.Vector3(x, y, z), q, sc.set(k, ky, k)), col.clone().setHSL(hue, sat, light)]);
       n++;
     };
+    // the blades are grown a slice at a time after the game is up, so the page never stalls on them; `ready` resolves when the last cell is in
+    const tick = () => new Promise((res) => setTimeout(res, 0)), meshes = []; let lawnCount = 0, self = null;
+    const grow = async () => {
     for (let i = 0; i < 600000 && n < 130000; i++) {
+      if ((i & 16383) === 0) await tick();
       const x = FX0 + r() * (FX1 - FX0), z = FZ0 + r() * (FZ1 - FZ0);
       const cl = noise(x / 4.2 + 3, z / 4.2 + 9), keep = 0.82 + cl * 0.4;   // clumpy, never a grid
       if (r() > keep) continue;
@@ -2037,9 +2041,10 @@ export function buildWorld(scene) {
       const k = 0.62 + r() * 0.52, tone = noise(x / 9 + 1, z / 9 + 4);
       put(x, z, -0.012, k, k * (0.4 + r() * 0.3 + tone * 0.14), 0.165 + tone * 0.04 + r() * 0.025, 0.26 + r() * 0.16, 0.6 + r() * 0.18);
     }
-    const lawnCount = n;
+    lawnCount = n;
     // the field grass just outside the fence: longer, drier, sparser, rooted on the rolling ground
     for (let i = 0; i < 160000 && n < lawnCount + 22000; i++) {
+      if ((i & 16383) === 0) await tick();
       const x = FX0 - 14 + r() * (FX1 - FX0 + 28), z = FZ0 - 2 + r() * (FZ1 - FZ0 + 16);
       if (x > FX0 - 0.6 && x < FX1 + 0.6 && z > FZ0 - 0.6 && z < FZ1 + 0.6) continue;
       if (z < RZ1 + 2.6) continue;
@@ -2049,15 +2054,25 @@ export function buildWorld(scene) {
       const k = 0.9 + r() * 0.5;
       put(x, z, fieldH(x, z) - 0.04, k, k * (0.95 + r() * 0.6), 0.14 + r() * 0.05, 0.28 + r() * 0.15, 0.62 + r() * 0.2);
     }
-    const meshes = [];
     for (const list of cells.values()) {
+      await tick();
       const im = new THREE.InstancedMesh(geo, mat, list.length);
       list.forEach(([m, cc], i) => { im.setMatrixAt(i, m); im.setColorAt(i, cc); });
       im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); meshes.push(im);
+      // each cell draws all of its blades when it is near, a share of them further off (they are shrinking into the ground out there anyway), and
+      // a handful at the far end: the blades in a cell are in random order, so a shorter count thins evenly
+      const full = list.length, c = im.boundingSphere.center;
+      im.onBeforeRender = (renderer, scene, camera) => {
+        time.value = performance.now() / 1000;
+        const d = Math.hypot(camera.position.x - c.x, camera.position.z - c.z), lod = d < 17 ? 1 : d < 27 ? 0.4 : 0.1;
+        im.count = Math.max(1, Math.round(full * self.share * lod));
+      };
     }
+      return n;
+    };
     // the share of the blades drawn at each graphics preset (the instances in a cell are in random order, so a shorter count thins evenly)
     const SHARE = PHONE ? { ultra: 0.3, high: 0.25, medium: 0.16, low: 0.08 } : { ultra: 1, high: 1, medium: 0.55, low: 0.3 }; let quality = 'high';
-    const setQuality = (q) => { if (q === quality || !(q in SHARE)) return; quality = q; lawn.share = SHARE[q]; };
+    const setQuality = (q) => { if (q === quality || !(q in SHARE)) return; quality = q; self.share = SHARE[q]; };
     // the worn edges of the drive: gravel that fades into the grass; bare dirt where feet and tyres go; needles and bare ground under the trees
     {
       const ec = document.createElement('canvas'); ec.width = 16; ec.height = 128; const e = ec.getContext('2d'), gr = e.createLinearGradient(0, 0, 0, 128);
@@ -2076,19 +2091,10 @@ export function buildWorld(scene) {
       for (const [x, z, a, b, rot] of [[3.1, -6.4, 1.3, 0.8, 0.3], [-7.3, -4.6, 1.0, 0.7, 0.8], [8.2, -12.9, 0.9, 0.7, 1.2], [-10.9, -3.4, 1.2, 0.8, 0.5], [7.4, -20.5, 1.1, 0.7, 0.9], [-16, -16, 0.9, 0.7, 0.2]]) disc(pm, x, z, a, b, rot);
       for (const [x, z] of yardTrunks) disc(nm, x, z, 1.3 + r() * 0.5, 1.1 + r() * 0.5, r() * 3, fieldH(x, z) + 0.006);
     }
-    return { group: g, time, count: n, lawnCount, setQuality, share: 1, get quality() { return quality; } };
+    self = { group: g, time, setQuality, share: 1, get count() { return n; }, get lawnCount() { return lawnCount; }, get quality() { return quality; } };
+    self.ready = grow();
+    return self;
   })();
-  // each cell draws all of its blades when it is near, a share of them further off (they are shrinking into the ground out there anyway), and
-  // a handful at the far end: the blades in a cell are in random order, so a shorter count thins evenly
-  lawn.group.traverse((o) => {
-    if (!o.isInstancedMesh) return;
-    const full = o.instanceMatrix.count, c = o.boundingSphere ? o.boundingSphere.center : null;   // the cell's own sphere, over all its blades
-    o.onBeforeRender = (renderer, scene, camera) => {
-      lawn.time.value = performance.now() / 1000;
-      const d = c ? Math.hypot(camera.position.x - c.x, camera.position.z - c.z) : 0, lod = d < 17 ? 1 : d < 27 ? 0.4 : 0.1;
-      o.count = Math.max(1, Math.round(full * lawn.share * lod));
-    };
-  });
   // invisible yard boundary
   solid(-70, 60, -60, -58); solid(-70, 60, 30, 32); solid(-72, -70, -60, 32); solid(60, 62, -60, 32);
 
