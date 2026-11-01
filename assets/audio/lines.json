@@ -510,5 +510,75 @@
   "voice": "dad",
   "say": "Nobody goes anywhere alone tonight. Nobody.",
   "html": "<b>Dad:</b> Nobody goes anywhere alone tonight. Nobody."
+ },
+ "dad/call_a": {
+  "voice": "dad",
+  "say": "[sleepy, quiet] Bud? ...C'mere a sec.",
+  "html": "<b>Dad:</b> <i>(somewhere in the house)</i> Bud? ...C'mere a sec."
+ },
+ "dad/call_b": {
+  "voice": "dad",
+  "say": "[quiet] Hey. You up? Come here.",
+  "html": "<b>Dad:</b> <i>(somewhere in the house)</i> Hey. You up? Come here."
+ },
+ "dad/call_c": {
+  "voice": "dad",
+  "say": "[quiet] In the kitchen, bud. Come on.",
+  "html": "<b>Dad:</b> <i>(from the kitchen)</i> In the kitchen, bud. Come on."
+ },
+ "dad/call_d": {
+  "voice": "dad",
+  "say": "Buddy? ... ... ... ... Come here.",
+  "html": "<b>Dad:</b> Buddy? ... ... Come here."
+ },
+ "dad/call_e": {
+  "voice": "dad",
+  "say": "Ben? ...No. Bud. Come here, bud.",
+  "html": "<b>Dad:</b> Ben? ...No. Bud. Come here, bud."
+ },
+ "dad/call_f": {
+  "voice": "dad",
+  "say": "[very quiet] I'm right here. Don't turn the light on.",
+  "html": "<b>Dad:</b> I'm right here. Don't turn the light on."
+ },
+ "news/n1": {
+  "voice": "news",
+  "say": "And in local news tonight, the house at the end of Larch Road has new tenants, the first in six years. Neighbors say the family before them left in the middle of the night. They did not take their furniture. No report was ever filed.",
+  "html": "<i>(the TV)</i> ...the house at the end of Larch Road has new tenants, the first in six years..."
+ },
+ "news/n2": {
+  "voice": "news",
+  "say": "Eleven years ago this week, a seven-year-old boy went missing from his bedroom on Larch Road. His parents told investigators he had said something was standing at the foot of his bed. The case remains open.",
+  "html": "<i>(the TV)</i> ...a seven-year-old boy went missing from his bedroom on Larch Road..."
+ },
+ "news/n3": {
+  "voice": "news",
+  "say": "Drivers on County Road Nine are asked to use caution tonight after a deer was found lying in the road. Animal control says it had not been hit by a car. They would not say what had happened to it.",
+  "html": "<i>(the TV)</i> ...a deer was found lying in the road. It had not been hit by a car..."
+ },
+ "news/n4": {
+  "voice": "news",
+  "say": "Several homes on Larch Road are without power tonight. The utility says its crews found nothing wrong with the lines. Residents are asked to stay inside, keep their doors shut, and not to answer if someone calls them by name.",
+  "html": "<i>(the TV)</i> ...and not to answer if someone calls them by name."
+ },
+ "news/n5": {
+  "voice": "news",
+  "say": "Overnight, fog in the low places, and a low near thirty-eight. Sunrise at six-oh-two. For anyone still awake out on Larch Road, it will not be long now.",
+  "html": "<i>(the TV)</i> ...for anyone still awake out on Larch Road, it will not be long now."
+ },
+ "news/n6": {
+  "voice": "news",
+  "say": "We have a late report from the house at the end of Larch Road. A boy has been awake since three. He has been walking the hall. He went into the kitchen. He did not turn on the light.",
+  "html": "<i>(the TV)</i> ...a boy has been awake since three. He has been walking the hall..."
+ },
+ "news/n7": {
+  "voice": "news",
+  "say": "He is in the living room now. He is standing in front of the television. He is listening to this. ... Go back to bed.",
+  "html": "<i>(the TV)</i> He is in the living room now. He is listening to this. ...Go back to bed."
+ },
+ "news/n8": {
+  "voice": "news",
+  "say": "One more thing before we go. The boy on Larch Road is not alone in the house. ... It has been standing behind him the whole time.",
+  "html": "<i>(the TV)</i> ...the boy on Larch Road is not alone in the house..."
  }
 }

@@ -18,7 +18,7 @@ export const ACHIEVEMENTS = [
   { id: 'HOLD_BREATH', name: 'Not a sound', desc: 'Hold your breath until the meter runs red.', hidden: false },
   { id: 'STARE_DOWN', name: "Don't blink", desc: 'Keep your eyes on it while it creeps toward you, until it gives up.', hidden: false },
   { id: 'PHOTO_FELL', name: 'Off the wall', desc: 'Be there when the photo in the hall comes down.', hidden: false },
-  { id: 'NOT_DAD', name: "That isn't Dad", desc: 'Walk up to Dad in front of the TV.', hidden: true },
+  { id: 'NOT_DAD', name: "That isn't Dad", desc: "Follow Dad's voice to the end of the hall.", hidden: true },
   { id: 'GRANDPA', name: 'Grandpa', desc: "Go to grandpa's chair at the end of the hall.", hidden: true },
   { id: 'GLOVE_BOX', name: 'Eyes on the road', desc: 'Wake up from the drive without opening the glove box.', hidden: true },
   { id: 'FIRST_TRY', name: 'Not a scratch', desc: 'Survive a night without getting caught.', hidden: false },

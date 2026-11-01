@@ -147,6 +147,17 @@ export function createNightmares(ctx) {
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmShadow');
   }
 
+  // ---------- after the crawler reaches you ----------
+  // the screen is already black: the room turns over in the dark with the faces gone from the walls, something mutters close by, then the bunk
+  async function crawled(t) {
+    pullUnder(); F.blackout = true; ctx.nlMult(0, false); blackenPhotos(true);
+    const yaw0 = P.yaw, pitch0 = P.pitch;
+    UI.fade(0, 1.8); sfx.heartbeat(0.9); sfx.drone(0.12, 1);
+    await swim(6.5, pitch0, yaw0, (k) => { if (Math.random() < 0.025) sfx.lurk(Math.sin(k * 17), 0.7, 1.2); });
+    await wake();
+    if (ctx.alive(t)) F.fear = 0.7;
+  }
+
   // ---------- the hall that does not end ----------
   async function hall(t) {
     let passes = 0, busy = false;
@@ -242,5 +253,5 @@ export function createNightmares(ctx) {
     await wake(); if (ctx.alive(t)) ctx.proofFire('nmMirror');
   }
 
-  return { shadow, hall, basement, mirror, blackenPhotos, makeShadow };
+  return { shadow, hall, basement, mirror, crawled, blackenPhotos, makeShadow };
 }

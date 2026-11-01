@@ -7,6 +7,8 @@ import { createDirector, makePlan, PLAN_VERSION, PROOF_FROM, proofSources, TYPE_
 import { NODES, nearestNode } from './nav.js';
 import { pick } from './rng.js';
 import { achievements } from './achievements.js';
+import { createGaze } from './gaze.js';
+import { makePerson } from './people.js';
 
 const DAWN = 360;   // minutes after midnight
 
@@ -129,6 +131,215 @@ export function createNights(env) {
   const nm = createNightmares({ ...env, P, F, W, E, sfx, UI, camera, hunter, D, wait, tween, lerp, alive, proofFire: (id) => proofFire(id) });
   D.holdTv = (v) => { tvHeld = v; };
 
+  // ---------- the blind spot: things put where you just were looking, shown by your own turn, gone when you look away ----------
+  const gaze = createGaze({ camera, P, los: hunter.los, roomAt: env.roomAt, colliders: W.colliders });
+  let LINES = {}; if (typeof fetch === 'function') fetch('assets/audio/lines.json').then((r) => r.json()).then((j) => { LINES = j; }).catch(() => {});
+  const sub = (id, sec) => { const l = LINES[id]; if (l) UI.subtitle(l.html, sec); };
+  // a voice somewhere in the house: placed, quieter with distance, through the walls when there are walls in the way, with its words
+  function voiceAt(id, x, z, gain = 1.3) {
+    const d = Math.hypot(P.pos.x - x, P.pos.z - z), seen = hunter.los(P.pos.x, P.pos.z, x, z);
+    const dur = sfx.play('vo/' + id, { gain: gain / (1 + d * 0.1), pan: D.pan(x, z), wet: 0.4, muffle: !seen }) || 2.2;
+    sub(id, Math.max(2.4, dur + 0.6)); return dur;
+  }
+  // doubles of Mom and Dad for the things that look like them (the real ones stay asleep in their bed); built the first time they are needed
+  const doubles = {};
+  function double(who) {
+    if (!doubles[who]) {
+      const p = makePerson(who === 'mom' ? { model: 'mom', height: 1.66 } : { model: 'dad', height: 1.84 });
+      p.group.visible = false; env.scene.add(p.group); p.setNight(true); p.busy = true; doubles[who] = p;
+    }
+    return doubles[who];
+  }
+  const standDouble = (p, x, z, yaw) => { p.pose = null; p.lookAt = null; p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, yaw, 0); p.group.position.set(x, 0, z); p.group.visible = true; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.4 }); };
+  const ST = { on: null, lastBeat: -99, lastReveal: -99, cancel: [], it: null, gap: 60 };
+  const freeE = () => !E.visible && !hunter.busy && hunter.cool <= 0;
+  const hideE = () => { E.visible = false; E.mode = 'idle'; E.leanSide = 0; E.lean = 0; E.snap = 0; E.lookTarget = null; E.root.scale.setScalar(1); E.standUp(); };
+  function endStage() {
+    for (const c of ST.cancel) c(); ST.cancel = [];
+    if (ST.it) { env.removeI(ST.it); ST.it = null; }
+    const st = ST.on; ST.on = null; if (st && st.end) st.end();
+    sfx.unhush();
+  }
+  const revealed = () => { ST.lastReveal = env.time(); };
+  // one of these is tried whenever the house has been quiet long enough; each says no unless you are placed right for it
+  const SCARES = {
+    // on the floor where you were just looking: folded up on its knees, collapsed over them, its head bent too far, staring at you and muttering
+    crumple: { minN: 3, w: 3, run() {
+      if (!freeE() || P.mode !== 'walk') return false;
+      const room = env.roomAt(P.pos.x, P.pos.z); if (!room || room === 'bath') return false;
+      const p = gaze.behind(1.8, 3.4); if (!p) return false;
+      E.root.scale.setScalar(1); E.root.position.set(p.x, P.pos.y, p.z); E.faceTowards(P.pos.x, P.pos.z, 1); E.mode = 'crumple'; E.side = rnd() < 0.5 ? -1 : 1; E.snap = 0;
+      E.lookTarget = camera.position; E.visible = true; sfx.holdHush();
+      const st = { kind: 'crumple', p, t0: env.time(), mum: 0, end: () => { if (!st.caught) hideE(); } }; ST.on = st;
+      ST.cancel.push(gaze.whenLookAt(p, () => {
+        st.seen = env.time(); revealed(); sfx.unhush(); sfx.pianoSlam(1.25); env.addShake(0.35); F.fear = 1;
+        ST.it = env.addI({ p: new V3(p.x, 0.6, p.z), r: 5.5, label: 'Take a photo', when: () => ST.on === st && !st.crawl && gaze.inView(p) && P.mode === 'walk', act: () => crawlAt(st) });
+        ST.cancel.push(gaze.whenLookAway(p, () => { if (!st.crawl) endStage(); }, 0.3));
+      }, 0.72));
+      return true;
+    } },
+    // standing at the far end of where you were looking, facing you; gone the next time you turn
+    stand: { minN: 2, w: 3, run() {
+      if (!freeE() || P.mode !== 'walk') return false;
+      const p = gaze.behind(4.2, 7.5); if (!p) return false;
+      E.root.scale.setScalar(1); E.root.position.set(p.x, P.pos.y, p.z); E.faceTowards(P.pos.x, P.pos.z, 1); E.mode = 'idle'; E.lookTarget = camera.position; E.visible = true; sfx.holdHush();
+      const st = { kind: 'stand', p, t0: env.time(), end: hideE }; ST.on = st;
+      ST.cancel.push(gaze.whenLookAt(p, () => {
+        st.seen = env.time(); revealed(); sfx.unhush(); sfx.pianoSlam(0.95); F.fear = Math.max(F.fear, 0.85);
+        ST.cancel.push(gaze.whenLookAway(p, () => endStage(), 0.25));
+      }, 0.7));
+      return true;
+    } },
+    // a head leaning out from a doorway at the edge of sight; it pulls back the moment you look straight at it
+    peek: { minN: 2, w: 2.5, run() {
+      if (!freeE() || P.mode !== 'walk') return false;
+      for (const name of ['kid', 'bath', 'room2', 'spare', 'parents']) {
+        const d = W.doors[name]; if (!d || d.a < 0.85 || d.target !== 1) continue;
+        const m = d.mid, dist = Math.hypot(m.x - P.pos.x, m.z - P.pos.z); if (dist < 3 || dist > 9) continue;
+        const mp = { x: m.x, z: m.z, y: 0 }; if (gaze.onScreen(mp, 1.15) || !hunter.los(P.pos.x, P.pos.z, m.x, m.z)) continue;
+        // along the wall, toward your side of the opening, and through it (away from you). It stands in the room behind the near jamb,
+        // where the wall hides it from down the hall, and leans its head and shoulder out into the doorway
+        let ax = m.x - d.hx, az = m.z - d.hz; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
+        if (ax * (P.pos.x - m.x) + az * (P.pos.z - m.z) < 0) { ax = -ax; az = -az; }
+        let nx = -az, nz = ax; if (nx * (m.x - P.pos.x) + nz * (m.z - P.pos.z) < 0) { nx = -nx; nz = -nz; }
+        const x = m.x + nx * 0.28 + ax * 0.6, z = m.z + nz * 0.28 + az * 0.6;
+        E.root.scale.setScalar(0.72); E.root.position.set(x, P.pos.y, z); E.faceTowards(x - nx * 3, z - nz * 3, 1); E.mode = 'idle'; E.lookTarget = camera.position;
+        const ry = E.root.rotation.y, lx = Math.cos(ry), lz = -Math.sin(ry);   // its left, in the world
+        E.leanSide = ((-ax) * lx + (-az) * lz > 0 ? -1 : 1) * 0.85; E.lean = 0.3; E.visible = true;
+        const st = { kind: 'peek', p: mp, t0: env.time(), end: hideE }; ST.on = st;
+        ST.cancel.push(gaze.whenLookAt(mp, () => { revealed(); sfx.whoosh(D.pan(m.x, m.z)); sfx.lurk(D.pan(m.x, m.z), 0.5, 0.8); F.fear = Math.max(F.fear, 0.7); endStage(); }, 0.93));
+        return true;
+      }
+      return false;
+    } },
+    // the door to your room, that you shut, is open again when you turn round
+    door: { minN: 1, w: 1.5, run() {
+      const d = W.doors.kid; if (!d || d.target !== 0) return false;
+      const m = { x: d.mid.x, z: d.mid.z, y: 0 }; if (Math.hypot(m.x - P.pos.x, m.z - P.pos.z) > 7 || gaze.onScreen(m, 1.15) || !gaze.sawRecently(m, 4)) return false;
+      W.setDoor('kid', true, true);
+      const st = { kind: 'door', p: m, t0: env.time() }; ST.on = st;
+      ST.cancel.push(gaze.whenLookAt(m, () => { sfx.creak(0.1, D.pan(m.x, m.z)); F.fear = Math.max(F.fear, 0.4); endStage(); }, 0.6));
+      return true;
+    } },
+    // your bear, turned round to face you
+    bear: { minN: 1, w: 1.5, run() {
+      const b = W.teddy; if (!b || !b.visible || b.sim) return false;
+      const p = { x: b.position.x, z: b.position.z, y: b.position.y }; if (Math.hypot(p.x - P.pos.x, p.z - P.pos.z) > 6 || gaze.onScreen(p, 1.15) || !gaze.sawRecently(p, 4)) return false;
+      b.rotation.y = Math.atan2(P.pos.x - p.x, P.pos.z - p.z);
+      const st = { kind: 'bear', p, t0: env.time() }; ST.on = st;
+      ST.cancel.push(gaze.whenLookAt(p, () => { sfx.whisper(D.pan(p.x, p.z), 0.08); endStage(); }, 0.8));
+      return true;
+    } },
+    // the faces in the photographs in the hall, gone while you were not looking; back when you look away
+    faces: { minN: 1, w: 1.2, run() {
+      if (pr.shown.has('PHOTO') || pr.pending.has('PHOTO') || env.roomAt(P.pos.x, P.pos.z) !== 'hall') return false;
+      const p = { x: 6.48, z: -1.02, y: 1.0 }; if (gaze.onScreen(p, 1.15) || !gaze.sawRecently(p, 4)) return false;
+      nm.blackenPhotos(true);
+      const st = { kind: 'faces', p, t0: env.time(), end: () => nm.blackenPhotos(false) }; ST.on = st;
+      ST.cancel.push(gaze.whenLookAt(p, () => { F.fear = Math.max(F.fear, 0.5); sfx.whisper(D.pan(p.x, p.z), 0.07); ST.cancel.push(gaze.whenLookAway(p, () => endStage(), 0.4)); }, 0.55));
+      return true;
+    } },
+    // Mom, in the dark kitchen with her back to you; when you come close she walks into the wall and is not there
+    mom: { minN: 4, w: 1.5, run() {
+      const room = env.roomAt(P.pos.x, P.pos.z); if (P.mode !== 'walk' || !['living', 'dining', 'hall'].includes(room)) return false;
+      const k = { x: 1.9, z: 3.4, y: 0 }, dm = double('mom'); if (!dm.rig || gaze.onScreen(k, 1.15) || Math.hypot(k.x - P.pos.x, k.z - P.pos.z) < 4) return false;
+      standDouble(dm, k.x, k.z, 0);   // facing the window over the sink, her back to the room
+      const st = { kind: 'mom', p: k, t0: env.time(), d: dm, end: () => { dm.group.visible = false; } }; ST.on = st;
+      ST.cancel.push(gaze.whenLookAt(k, () => { st.seen = env.time(); F.fear = Math.max(F.fear, 0.6); sfx.tension(0.04, 1.5); ST.cancel.push(gaze.whenLookAway(k, () => endStage(), 0.6)); }, 0.75));
+      return true;
+    } },
+  };
+  // the flash in its face: its head snaps up, and it comes for you on all fours, faster if you run
+  async function crawlAt(st) {
+    if (st.crawl) return; st.crawl = { t0: 0 }; if (ST.it) { env.removeI(ST.it); ST.it = null; }
+    for (const c of ST.cancel) c(); ST.cancel = [];
+    if (env.photo) env.photo();
+    F.fear = 1; await tween(0.14, (k) => { E.snap = k; });
+    await wait(0.35); if (ST.on !== st) return;
+    E.mode = 'crawl'; E.speed = 1; E.lookTarget = camera.position; st.crawl.t0 = env.time();
+    sfx.heavyStep(0.5, D.pan(E.root.position.x, E.root.position.z));
+  }
+  // it reaches you: the low piano and nothing else, black, and under
+  async function crawlCatch(st) {
+    st.caught = true; revealed(); sfx.pianoSlam(1.9); UI.fade(1, 0.02); env.addShake(1.2);
+    endStage(); hideE(); F.nmDone = true;
+    await wait(0.9); if (F.live && !F.dead) nm.crawled(tok).catch((e) => console.warn('nightmare failed', e));
+  }
+  // a photo was taken (here, or of a piece of proof): with the folded one in view, it is the flash that sets it off
+  function photoTaken() { const st = ST.on; if (st && st.kind === 'crumple' && st.seen && !st.crawl && gaze.inView(st.p)) crawlAt(st); }
+  const beatGap = (n) => (n <= 1 ? 75 + rnd() * 40 : n <= 3 ? 55 + rnd() * 35 : n <= 7 ? 45 + rnd() * 30 : 40 + rnd() * 25);
+  const quietTypes = new Set(['vigil', 'car', 'finale']);
+  function stageTick(dt) {
+    gaze.update(dt);
+    for (const k in doubles) { const d = doubles[k]; if (d.group.visible) d.update(env.time(), dt); }
+    if (F.dead || !F.live) { if (ST.on) endStage(); return; }
+    const st = ST.on, now = env.time();
+    if (st) {
+      const d = Math.hypot(st.p.x - P.pos.x, st.p.z - P.pos.z);
+      if (st.kind === 'crumple') {
+        if (st.crawl && st.crawl.t0) {
+          const e = E.root.position, dx = P.pos.x - e.x, dz = P.pos.z - e.z, dd = Math.hypot(dx, dz) || 1, v = (P.sprinting ? 7.2 : 4.8) * dt;
+          e.x += dx / dd * Math.min(v, dd); e.z += dz / dd * Math.min(v, dd); E.faceTowards(P.pos.x, P.pos.z, 0.4); E.speed = 1.6;
+          if (dd < 1.1 || now - st.crawl.t0 > 3.2) crawlCatch(st);
+          return;
+        }
+        if (!st.crawl) E.faceTowards(P.pos.x, P.pos.z, dt * 2);
+        if (st.seen && !st.crawl) { st.mum -= dt; if (st.mum <= 0) { sfx.mumble('lurker', 1.5, { gain: 0.42 / (1 + d * 0.25), pan: D.pan(st.p.x, st.p.z) }); st.mum = 1.6; } }
+        if ((!st.seen && (now - st.t0 > 25 || d > 9)) || (st.seen && now - st.seen > 14)) { if (st.seen) D.flicker(0.6); endStage(); }
+        return;
+      }
+      if (st.kind === 'stand') {
+        if (st.seen && d < 2.6) { D.flicker(0.6); sfx.pianoSlam(0.7); endStage(); return; }
+        if (!st.seen && (now - st.t0 > 25 || d > 12)) endStage();
+        return;
+      }
+      if (st.kind === 'mom') {
+        if (st.seen && d < 3.4 && !st.walking) {   // she walks forward into the wall, and is not there
+          st.walking = true; const g = st.d.group, z0 = g.position.z; if (st.d.rig) st.d.rig.play('walk', { fade: 0.2, speed: 0.6 });
+          tween(1.1, (k) => { g.position.z = z0 + k * 0.9; }).then(() => { sfx.thump(); endStage(); });
+        }
+        if (!st.seen && now - st.t0 > 30) endStage();
+        return;
+      }
+      if (now - st.t0 > 30) endStage();
+      return;
+    }
+    // a new one, when the house has been quiet long enough and you are free to be shown something
+    if (!F.plan || quietTypes.has(F.plan.type) || F.script || F.cutscene || hunter.busy || hunter.cool > 0 || P.mode !== 'walk') return;
+    if (now - ST.lastBeat < ST.gap || now - ST.lastReveal < 15) return;
+    const n = F.night || 1, pool = Object.entries(SCARES).filter(([, s]) => n >= s.minN && (n > 1 || s.minN <= 1));
+    let tot = pool.reduce((a, [, s]) => a + s.w, 0), r = rnd() * tot;
+    const order = []; for (const [k, s] of pool) { r -= s.w; if (r <= 0 && !order.length) order.push(k); }
+    for (const [k] of pool) if (!order.includes(k)) order.push(k);
+    for (const k of order) if (SCARES[k].run()) { ST.lastBeat = now; ST.gap = beatGap(n); return; }
+    ST.lastBeat = now - ST.gap + 2;   // nothing fitted: look again in a couple of seconds
+  }
+  D.revealCool = () => env.time() - ST.lastReveal < 15 || !!ST.on;
+  D.revealed = revealed;
+
+  // the late news, on the TV or the kitchen radio, in a small speaker's voice. Early nights it is about the town; later it is about this house,
+  // and what you did tonight; on the last of them the reader stops and breathes. Each bulletin plays once a run.
+  D.news = () => {
+    const R = env.RUN, heard = (R.news ||= []), n = F.night || 2, room = env.roomAt(P.pos.x, P.pos.z);
+    let pool = n <= 5 ? ['n1', 'n2', 'n3', 'n4', 'n5'] : n <= 7 ? ['n6', 'n7', 'n5', 'n4'] : ['n8', 'n7', 'n6'];
+    pool = pool.filter((k) => !heard.includes(k) && (k !== 'n7' || room === 'living'));
+    if (!pool.length) return;
+    const id = pool[0], onTv = room === 'living' || rnd() < 0.55, x = onTv ? 4.22 : 1.6, z = onTv ? -3.04 : 4.35;
+    heard.push(id); env.saveRun();
+    if (onTv) { W.tvFx.set(true); D.holdTv(true); }
+    sfx.staticBurst(D.pan(x, z), 0.7);
+    later(0.7, () => {
+      if (!F.live) return;
+      const dist = Math.hypot(P.pos.x - x, P.pos.z - z), dur = sfx.speaker('vo/news/' + id, { pan: D.pan(x, z), gain: 1.4 / (1 + dist * 0.12) }) || 8;
+      sub('news/' + id, dur + 0.5); F.fear = Math.max(F.fear, n >= 6 ? 0.6 : 0.3);
+      const late = id === 'n7' || id === 'n8';
+      later(dur + (late ? 0.4 : 0), () => {
+        if (late) for (let i = 0; i < 4; i++) later(i * 1.6, () => sfx.breath(i % 2 === 0, 0.22 / (1 + dist * 0.12)));   // the reader stops, and breathes
+        later(late ? 7 : 1.2, () => { sfx.staticBurst(D.pan(x, z), 0.4); if (onTv) { W.tvFx.set(false); D.holdTv(false); } });
+      });
+    });
+  };
+
   // nodes the player could see right now (line of sight, within a range, in front of or behind them)
   function visibleNodes(min, max, where = 'front') {
     camera.getWorldDirection(tmp); const fx = tmp.x, fz = tmp.z, fl = Math.hypot(fx, fz) || 1, out = [];
@@ -145,6 +356,7 @@ export function createNights(env) {
 
   // an encounter with the thing. Returns true if it began.
   function encounter(kind) {
+    if (ST.on) return false;   // something is already staged in the blind spot
     if (kind === 'sight') {
       if (hidden()) return false;
       let c = visibleNodes(6, 15, rnd() < 0.3 ? 'behind' : 'front'); if (!c.length) c = visibleNodes(5, 15, 'front'); if (!c.length) return false;
@@ -180,7 +392,7 @@ export function createNights(env) {
     // the grandfather clock: it strikes the hour, and it stops dead while the thing hunts you
     const hr = Math.floor(F.clock / 60); if (hr !== lastHr) { if (lastHr >= 0 && F.live && !W.clock.silent) D.chime(hr % 12 || 12); lastHr = hr; }
     W.clock.silent = hunter.state === 'hunt';
-    director.update(); hunter.update(dt); proofTick();
+    director.update(); hunter.update(dt); proofTick(); stageTick(dt);
     // the breath meter shows whenever something is near enough to hear you
     if (F.live) F.breathUI = F.breathUI || (P.mode === 'hide' && hunter.busy && hunter.gap() < 14 && hunter.state !== 'leave');
     if (F.live && P.mode === 'hide' && !(hunter.busy && hunter.gap() < 14)) F.breathUI = F.breathCheck;
@@ -311,7 +523,7 @@ export function createNights(env) {
     await wait(0.25);
     const url = env.photo ? env.photo() : null;
     if (url) { photos()[k] = url; env.saveRun(); }
-    UI.print && UI.print(url, d.cap);
+    UI.print && UI.print(url, d.cap); photoTaken();
     if (d.took) d.took();
     await wait(1.1);
     const back = new V3(P.pos.x, env.EYE, P.pos.z);
@@ -376,7 +588,7 @@ export function createNights(env) {
     rnd = plan.r; F.plan = plan; F.typeName = TYPE_NAMES[plan.type];
     F.clock = plan.clock0; lastMin = -1; lastHr = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
     F.nmDone = false; F.objOk = plan.type === 'poltergeist' || plan.type === 'finale'; hunter.reset(); hunter.setLevel(n + (env.RUN.objDone[n - 1] === false ? 1 : 0)); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
-    env.toBunk();
+    env.toBunk(); endStage(); gaze.clearAll(); ST.lastBeat = env.time(); ST.lastReveal = -99; ST.gap = 35 + rnd() * 20;
     const dialClock = clockText(F.clock);
     UI.card(dialClock, `Night ${n}`, 4.5);
     await wait(2.5); UI.fade(0, 3); await wait(2.0);
@@ -406,7 +618,7 @@ export function createNights(env) {
 
   async function dawn(n) {
     env.RUN.objDone[n] = !!F.objOk;
-    F.live = false; F.script = true; director.stop(); tok++;
+    F.live = false; F.script = true; director.stop(); tok++; endStage();
     env.vigil.stop(); hunter.dismiss(); sfx.violins(0, 3); sfx.tension(0, 2); sfx.drone(0.04, 4); UI.objective(null); UI.hint(null); W.tvFx.set(false); W.phone.setRinging(false);
     proofSync(); pr.kinds = [];
     F.breathCheck = false; F.chase = false; F.echo = false; W.nightLights.forEach((x) => { x.dead = false; }); F.blackout = false; env.nlMult(1, false);
@@ -456,35 +668,47 @@ export function createNights(env) {
       await until(t, () => answered || rings >= 11); W.phone.setRinging(false); env.removeI(it);
       if (!answered && alive(t)) { obj(null); W.setDoor('parents', true); proofFire('ring'); }
     },
-    // the TV in the living room, and Dad's voice
+    // you wake to Dad calling you from somewhere in the dark house. Whenever you get close he is further on; the calls come out a little wrong.
+    // His bed is not empty: he is asleep in it. At the end of the hall something in his pyjamas stands with its face in the corner.
     async static(plan, t) {
-      await atClock(t, plan.clock0 + 24); if (!alive(t)) return;
-      W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(4.22, -3.04), 3);
-      await wait(5); if (!alive(t)) return;
-      env.say('dad/lure_a', { muffle: true }); obj("The TV's on and Dad is up. Turn it off");
-      mom.group.visible = true;
-      dad.sleeping = false; dad.busy = true; dad.pose = null; dad.group.rotation.order = 'XYZ';   // out of the sleeping pose (it points the feet like a man lying down) dad.group.rotation.set(0, 0, 0); dad.group.position.set(3.21, 0, -2.37); dad.group.rotation.y = Math.atan2(4.22 - 3.21, -3.04 + 2.37);   // standing in front of the TV, his back to you
-      dad.group.visible = true; dad.lookAt = null; dad.fake = true; W.bedSleepers.one('dad', false); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 0.6 });   // and his side of the bed is empty
-      let revealed = false, saidB = false; const t0 = env.time();
-      const off = env.addI({ p: new V3(4.22, 1.0, -3.04), r: 1.7, label: 'Turn the TV off', when: () => alive(t) && !revealed && W.tvFx.on && P.mode === 'walk', act: () => { completeObjective(); revealed = true; } });
-      while (alive(t) && !revealed && env.time() - t0 < 95) {
-        const d = Math.hypot(P.pos.x - 3.21, P.pos.z + 2.37);
-        if (!saidB && d < 6.5 && hunter.los(P.pos.x, P.pos.z, 3.21, -2.37)) { saidB = true; env.say('dad/lure_b'); }
-        if (d < 1.9 && hunter.los(P.pos.x, P.pos.z, 3.21, -2.37) && !hidden()) revealed = true;
+      await atClock(t, plan.clock0 + 4); if (!alive(t)) return;
+      const stops = [
+        { x: -3.4, z: 1.2, lines: ['call_a', 'call_b'] },   // by his own door, off the dining room
+        { x: 1.9, z: 2.8, lines: ['call_c', 'call_a'] },    // the kitchen (the first call again, word for word)
+        { x: 5.6, z: -0.5, lines: ['call_d', 'call_e'] },   // the near end of the hall
+      ];
+      const end = { x: 11.0, z: -0.95 }, corner = { x: 11.36, z: -1.14 };
+      obj("Dad's calling you");
+      for (const s of stops) {
+        let i = 0, nextAt = env.time() + 1.5;
+        while (alive(t)) {
+          const d = Math.hypot(P.pos.x - s.x, P.pos.z - s.z);
+          if (d < 4.2 || (d < 7.5 && gaze.inView({ x: s.x, z: s.z, y: 0 }))) break;
+          if (env.time() >= nextAt && !F.script && !F.cutscene) { voiceAt('dad/' + s.lines[i % s.lines.length], s.x, s.z); i++; nextAt = env.time() + 7 + rnd() * 5; }
+          await wait(0.2);
+        }
+        if (!alive(t)) return;
+        sfx.footstep(0.1, D.pan(s.x, s.z), 0.4); await wait(0.8);   // a soft step, going on ahead
+      }
+      const fd = double('dad'); const tr = env.time(); await until(t, () => fd.rig || env.time() - tr > 8); if (!alive(t)) return;
+      standDouble(fd, end.x, end.z, Math.atan2(corner.x - end.x, corner.z - end.z));
+      voiceAt('dad/call_f', end.x, end.z, 0.9);
+      let seen = false; const t0 = env.time();
+      while (alive(t) && env.time() - t0 < 90) {
+        const d = Math.hypot(P.pos.x - end.x, P.pos.z - end.z);
+        if (d < 2.0 && hunter.los(P.pos.x, P.pos.z, end.x, end.z) && !hidden()) { seen = true; break; }
         await wait(0.1);
       }
-      env.removeI(off);
-      if (alive(t) && revealed) {   // it was never Dad
-        achievements.unlock('NOT_DAD'); F.script = true; obj(null); W.tvFx.figure = 1; sfx.staticBurst(0, 0.6);
-        env.nlMult(0, false); D.flicker(1.4); await wait(0.5);
-        dad.group.visible = false; dad.fake = false; dad.busy = false; W.tvFx.set(false); D.holdTv(false); W.tvFx.figure = 0;
-        F.script = false;
-        hunter.hunt('livTV'); E.faceTowards(P.pos.x, P.pos.z, 1);
-      } else if (alive(t)) {
-        W.tvFx.set(false); D.holdTv(false); obj(null);
+      if (alive(t) && seen) {   // it was never Dad: it turns round, the lights go, and it comes for you
+        completeObjective(); achievements.unlock('NOT_DAD'); F.script = true; obj(null);
+        const g = fd.group, y0 = g.rotation.y, y1 = Math.atan2(P.pos.x - end.x, P.pos.z - end.z);
+        await tween(0.55, (k) => { g.rotation.y = lerpAngle(y0, y1, k * k); });
+        env.nlMult(0, false); sfx.pianoSlam(1.6); env.addShake(0.8); revealed(); g.visible = false;
+        E.root.position.set(end.x, 0, end.z); E.faceTowards(P.pos.x, P.pos.z, 1);
+        await wait(0.6); F.script = false; env.nlMult(1, false);
+        if (alive(t)) hunter.hunt(nearestNode(end.x, end.z) || 'hallE');
       }
-      if (dad.fake) { dad.fake = false; dad.busy = false; env.sleepers(true); }
-      W.bedSleepers.one('dad', true);
+      fd.group.visible = false; obj(null);
       if (alive(t)) proofFire('static');
     },
     // Mom calls you from the kitchen
@@ -672,5 +896,6 @@ export function createNights(env) {
     },
   };
 
-  return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor };
+  return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor,
+    stage: { SCARES, gaze, ST, crawlAt, photoTaken, endStage, tick: stageTick, double } };
 }

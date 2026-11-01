@@ -1,5 +1,11 @@
 {
 "files": [
+"vo/dad/call_a",
+"vo/dad/call_b",
+"vo/dad/call_c",
+"vo/dad/call_d",
+"vo/dad/call_e",
+"vo/dad/call_f",
 "vo/dad/car_a",
 "vo/dad/car_b",
 "vo/dad/car_c",
@@ -93,6 +99,14 @@
 "vo/mom/talk_a",
 "vo/mom/talk_b",
 "vo/mom/talk_c",
-"vo/mom/teeth"
+"vo/mom/teeth",
+"vo/news/n1",
+"vo/news/n2",
+"vo/news/n3",
+"vo/news/n4",
+"vo/news/n5",
+"vo/news/n6",
+"vo/news/n7",
+"vo/news/n8"
 ]
 }

@@ -202,9 +202,9 @@ const EVENT_LIST = [
   { id: 'lightDies', safe: true, w: 2, minN: 2, run: (D) => D.killNightLight(35 + D.r() * 40) },
   { id: 'kidDoorShuts', safe: true, w: 2, ok: (D) => D.W.doors.kid.target === 1 && room(D) === 'bed' && D.dist(D.W.doors.kid.mid) > 1.2, run: (D) => { D.W.setDoor('kid', false); D.F.fear = Math.max(D.F.fear, 0.45); } },
   { id: 'doorDrifts', safe: true, w: 2, minN: 2, ok: (D) => D.W.doors.room2.target === 0, run: (D) => { D.W.setDoor('room2', true); } },
-  { id: 'glimpse', w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0 && !D.onBunk() && room(D) !== 'bath', run: (D) => D.glimpse() },
+  { id: 'glimpse', reveal: true, w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0 && !D.onBunk() && room(D) !== 'bath', run: (D) => D.glimpse() },
   { id: 'breathBehind', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.breath(true, 0.5); D.sfx.breath(false, 0.5); D.sfx.whisper(-0.9 + D.r() * 1.8, 0.12); D.F.fear = Math.max(D.F.fear, 0.6); } },
-  { id: 'mirror', safe: true, w: 2, minN: 2, ok: (D) => room(D) === 'bath', run: (D) => D.mirror(D.F.night > 1 && D.r() < 0.5 ? 'figure' : 'writing') },
+  { id: 'mirror', reveal: true, safe: true, w: 2, minN: 2, ok: (D) => room(D) === 'bath', run: (D) => D.mirror(D.F.night > 1 && D.r() < 0.5 ? 'figure' : 'writing') },
   { id: 'tvStatic', safe: true, w: 2, minN: 2, ok: (D) => room(D) !== 'living' && !D.W.tvFx.on, run: (D) => D.tvBlip() },
   { id: 'faucet', safe: true, w: 2, run: (D) => D.sfx.faucet(4, D.randPan()) },
   { id: 'clockGlitch', safe: true, w: 2, minN: 2, run: (D) => D.clockGlitch() },
@@ -225,12 +225,14 @@ const EVENT_LIST = [
   { id: 'bunkShake', safe: true, w: 2, minN: 2, ok: (D) => D.onBunk(), run: (D) => { D.shake(0.5); D.sfx.creak(0.35, 0); D.F.fear = Math.max(D.F.fear, 0.5); } },
   { id: 'steps', safe: true, w: 2, minN: 2, ok: (D) => !D.onBunk() && !D.hunter.busy, run: (D) => { D.F.echo = true; D.later(9, () => { D.F.echo = false; }); } },
   { id: 'flush', safe: true, w: 1, run: (D) => D.sfx.flush(D.pan(4.2, 1.5)) },
+  // the late news comes on by itself, on the TV or the radio in the kitchen
+  { id: 'news', w: 2.5, minN: 2, ok: (D) => D.calm() && !D.hunter.busy && D.news, run: (D) => D.news() },
   // a car goes by out front and its headlights slide through the house (about four minutes of the clock)
   { id: 'carPass', w: 2, minN: 2, once: true, alone: 6, ok: (D) => D.calm(), run: (D) => D.carPass() },
   // the huge pale face drifts past the windows (about twelve minutes): once a night, while you are in your room or can see its window
-  { id: 'windowFace', w: 2, minN: 2, once: true, alone: 20, ok: (D) => D.calm() && D.seesKidWindow(), run: (D) => D.faceAtWindow() },
+  { id: 'windowFace', reveal: true, w: 2, minN: 2, once: true, alone: 20, ok: (D) => D.calm() && D.seesKidWindow(), run: (D) => D.faceAtWindow() },
   // the build-up to a hunt (flicker, violins, heavy steps) with no hunt after it
-  { id: 'falseAlarm', w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0, run: (D) => { D.flicker(1.5); D.sfx.violins(0.3, 0.6); D.sfx.heavyStep(0.5, D.randPan()); D.later(0.85, () => { D.sfx.heavyStep(0.4, D.randPan()); D.sfx.pianoSlam(0.7); }); D.later(2.6, () => D.sfx.violins(0, 2.5)); D.F.fear = Math.max(D.F.fear, 0.8); } },
+  { id: 'falseAlarm', reveal: true, w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0, run: (D) => { D.flicker(1.5); D.sfx.violins(0.3, 0.6); D.sfx.heavyStep(0.5, D.randPan()); D.later(0.85, () => { D.sfx.heavyStep(0.4, D.randPan()); D.sfx.pianoSlam(0.7); }); D.later(2.6, () => D.sfx.violins(0, 2.5)); D.F.fear = Math.max(D.F.fear, 0.8); } },
   // the wall phone rings once and stops (later it is off the hook)
   { id: 'phone', spare: true, minN: 2, ok: (D) => !D.W.phone.ringing && !D.W.phone.off, run: (D) => D.sfx.phoneRing(D.pan(-1.5, 0.9)) },
   // the power cuts out for a second or two, night lights and all, and the breaker clunks back on by itself
@@ -266,8 +268,9 @@ export function createDirector(D) {
         if (!okNow(ev)) { if (c > ev.t + 40) { ev.done = ev.dropped = true; if (D.dropped) D.dropped(ev.id); } continue; }
         if (def.alone && c - lastAt < def.alone) continue;
         if (!def.alone && (c - lastAt < 2.5 || (D.hunter.busy && !def.safe))) continue;
+        if (def.reveal && D.revealCool && D.revealCool()) continue;   // never two reveals within fifteen seconds
         ev.done = true; lastAt = c; if (def.alone) holdUntil = c + def.alone;
-        try { def.run(D); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // no proof for an event that never happened
+        try { def.run(D); if (def.reveal && D.revealed) D.revealed(); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // no proof for an event that never happened
       }
     },
   };
