@@ -326,13 +326,29 @@ let BASE = '';
         ok(mid.length > 0, 'no night from 2 to 9 can leave proof on this seed');
         ok(e.set.shown && e.set.text === 'Smoke test 1 / 2' && e.cleared, `objective: ${JSON.stringify(e.set)}, cleared ${e.cleared}`);
         ok(e.proofLine, 'no #proof line under the objective');
+        // the camera: a piece of proof photographed is kept in the run with its print, shown at the corner, and pinned on the photo board
+        await page.evaluate(() => { const g = window.__game; window.__q = g.gfx.quality; g.gfx.setQuality('low', { save: false }); if (!g.F.live) g.start(); g.F.cutscene = false; g.F.script = false; g.P.mode = 'walk'; window.__shot = g.nights.proof.look('SCRATCHES').then(() => { window.__shotDone = 1; }, (e) => { window.__shotDone = String(e); }); });
+        await until(page, () => window.__shotDone, null, 240e3).catch(async () => { throw new Error(`the photo never finished: ${JSON.stringify(await page.evaluate(() => { const g = window.__game; return { t: g.gameTime, mode: g.P.mode, cut: g.F.cutscene, dead: g.F.dead, paused: g.menu.state.open }; }))}`); });
+        const cam = await page.evaluate(async () => {
+          const g = window.__game, pr = g.nights.proof; if (window.__shotDone !== 1) return { err: window.__shotDone };
+          const print = document.getElementById('print'), body = document.createElement('div'); pr.board(body);
+          const r = { has: g.RUN.evidence.includes('SCRATCHES'), url: String((g.RUN.photos || {}).SCRATCHES || '').slice(0, 22), size: String((g.RUN.photos || {}).SCRATCHES || '').length,
+            print: print.classList.contains('show') || !!print.querySelector('.ph').style.backgroundImage, cap: print.querySelector('.cap').textContent,
+            pins: body.querySelectorAll('.pin img').length, note: !!body.querySelector('.board-note'), hud: !!document.querySelector('#proof .cam'), mode: g.P.mode, digits: /\d/.test(document.getElementById('proof').textContent) };
+          // put the run back as it was
+          g.RUN.evidence.splice(g.RUN.evidence.indexOf('SCRATCHES'), 1); delete g.RUN.evidenceAt.SCRATCHES; delete g.RUN.photos.SCRATCHES; pr.sync(); g.gfx.setQuality(window.__q, { save: false });
+          return r;
+        });
+        ok(cam.has && cam.url === 'data:image/jpeg;base64' && cam.size > 2000 && cam.size < 120000, `the photo was not kept: ${JSON.stringify(cam)}`);
+        ok(cam.print && cam.cap === 'closet door', `no print at the corner: ${JSON.stringify(cam)}`);
+        ok(cam.pins >= 1 && cam.note && cam.hud && !cam.digits, `photo board / HUD: ${JSON.stringify(cam)}`);
         if (!e.finale) throw new Skip('window.__game.finaleFor is not exposed, so the ending choice was not checked');
         const want3 = { 0: 'ENDING_ALONE', 2: 'ENDING_ALONE', 3: 'ENDING_TAKEN', 4: 'ENDING_TAKEN', 6: 'ENDING_TAKEN', 7: 'ENDING_BELIEVED', 8: 'ENDING_BELIEVED', 10: 'ENDING_BELIEVED' };
         const wrong = e.finale.filter(([n, v]) => v !== want3[n]);
         ok(!wrong.length, `finaleFor: ${JSON.stringify(wrong)}`);
         clean(w);
         await page.close();
-        return `RUN.evidence holds ${e.evidence}, ${e.total} kinds; proof possible on nights ${mid.join(',')} and none on 1 or 10; objective set and cleared; finaleFor 0/4/8 -> ${e.finale.filter(([n]) => [0, 4, 8].includes(n)).map(([, v]) => v).join(', ')}`;
+        return `a photo kept (${cam.size} B jpeg, print "${cam.cap}", pinned on the board); RUN.evidence holds ${e.evidence}, ${e.total} kinds; proof possible on nights ${mid.join(',')} and none on 1 or 10; objective set and cleared; finaleFor 0/4/8 -> ${e.finale.filter(([n]) => [0, 4, 8].includes(n)).map(([, v]) => v).join(', ')}`;
       });
     }
 
@@ -490,7 +506,7 @@ let BASE = '';
 
     // ---------- 12: the three end screens, by the finale path with proof 0, 4 and 8 ----------
     await check(12, 'endings', () => alone(browser, async (c) => {
-      const want = { 0: ['They never believed you.', 'proof 0 / 12'], 4: ['They saw it.', 'proof 4 / 12'], 8: ['They believed you.', 'proof 8 / 12'] };
+      const want = { 0: ['They never believed you.', 'photos 0 / 12'], 4: ['They saw it.', 'photos 4 / 12'], 8: ['They believed you.', 'photos 8 / 12'] };
       const runs = [];   // one after the other: pages side by side starve each other of frames
       for (const proof of Object.keys(want)) {
         const { page, w } = await openGame(c, `/index.html#night10&proof=${proof}`, { clock: 30 });   // not faster: the night's clock must not step past dawn before the finale starts

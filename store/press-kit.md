@@ -7,7 +7,7 @@ farmhouse, you've got the top bunk in the back corner room, and something tall w
 of the hallway. It only comes out at night. Over ten nights the doors start shutting on their own, the phone rings, the TV switches
 itself on, and Mom calls you from the kitchen while she's asleep in bed. The thing hunts you through the dark, and you run, shut
 doors, hide under the covers or in a closet, and hold your breath until it leaves. At breakfast your parents explain it all away
-unless you've found something they can't. How it ends on the last night depends on how much proof you've shown them.
+unless you've found something they can't. How it ends on the last night depends on how many photos you've shown them.
 
 ## Fact sheet
 
@@ -23,7 +23,7 @@ unless you've found something they can't. How it ends on the last night depends 
 | Players | 1 |
 | Length | Short: ten nights plus the mornings. A night's clock runs to dawn in about six real minutes, so a full run should take an hour to ninety minutes, more if it catches you |
 | Input | Keyboard and mouse; game controller with rumble (partial support: not every screen has been checked on a pad); touch on the web build |
-| Languages | English: interface and subtitles. Mom, Dad and grandpa are voiced; the kid's lines and the proof scene at breakfast are text only |
+| Languages | English: interface and subtitles. Mom, Dad and grandpa are voiced; the kid's lines are text only |
 | Engine | three.js (WebGL 2) in Electron for the desktop build; no engine licence, no middleware |
 | Rating | Not yet rated; horror themes, jump scares, flashing lights, no gore |
 | Press contact | *[email]* |
@@ -44,7 +44,7 @@ unless you've found something they can't. How it ends on the last night depends 
   the breaker flipped, the bear in the middle of the hall) and would still rather believe it was you.
 - Four nightmares (the shadow, the mirror, the hall, the basement): at most one a night, and each leaves something behind.
 - The house: a back door, stairs down to a basement laundry room, a detached garage, Mom and Dad's room at the end of the hall.
-- Proof. A dozen kinds of thing a night can leave behind, and what you find changes breakfast. How much you have by the tenth night
+- Proof. A dozen kinds of thing a night can leave behind, photographed with a disposable camera and laid on the breakfast table. How much you have by the tenth night
   decides which of three endings you get.
 - Graphics presets from Low to Ultra, and a brightness slider. Auto lowers the resolution, then the preset, when the frame rate drops.
 - Keyboard and mouse or a controller, and the on-screen prompts follow whichever you used last. Controller support is partial for

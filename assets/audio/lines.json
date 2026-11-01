@@ -450,5 +450,65 @@
   "voice": "dad",
   "say": "[muffled, low, flat, like he is talking on the phone] Yeah. He's asleep. They're all asleep. Come in through the back.",
   "html": "<b>Dad:</b> <i>(through the wall)</i> Yeah. He's asleep. They're all asleep. Come in through the back."
+ },
+ "mom/ph_low_a": {
+  "voice": "mom",
+  "say": "Honey... it's a dark picture of a door. Eat your toast.",
+  "html": "<b>Mom:</b> Honey. It's a dark picture of a door. Eat your toast."
+ },
+ "mom/ph_low_b": {
+  "voice": "mom",
+  "say": "Where did you even get film for that thing? Not at the table.",
+  "html": "<b>Mom:</b> Where did you even get film for that thing? Not at the table."
+ },
+ "dad/ph_low_a": {
+  "voice": "dad",
+  "say": "Bud, that's a shadow. The flash does that.",
+  "html": "<b>Dad:</b> Bud, that's a shadow. The flash does that."
+ },
+ "dad/ph_low_b": {
+  "voice": "dad",
+  "say": "You were up taking pictures at three in the morning? Well, there's your problem.",
+  "html": "<b>Dad:</b> You were up taking pictures at three in the morning? Well, there's your problem."
+ },
+ "mom/ph_mid_a": {
+  "voice": "mom",
+  "say": "...When did you take this?",
+  "html": "<b>Mom:</b> ...When did you take this?"
+ },
+ "mom/ph_mid_b": {
+  "voice": "mom",
+  "say": "That wasn't there yesterday. Was it?",
+  "html": "<b>Mom:</b> That wasn't there yesterday. Was it?"
+ },
+ "dad/ph_mid_a": {
+  "voice": "dad",
+  "say": "Huh. Let me see that again.",
+  "html": "<b>Dad:</b> Huh. Let me see that again."
+ },
+ "dad/ph_mid_b": {
+  "voice": "dad",
+  "say": "Okay. Don't touch it. I'll look at it when I get home.",
+  "html": "<b>Dad:</b> Okay. Don't touch it. I'll look at it when I get home."
+ },
+ "mom/ph_high_a": {
+  "voice": "mom",
+  "say": "[quiet] Mark. Look at this. Look at it.",
+  "html": "<b>Mom:</b> Mark. Look at this. Look at it."
+ },
+ "mom/ph_high_b": {
+  "voice": "mom",
+  "say": "Put it away. Please. I can't look at it.",
+  "html": "<b>Mom:</b> Put it away. Please. I can't look at it."
+ },
+ "dad/ph_high_a": {
+  "voice": "dad",
+  "say": "[quiet] ...I heard it too. I didn't want to say.",
+  "html": "<b>Dad:</b> ...I heard it too. I didn't want to say."
+ },
+ "dad/ph_high_b": {
+  "voice": "dad",
+  "say": "Nobody goes anywhere alone tonight. Nobody.",
+  "html": "<b>Dad:</b> Nobody goes anywhere alone tonight. Nobody."
  }
 }

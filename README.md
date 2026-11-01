@@ -8,7 +8,7 @@ A short first-person horror game made with [three.js](https://threejs.org). Your
 
 Moving day: carry your three boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Someone left a crayon drawing taped up in the hall. At 2:47 that night the house wakes up. Your bear falls off the bunk, your door shuts by itself, something scratches inside the closet and the photo in the hall comes off the wall, but you never see what does it. When it all goes quiet, get under the covers and hold your breath. At breakfast nobody believes you.
 
-From night two the whole house is open, a clock runs toward dawn, and the thing in the hall hunts you. You run, shut doors, hide and hold your breath. The run's seed decides what each night is about (the phone, the TV, Mom calling from the kitchen while she's asleep, the blackout, the drive, the vigil and others), and most nights leave something behind to show your parents in the morning. Get caught and you play the night again. On night ten it comes down the hall, and how much proof you found decides which of the three endings you get.
+From night two the whole house is open, a clock runs toward dawn, and the thing in the hall hunts you. You run, shut doors, hide and hold your breath. The run's seed decides what each night is about (the phone, the TV, Mom calling from the kitchen while she's asleep, the blackout, the drive, the vigil and others), and most nights leave something behind: a sound gives it away, and you photograph it with your disposable camera to lay on the breakfast table in the morning (Tab, or Select on a controller, shows your photos). Get caught and you play the night again. On night ten it comes down the hall, and how many photos you showed them decides which of the three endings you get.
 
 ## Controls
 
@@ -49,7 +49,7 @@ Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml
 | `index.html` | HUD, title/pause/death/end screens, import map for the vendored three.js r170 (`vendor/three`) |
 | `css/` | HUD and screen styling, film grain, vignette, blanket overlay; `fonts.css` loads the fonts in `assets/fonts/` |
 | `js/main.js` | Game loop, player, collisions, moving day, the mornings, night ten's endings |
-| `js/nights.js` | The nights: clock, hiding places, proof, and what each kind of night does |
+| `js/nights.js` | The nights: clock, hiding places, proof and the camera, and what each kind of night does |
 | `js/director.js` | Which night is which for a seed, and the small events that fill a night |
 | `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, and the graph of the house it walks on |
 | `js/entity.js`, `js/creature.js`, `js/mathx.js` | The thing itself: model, animation, head and eye tracking; its face, built in code; small shared math helpers |

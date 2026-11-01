@@ -78,6 +78,30 @@ settings.delegate('quality', { get: () => gfx.mode, set: (v) => gfx.setMode(v), 
 const BATH_I = 95;
 // the flashlight: a spot light carried on the camera (see toggleLight)
 const flash = new THREE.SpotLight(0xfff1d2, 0, 15, 0.5, 0.55, 1.2);
+// the disposable camera: a flash bulb at the lens (always in the scene, dark, so taking a photo never changes the lights and recompiles the
+// shaders), and a grab of the frame it lit, cropped to a print and given a cheap camera's look
+const bulb = new THREE.PointLight(0xfff4e2, 0, 7, 2); scene.add(bulb);
+function grabPrint() {
+  const src = renderer.domElement, w = 288, h = 216, c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'), sw = src.width, sh = src.height, k = Math.min(sw / w, sh / h) * 0.8, cw = w * k, ch = h * k;
+  x.filter = 'sepia(0.22) saturate(0.85) contrast(1.08)'; x.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h); x.filter = 'none';
+  const v = x.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.85); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(10,6,0,0.55)');
+  x.fillStyle = v; x.fillRect(0, 0, w, h);
+  return c.toDataURL('image/jpeg', 0.62);
+}
+function takePhoto() {
+  bulb.position.copy(camera.position); camera.getWorldDirection(tmp); bulb.position.addScaledVector(tmp, -0.25); bulb.intensity = 3.2;   // a cheap flash: bright up close, gone by the far wall
+  let url = null;
+  try { camera.updateMatrixWorld(); gfx.render(0); url = grabPrint(); } catch (e) { url = null; }   // the frame the flash lit, read before the browser shows it
+  UI.flash(settings.get('reduceFlashing') ? 'rgba(255,250,240,0.45)' : 'rgba(255,250,240,0.95)', 0.5); sfx.shutter(); sfx.winder();
+  setTimeout(() => { bulb.intensity = 0; }, 120);
+  return url;
+}
+// the photo board: from play it pauses and opens over the pause menu (Tab, the controller's Select, the camera on a touch screen)
+function openPhotos() {
+  if (uiMode === 'playing' && !F.dead && !F.cutscene) setPause(true);
+  if (uiMode === 'pause') setTimeout(() => { if (uiMode === 'pause') menu.open('photos'); }, 0);   // after the pause menu has opened under it
+}
 flash.position.set(0.12, -0.14, 0); camera.add(flash); camera.add(flash.target); flash.target.position.set(0, 0, -3);
 function toggleLight() {
   if (uiMode !== 'playing' || F.phase !== 'night' || F.dead || F.noFlash) return;
@@ -141,6 +165,7 @@ addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyE') pressE = true;
+  if (e.code === 'Tab') { e.preventDefault(); openPhotos(); }
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -169,7 +194,7 @@ function confirmPress() {
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
-initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); } });
+initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos() });
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
   $('controls').innerHTML = controlsTable().map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
@@ -409,6 +434,7 @@ function speak(id, { muffle = false, hold = 0.45 } = {}) {
 const LINE_TO = {
   'dad/cheap': 'mom', 'dad/m4_a': 'mom', 'mom/m5_a': 'dad', 'dad/m5_b': 'mom', 'mom/m5_b': 'dad', 'dad/m6_a': 'mom', 'mom/m6_b': 'dad',
   'mom/m7_a': 'dad', 'dad/m7_b': 'mom', 'dad/m8_a': 'mom', 'mom/m8_b': 'dad',
+  'mom/ph_high_a': 'dad', 'dad/ph_high_a': 'mom',
 };
 const talkNow = { who: null, to: null, until: 0 };
 // every frame: the speaker looks at whoever the line is for, the other parent looks at the speaker and turns a little toward them
@@ -670,6 +696,7 @@ async function startGame() {
   if (DEBUG === 'night' || DEBUG === 'night1') { await playFrom('n1'); return; }
   if (DEBUG === 'breakfast') { await playFrom('b1'); return; }
   if (/^n\d+$/.test(DEBUG) || /^night\d+$/.test(DEBUG)) { await playFrom('n' + DEBUG.replace(/\D/g, '')); return; }
+  if (/^b[2-9]$/.test(DEBUG)) { await playFrom(DEBUG); return; }   // a morning after a night (#b3), with whatever the saved run holds
   if (DEBUG === 'morning') { await endingScript(); return; }
   if (!DEBUG && hasRun()) { await playFrom('n' + Math.min(RUN.night, 10)); return; }   // the run continues where you died or stopped
   await playFrom('day');
@@ -1068,7 +1095,6 @@ async function breakfast(n) {
   kitchenLife();
   F.birds = true;
   UI.card('6:58 AM', n === 1 ? 'Morning' : `Morning ${n}`, 3.5);
-  if (n >= 2 && nights) cardProof(`Night ${n} · proof ${nights.proof.count()} / ${nights.proof.total}`, 3.5);
   await wait(2.2); UI.fade(0, 3); await wait(2.4);
   UI.subtitle(n === 1 ? '<i>You hardly slept.</i>' : n < 6 ? '<i>You did not sleep at all.</i>' : '<i>You are so tired it feels like a fever.</i>', 3.5);
   UI.objective('Go to the kitchen');
@@ -1081,36 +1107,28 @@ async function breakfast(n) {
   await wait(0.5);
   const lines = [...(MORN[n] || MORN[3])];
   const tl = n >= 2 && nights && TYPE_LINE[nights.plan(n).type]; if (tl) lines.push(tl);
-  const fresh = nights ? nights.proof.on(n) : []; if (fresh.length) lines.push(() => proofBeat(fresh[fresh.length - 1]));
+  const fresh = nights ? nights.proof.on(n) : []; if (fresh.length) lines.unshift(() => photoBeat(fresh));   // the photos first, then the usual talk
   await conversation(lines);
   UI.fade(1, 2.5); await wait(3);
   F.birds = false; F.cutscene = false; F.morningReady = false;
   kitchen.run++; mom.pose = dad.pose = null; for (const o of kitchen.things) if (o.parent) o.parent.remove(o); kitchen.things.length = 0;
   mom.group.visible = dad.group.visible = false;
 }
-// a third line on the morning card (ui.js fills only two); it goes when the card does
-let cardProofT = 0;
-function cardProof(text, dur) {
-  const card = $('card'); let el = card.querySelector('.proof');
-  if (!el) { el = document.createElement('div'); el.className = 'proof'; card.appendChild(el); }
-  el.textContent = text; clearTimeout(cardProofT); cardProofT = setTimeout(() => { el.textContent = ''; }, (dur + 1.3) * 1000);
-}
-// you found something last night and try to show them. How they take it depends on how much there has been.
-async function proofBeat(id) {
-  const c = nights.proof.count();
-  await wideShot(); await lookDown(); await say(`<b>You:</b> ${nights.proof.tell(id)}`); await wait(0.25);
-  if (c < 3) {
-    await closeOn(mom, 0.6); await say('<b>Mom:</b> Not at breakfast. Please. Not today.'); await wait(0.3);
-    await closeOn(dad, 0.6); await say("<b>Dad:</b> You need sleep, bud. That's all this is.");
-  } else if (c < 7) {
-    await closeOn(dad, 0.6); await say('<b>Dad:</b> ...Show me after breakfast.'); await wait(0.3);
-    await closeOn(mom, 0.6); await say("<b>Mom:</b> ...We'll call the landlord.");
-  } else {
-    await closeOn(dad, 0.6); dad.gaze = mom.head.getWorldPosition(new V3());
-    UI.subtitle("<i>Dad doesn't say anything. He looks at Mom for a long time.</i>", 4.5); await wait(4.2);
-    dad.gaze = null;
+// last night's photos go on the table one at a time; you say what each one is, and one of them answers. How they take it depends on how much
+// there has been in the whole run: brushed off, then uneasy, then scared (the same thresholds the ending uses, never shown)
+const REG = (c) => (c < 3 ? 'low' : c < 7 ? 'mid' : 'high');
+async function photoBeat(ids) {
+  ids = ids.slice(-4); const total = nights.proof.count();
+  await wideShot(); await lookDown();
+  UI.subtitle('<i>You put the photos on the table.</i>', 2.6); await wait(1.4);
+  for (const [i, id] of ids.entries()) {
+    UI.tablePhoto(nights.proof.photo(id), nights.proof.cap(id), i); sfx.click(); await wait(0.7);
+    await say(`<b>You:</b> ${nights.proof.tell(id)}`); await wait(0.25);
+    const reg = REG(total - (ids.length - 1 - i)), who = (i + kitchen.run) % 2 ? 'dad' : 'mom', ab = Math.floor(i / 2) % 2 ? 'b' : 'a';
+    await closeOn(who === 'mom' ? mom : dad, 0.6); await say(`${who}/ph_${reg}_${ab}`); await wait(0.35);
+    if (i < ids.length - 1) { await wideShot(0.5); await lookDown(0.4); }
   }
-  await wait(0.3);
+  await wait(0.4); UI.tablePhoto(null);
 }
 
 // ---------- the car: the road-trip dream, and driving away at the end ----------
@@ -1312,7 +1330,7 @@ const ENDINGS = {
 function endScreen(id) {
   const [title, line] = ENDINGS[id];
   $('endtitle').textContent = title; $('endtitle').classList.toggle('red', id !== 'ENDING_BELIEVED'); $('endtag').textContent = line;
-  $('endinfo').textContent = `Seed ${RUN.seed}  ·  proof ${proofCount()} / ${nights.proof.total}`;
+  $('endinfo').textContent = `Seed ${RUN.seed}  ·  photos ${proofCount()} / ${nights.proof.total}`;
   uiMode = 'end'; unlock(); UI.show('end'); achievements.ending(id);
   store.remove('topbunk.run');
 }
@@ -1459,6 +1477,7 @@ nights = createNights({
   addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); },
   holding: () => !!keys.Space || input.breath || breathLatch,
   addShake: (v) => { shake = Math.max(shake, v); },
+  scene, photo: takePhoto, openPhotos,
   clockRate: 1 / 1.1, lightLabel: () => L('light'),
 });
 UI.makeGrain();
@@ -1475,6 +1494,8 @@ function newRun(seed) {   // New game: a run from moving day on the seed it was 
 // the test mode and the debug jumps (#night5, #morning, #proof=4, #type=vigil, #night=6) earn nothing
 const jumped = !!DEBUG || ['proof', 'type', 'night'].some((k) => HPARAM[k] !== undefined);
 // before menu.init: it adds its panel to the title and pause menus
+menu.panel('photos', { title: 'Photos', render: (body) => { if (nights) nights.proof.board(body); } });
+menu.add('pause', { id: 'photos', label: 'Photos', panel: 'photos', when: () => !!nights && (nights.proof.count() > 0 || nights.proof.kinds().length > 0) }, { after: 'resume' });
 achievements.bind({ F, P, W, RUN, sfx, menu, hunter: () => nights && nights.hunter, test: () => uiMode === 'test' || jumped });
 menu.init({
   startGame, newGame: newRun, hasSave: hasRun, night: () => Math.min(RUN.night, 10),
@@ -1491,4 +1512,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 $('loading').classList.add('done');
 requestAnimationFrame(loop);
-window.__game = { speak, caught, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { speak, caught, openPhotos, takePhoto, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

@@ -31,6 +31,9 @@ SCENES = [
     ['you/m2_a', 'mom/m2_a', 'dad/m2_a', 'mom/m2_b'], ['you/m3_a', 'mom/m3_a', 'dad/m3_a'], ['mom/m4_a', 'dad/m4_a', 'you/m4_a', 'mom/m4_b'],
     ['dad/m5_a', 'mom/m5_a', 'dad/m5_b', 'mom/m5_b'], ['mom/m6_a', 'dad/m6_a', 'mom/m6_b'], ['dad/m7_a', 'you/m7_a', 'mom/m7_a', 'dad/m7_b'],
     ['mom/m8_a', 'dad/m8_a', 'mom/m8_b'], ['mom/m9_a', 'dad/m9_a', 'you/m9_a', 'mom/m9_b'],
+    # the photos on the breakfast table: brushed off, then uneasy, then scared
+    ['mom/ph_low_a', 'dad/ph_low_a', 'mom/ph_low_b', 'dad/ph_low_b'], ['mom/ph_mid_a', 'dad/ph_mid_a', 'mom/ph_mid_b', 'dad/ph_mid_b'],
+    ['mom/ph_high_a', 'dad/ph_high_a', 'mom/ph_high_b', 'dad/ph_high_b'],
 ]
 # Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).
 GRAMPS = (os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)

@@ -442,4 +442,34 @@ export class Sound {
   honk(pan = 0) { if (!this.ctx) return; this.tone({ type: 'square', f: 420, dur: 0.35, gain: 0.12, pan, wet: 0.3 }); this.tone({ type: 'square', f: 520, dur: 0.35, gain: 0.1, pan, wet: 0.3 }); }
 
   click() { this.noiseHit({ dur: 0.02, type: 'highpass', f: 3000, gain: 0.3, wet: 0.02 }); }
+
+  // ---- the disposable camera: the shutter's clack, the flash's whine, the thumbwheel winding on ----
+  shutter() {
+    if (!this.ctx) return;
+    this.noiseHit({ dur: 0.018, type: 'highpass', f: 2600, gain: 0.55, wet: 0.04 });
+    this.noiseHit({ dur: 0.05, type: 'bandpass', f: 1400, q: 3, gain: 0.35, wet: 0.05, delay: 0.012 });
+    this.tone({ type: 'square', f: 1900, f2: 1500, dur: 0.03, gain: 0.05, wet: 0.03, delay: 0.004 });
+    this.tone({ type: 'sine', f: 5200, f2: 7800, dur: 0.5, gain: 0.025, wet: 0.05, delay: 0.08 });   // the flash charging back up
+  }
+  winder() { if (!this.ctx) return; for (let i = 0; i < 9; i++) this.noiseHit({ dur: 0.012, type: 'highpass', f: 3600 + (i % 2) * 600, gain: 0.22, wet: 0.03, delay: 0.25 + i * 0.075 }); }
+  // what gives a piece of proof away, from its direction; gain falls off with distance in nights.js
+  proofCue(kind, pan = 0, gain = 1) {
+    if (!this.ctx || gain <= 0) return;
+    const g = gain;
+    switch (kind) {
+      case 'scratch': for (let i = 0; i < 4; i++) this.noiseHit({ dur: 0.22, type: 'highpass', f: 2400, gain: 0.16 * g, pan, wet: 0.35, delay: i * 0.3 }); break;
+      case 'drip': for (let i = 0; i < 3; i++) this.tone({ f: 1500, f2: 700, dur: 0.07, gain: 0.12 * g, pan, wet: 0.5, delay: i * 0.7 }); break;
+      case 'cabinet': this.cabinet(pan, 0.5 * g); break;
+      case 'hiss': for (let i = 0; i < 14; i++) this.noiseHit({ dur: 0.04, type: 'highpass', f: 2200, gain: 0.12 * g, pan, wet: 0.15, delay: Math.random() * 1.1 }); break;
+      case 'crayon': for (let i = 0; i < 5; i++) this.noiseHit({ dur: 0.12, type: 'bandpass', f: 1800 + i * 120, q: 4, gain: 0.14 * g, pan, wet: 0.25, delay: i * 0.17 }); break;
+      case 'chair': this.noiseHit({ dur: 0.55, type: 'bandpass', f: 700, f2: 450, q: 2, gain: 0.25 * g, pan, wet: 0.35, attack: 0.05 }); break;
+      case 'dial': this.tone({ f: 350, dur: 1.2, gain: 0.05 * g, pan, wet: 0.2 }); this.tone({ f: 440, dur: 1.2, gain: 0.05 * g, pan, wet: 0.2 }); break;
+      case 'metal': for (let i = 0; i < 2; i++) this.tone({ type: 'triangle', f: 1850, f2: 1700, dur: 0.25, gain: 0.1 * g, pan, wet: 0.45, delay: i * 0.35 }); break;
+      case 'tear': this.noiseHit({ dur: 0.45, type: 'bandpass', f: 900, f2: 2600, q: 1.5, gain: 0.22 * g, pan, wet: 0.3, attack: 0.02 }); break;
+      case 'frame': this.creak(0.18 * g, pan); break;
+      case 'lid': this.tone({ f: 140, f2: 80, dur: 0.18, gain: 0.3 * g, pan, wet: 0.5 }); this.noiseHit({ dur: 0.06, f: 900, gain: 0.25 * g, pan, wet: 0.5 }); break;
+      case 'match': this.noiseHit({ dur: 0.12, type: 'highpass', f: 1800, gain: 0.3 * g, pan, wet: 0.25 }); this.noiseHit({ dur: 0.6, type: 'lowpass', f: 900, gain: 0.12 * g, pan, wet: 0.3, attack: 0.08, delay: 0.1 }); break;
+      default: this.creak(0.15 * g, pan);
+    }
+  }
 }
