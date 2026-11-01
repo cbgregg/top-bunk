@@ -87,3 +87,13 @@ Command line, same thing:
 ```
 node tools\sing.js --midi song.mid --words words.txt --trim 4 --guess-chords --out song.wav --slow 0.97 --wobble 0.6
 ```
+
+## Timing against a recording
+
+With a recording of the song dropped as the timing reference (a vocal stem, or the record itself), `match timing to the
+reference` sets each sung phrase to start and end where the recording's does, and the leading silence follows; the readout gives
+every phrase's offset before and after. The timing is written into the song file as a `timing` map, a piecewise-linear line
+from the song's beats to seconds (`[{ "beat": 0, "sec": 1.95 }, { "beat": 12, "sec": 10.2 }, ...]`) that the singer honours;
+without one, a beat is `60 / bpm` seconds. `fit length only` is one global stretch instead. Command line: `--ref stem.wav
+--match-timing` (or `--fit-length`), and `--voice-only` to hear the voice alone. Add `voice only` to the checklist when the
+point is to hold the render against the recording.

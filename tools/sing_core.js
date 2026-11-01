@@ -126,6 +126,8 @@ function tempoMap(mid) {
   const changes = [];
   for (const t of mid.tracks) for (const e of t) if (e.meta === 0x51 && e.data.length >= 3) changes.push({ tick: e.tick, us: (e.data[0] << 16) | (e.data[1] << 8) | e.data[2] });
   changes.sort((a, b) => a.tick - b.tick);
+  let late = null;
+  if (changes.length === 1 && changes[0].tick > 0) { late = changes[0].tick; changes[0] = { tick: 0, us: changes[0].us }; }   // a file's only tempo, set late: it meant the whole song
   if (!changes.length || changes[0].tick > 0) changes.unshift({ tick: 0, us: 500000 });
   const segs = []; let sec = 0;
   for (let i = 0; i < changes.length; i++) {
@@ -137,7 +139,7 @@ function tempoMap(mid) {
     let s = segs[0]; for (const g of segs) { if (g.tick <= tick) s = g; else break; }
     return s.sec + (tick - s.tick) / mid.ppq * s.us / 1e6;
   };
-  return { toSec, bpm: 60e6 / segs[0].us, changes: segs.length };
+  return { toSec, bpm: 60e6 / segs[0].us, changes: segs.length, late };
 }
 
 // one part per track and channel: its notes in seconds, sorted, with the lyric events that start on them
@@ -274,8 +276,8 @@ export function applyLyrics(voice, lyrics, log = () => {}) {
 // the parts of a MIDI file, for choosing tracks: [{ track, ch, name, program, notes, overlaps, lyrics, mean }]
 export function midiInfo(bytes, name) {
   const mid = readMidi(bytes, name);
-  const { toSec, bpm, changes } = tempoMap(mid);
-  return { mid, bpm, changes, parts: midiParts(mid, toSec).filter((pt) => pt.notes.length) };
+  const { toSec, bpm, changes, late } = tempoMap(mid);
+  return { mid, bpm, changes, late, parts: midiParts(mid, toSec).filter((pt) => pt.notes.length) };
 }
 
 // a song from a MIDI file and its words. The melody is the track that carries lyric events, else the part scoreParts() ranks
@@ -283,10 +285,10 @@ export function midiInfo(bytes, name) {
 // (or chordTracks). Tempo changes are kept. Notes left without a syllable sing "la"; without lyrics, lyric events in the MIDI are used.
 // log gets one line per thing found.
 export function songFromMidi(bytes, { name = 'the file', lyrics = null, melodyTrack = 0, chordTracks = [], log = () => {} } = {}) {
-  const { mid, bpm, changes, parts } = midiInfo(bytes, name);
+  const { mid, bpm, changes, late, parts } = midiInfo(bytes, name);
   const bl = 60 / bpm;
   if (!parts.length) throw new Error(name + ' has no notes');
-  log(`${name}: type ${mid.format}, ${mid.tracks.length} track${mid.tracks.length === 1 ? '' : 's'}, ${bpm.toFixed(1)} bpm${changes > 1 ? ` (${changes} tempo changes)` : ''}`);
+  log(`${name}: type ${mid.format}, ${mid.tracks.length} track${mid.tracks.length === 1 ? '' : 's'}, ${bpm.toFixed(1)} bpm${changes > 1 ? ` (${changes} tempo changes)` : ''}${late ? ` (the file's only tempo is set at tick ${late}; taken as the tempo of the whole song)` : ''}`);
   const ranked = scoreParts(parts, bl);
   const lyricParts = parts.filter((pt) => pt.lyrics >= Math.max(3, 0.3 * pt.notes.length));
   // the melody: a chosen track, else the track that carries the words, else the best score
@@ -349,7 +351,8 @@ export function songText(song) {
     chords: (song.chords || []).map((c) => ({ beats: c.beats, notes: c.notes.map((n) => (typeof n === 'number' ? nameOf(n) : n)) })),
   };
   const line = (o) => JSON.stringify(o);
-  return `{\n  "title": ${line(dump.title || '')},\n  "bpm": ${line(dump.bpm || 96)},${dump.key ? `\n  "key": ${line(dump.key)},` : ''}\n  "voice": [\n    ${dump.voice.map(line).join(',\n    ')}\n  ],\n  "chords": [\n    ${dump.chords.map(line).join(',\n    ')}\n  ]\n}\n`;
+  const timing = song.timing && song.timing.length >= 2 ? `,\n  "timing": [\n    ${song.timing.map((t) => line({ beat: +t.beat.toFixed(4), sec: +t.sec.toFixed(4) })).join(',\n    ')}\n  ]` : '';
+  return `{\n  "title": ${line(dump.title || '')},\n  "bpm": ${line(dump.bpm || 96)},${dump.key ? `\n  "key": ${line(dump.key)},` : ''}\n  "voice": [\n    ${dump.voice.map(line).join(',\n    ')}\n  ],\n  "chords": [\n    ${dump.chords.map(line).join(',\n    ')}\n  ]${timing}\n}\n`;
 }
 
 // ---------- a melody out of a recording ----------
@@ -517,9 +520,11 @@ export function chordsFromMelody(notes, key, bpm, barBeats, totalBeats) {
   const steps = key.minor ? [[0, 1], [5, 1], [7, 1], [8, 0], [3, 0], [10, 0]] : [[0, 0], [5, 0], [7, 0], [9, 1], [2, 1], [4, 1]];   // [degree offset, minor triad]
   const triads = steps.map(([d, mn]) => { const r = (key.tonic + d) % 12; return [r, (r + (mn ? 3 : 4)) % 12, (r + 7) % 12]; });
   const out = []; let last = triads[0];
+  const first = notes.length ? Math.min(...notes.map((n) => n.s)) : 0, lastEnd = notes.length ? Math.max(...notes.map((n) => n.e)) : 0;
   for (let b = 0; b < bars; b++) {
     const s = b * barBeats * beat, e = s + barBeats * beat, held = new Array(12).fill(0); let any = 0;
     for (const n of notes) { const o = Math.min(n.e, e) - Math.max(n.s, s); if (o > 0) { held[((n.m % 12) + 12) % 12] += o; any += o; } }
+    if (e <= first || s >= lastEnd) { out.push({ beats: barBeats, notes: [] }); continue; }   // nothing before the singing starts or after it ends
     let pick = last;
     if (any > 0) { let bestW = -1; for (const t of triads) { const w = t.reduce((a, pc) => a + held[pc], 0); if (w > bestW + 1e-9) { bestW = w; pick = t; } } }
     last = pick;
@@ -974,12 +979,14 @@ function consonant(voice, c, s, e, f0, mouth, V) {
 
 // ---------- the band: a small organ and a soft bass ----------
 function renderBand(band, bandR, song, beat, pitch, B, progress) {
-  let t0 = 0;
+  let t0 = song.timing && song.timing.length >= 2 ? Math.max(0, timeAt(song, 0)) : 0;
   const lp = new Biquad().lp(B.organLpHz, 0.6), blp = new Biquad().lp(300, 0.7);
-  const chords = song.chords || [];
+  const chords = song.chords || [], timed = song.timing && song.timing.length >= 2;
   const attackN = B.attackMs / 1000 * SR, releaseN = B.releaseMs / 1000 * SR;
+  let atBeat = 0;
   chords.forEach((ch, ci) => {
-    const dur = ch.beats * beat, s = Math.floor(t0 * SR), e = Math.floor((t0 + dur) * SR); t0 += dur;
+    const dur = timed ? timeAt(song, atBeat + ch.beats) - timeAt(song, atBeat) : ch.beats * beat; atBeat += ch.beats;
+    const s = Math.floor(t0 * SR), e = Math.floor((t0 + dur) * SR); t0 += dur;
     if (progress && (ci & 7) === 0) progress(ci / chords.length);
     let ms = ch.notes.map((n) => midi(n, pitch)).filter((m) => m != null); if (!ms.length) return;
     if (B.voicing && ms.length >= 3) { ms = ms.slice().sort((a, b) => a - b); ms[1] += 12; }
@@ -1031,6 +1038,126 @@ export function sliceSong(song, from = 0, to = Infinity) {
   return { ...song, voice: cut(song.voice), chords: cut(song.chords || []) };
 }
 
+// ---------- timing against a reference ----------
+// A song can carry a timing map: song.timing = [{ beat, sec }, ...], a piecewise-linear line from its own beats to seconds, so a
+// phrase can be made to start and end where a recording's does. Without one, a beat is 60 / bpm seconds.
+export function timeAt(song, beat) {
+  const T = song.timing, bl = 60 / (song.bpm || 96);
+  if (!T || T.length < 2) return beat * bl;
+  if (beat <= T[0].beat) return T[0].sec + (beat - T[0].beat) * bl;
+  for (let i = 1; i < T.length; i++) if (beat <= T[i].beat) { const a = T[i - 1], b = T[i]; return a.sec + (beat - a.beat) / Math.max(1e-9, b.beat - a.beat) * (b.sec - a.sec); }
+  const a = T[T.length - 2], b = T[T.length - 1], rate = (b.sec - a.sec) / Math.max(1e-9, b.beat - a.beat);
+  return b.sec + (beat - b.beat) * rate;
+}
+// the sung phrases of a song in seconds (through its timing): runs of notes between rests of restBeats or more
+export function songPhrases(song, restBeats = 0.4) {
+  const out = []; let cur = null, rest = 0, beat = 0;
+  for (const v of song.voice) {
+    if (v.note == null) { rest += v.beats; beat += v.beats; continue; }
+    if (cur && rest >= restBeats) { out.push(cur); cur = null; }
+    if (!cur) cur = { b0: beat, b1: beat + v.beats, s: timeAt(song, beat), e: timeAt(song, beat + v.beats) };
+    else { cur.b1 = beat + v.beats; cur.e = timeAt(song, cur.b1); }
+    rest = 0; beat += v.beats;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+// a 16-bit / 32-bit WAV in memory -> { sr, chans: [Float32Array] }
+export function decodeWav(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), dv = new DataView(b.buffer, b.byteOffset, b.byteLength), tag = (p) => String.fromCharCode(b[p], b[p + 1], b[p + 2], b[p + 3]);
+  if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') throw new Error('not a WAV file');
+  let p = 12, fmt = null, data = null;
+  while (p + 8 <= b.length) { const id = tag(p), len = dv.getUint32(p + 4, true); if (id === 'fmt ') fmt = { tagf: dv.getUint16(p + 8, true), ch: dv.getUint16(p + 10, true), sr: dv.getUint32(p + 12, true), bits: dv.getUint16(p + 22, true) }; if (id === 'data') { data = [p + 8, Math.min(len, b.length - p - 8)]; break; } p += 8 + len + (len & 1); }
+  if (!fmt || !data) throw new Error('WAV without data');
+  const bytesPer = fmt.bits / 8, n = Math.floor(data[1] / bytesPer / fmt.ch), chans = [];
+  for (let c = 0; c < fmt.ch; c++) chans.push(new Float32Array(n));
+  for (let i = 0, q = data[0]; i < n; i++) for (let c = 0; c < fmt.ch; c++) { chans[c][i] = fmt.bits === 16 ? dv.getInt16(q, true) / 32768 : fmt.bits === 32 && fmt.tagf === 3 ? dv.getFloat32(q, true) : fmt.bits === 32 ? dv.getInt32(q, true) / 2147483648 : fmt.bits === 24 ? ((b[q] | (b[q + 1] << 8) | (b[q + 2] << 16)) << 8 >> 8) / 8388608 : dv.getUint8(q) / 128 - 1; q += bytesPer; }
+  return { sr: fmt.sr, chans };
+}
+export const monoOf = (chans) => { const n = chans[0].length, out = new Float32Array(n); for (const c of chans) for (let i = 0; i < n; i++) out[i] += c[i] / chans.length; return out; };
+// the loudness envelope: 50 ms RMS frames every 25 ms, smoothed over 0.3 s, normalised to its own peak
+export function envelopeOf(x, sr, { win = 0.05, hop = 0.025, smooth = 0.3 } = {}) {
+  const W = Math.round(win * sr), H = Math.round(hop * sr), n = Math.max(1, Math.floor((x.length - W) / H) + 1), env = new Float32Array(n);
+  for (let f = 0; f < n; f++) { let e = 0; const s = f * H; for (let i = 0; i < W; i++) e += x[s + i] * x[s + i]; env[f] = Math.sqrt(e / W); }
+  const k = Math.max(1, Math.round(smooth / hop)), out = new Float32Array(n);
+  for (let f = 0; f < n; f++) { let s = 0, c = 0; for (let j = f - (k >> 1); j <= f + (k >> 1); j++) if (j >= 0 && j < n) { s += env[j]; c++; } out[f] = s / c; }
+  let peak = 0; for (const v of out) if (v > peak) peak = v;
+  if (peak > 0) for (let f = 0; f < n; f++) out[f] /= peak;
+  return { env: out, hop, duration: x.length / sr };
+}
+// where a recording's voice sings: runs above a threshold set from the envelope, joined over gaps shorter than minGap
+export function burstsOf({ env, hop }, { minGap = 0.35, minLen = 0.2, level = 0.2 } = {}) {
+  const sorted = [...env].sort((a, b) => a - b), high = sorted[Math.floor(sorted.length * 0.9)] || 0, thr = Math.max(0.02, level * high);
+  const raw = []; let cur = null;
+  for (let f = 0; f < env.length; f++) { if (env[f] >= thr) { if (!cur) cur = { s: f * hop, e: (f + 1) * hop }; else cur.e = (f + 1) * hop; } else if (cur && f * hop - cur.e >= minGap) { raw.push(cur); cur = null; } }
+  if (cur) raw.push(cur);
+  return raw.filter((b) => b.e - b.s >= minLen);
+}
+// the song's phrases against the recording's bursts, in order: each song phrase gets a burst (or two joined), each burst a phrase
+// (or two joined); a dynamic programme on the lengths and the positions. Returns per song phrase { s, e } in the recording's seconds.
+export function alignToBursts(phrases, bursts) {
+  const n = phrases.length, m = bursts.length; if (!n || !m) return [];
+  const sTot = Math.max(1e-6, phrases[n - 1].e - phrases[0].s), rTot = Math.max(1e-6, bursts[m - 1].e - bursts[0].s);
+  const cost = (p, s0, e0) => { const lenP = p.e - p.s, lenR = e0 - s0; return Math.abs(lenP - lenR) / Math.max(lenP, lenR, 0.1) + 2 * Math.abs((p.s - phrases[0].s) / sTot - (s0 - bursts[0].s) / rTot); };
+  const INF = 1e9, D = Array.from({ length: n + 1 }, () => new Float64Array(m + 1).fill(INF)), from = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(null));
+  D[0][0] = 0;
+  for (let i = 0; i <= n; i++) for (let j = 0; j <= m; j++) {
+    if (D[i][j] >= INF) continue;
+    const step = (ni, nj, c, how) => { if (ni <= n && nj <= m && D[i][j] + c < D[ni][nj]) { D[ni][nj] = D[i][j] + c; from[ni][nj] = [i, j, how]; } };
+    if (i < n && j < m) step(i + 1, j + 1, cost(phrases[i], bursts[j].s, bursts[j].e), 'one');
+    if (i < n && j + 1 < m) step(i + 1, j + 2, cost(phrases[i], bursts[j].s, bursts[j + 1].e) + 0.3, 'spans');
+    if (i + 1 < n && j < m) { const p = { s: phrases[i].s, e: phrases[i + 1].e }; step(i + 2, j + 1, cost(p, bursts[j].s, bursts[j].e) + 0.3, 'shares'); }
+    if (i < n) step(i + 1, j, 1.5, 'unmatched');   // a phrase the recording has no burst for keeps its own place
+    if (j < m) step(i, j + 1, 0.8, 'skip');          // a burst that is not a phrase (an instrumental, a shout)
+  }
+  const out = new Array(n).fill(null); let i = n, j = m;
+  while (i > 0 || j > 0) {
+    const f = from[i][j]; if (!f) break;
+    const [pi, pj, how] = f;
+    if (how === 'one') out[pi] = { s: bursts[pj].s, e: bursts[pj].e };
+    else if (how === 'spans') out[pi] = { s: bursts[pj].s, e: bursts[pj + 1].e };
+    else if (how === 'shares') { const b = bursts[pj], len = (phrases[pi].e - phrases[pi].s) + (phrases[pi + 1].e - phrases[pi + 1].s), cut = b.s + (b.e - b.s) * (phrases[pi].e - phrases[pi].s) / Math.max(1e-6, len); out[pi] = { s: b.s, e: cut }; out[pi + 1] = { s: cut, e: b.e }; }
+    i = pi; j = pj;
+  }
+  return out;
+}
+// a timing map that puts each phrase where the recording's is (matched: per phrase { s, e } or null to leave it); the leading
+// silence follows the first phrase, rests between phrases are shared out linearly, the tail keeps the last stretch
+export function timingFor(song, phrases, matched) {
+  const bl = 60 / (song.bpm || 96), pts = [];
+  let lastBeat = 0, lastSec = 0, firstSet = false;
+  for (let k = 0; k < phrases.length; k++) {
+    const p = phrases[k], m = matched[k]; if (!m) continue;
+    const s0 = m.s, e0 = Math.max(m.s + 0.05, m.e);
+    if (!firstSet) { pts.push({ beat: 0, sec: Math.max(0, s0 - p.b0 * bl) }); firstSet = true; }
+    pts.push({ beat: p.b0, sec: s0 }, { beat: p.b1, sec: e0 });
+    lastBeat = p.b1; lastSec = e0;
+  }
+  if (!pts.length) return null;
+  const total = song.voice.reduce((a, v) => a + v.beats, 0);
+  if (total > lastBeat) pts.push({ beat: total, sec: lastSec + (total - lastBeat) * bl });
+  // monotonic, no two points on one beat
+  const out = []; for (const q of pts) { const last = out[out.length - 1]; if (last && q.beat <= last.beat + 1e-9) continue; if (last && q.sec <= last.sec) q.sec = last.sec + 1e-3; out.push(q); }
+  return out;
+}
+// one global stretch so the sung span (first note to last end) is as long as the recording's active span
+export function timingFit(song, bursts) {
+  const ph = songPhrases(song, 0); if (!ph.length || !bursts.length) return null;
+  const s0 = ph[0].s, e0 = ph[ph.length - 1].e, r0 = bursts[0].s, r1 = bursts[bursts.length - 1].e, k = (r1 - r0) / Math.max(1e-6, e0 - s0);
+  const total = song.voice.reduce((a, v) => a + v.beats, 0), bl = 60 / (song.bpm || 96);
+  return [{ beat: 0, sec: Math.max(0, r0 - s0 * k) }, { beat: ph[0].b0, sec: r0 }, { beat: ph[ph.length - 1].b1, sec: r1 }, { beat: total, sec: r1 + (total * bl - e0) * k }];
+}
+// the whole thing: phrases, bursts, the match, the map, and a readout of each phrase's offset before and after
+export function matchTiming(song, ref, { restBeats = 0.4, fit = false } = {}) {
+  const bursts = burstsOf(ref);
+  if (fit) { const timing = timingFit(song, bursts); return { timing, bursts, report: [] }; }
+  const base = { ...song, timing: undefined }, phrases = songPhrases(base, restBeats), matched = alignToBursts(phrases, bursts);
+  const timing = timingFor(base, phrases, matched), after = { ...base, timing };
+  const ph2 = songPhrases(after, restBeats);
+  const report = phrases.map((p, k) => ({ phrase: k + 1, before: matched[k] ? Math.round((p.s - matched[k].s) * 1000) : null, after: matched[k] ? Math.round((ph2[k].s - matched[k].s) * 1000) : null, endAfter: matched[k] ? Math.round((ph2[k].e - matched[k].e) * 1000) : null, matched: !!matched[k] }));
+  return { timing, bursts, report, phrases, matched };
+}
+
 // ---------- the whole thing ----------
 // render(song, options) -> a mono Float64Array at SR, after the tape and the room, before the limiter (see toStereo / encodeWav),
 // or with .right set when the mix is stereo (band spread, chorus, width). Options: the old flags (slow, pitch, wobble, voice, band),
@@ -1047,16 +1174,18 @@ export function resolveParams({ slow, pitch, wobble, voice, band, params } = {})
 export function render(song, opts = {}) {
   const P = resolveParams(opts), V = P.voice, B = P.band, T = P.tape, L = P.lofi, M = P.mix, progress = opts.progress || null;
   seed = 1234;
-  const beat = 60 / (song.bpm || 96), pitch = V.transpose;
-  const notes = [];
+  const beat = 60 / (song.bpm || 96), pitch = V.transpose, timed = song.timing && song.timing.length >= 2;
+  const notes = []; let atBeat = 0;
+  if (timed && timeAt(song, 0) > 0) notes.push({ m: null, dur: timeAt(song, 0), syl: 'ah' });   // the map can start the song late
   for (const n of song.voice) {
-    const syl = n.syl || 'ah', m = midi(n.note, pitch), dur = n.beats * beat;
+    const syl = n.syl || 'ah', m = midi(n.note, pitch), dur = timed ? timeAt(song, atBeat + n.beats) - timeAt(song, atBeat) : n.beats * beat;
+    atBeat += n.beats;
     if (m == null || !syl.includes('+')) { notes.push({ m, dur, syl }); continue; }
     const parts = syl.split('+').filter(Boolean), w = parts.map((p) => Math.max(1, p.replace(/\s/g, '').length)), tot = w.reduce((a, b) => a + b, 0);
     parts.forEach((p, i) => notes.push({ m, dur: dur * w[i] / tot, syl: p }));   // two syllables on one note: each gets its share
   }
   const totalV = notes.reduce((a, n) => a + n.dur, 0);
-  const totalC = (song.chords || []).reduce((a, c) => a + c.beats * beat, 0);
+  const totalC = timed ? timeAt(song, (song.chords || []).reduce((a, c) => a + c.beats, 0)) : (song.chords || []).reduce((a, c) => a + c.beats * beat, 0);
   const total = Math.max(totalV, totalC) + 1.5;
   const N = Math.ceil(total * SR);
   const voice = new Float64Array(N), band = new Float64Array(N);
@@ -1073,8 +1202,7 @@ export function render(song, opts = {}) {
       for (let i = 0; i < N; i++) { const v = tmp[i - shift] || 0; voice[i] += v * gl / copies * 1.6; voiceR[i] += v * gr / copies * 1.6; }
     }
   }
-  renderBand(band, bandR, song, beat, pitch, B, progress && ((k) => progress(0.8 + k * 0.2, 'band')));
-  if (B.drums) renderDrums(band, song, beat, B);
+  if (!opts.voiceOnly) { renderBand(band, bandR, song, beat, pitch, B, progress && ((k) => progress(0.8 + k * 0.2, 'band'))); if (B.drums) renderDrums(band, song, beat, B); }
   if (V.brightness) { const sh = new Biquad().hs(2500, V.brightness); for (let i = 0; i < N; i++) voice[i] = sh.run(voice[i]); if (voiceR && V.voices > 1) { const sh2 = new Biquad().hs(2500, V.brightness); for (let i = 0; i < N; i++) voiceR[i] = sh2.run(voiceR[i]); } }
   // the voice is normalised to its peak; the band is set by loudness, about 5 dB under it
   let mix = new Float64Array(N), mixR = stereo ? new Float64Array(N) : null;

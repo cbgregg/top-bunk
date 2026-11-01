@@ -7,6 +7,7 @@
 //   node tools/sing.js --midi song.mid --lyrics words.txt --out out.wav [--melody-track N] [--chord-track N,N] [--out-json song.json]
 //   node tools/sing.js --midi song.mid --words words.txt --out out.wav [--phrase-rest 0.4] [--trim 4] [--guess-chords]
 //   node tools/sing.js song.json --out out.wav --preset "drunk tape" --params mine.json --set voice.vibratoDepth=12 --from 10 --to 25
+//   node tools/sing.js song.json --out out.wav --ref stem.wav --match-timing --out-json timed.json --voice-only
 //
 // song.json: { bpm, key, voice: [{ note: 'C4' | 60 | null, beats, syl: 'dai' }], chords: [{ beats, notes: ['C3','E3','G3'] }] }
 //   syl is spelled ('win', 'dow') or, with spaces, given as sounds ('d o u'): consonants s z sh ch j f v th dh h t d k g p b m n ng l r w y,
@@ -32,8 +33,12 @@
 //   --params file.json   a parameter set (partial; it goes over the defaults and the preset), see tools/voice-params.md
 //   --set key=value      one parameter, repeatable (voice.vibratoDepth=12); --dump-params prints the set in use as JSON and stops
 //   --from S --to S      sing only this stretch of the song, in seconds of the song's own time (before the tape speed)
+//   --voice-only         the band muted (the room and the tape stay), for comparing the voice against a recording
+//   --ref stem.wav       a recording of the song (a vocal stem, or the record itself; WAV) as the timing reference:
+//     --match-timing     each sung phrase starts and ends where the recording's does (a timing map goes into --out-json)
+//     --fit-length       one stretch only, so the sung span is as long as the recording's
 import fs from 'node:fs';
-import { SR, songFromMidi, songFromNotes, notesFromVoice, trimLongNotes, songText, render, encodeWav, sliceSong, mergeParams, setParam, resolveParams, PRESETS } from './sing_core.js';
+import { SR, songFromMidi, songFromNotes, notesFromVoice, trimLongNotes, songText, render, encodeWav, sliceSong, mergeParams, setParam, resolveParams, PRESETS, decodeWav, monoOf, envelopeOf, matchTiming, timeAt } from './sing_core.js';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; };
@@ -58,11 +63,24 @@ if (WORDS || TRIM || GUESS) {   // through the notes: the same path the page tak
   if (TRIM) console.error(`  ${trimLongNotes(notes, song.bpm || 96, TRIM)} notes trimmed to ${TRIM} beats`);
   song = songFromNotes(notes, { bpm: song.bpm || 96, quantize: 0, chords: GUESS, band: song.chords, lyrics: WORDS ? fs.readFileSync(WORDS, 'utf8') : null, restBeats: REST, log: (s) => console.error(s) }).song;
 }
+if (opt('--ref', null)) {
+  const w = decodeWav(fs.readFileSync(opt('--ref', null))), ref = envelopeOf(monoOf(w.chans), w.sr);
+  const fit = args.includes('--fit-length');
+  if (args.includes('--match-timing') || fit) {
+    const r = matchTiming(song, ref, { restBeats: REST, fit });
+    if (!r.timing) console.error('  no phrases could be matched to the recording');
+    else {
+      song = { ...song, timing: r.timing };
+      console.error(`  timing ${fit ? 'fitted to' : 'matched to'} ${opt('--ref', null)}: ${r.bursts.length} bursts in the recording, the voice now ${timeAt(song, song.voice.reduce((a, v) => a + v.beats, 0)).toFixed(1)} s`);
+      for (const l of r.report) console.error(`  phrase ${l.phrase}: ${l.matched ? `was ${l.before > 0 ? '+' : ''}${l.before} ms, now ${l.after > 0 ? '+' : ''}${l.after} ms (end ${l.endAfter > 0 ? '+' : ''}${l.endAfter} ms)` : 'no burst for it, kept where it was'}`);
+    }
+  }
+}
 if (OUT_JSON) {
   fs.writeFileSync(OUT_JSON, songText(song));
   console.error(`${OUT_JSON}: ${song.voice.length} voice entries, ${(song.chords || []).length} chord blocks`);
 }
 if (opt('--from', null) != null || opt('--to', null) != null) song = sliceSong(song, +opt('--from', 0) || 0, opt('--to', null) != null ? +opt('--to', 0) : Infinity);
-const mix = render(song, { ...flags, params });
+const mix = render(song, { ...flags, params, voiceOnly: args.includes('--voice-only') });
 fs.writeFileSync(OUT, encodeWav(mix));
 console.log(`${OUT}: ${(mix.length / SR).toFixed(1)} s, ${song.voice.length} notes`);

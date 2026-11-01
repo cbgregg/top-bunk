@@ -2,13 +2,16 @@
 // Measures a rendering of the robot singer against the song it sang, so a tuning loop (or a person) can see what a parameter
 // did. No dependencies.
 //
-//   node tools/sing_measure.js out.wav --song song.json [--voice voice_only.wav] [--params p.json] [--png report.png] [--json metrics.json]
+//   node tools/sing_measure.js out.wav --song song.json [--voice voice_only.wav] [--params p.json] [--ref stem.wav] [--png report.png] [--json metrics.json]
 //
 // out.wav       the mix to measure (loudness, peak, spectrum, width)
 // --voice       the same render with the band off (tools/sing.js --band 0): the pitch, formant and gap figures come from it,
 //               and the band/voice balance from the two together. Without it they come from the mix, muddied by the band.
 // --params      the parameter set the render used, so the expected notes follow its tape speed and transpose
 // --png         a spectrogram with the song's notes drawn over the tracked pitch, for a look
+// --ref         a recording of the song (a vocal stem or the record) to hold the render against: durationRatio, where each
+//               becomes active, the loudness envelopes' correlation (50 ms RMS frames every 25 ms, 0.3 s smoothing, each to its
+//               own peak, time as 0-100%), peak / RMS / crest of both, and each sung phrase's onset against the recording's bursts
 // --json        write the metrics there (they always go to stdout)
 //
 // The metrics:
@@ -19,7 +22,7 @@
 //   wobbleIndex (pitch deviation faster than 0.5 Hz, std in cents / 30: 1 is about the default), vibratoCents (over 3 Hz), driftCents (0.5-3 Hz)
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import { SR, VOWELS, parse, midi, toTrackerRate, trackPitch, mergeParams } from './sing_core.js';
+import { SR, VOWELS, parse, midi, toTrackerRate, trackPitch, mergeParams, envelopeOf, burstsOf, songPhrases, alignToBursts, timeAt } from './sing_core.js';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args.length ? args[i + 1] : d; };
@@ -92,11 +95,11 @@ function spectrum(x, sr, { win = 2048, hop = 1024 } = {}) {
 
 // ---------- the pitch against the song ----------
 function expectedNotes(song, P) {
-  const beat = 60 / (song.bpm || 96), speed = P.tape.speed, out = []; let t = 0;
+  const speed = P.tape.speed, out = []; let b = 0;
   for (const v of song.voice) {
-    const dur = v.beats * beat / speed;
-    if (v.note != null) out.push({ s: t, e: t + dur, m: midi(v.note, P.voice.transpose) + 12 * Math.log2(speed) + P.voice.flatCents / 100, syl: v.syl || 'ah', note: v.note });
-    t += dur;
+    const s = timeAt(song, b) / speed, e = timeAt(song, b + v.beats) / speed;
+    if (v.note != null) out.push({ s, e, m: midi(v.note, P.voice.transpose) + 12 * Math.log2(speed) + P.voice.flatCents / 100, syl: v.syl || 'ah', note: v.note });
+    b += v.beats;
   }
   return out;
 }
@@ -193,13 +196,18 @@ function formants(x, sr, notes) {
 }
 
 // ---------- the picture: spectrogram, the tracked pitch and the song's notes ----------
-function png(path, gram, sr, win, hop, track, notes, maxHz = 3000) {
-  const W = Math.min(1600, gram.length), H = 400, cols = gram.length, binMax = Math.floor(maxHz / (sr / win));
+function png(path, gram, sr, win, hop, track, notes, maxHz = 3000, envs = null) {
+  const W = Math.min(1600, gram.length), H0 = 400, EH = envs ? 110 : 0, H = H0 + EH, cols = gram.length, binMax = Math.floor(maxHz / (sr / win));
   const img = new Uint8Array(W * H * 3);
   let top = 0; for (const row of gram) for (let k = 1; k < binMax; k++) if (row[k] > top) top = row[k];
   const set = (x, y, r, g, b) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const p = (y * W + x) * 3; img[p] = r; img[p + 1] = g; img[p + 2] = b; };
-  for (let x = 0; x < W; x++) { const row = gram[Math.floor(x * cols / W)]; for (let y = 0; y < H; y++) { const k = Math.floor((1 - y / H) * binMax); const v = row[k] ? Math.max(0, 1 + (10 * Math.log10(row[k] / top)) / 70) : 0; set(x, y, Math.round(10 + 190 * v * v), Math.round(10 + 120 * v), Math.round(20 + 60 * v)); } }
-  const secs = cols * hop / sr, xOf = (t) => Math.floor(t / secs * W), yOf = (hz) => Math.floor((1 - hz / maxHz) * H);
+  for (let x = 0; x < W; x++) { const row = gram[Math.floor(x * cols / W)]; for (let y = 0; y < H0; y++) { const k = Math.floor((1 - y / H0) * binMax); const v = row[k] ? Math.max(0, 1 + (10 * Math.log10(row[k] / top)) / 70) : 0; set(x, y, Math.round(10 + 190 * v * v), Math.round(10 + 120 * v), Math.round(20 + 60 * v)); } }
+  const secs = cols * hop / sr, xOf = (t) => Math.floor(t / secs * W), yOf = (hz) => Math.floor((1 - hz / maxHz) * H0);
+  if (envs) {   // the two loudness envelopes under the spectrogram, each over its own length (time as 0-100%): the render in yellow, the recording in blue
+    for (let x = 0; x < W; x++) for (let y = H0; y < H; y++) set(x, y, 14, 14, 18);
+    const draw = (env, r, g, b, dy) => { for (let x = 0; x < W; x++) { const v = env.env[Math.min(env.env.length - 1, Math.floor(x / W * env.env.length))]; const y = H - 4 - Math.floor(v * (EH - 10)); for (let d = -1; d <= 1; d++) set(x, y + d + dy, r, g, b); } };
+    draw(envs.b, 70, 200, 255, 0); draw(envs.a, 255, 230, 80, 0);
+  }
   for (const n of notes) { const f = 440 * Math.pow(2, (n.m - 69) / 12); for (let x = xOf(n.s); x < xOf(n.e); x++) for (let d = -2; d <= 2; d++) set(x, yOf(f) + d, 70, 200, 255); }
   for (let i = 0; i < track.f0.length; i++) if (track.f0[i]) { const x = xOf(track.times[i]), y = yOf(track.f0[i]); set(x, y, 255, 230, 80); set(x, y - 1, 255, 230, 80); }
   // encode
@@ -226,7 +234,29 @@ out.centroidHz = Math.round(sp.centroidHz); out.tiltDbPerOct = +sp.tiltDbPerOct.
 out.nhr = +(1 - (() => { let s = 0, n = 0; for (let i = 0; i < track.conf.length; i++) if (track.f0[i]) { s += track.conf[i]; n++; } return n ? s / n : 0; })()).toFixed(3);
 Object.assign(out, wobble(track, notes));
 if (vw && vw.chans[0].length === w.chans[0].length) { let sv = 0, sb = 0; for (let i = 0; i < m.length; i++) { const b = m[i] - v[i]; sv += v[i] * v[i]; sb += b * b; } out.bandVoiceDb = sv > 0 && sb > 0 ? +(10 * Math.log10(sb / sv)).toFixed(1) : null; } else out.bandVoiceDb = null;
-if (opt('--png', null)) { png(opt('--png', null), sp.gram, w.sr, sp.win, sp.hop, track, notes); out.png = opt('--png', null); }
+// against a recording
+let refPlot = null;
+if (opt('--ref', null)) {
+  const rw = readWav(opt('--ref', null)), rm = mono(rw);
+  const stats = (x) => { let pk = 0, e = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > pk) pk = a; e += x[i] * x[i]; } const rms = Math.sqrt(e / x.length); return { peakDb: +(20 * Math.log10(pk || 1e-9)).toFixed(2), rmsDb: +(20 * Math.log10(rms || 1e-9)).toFixed(2), crestDb: +(20 * Math.log10((pk || 1e-9) / (rms || 1e-9))).toFixed(2) }; };
+  const eA = envelopeOf(m, w.sr), eB = envelopeOf(rm, rw.sr), speed = P.tape.speed;
+  const active = (env) => { const sorted = [...env.env].sort((a, b) => a - b), thr = Math.max(0.02, 0.2 * sorted[Math.floor(sorted.length * 0.9)]); let s = -1, e = -1; for (let f = 0; f < env.env.length; f++) if (env.env[f] >= thr) { if (s < 0) s = f; e = f; } return s < 0 ? [0, env.duration] : [s * env.hop, (e + 1) * env.hop]; };
+  const aA = active(eA), aB = active(eB);
+  const corr = (x, y) => { const n = Math.min(x.length, y.length); let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += x[i]; my += y[i]; } mx /= n; my /= n; let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; } return sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0; };
+  const onGrid = (env, a, b, N = 2000) => { const out = new Float32Array(N); for (let i = 0; i < N; i++) { const t = a + (b - a) * i / (N - 1); out[i] = env.env[Math.min(env.env.length - 1, Math.max(0, Math.floor(t / env.hop)))]; } return out; };
+  const full = corr(onGrid(eA, 0, eA.duration), onGrid(eB, 0, eB.duration)), act = corr(onGrid(eA, aA[0], aA[1]), onGrid(eB, aB[0], aB[1]));
+  // each sung phrase (in the render's time) against the recording's bursts
+  const bursts = burstsOf(eB), phr = songPhrases(song).map((p) => ({ s: p.s / speed, e: p.e / speed })), matched = alignToBursts(phr, bursts);
+  const per = phr.map((p, k) => (matched[k] ? Math.round((p.s - matched[k].s) * 1000) : null));
+  const offs = per.filter((v) => v != null).map(Math.abs);
+  out.ref = { file: opt('--ref', null), durationSec: +eB.duration.toFixed(2), activeStartSec: +aB[0].toFixed(3), activeEndSec: +aB[1].toFixed(3), ...stats(rm), bursts: bursts.length };
+  out.render = { activeStartSec: +aA[0].toFixed(3), activeEndSec: +aA[1].toFixed(3), ...stats(m) };
+  out.durationRatio = +(eA.duration / eB.duration).toFixed(4);
+  out.envelopeCorrFull = +full.toFixed(3); out.envelopeCorrActive = +act.toFixed(3);
+  out.perPhraseOnsetMs = per; out.meanPhraseOnsetMs = offs.length ? Math.round(offs.reduce((a, b) => a + b, 0) / offs.length) : null; out.maxPhraseOnsetMs = offs.length ? Math.max(...offs) : null;
+  refPlot = { a: eA, b: eB };
+}
+if (opt('--png', null)) { png(opt('--png', null), sp.gram, w.sr, sp.win, sp.hop, track, notes, 3000, refPlot); out.png = opt('--png', null); }
 const text = JSON.stringify(out, null, 1);
 if (opt('--json', null)) fs.writeFileSync(opt('--json', null), text);
 console.log(text);

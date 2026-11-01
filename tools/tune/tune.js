@@ -4,7 +4,8 @@
 // prompt on stdin and answers with JSON on stdout; without it, from a plain coordinate search on the numbers in the goal file.
 //
 //   node tools/tune/tune.js --song s.json --goal goal.txt --out dir/ [--params p.json | --preset NAME] [--iters 8]
-//                           [--from 10 --to 30] [--llm "opencode run --agent voice-tuner"] [--keep-wav]
+//                           [--from 10 --to 30] [--ref stem.wav] [--llm "opencode run --agent voice-tuner"] [--keep-wav]
+// --ref hands a recording to the measure, so goals can name envelopeCorrActive, durationRatio, meanPhraseOnsetMs...
 //
 // goal.txt is words for the model, and optionally lines of targets the search can use:  wobbleIndex: 0.6
 // Output: dir/iter_N/{params.json, out.wav, voice.wav, metrics.json, report.png, notes.md} and dir/summary.md.
@@ -20,7 +21,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 && i + 1 < args
 const has = (k) => args.includes(k);
 const SONG = opt('--song', null), GOAL = opt('--goal', null), OUT = opt('--out', null);
 if (!SONG || !GOAL || !OUT) { console.error('usage: node tools/tune/tune.js --song s.json --goal goal.txt --out dir/ [--params p.json | --preset NAME] [--iters 8] [--from S --to S] [--llm cmd]'); process.exit(1); }
-const ITERS = +opt('--iters', 8) || 8, FROM = opt('--from', null), TO = opt('--to', null), LLM = opt('--llm', null);
+const ITERS = +opt('--iters', 8) || 8, FROM = opt('--from', null), TO = opt('--to', null), LLM = opt('--llm', null), REF = opt('--ref', null);
 const goalText = fs.readFileSync(GOAL, 'utf8');
 // targets in the goal file:  name: number
 const targets = {};
@@ -45,6 +46,7 @@ const LEVERS = {
   truePeakDb: [['mix.master', 1]],
   bandVoiceDb: [['mix.band', 1], ['mix.bandBalance', 1]],
   stereoWidthDb: [['mix.width', 1], ['band.width', 1]],
+  crestDb: [['tape.drive', -1], ['mix.limiterDrive', -1]],
 };
 
 function render(iter, P) {
@@ -56,8 +58,8 @@ function render(iter, P) {
   // the excerpt as a song file, so the measure lines the notes up with it
   let songFile = SONG;
   if (range.length) { songFile = path.join(dir, 'excerpt.json'); fs.writeFileSync(songFile, JSON.stringify(sliceSong(JSON.parse(fs.readFileSync(SONG, 'utf8')), +(FROM ?? 0) || 0, TO != null ? +TO : Infinity))); }
-  const out = execFileSync(process.execPath, [path.join(tools, 'sing_measure.js'), path.join(dir, 'out.wav'), '--song', songFile, '--voice', path.join(dir, 'voice.wav'), '--params', pfile, '--png', path.join(dir, 'report.png'), '--json', path.join(dir, 'metrics.json')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
-  const m = JSON.parse(out); delete m.perNote;
+  const out = execFileSync(process.execPath, [path.join(tools, 'sing_measure.js'), path.join(dir, 'out.wav'), '--song', songFile, '--voice', path.join(dir, 'voice.wav'), '--params', pfile, '--png', path.join(dir, 'report.png'), '--json', path.join(dir, 'metrics.json'), ...(REF ? ['--ref', REF] : [])], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  const m = JSON.parse(out); delete m.perNote; delete m.perPhraseOnsetMs; if (m.ref) { m.refDurationSec = m.ref.durationSec; delete m.ref; } if (m.render) { m.activeStartSec = m.render.activeStartSec; m.crestDb = m.render.crestDb; delete m.render; }
   return { dir, metrics: m };
 }
 const score = (m) => { let s = 0, n = 0; for (const [k, t] of Object.entries(targets)) { if (m[k] == null) continue; const scale = Math.max(1e-6, Math.abs(t) || 1); s += Math.abs(m[k] - t) / scale; n++; } return n ? s / n : NaN; };

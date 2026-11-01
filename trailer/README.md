@@ -178,6 +178,14 @@ phrase, laid on the melody the way the page does (`--phrase-rest B` sets the res
 past N beats; `--guess-chords` adds a chord per bar from the melody. `--out-json song.json` also writes what it read as a song
 file, to fix a syllable or a chord by hand and sing again from that.
 
+The page also takes a recording of the song as a timing reference (a vocal stem, or the record itself): its loudness envelope
+shows on the roll as a grey band, and `match timing to the reference` sets each sung phrase to start and end where the
+recording's does (a readout gives every phrase's offset before and after; `fit length only` is one global stretch instead). The
+timing goes into the song JSON as a `timing` map and into the WAV. `voice only` next to Export mutes the band for comparisons.
+On the command line: `--ref stem.wav --match-timing` (or `--fit-length`), `--voice-only`; and `tools/sing_measure.js --ref
+stem.wav` reports the duration ratio, where each becomes active, the envelopes' correlation, peak / RMS / crest of both, and each
+phrase's onset against the recording's. `tools/words-format.md` describes the words box and the song file.
+
 Every number in the synth is a parameter (`tools/voice-params.md`: 70 of them in five groups, voice, tape, lo-fi, band and mix,
 each with its range, default and meaning). `--preset NAME` (1961, clean, drunk tape, telephone, choir of one, vocoder),
 `--params file.json` (a partial set over the defaults), `--set key=value` and `--dump-params` on the command line; in the page the
