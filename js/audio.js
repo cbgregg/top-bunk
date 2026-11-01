@@ -280,26 +280,29 @@ export class Sound {
     this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1 * k, attack: 0.001, wet: 0.35 });
   }
   // the thing is suddenly there: the low piano note and the strings under it
-  appear(k = 1) { this.pianoSlam(APPEAR_BOOST * k); this.stab(); }
+  appear(k = 1) { this.pianoSlam(APPEAR_BOOST * k); }
   // ---- the horror layer: screaming violins (Insidious), a low dread bed, and the small paranormal knocks ----
   // violins(v): 0 silences them, 1 is the full storm. A looping recording, or a synthesized stand-in: detuned sawtooth "violins" with frantic vibrato.
-  violins(v, t = 1.5) {
-    if (!this.ctx) return;
-    this.bed('sfx/violin_storm', v * 0.95, t);
-    const have = !!(this.buf && this.buf['sfx/violin_storm']);
-    if (!this.strings) {
-      const ctx = this.ctx, g = ctx.createGain(); g.gain.value = 0;
-      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.6;
-      const vib = ctx.createOscillator(); vib.frequency.value = 6.5; const vg = ctx.createGain(); vg.gain.value = 22; vib.connect(vg); vib.start();
-      const slide = ctx.createOscillator(); slide.frequency.value = 0.37; const sg = ctx.createGain(); sg.gain.value = 120; slide.connect(sg); slide.start();
-      for (const f of [740, 784, 1109, 1480, 1865, 2217, 2960]) {
-        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; vg.connect(o.frequency); sg.connect(o.frequency); o.connect(bp); o.start();
-      }
-      bp.connect(g).connect(this.buses.sfx); this.strings = { g };
-    }
-    this.set(this.strings.g.gain, have ? 0 : v * 0.05, t);
+  // no strings any more: what used to call for the violins gets a slow low drone, and the reveals are the piano alone
+  violins(v, t = 1.5) { if (!this.ctx) return; this.set(this.tensionGain.gain, v * 0.12, t); this.bed('sfx/violin_storm', 0, 0.3); }
+  // a reveal: the low piano slam and nothing else
+  stab() { this.pianoSlam(1.3); }
+  // the slam with the room gone quiet a beat before it: ambience ducks, then the low note
+  quietSlam(k = 1.3, quiet = 1.5) { this.hush(quiet); if (!this.ctx) return; setTimeout(() => { this.unhush(); this.pianoSlam(k); }, quiet * 1000); }
+  // the house goes quiet and stays quiet until unhush() (a scare waiting behind you)
+  holdHush() { if (!this.ctx) return; const g = this.master.gain, t = this.now; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(this.level * 0.2, t + 0.6); }
+  unhush() { if (!this.ctx) return; const g = this.master.gain, t = this.now; g.cancelScheduledValues(t); g.setValueAtTime(this.level, t); }
+  // a voice from a small speaker across the room (the TV, the kitchen radio): band-limited, a little broken up, and placed
+  speaker(id, { pan = 0, gain = 1, wet = 0.25 } = {}) {
+    const b = this.buf && this.buf[id]; if (!this.ctx || !b) return 0;
+    const ctx = this.ctx, src = ctx.createBufferSource(); src.buffer = b;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 420;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200;
+    const sh = ctx.createWaveShaper(), curve = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i / 255.5 - 1; curve[i] = Math.tanh(x * 2.2) / Math.tanh(2.2); } sh.curve = curve;
+    src.connect(hp).connect(lp).connect(sh).connect(this.bus(gain, pan, wet, b.duration, 'voice'));
+    src.start(this.now); return b.duration;
   }
-  stab() { if (!this.play('sfx/violin_stab', { gain: 2.3, wet: 0.1 })) this.scream(); }
+
   swell() { if (!this.play('sfx/violin_swell', { gain: 1, wet: 0.1 })) this.tone({ type: 'sawtooth', f: 900, f2: 2400, dur: 6, gain: 0.06, attack: 5, wet: 0.5 }); }
   dread(v, t = 3) { if (!this.ctx) return; this.bed('sfx/low_drone', v, t); this.bed('sfx/whispers', v * 0.8, t); }
   scratch(pan = 0) { if (!this.play('sfx/closet_scratch', { gain: 0.9, pan, wet: 0.3 })) for (let i = 0; i < 7; i++) this.noiseHit({ dur: 0.25, type: 'highpass', f: 2500, gain: 0.18, pan, wet: 0.3, delay: i * 0.35 }); }

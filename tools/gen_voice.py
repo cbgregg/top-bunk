@@ -21,6 +21,8 @@ EL_MODEL = os.environ.get('EL_MODEL', 'eleven_v4')
 # (voice id, speed). ElevenLabs library voices: Andrea (kind, calm) for Mom, Jerry B (off-the-cuff, unpolished) for Dad
 MOM = ('wVZ5qbJFYF3snuC65nb4', 0.95)
 DAD = ('1t1EeRixsJrKbiF1zwM6', 0.9)
+# the late news on the TV and the kitchen radio: a broadcast reader (David Castlemore, newsreader), read flat and even
+NEWS = ('XjLkpWUlnhS8i7gGz3lZ', 0.92)
 # steady, low-style delivery: these are people talking in a kitchen, not a radio play
 SETTINGS = {'stability': 1.0, 'similarity_boost': 0.8, 'style': 0.0}
 # lines that are one conversation, in order; each is read with its neighbours as context so it is not delivered as an announcement
@@ -34,6 +36,9 @@ SCENES = [
     # the photos on the breakfast table: brushed off, then uneasy, then scared
     ['mom/ph_low_a', 'dad/ph_low_a', 'mom/ph_low_b', 'dad/ph_low_b'], ['mom/ph_mid_a', 'dad/ph_mid_a', 'mom/ph_mid_b', 'dad/ph_mid_b'],
     ['mom/ph_high_a', 'dad/ph_high_a', 'mom/ph_high_b', 'dad/ph_high_b'],
+    # Dad calling through the dark house, and the late bulletins, each read as one run
+    ['dad/call_a', 'dad/call_b', 'dad/call_c', 'dad/call_d', 'dad/call_e', 'dad/call_f'],
+    ['news/n1', 'news/n2', 'news/n3', 'news/n4', 'news/n5'], ['news/n6', 'news/n7', 'news/n8'],
 ]
 # Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).
 GRAMPS = (os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)
@@ -44,7 +49,7 @@ LINES = {}
 _ALL = json.load(open(os.path.join(OUT, 'lines.json')))
 for _id, _l in _ALL.items():
     if _l.get('voice'):
-        LINES['vo/' + _id] = ({'mom': MOM, 'gramps': GRAMPS}.get(_l['voice'], DAD), _l['say'])
+        LINES['vo/' + _id] = ({'mom': MOM, 'gramps': GRAMPS, 'news': NEWS}.get(_l['voice'], DAD), _l['say'])
 
 
 def ssml_safe(s):

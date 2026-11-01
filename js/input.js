@@ -18,14 +18,15 @@ const LABELS = {
   light: { kb: 'F', pad: 'Y', touch: 'LIGHT' },
   pause: { kb: 'Esc', pad: 'Start', touch: 'II' },
   photos: { kb: 'Tab', pad: 'Select', touch: 'the camera at the top' },
+  journal: { kb: 'J', pad: 'R3', touch: 'the notebook at the top' },
 };
 export const label = (action) => LABELS[action][input.scheme];
-export const controlsTable = () => ['move', 'look', 'sprint', 'interact', 'breath', 'light', 'photos', 'pause'].map((a) => [a === 'move' && input.scheme === 'touch' ? 'Left thumb' : a === 'look' && input.scheme === 'touch' ? 'Right thumb' : LABELS[a][input.scheme],
-  { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact / take a photo', breath: 'Hold your breath / hide', light: 'Flashlight', photos: 'Your photos', pause: 'Pause' }[a]]);
+export const controlsTable = () => ['move', 'look', 'sprint', 'interact', 'breath', 'light', 'photos', 'journal', 'pause'].map((a) => [a === 'move' && input.scheme === 'touch' ? 'Left thumb' : a === 'look' && input.scheme === 'touch' ? 'Right thumb' : LABELS[a][input.scheme],
+  { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact / take a photo', breath: 'Hold your breath / hide', light: 'Flashlight', photos: 'Your photos', journal: 'Your journal', pause: 'Pause' }[a]]);
 
 function setScheme(s) { if (input.scheme !== s) { input.scheme = s; document.body.dataset.scheme = s; if (input.onScheme) input.onScheme(s); } }
 
-export function initInput({ interact, pause, confirm, lookBy, light, cover, photos }) {
+export function initInput({ interact, pause, confirm, lookBy, light, cover, photos, journal }) {
   input.touchDevice = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
   addEventListener('keydown', () => setScheme('kb'));
   addEventListener('mousemove', () => { if (input.scheme !== 'kb' && !input.touchDevice) setScheme('kb'); });
@@ -112,6 +113,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
       if (!menuOn && (edge(0) || edge(2))) { interact(); confirm(); }
       if (edge(9)) pause();
       if (edge(8) && photos && !menuOn) photos();   // Select (Back / View): the photo board
+      if (edge(11) && journal && !menuOn) journal();   // the right stick pressed in: the journal
       if (edge(3) && light) light();
       prev = gp.buttons.map((b) => b.pressed);
     } else prev = [];

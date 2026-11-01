@@ -218,7 +218,49 @@ export class Entity {
     this.root.rotation.y = cur + d * Math.min(1, k);
   }
 
+  // low to the floor: 'crumple' (knees folded under, collapsed over them, the head bent sideways too far, staring) and 'crawl' (flat out on
+  // all fours like a spider, elbows and knees up and wrong, fast). snap 0..1 straightens the bent head (the moment it notices the flash)
+  updateLow(dt) {
+    const r = this.rig, rr = r.root, crawl = this.mode === 'crawl';
+    r.play('idle', { fade: 0, speed: 0.05 }); r.update(dt);
+    if (this.shroud) this.shroud.mat.uniforms.uRise.value = crawl ? 0.1 : 0.05;
+    rr.position.set(0, 0, 0); rr.rotation.x = crawl ? 1.42 : 0; rr.updateMatrixWorld(true);
+    const B = r.bones, aimAt = (bone, child, pt) => { bone.updateWorldMatrix(true, false); bone.getWorldPosition(_w); r.aim(bone, child, _x.copy(pt).sub(_w).normalize(), 1); };
+    const T = (x, y, z) => this.root.localToWorld(_y.set(x, y, z));
+    if (!crawl) {
+      r.bend(['L_Thigh', 'R_Thigh'], [1, 1], [1, 0, 0], -1.55);
+      r.bend(['L_Calf', 'R_Calf'], [1, 1], [1, 0, 0], 2.9);
+      r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 1.2 + Math.sin(this.t * 0.9) * 0.03);
+      for (const s of ['L', 'R']) { aimAt(B[s + '_UpperArm'], B[s + '_Forearm'], T(s === 'L' ? 0.35 : -0.35, 0, 0.55)); aimAt(B[s + '_Forearm'], B[s + '_Hand'], T(s === 'L' ? 0.4 : -0.4, -0.2, 0.75)); }
+      const snap = this.snap || 0;
+      r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.95 - snap * 0.25);
+      r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], (1 - snap) * 1.15 * (this.side || 1) + Math.sin(this.t * 2.3) * 0.02);
+      // down onto the floor: the knees on the boards
+      rr.updateMatrixWorld(true); B.L_Calf.getWorldPosition(_v); const knee = _v.y; B.R_Calf.getWorldPosition(_v);
+      rr.position.y = this.root.position.y + 0.1 - Math.min(knee, _v.y); rr.updateMatrixWorld(true);
+    } else {
+      const ph = (this.phase += dt * (3.4 + this.speed * 2.4));
+      rr.position.set(0, 0.55 + Math.abs(Math.sin(ph)) * 0.05, -1.7); rr.updateMatrixWorld(true);
+      r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -1.3);
+      for (const [i, s] of [[0, 'L'], [1, 'R']]) {
+        const sx = s === 'L' ? 1 : -1, g = Math.sin(ph + i * Math.PI), lift = Math.max(0, g) * 0.28;
+        aimAt(B[s + '_UpperArm'], B[s + '_Forearm'], T(sx * 0.95, 1.1, 0.75));
+        aimAt(B[s + '_Forearm'], B[s + '_Hand'], T(sx * 0.6, lift, 1.25 + g * 0.35));
+        aimAt(B[s + '_Thigh'], B[s + '_Calf'], T(sx * 0.95, 0.95, -0.4));
+        aimAt(B[s + '_Calf'], B[s + '_Foot'], T(sx * 0.65, Math.max(0, -g) * 0.22, -1.0 - g * 0.3));
+      }
+      r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 10 });
+    }
+    this.relaxHands(r);
+    this.head.update(dt, { target: this.lookTarget, smile: this.smileScale });
+    if (this.shroud) { this.root.updateMatrixWorld(true); this.shroud.update(dt, this.root.getWorldPosition(_v), { obj: this.head, r: 0.24 }); }
+  }
+  // back on its feet (the low modes moved the whole skeleton)
+  standUp() { if (!this.rig) return; const rr = this.rig.root; rr.position.set(0, 0, 0); rr.rotation.x = 0; if (this.shroud) this.shroud.mat.uniforms.uRise.value = 0.16; this.snap = 0; }
+
   updateRig(dt) {
+    if (this.mode === 'crumple' || this.mode === 'crawl') { this.updateLow(dt); return; }
+    if (this.rig.root.rotation.x || this.rig.root.position.y) this.standUp();
     const r = this.rig, t = this.t, run = this.mode === 'run', walk = this.mode === 'walk';
     // the clip keeps pace with how fast it is actually moving (this.speed is metres per second over 3)
     if (run) r.play('run', { fade: 0.25, speed: 0.8 + this.speed * 0.3 });
@@ -228,6 +270,7 @@ export class Entity {
     // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0));
     r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
+    if (this.leanSide) r.bend(['Spine', 'Spine1', 'Spine2', 'Neck'], [0.2, 0.25, 0.35, 0.2], [0, 0, 1], this.leanSide);   // leaning out from behind something
     r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt + Math.sin(t * 0.7) * 0.05);
     // slow breathing: the chest opens and the shoulders lift a few millimetres
     const br = 0.5 + 0.5 * Math.sin(t * 1.15);

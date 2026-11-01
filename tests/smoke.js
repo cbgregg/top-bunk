@@ -276,7 +276,7 @@ let BASE = '';
         await page.evaluate(() => window.__game.setPause(true));
         const p = await page.evaluate(() => ({ shown: !document.getElementById('pause').classList.contains('hidden'), state: window.__game.menu.state, items: [...document.querySelectorAll('#pause-menu .mi .ml')].map((e) => e.textContent), t: window.__game.gameTime }));
         ok(p.shown && p.state.open.join() === 'pause' && p.state.focus === 'resume', `pause menu: ${JSON.stringify(p)}`);
-        const expect = ['Resume', 'Options', 'Achievements', 'Controls', 'Restart night', 'Quit to title'];
+        const expect = ['Resume', 'Journal', 'Options', 'Achievements', 'Controls', 'Restart night', 'Quit to title'];
         ok(p.items.join('|') === expect.join('|'), `pause entries ${JSON.stringify(p.items)}`);
         await sleep(1500);
         const frozen = await page.evaluate((t) => window.__game.gameTime - t, p.t);
