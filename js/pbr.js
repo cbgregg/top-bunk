@@ -4,19 +4,28 @@ import * as THREE from 'three';
 import { PHONE } from './gfx.js';
 
 const loader = new THREE.TextureLoader();
-// on a phone every texture is held at half size (a quarter of the memory): the picture is drawn into a canvas and that replaces the image
-const PHONE_MAX = 512;
-export function shrinkTexture(t) {
-  const im = t && t.image; if (!PHONE || !im || !(im.width > PHONE_MAX || im.height > PHONE_MAX)) return;
-  const k = Math.min(1, PHONE_MAX / Math.max(im.width, im.height)), c = document.createElement('canvas');
+// on a phone every picture is held small (256 a side for a model's or a surface's map, 512 for a painted canvas): the picture is drawn into
+// a canvas at that size and that replaces the image. Three hundred textures at full size were most of what filled the phone's memory
+const PHONE_MAX = 256, PHONE_CANVAS_MAX = 512;
+export function shrinkTexture(t, max = PHONE_MAX) {
+  const im = t && t.image; if (!PHONE || !im || !(im.width > max || im.height > max)) return;
+  const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k));
   try { c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); } catch (e) { return; }
   t.image = c; t.needsUpdate = true; if (im.close) im.close();
 }
-// every texture on every material under root
+// every texture on every material under root; a phone also drops the relief and roughness maps of models (the colour map alone is a third
+// of the pictures, and at that size the rest did little), and a small painted canvas needs no mipmaps
+const PHONE_DROP = ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'bumpMap', 'displacementMap'];
 export function shrinkTextures(root) {
   if (!PHONE) return;
-  root.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const v = m[k]; if (v && v.isTexture) shrinkTexture(v); } });
+  root.traverse((o) => {
+    const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of ms) {
+      for (const k of PHONE_DROP) if (m[k]) { m[k].dispose(); m[k] = null; m.needsUpdate = true; }
+      for (const k in m) { const v = m[k]; if (!(v && v.isTexture)) continue; const canvas = v.image && v.image.tagName === 'CANVAS'; shrinkTexture(v, canvas ? PHONE_CANVAS_MAX : PHONE_MAX); if (canvas && v.image.width <= 256 && v.image.height <= 256) { v.generateMipmaps = false; v.minFilter = THREE.LinearFilter; } }
+    }
+  });
 }
 const metaP = fetch('assets/pbr/pbr.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 const cache = new Map();
@@ -59,8 +68,16 @@ export async function applyPBR(mat, name, { tint, tile, normal = 1, rough = 1, f
   const meta = await metaP, t = tile ?? meta[name];
   if (!t) return;
   const rep = 1 / t, base = `assets/pbr/${name}_`;
-  const a = tex(base + 'a.webp', false, rep);
   if (!keepMap) mat.map = tex(base + 'c.webp', true, rep);   // keepMap: a patterned colour map (the floral quilt) stays, the PBR only adds relief
+  if (PHONE) {   // a phone takes the colour alone, with the roughness the set would have averaged to
+    mat.normalMap = mat.roughnessMap = mat.aoMap = mat.metalnessMap = null;
+    mat.roughness = flat !== null ? flat : Math.min(1, 0.55 * rough * (ROUGH_SCALE[name] ?? 1) + 0.3); mat.metalness = name === 'metal' ? 0.85 : 0;
+    if (!keepMap) mat.color.set(tint ?? 0xffffff);
+    if (rotate) mat.map.rotation = rotate;
+    if (anti) breakTiling(mat, typeof anti === 'object' ? anti : undefined);
+    mat.needsUpdate = true; return;
+  }
+  const a = tex(base + 'a.webp', false, rep);
   mat.normalMap = tex(base + 'n.webp', false, rep); mat.normalScale.set(normal, normal);
   mat.roughnessMap = mat.aoMap = a;
   mat.roughness = rough * (ROUGH_SCALE[name] ?? 1); mat.metalness = name === 'metal' ? 0.85 : 0; mat.metalnessMap = null; mat.aoMapIntensity = 1;   // the blue channel of the packed maps is empty, so metalness is set here instead

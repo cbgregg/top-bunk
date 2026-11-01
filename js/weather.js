@@ -3,8 +3,9 @@
 // The rain is one cloud of short line streaks in a box around the camera; the shader drops every streak that would fall inside the house or the
 // garage, so from indoors the rain only shows through the windows. Kinds: 'clear' | 'wet' (after a rainy night: the ground still dark) | 'rain' | 'storm'.
 import * as THREE from 'three';
+import { PHONE } from './gfx.js';
 
-const N = 2400;   // streaks in the cloud
+const N = PHONE ? 600 : 2400;   // streaks in the cloud
 
 export function createWeather(scene, camera, W, sfx) {
   // ---- the streaks: two vertices each; seed = where in the box, end = top (1) or bottom (0) of the streak, rnd = its own speed ----
@@ -52,7 +53,9 @@ export function createWeather(scene, camera, W, sfx) {
   const rain = new THREE.LineSegments(geo, mat); rain.frustumCulled = false; rain.visible = false; rain.renderOrder = 1; scene.add(rain);   // drawn before the window panes (renderOrder 2), which write depth
 
   // ---- lightning: a sheet of cold light from over the field across the road ----
-  const bolt = new THREE.DirectionalLight(0xd6dfff, 0); bolt.position.set(30, 70, -120); bolt.target.position.set(0, 0, -30); scene.add(bolt, bolt.target);
+  // on a phone the sheet of light is a lift of the sky and the fog instead of a light (one more light is one more pass over every surface)
+  const bolt = new THREE.DirectionalLight(0xd6dfff, 0); bolt.position.set(30, 70, -120); bolt.target.position.set(0, 0, -30); if (!PHONE) scene.add(bolt, bolt.target);
+  const skyFlash = (v) => { if (!(scene.background && scene.background.isColor)) return; if (v > 0 && !S.skyBase) { S.skyBase = scene.background.clone(); S.fogBase = scene.fog ? scene.fog.color.clone() : null; } if (!S.skyBase) return; scene.background.copy(S.skyBase).addScalar(v * 0.22); if (scene.fog && S.fogBase) scene.fog.color.copy(S.fogBase).addScalar(v * 0.18); if (v === 0) { S.skyBase = null; S.fogBase = null; } };
 
   // ---- the ground going wet: these materials darken and lose their roughness ----
   // sealed surfaces (asphalt, paint, concrete) go glassy; gravel and dirt only darken and dull a little. The dry values are read the first
@@ -118,7 +121,8 @@ export function createWeather(scene, camera, W, sfx) {
       if (S.flashT >= 0) {
         S.flashT += dt; let v = 0, done = true;
         for (const f of S.flashes) { if (S.flashT < f.at + f.len) done = false; if (S.flashT >= f.at && S.flashT < f.at + f.len) v = Math.max(v, f.v); }
-        bolt.intensity = v; if (done) { S.flashT = -1; bolt.intensity = 0; }
+        if (PHONE) skyFlash(v); else bolt.intensity = v;
+        if (done) { S.flashT = -1; if (PHONE) skyFlash(0); else bolt.intensity = 0; }
       } else if (S.kind === 'storm' && S.k > 0.5) { S.next -= dt; if (S.next <= 0) { S.next = 14 + Math.random() * 38; weather.flash(); } }
     },
   };

@@ -1459,7 +1459,7 @@ export function buildWorld(scene) {
   // for the night event: the face's glow, and a passing car's headlights (a shadow-casting spot, so the light only comes in through the windows)
   const faceLight = new THREE.PointLight(0xdce6ff, 0, 20, 2); faceLight.visible = false; scene.add(faceLight);
   const carLight = new THREE.SpotLight(0xfff2d6, 0, 48, 0.3, 0.55, 1.5); carLight.visible = false;
-  carLight.castShadow = true; carLight.shadow.mapSize.set(1024, 1024); carLight.shadow.camera.near = 1; carLight.shadow.camera.far = 48; carLight.shadow.bias = -0.0006; carLight.shadow.autoUpdate = false;
+  carLight.castShadow = !PHONE; carLight.shadow.mapSize.set(1024, 1024); carLight.shadow.camera.near = 1; carLight.shadow.camera.far = 48; carLight.shadow.bias = -0.0006; carLight.shadow.autoUpdate = false;
   carLight.position.set(34, 0.8, -30); scene.add(carLight, carLight.target);
 
   // window fill lights: cheap light through the glass, no shadows
@@ -1474,7 +1474,7 @@ export function buildWorld(scene) {
   // the hall spot: from the living-room end it lights the thing from behind and throws its long shadow down the hall
   const bathSpot = new THREE.SpotLight(0xffcf7a, 0, 32, 0.3, 0.35, 1.5);
   bathSpot.position.set(SX(-1.5), 2.4, SZ(-0.9)); bathSpot.target.position.set(SX(7), 0.2, SZ(-0.9));
-  bathSpot.castShadow = true; bathSpot.shadow.mapSize.set(1024, 1024); bathSpot.shadow.camera.near = 0.3; bathSpot.shadow.camera.far = 32; bathSpot.shadow.bias = -0.0005;
+  bathSpot.castShadow = !PHONE; bathSpot.shadow.mapSize.set(1024, 1024); bathSpot.shadow.camera.near = 0.3; bathSpot.shadow.camera.far = 32; bathSpot.shadow.bias = -0.0005;
   scene.add(bathSpot, bathSpot.target);
 
   // brick-edged planter along the front wall under the picture window, with shrubs; the stoop at the front door
@@ -1541,7 +1541,7 @@ export function buildWorld(scene) {
   })();
   fieldHeight = fieldH;
   {   // the field itself: one big plane with its vertices lifted; under the flat ground it sits a centimetre below the slabs
-    const N = 260, geo = new THREE.PlaneGeometry(520, 520, N, N); geo.rotateX(-Math.PI / 2);
+    const N = PHONE ? 90 : 260, geo = new THREE.PlaneGeometry(520, 520, N, N); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, -0.03 + fieldH(x, z)); uv.setXY(i, x, z); }
     geo.computeVertexNormals();
@@ -1784,9 +1784,9 @@ export function buildWorld(scene) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })); sign.position.set(-46, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.4, 0.06), M.steel); post.position.set(-46.04, 1.2, -26.0); yard.add(post);
-    const n = 13, posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), M.white, n), refl = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), n), mm = new THREE.Matrix4();
+    const n = PHONE ? 0 : 13, posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), M.white, Math.max(1, n)), refl = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), Math.max(1, n)), mm = new THREE.Matrix4();
     for (let i = 0; i < n; i++) { const x = -240 + i * 40; mm.makeTranslation(x, 0.55, RZ0 - 0.9); posts.setMatrixAt(i, mm); mm.makeTranslation(x, 0.95, RZ0 - 0.88); refl.setMatrixAt(i, mm); }
-    yard.add(posts, refl);
+    if (n) yard.add(posts, refl);
   }
   // puddles on the drive and the road, shown by weather.js once the ground is wet; dry patches in the grass where the summer burnt it
   const puddles = new THREE.Group(); puddles.visible = false; yard.add(puddles);
@@ -1810,7 +1810,7 @@ export function buildWorld(scene) {
     gr.addColorStop(0, 'rgba(255,225,170,1)'); gr.addColorStop(0.3, 'rgba(255,210,140,0.5)'); gr.addColorStop(1, 'rgba(255,190,100,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     // the last two are the farmhouse over the fields to the west: a kitchen window and the yard light on its pole
-    for (const [x, y, z, s] of [[160, 3.2, -118, 2.2], [185, 2.6, -70, 1.6], [-175, 3.0, -100, 2.0], [-150, 9.5, -140, 1.4], [120, 2.4, -190, 1.2], [-128, 2.0, 44, 1.5], [-121, 6.5, 52, 1.9]]) {
+    for (const [x, y, z, s] of PHONE ? [] : [[160, 3.2, -118, 2.2], [185, 2.6, -70, 1.6], [-175, 3.0, -100, 2.0], [-150, 9.5, -140, 1.4], [120, 2.4, -190, 1.2], [-128, 2.0, 44, 1.5], [-121, 6.5, 52, 1.9]]) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, color: s > 1.5 ? 0xffd9a0 : 0xffc880, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.8 })); sp.scale.set(s, s, 1); sp.position.set(x, y + fieldH(x, z), z); farLights.add(sp);
     }
   }
@@ -1892,27 +1892,30 @@ export function buildWorld(scene) {
     const tryFir = (x, z, k) => { if (!treeOk(x, z, 2.6 * k)) { treesRejected++; return false; } fir[r() < 0.5 ? 0 : 1].push(at(x, z, k, r() * 6.28)); return true; };
     // the firs: clumps across the fields, a shelter belt just past the fence, and a treeline all round at the edge of the fog
     const clump = (cx, cz, n, spread, k0 = 1.3, k1 = 2.3) => { for (let i = 0; i < n * 4 && n > 0; i++) if (tryFir(cx + (r() - 0.5) * spread, cz + (r() - 0.5) * spread, k0 + r() * (k1 - k0))) n--; };
-    for (const [x, z, n, s] of [[-48, 24, 7, 14], [-70, 38, 9, 18], [52, 30, 8, 16], [60, -8, 6, 14], [-96, -4, 10, 20], [-56, -40, 5, 12], [30, -60, 8, 16], [-20, -62, 7, 16], [72, -52, 6, 14], [-110, 30, 8, 18], [4, 58, 9, 18], [-30, 50, 6, 14]]) clump(x, z, n, s);
-    for (const [x, z] of [[-40, 36], [44, 24], [-38, -8], [-44, 14], [50, -2], [-60, 16], [34, 10], [-33, 30]]) tryFir(x, z, 1.8 + r() * 0.5);
-    for (let a = 0; a < Math.PI * 2; a += 0.04) {   // the treeline, two deep, broken here and there
+    // a phone gets the trees within forty-five metres of the house and no treeline; the fog closes the distance anyway
+    const CLUMPS = [[-48, 24, 7, 14], [-70, 38, 9, 18], [52, 30, 8, 16], [60, -8, 6, 14], [-96, -4, 10, 20], [-56, -40, 5, 12], [30, -60, 8, 16], [-20, -62, 7, 16], [72, -52, 6, 14], [-110, 30, 8, 18], [4, 58, 9, 18], [-30, 50, 6, 14]];
+    for (const [x, z, n, s] of CLUMPS) if (!PHONE || Math.hypot(x, z) < 45) clump(x, z, n, s);
+    for (const [x, z] of [[-40, 36], [44, 24], [-38, -8], [-44, 14], [50, -2], [-60, 16], [34, 10], [-33, 30]]) if (!PHONE || Math.hypot(x, z) < 45) tryFir(x, z, 1.8 + r() * 0.5);
+    for (let a = 0; a < Math.PI * 2 && !PHONE; a += 0.04) {   // the treeline, two deep, broken here and there
       if (r() < 0.12) continue;
       const d = 62 + r() * 30; tryFir(Math.cos(a) * d, -8 + Math.sin(a) * d, 1.6 + r() * 0.9);
     }
     // a few firs inside the fence, in the corners of the yard, and the maples: by the house, along the drive and at the back
     for (const [x, z] of [[-23, 24], [22, 25], [-22, -22], [24, -21], [-24, 8]]) tryFir(x, z, 1.5 + r() * 0.4);
-    for (const [x, z, k] of [[-17, 9, 0.62], [19, 12, 0.58], [-19, -5, 0.5], [21, -4, 0.55], [-14, -22, 0.45], [12, 22, 0.6], [-6, 22, 0.52], [8, -22, 0.4], [17, -23, 0.48], [-20, 20, 0.55]]) {
+    for (const [x, z, k] of PHONE ? [[-17, 9, 0.62], [19, 12, 0.58], [-19, -5, 0.5], [21, -4, 0.55], [-6, 22, 0.52]] : [[-17, 9, 0.62], [19, 12, 0.58], [-19, -5, 0.5], [21, -4, 0.55], [-14, -22, 0.45], [12, 22, 0.6], [-6, 22, 0.52], [8, -22, 0.4], [17, -23, 0.48], [-20, 20, 0.55]]) {   // a phone keeps the five maples by the house
       if (!treeOk(x, z, 9.3 * k)) { treesRejected++; continue; }
       maple.push(at(x, z, k, r() * 6.28));
     }
-    for (let i = 0; i < 40 && bare.length < 14; i++) { const a = r() * 6.28, d = 36 + r() * 70, x = 5 + Math.cos(a) * d, z = -10 + Math.sin(a) * d; if (treeOk(x, z, 2)) bare.push(at(x, z, 6 + r() * 3.5, r() * 6.28)); else treesRejected++; }
-    // the trees past 32 m are the pack's far models (a quarter of the triangles), cast no shadow and are left out of the ambient occlusion pass
-    const near = (m) => Math.hypot(m.elements[12], m.elements[14]) < 32, far = new THREE.Group(); far.userData.noAO = true; yard.add(far);
+    for (let i = 0; i < 40 && bare.length < 14 && !PHONE; i++) { const a = r() * 6.28, d = 36 + r() * 70, x = 5 + Math.cos(a) * d, z = -10 + Math.sin(a) * d; if (treeOk(x, z, 2)) bare.push(at(x, z, 6 + r() * 3.5, r() * 6.28)); else treesRejected++; }
+    // the trees past 32 m are the pack's far models (a quarter of the triangles), cast no shadow and are left out of the ambient occlusion pass;
+    // on a phone every fir is the far model
+    const near = (m) => !PHONE && Math.hypot(m.elements[12], m.elements[14]) < 32, far = new THREE.Group(); far.userData.noAO = true; yard.add(far);
     for (const [i, name] of [[0, 'fir1'], [1, 'fir2']]) { scatter(yard, name, fir[i].filter(near)); scatter(far, name + '_far', fir[i].filter((m) => !near(m)), { cast: false }); }
     scatter(yard, 'maple', maple);
     scatter(yard, 'tree_bare', bare.filter(near)); scatter(far, 'tree_bare', bare.filter((m) => !near(m)), { cast: false });
     for (const m of [...fir[0], ...fir[1], ...maple, ...bare]) if (Math.hypot(m.elements[12] - 5, m.elements[14] + 15) < 70) solid(m.elements[12] - 0.4, m.elements[12] + 0.4, m.elements[14] - 0.4, m.elements[14] + 0.4);
     // leaves under the maples, lying flat, and a mole hill or two in the lawn
-    {
+    if (!PHONE) {
       const lg = new THREE.PlaneGeometry(0.11, 0.09); lg.rotateX(-Math.PI / 2);
       const lm = new THREE.InstancedMesh(lg, std({ color: 0x8a6a3a, roughness: 1, side: THREE.DoubleSide }), maple.length * 60), c = new THREE.Color(); let n = 0;
       for (const m of maple) for (let i = 0; i < 60; i++) {
@@ -1940,8 +1943,8 @@ export function buildWorld(scene) {
       for (const m of ms) { const key = Math.floor(m.elements[12] / 12) + ',' + Math.floor(m.elements[14] / 12); (cells.get(key) || cells.set(key, []).get(key)).push(m); }
       for (const list of cells.values()) scatter(yard, name, list, { cast: false });
     };
-    grass('grass2', 1500, 5, 36, 1.0, 2.0); grass('grass1', 260, 6, 32, 0.8, 1.4);
-    {   // tall grass out in the field, in drifts, on the rolling ground; chunked in bigger cells since it is only ever seen from a way off
+    if (!PHONE) { grass('grass2', 1500, 5, 36, 1.0, 2.0); grass('grass1', 260, 6, 32, 0.8, 1.4); }
+    if (!PHONE) {   // tall grass out in the field, in drifts, on the rolling ground; chunked in bigger cells since it is only ever seen from a way off
       const ms = [], cells = new Map();
       for (let i = 0; i < 2600 && ms.length < 900; i++) {
         const a = r() * 6.283, d = 34 + r() * 60, x = 2 + Math.cos(a) * d, z = -6 + Math.sin(a) * d;
@@ -1952,17 +1955,18 @@ export function buildWorld(scene) {
       for (const list of cells.values()) scatter(yard, 'grass2', list, { cast: false });
     }
     const rocks = [[-25, 7, 1.2], [-17, -10, 1.8], [27, -14, 1.4], [33, 5, 1.0], [14, -23.5, 1.6], [-12.5, -22, 1.1], [22, -20, 0.9]].map(([x, z, k]) => { q.setFromAxisAngle(up, r() * 6.28); return m4.clone().compose(new THREE.Vector3(x, -0.05, z), q, sc.set(k, k * 0.8, k)); });
-    scatter(yard, 'rock1', rocks);
+    scatter(yard, 'rock1', PHONE ? rocks.slice(0, 3) : rocks);   // the boulder model is six thousand triangles
     // field stones, none on the lawn round the house and none big enough to read as a boulder by the step
     const small = []; for (let i = 0; i < 40; i++) { const x = -20 + r() * 60, z = -35 + r() * 50; if (!ok(x, z, 2) || (Math.abs(x - 1.6) < 16 && Math.abs(z - 0.1) < 11)) continue; q.setFromAxisAngle(up, r() * 6.28); const k = 0.8 + r() * 1.0; small.push(m4.clone().compose(new THREE.Vector3(x, -0.03, z), q, sc.set(k, k, k))); }
-    scatter(yard, 'rock2', small);
+    if (!PHONE) scatter(yard, 'rock2', small);
   }
   // the lawn: blades of grass in their tens of thousands, instanced in cells so only the ones in view are drawn, bending in the wind in the
   // vertex shader (slow gusts rolling across the yard, a flutter on top), lying down where feet and tyres go and shrinking into the ground
   // past twelve metres so the lawn texture takes over without a line. Thick near the house, thinning toward the fence, clumpy from a noise
   // field, none on the house, the drive, the garage, the walks or under the trees; longer, drier grass just outside the fence.
   const lawn = (() => {
-    const r = TX.rng(8080), g = new THREE.Group(); g.userData.noAO = true; yard.add(g);   // blades get no ambient occlusion pass: it costs a draw of all of them and shows nothing
+    const r = TX.rng(8080), g = new THREE.Group(); g.userData.noAO = true; yard.add(g);   // blades get no ambient occlusion pass: it costs a draw of all of the
+    if (PHONE) return { group: g, time: { value: 0 }, count: 0, lawnCount: 0, setQuality() {}, share: 0, quality: 'phone' };   // a phone keeps the lawn texture and no bladesm and shows nothing
     const hash = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
     const noise = (x, z) => {
       const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
@@ -2158,7 +2162,7 @@ export function buildWorld(scene) {
         for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
         if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
         g.computeBoundingBox(); g.boundingBox.getCenter(v);
-        const cell = Math.floor(v.x / 6) + ',' + Math.floor(v.z / 6), flags = (m.castShadow ? 1 : 0) + (m.receiveShadow ? 2 : 0);
+        const CELL = PHONE ? 18 : 6, cell = Math.floor(v.x / CELL) + ',' + Math.floor(v.z / CELL), flags = (m.castShadow ? 1 : 0) + (m.receiveShadow ? 2 : 0);   // a phone merges in bigger cells: fewer draws, less culling
         const parts = Array.isArray(m.material) && g.groups.length ? g.groups : [{ start: 0, count: g.attributes.position.count, materialIndex: 0 }];
         for (const pt of parts) {
           let sub = g;
@@ -2178,6 +2182,8 @@ export function buildWorld(scene) {
       }
     };
     mergeInto(house); mergeInto(yard);
+    // a phone also merges each door's leaf and frame into a mesh per material: the panels, casings, hinges and knobs were two hundred draws
+    if (PHONE) for (const k in doors) { const d = doors[k]; if (d.g) mergeInto(d.g); if (d.fr) mergeInto(d.fr); }
   }
 
   return {

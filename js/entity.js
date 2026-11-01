@@ -11,7 +11,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _x = new THREE.Vector3
 const _lat = new THREE.Vector3(), _palm = new THREE.Vector3(), _p2 = new THREE.Vector3(), _cax = new THREE.Vector3(), _cr = new THREE.Vector3();
 const ARM_STRETCH = 1.4;
 // the shroud: how many wisps per graphics preset
-const WISPS = PHONE ? { ultra: 260, high: 220, medium: 160, low: 0 } : { ultra: 820, high: 640, medium: 340, low: 0 };
+const WISPS = PHONE ? { ultra: 120, high: 120, medium: 120, low: 0, phone: 120 } : { ultra: 820, high: 640, medium: 340, low: 0 };
 // the hands: the clips come in with the wrists bent and turned in, so every frame the hand is brought back near the forearm's line
 // and the long fingers are set a little curled, more toward the little finger, the thumb out
 const WRIST_FLEX = 0.12;
