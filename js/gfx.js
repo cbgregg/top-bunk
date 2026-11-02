@@ -159,11 +159,21 @@ export function contactShadow(r = 0.4, k = 0.5) {
   return m;
 }
 
+// where Auto starts, from the name the browser gives the graphics card: a software renderer starts on Low, a chip built into the CPU on
+// Medium, anything else on High (Auto then moves up or down from there by the frame times)
+export function gpuTier(renderer) {
+  let name = '';
+  try { const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)); } catch (e) { return 'high'; }
+  if (/swiftshader|llvmpipe|softpipe|software|basic render/i.test(name)) return 'low';
+  if (/intel|uhd|iris|hd graphics|mali|adreno|powervr|radeon\(tm\) (graphics|vega)|radeon graphics|vega \d+ graphics|apple gpu/i.test(name)) return 'medium';
+  return 'high';
+}
+
 export class Gfx {
   constructor(renderer, scene, camera, { quality } = {}) {
     this.r = renderer; this.scene = scene; this.camera = camera;
     const saved = store.get(KEY), q = quality || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('gfx')) || saved;   // ?gfx=low forces a preset from the address bar
-    this.autoQuality = PHONE ? 'phone' : 'high';   // phones start lighter
+    this.autoQuality = PHONE ? 'phone' : gpuTier(renderer);   // phones start lighter, and so do built-in and software graphics
     // the Graphics page: a custom setup (when chosen) and the settings that belong to no preset
     const og = store.get(OKEY) || {};
     this.custom = og.custom && typeof og.custom === 'object' ? { ...OPTS.high, ...og.custom } : null;
@@ -435,6 +445,8 @@ export class Gfx {
     const mk = (col, ang) => { const l = new THREE.SpotLight(col, 0, 6, ang, 0.85, 2); this.scene.add(l, l.target); return l; };
     this.rig = { key: mk(0xffd6aa, 0.42), fill: mk(0xaec4ff, 0.6), rim: mk(0xfff1dc, 0.4) };
   }
+  // how much of the screen's height each letterbox bar covers right now (0 out of a conversation)
+  barsNow() { const g = this.chain && this.chain.pass && this.chain.pass.grade; return g ? g.uniforms.bars.value : 0; }
   dropRig() { if (!this.rig) return; for (const k in this.rig) { const l = this.rig[k]; this.scene.remove(l, l.target); l.dispose(); } this.rig = null; }
   cineFrame(dt) {
     const ch = this.chain, k = this.cineK, cam = this.camera, f = this.cineFocus, fwd = cam.getWorldDirection(this._f);

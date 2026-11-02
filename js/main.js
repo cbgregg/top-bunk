@@ -1728,7 +1728,15 @@ function loop(now) {
   if (!window.__norender && booted && !warming) {
     gfx.render(dt);
     // the hands over the frame: the depth is cleared first, so a wall right in front of you never cuts through them
-    if (hands.visible()) { const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.clearDepth(); renderer.render(hands.scene, camera); renderer.autoClear = ac; }
+    if (hands.visible()) {
+      const ac = renderer.autoClear; renderer.autoClear = false; renderer.setRenderTarget(null); renderer.clearDepth();
+      // in a conversation the hands stay inside the letterbox, under the bars like the rest of the picture
+      const bar = Math.round((gfx.barsNow ? gfx.barsNow() : 0) * innerHeight);
+      if (bar > 0) { renderer.setScissor(0, bar, innerWidth, innerHeight - 2 * bar); renderer.setScissorTest(true); }
+      renderer.render(hands.scene, camera);
+      if (bar > 0) renderer.setScissorTest(false);
+      renderer.autoClear = ac;
+    }
   }
 }
 let wasFake = false;
