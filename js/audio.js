@@ -351,10 +351,18 @@ export class Sound {
     const b = (cars && cars.length && cars[Math.floor(Math.random() * cars.length)]) || (this.buf && this.buf[id]);
     if (!b) return this.movingSynth(id, from, to, dur || 4);
     const ctx = this.ctx, src = ctx.createBufferSource(); src.buffer = b;
+    // a car on the road is far off: the recordings are evened out to the same level, quieter the further you are from the road,
+    // and indoors it comes through the walls, dull and low
+    let head = src, wetV = 0.35;
+    if (id.includes('car_pass')) {
+      const out = this.room === 'out' || this.room === 'stoop', road = this.near && this.near.road != null ? this.near.road : 22;
+      gain *= (b.norm ?? 1) * (out ? 1 / (1 + Math.max(0, road - 6) * 0.08) : 0.3);
+      if (!out) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 0.5; head = src.connect(lp); wetV = 0.5; }
+    }
     const g = ctx.createGain(); g.gain.value = gain; const p = ctx.createStereoPanner(), t = this.now, len = dur || b.duration;
     p.pan.setValueAtTime(from, t); p.pan.linearRampToValueAtTime(to, t + len);
-    const wet = ctx.createGain(); wet.gain.value = 0.35;
-    const kind = this.kindOf(id); src.connect(g).connect(p).connect(this.buses[kind]); p.connect(wet).connect(this.sends[kind]); src.start(t);
+    const wet = ctx.createGain(); wet.gain.value = wetV;
+    const kind = this.kindOf(id); head.connect(g).connect(p).connect(this.buses[kind]); p.connect(wet).connect(this.sends[kind]); src.start(t);
     return b.duration;
   }
   movingSynth(id, from, to, dur) {
