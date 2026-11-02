@@ -8,6 +8,7 @@ import { NODES, nearestNode } from './nav.js';
 import { pick } from './rng.js';
 import { achievements } from './achievements.js';
 import { createGaze } from './gaze.js';
+import { createWindowScares } from './windowscares.js';
 import { makePerson } from './people.js';
 
 const DAWN = 360;   // minutes after midnight
@@ -121,7 +122,7 @@ export function createNights(env) {
     calm: () => !hunter.busy && hunter.cool <= 0 && !document.querySelector('#objective.show') && !W.phone.ringing && !W.tvFx.on,
     // in your room, or somewhere with a clear view of its window (the end wall, past the foot of the bunk); not under the covers or in a closet
     seesKidWindow: () => P.mode !== 'hide' && (env.roomAt(P.pos.x, P.pos.z) === 'bed' || (Math.hypot(P.pos.x - 11.06, P.pos.z - 3.83) < 9 && hunter.los(P.pos.x, P.pos.z, 11.06, 3.83))),
-    carPass: () => env.carPass(), faceAtWindow: () => env.faceAtWindow(),
+    carPass: () => { env.carPass(); if (ws) ws.carFlash(); }, faceAtWindow: () => env.faceAtWindow(),
     blackout(on) { F.blackout = on; env.nlMult(on ? 0 : 1, false); },
     startHunt, visibleNodes, objective: (t) => UI.objective(t),
     fired: (id) => proofFire(id),
@@ -151,7 +152,7 @@ export function createNights(env) {
     return doubles[who];
   }
   const standDouble = (p, x, z, yaw) => { p.pose = null; p.lookAt = null; p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, yaw, 0); p.group.position.set(x, 0, z); p.group.visible = true; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.4 }); };
-  const ST = { on: null, lastBeat: -99, lastReveal: -99, cancel: [], it: null, gap: 60 };
+  const ST = { on: null, lastBeat: -99, lastReveal: -99, cancel: [], it: null, gap: 60 }; let ws = null;
   const freeE = () => !E.visible && !hunter.busy && hunter.cool <= 0;
   const hideE = () => { E.visible = false; E.mode = 'idle'; E.leanSide = 0; E.lean = 0; E.snap = 0; E.lookTarget = null; E.root.scale.setScalar(1); E.standUp(); };
   function endStage() {
@@ -170,6 +171,7 @@ export function createNights(env) {
       const p = gaze.behind(1.8, 3.4); if (!p) return false;
       E.root.scale.setScalar(1); E.root.position.set(p.x, P.pos.y, p.z); E.faceTowards(P.pos.x, P.pos.z, 1); E.mode = 'crumple'; E.side = rnd() < 0.5 ? -1 : 1; E.snap = 0;
       E.lookTarget = camera.position; E.visible = true; sfx.holdHush();
+      if (sfx.libLoad) { sfx.libLoad('bone_crack'); sfx.libLoad('crawl'); }   // ready before the flash
       const st = { kind: 'crumple', p, t0: env.time(), mum: 0, end: () => { if (!st.caught) hideE(); } }; ST.on = st;
       ST.cancel.push(gaze.whenLookAt(p, () => {
         st.seen = env.time(); revealed(); sfx.unhush(); sfx.pianoSlam(1.25); env.addShake(0.35); F.fear = 1;
@@ -249,6 +251,10 @@ export function createNights(env) {
       return true;
     } },
   };
+  // the windows (windowscares.js): their scares join the same schedule, under the same gaps and the same quiet between reveals
+  ws = createWindowScares({ W, E, P, F, camera, sfx, env, gaze, D, hunter, rnd: () => rnd(), later,
+    stage: { start: (st) => { ST.on = st; }, on: () => ST.on, end: () => endStage(), revealed, hideE, freeE } });
+  Object.assign(SCARES, ws.scares);
   // the flash in its face: its head snaps up, and it comes for you on all fours, faster if you run
   async function crawlAt(st) {
     if (st.crawl) return; st.crawl = { t0: 0 }; if (ST.it) { env.removeI(ST.it); ST.it = null; }
@@ -256,8 +262,10 @@ export function createNights(env) {
     if (env.photo) env.photo();
     F.fear = 1; await tween(0.14, (k) => { E.snap = k; });
     await wait(0.35); if (ST.on !== st) return;
-    E.mode = 'crawl'; E.speed = 1; E.lookTarget = camera.position; st.crawl.t0 = env.time();
-    sfx.heavyStep(0.5, D.pan(E.root.position.x, E.root.position.z));
+    E.mode = 'crawl'; E.speed = 1; E.lookTarget = camera.position; st.crawl.t0 = env.time(); st.crawl.k = 0;
+    { const e = E.root.position, at = { x: e.x, y: 0.4, z: e.z };   // it unfolds: joints going back the wrong way, then it comes
+      if (!sfx.pick('bone_crack', { gain: 0.8, at, wet: 0.1 })) sfx.heavyStep(0.5, D.pan(e.x, e.z));
+      sfx.pick('bone_crack', { gain: 0.55, at, wet: 0.1, delay: 0.18 }); }
   }
   // it reaches you: the low piano and nothing else, black, and under
   async function crawlCatch(st) {
@@ -270,7 +278,7 @@ export function createNights(env) {
   const beatGap = (n) => (n <= 1 ? 75 + rnd() * 40 : n <= 3 ? 55 + rnd() * 35 : n <= 7 ? 45 + rnd() * 30 : 40 + rnd() * 25);
   const quietTypes = new Set(['vigil', 'car', 'finale']);
   function stageTick(dt) {
-    gaze.update(dt);
+    gaze.update(dt); if (ws) ws.tick(dt);
     for (const k in doubles) { const d = doubles[k]; if (d.group.visible) d.update(env.time(), dt); }
     if (F.dead || !F.live) { if (ST.on) endStage(); return; }
     const st = ST.on, now = env.time();
@@ -280,6 +288,7 @@ export function createNights(env) {
         if (st.crawl && st.crawl.t0) {
           const e = E.root.position, dx = P.pos.x - e.x, dz = P.pos.z - e.z, dd = Math.hypot(dx, dz) || 1, v = (P.sprinting ? 7.2 : 4.8) * dt;
           e.x += dx / dd * Math.min(v, dd); e.z += dz / dd * Math.min(v, dd); E.faceTowards(P.pos.x, P.pos.z, 0.4); E.speed = 1.6;
+          st.crawl.k -= dt; if (st.crawl.k <= 0) { st.crawl.k = 0.28 + Math.random() * 0.1; const at = { x: e.x, y: 0.2, z: e.z }; sfx.pick('crawl', { gain: 0.7, at, wet: 0.12, jitter: 0.08 }); if (Math.random() < 0.35) sfx.pick('bone_crack', { gain: 0.4, at, wet: 0.1 }); }
           if (dd < 1.1 || now - st.crawl.t0 > 3.2) crawlCatch(st);
           return;
         }
@@ -301,6 +310,7 @@ export function createNights(env) {
         if (!st.seen && now - st.t0 > 30) endStage();
         return;
       }
+      if (st.tick) { if (st.tick(dt) === false || now - st.t0 > (st.max || 30)) endStage(); return; }
       if (now - st.t0 > 30) endStage();
       return;
     }
@@ -417,8 +427,8 @@ export function createNights(env) {
       tell: 'The TV was on again last night. Nobody was watching it.' },
     DRAWING: { from: PROOF_FROM.DRAWING, keep: true, at: [7.1, 0.45, 0.19], p: [7.19, 0.6, 0.08], show: prop('DRAWING'), cap: 'black crayon', clue: 'my drawing', snd: 'crayon',
       tell: "Somebody drew on the wall under the drawing. In black crayon. I don't have a black one." },
-    CHAIR: { from: PROOF_FROM.CHAIR, at: [-1.21, 0.5, 1.31], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, -1.21, 1.31, Math.PI / 2); else if (c) W.moveChair(2, c.x, c.z, c.rot); }, cap: 'the chair', clue: 'the dining room', snd: 'chair',
-      tell: 'Somebody turned a chair in the dining room to face the wall. Right up against it.' },
+    CHAIR: { from: PROOF_FROM.CHAIR, at: [0.5, 0.5, 0.66], show: (on) => { const c = W.chairs[2]; if (on) W.moveChair(2, 0.5, 0.66, Math.PI); else if (c) W.moveChair(2, c.x, c.z, c.rot); }, cap: 'the chair', clue: 'the kitchen table', snd: 'chair',
+      tell: 'Somebody turned a kitchen chair to face the wall. Right up against it.' },
     PHONE: { from: PROOF_FROM.PHONE, at: [-0.82, 1.15, 1.63], p: [-0.78, 1.3, 1.64], show: (on) => (on ? W.phone.pickUp() : W.phone.hangUp()), still: () => W.phone.off, took: () => { W.phone.hangUp(); sfx.click(); }, cap: 'off the hook', clue: 'the phone', snd: 'dial',
       tell: 'The phone was off the hook. Somebody was still breathing on it.' },
     HANDPRINT: { from: PROOF_FROM.HANDPRINT, keep: true, at: [-9.65, 1.47, -7.24], p: [-9.65, 1.45, -7.0], show: prop('HANDPRINT'), cap: 'handprint', clue: 'the garage', snd: 'metal',
@@ -514,20 +524,22 @@ export function createNights(env) {
     const d = PROOF[k]; if (F.cutscene || isFound(k)) return;
     found().push(k); foundAt()[k] = pr.n; env.saveRun(); proofLine();
     env.removeI(pr.its[k]); delete pr.its[k]; glintOff(k);
-    F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
-    const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, at = new V3(...d.at), dist = from.distanceTo(at);
-    const to = from.clone().lerp(at, clamp((dist - 0.6) / Math.max(dist, 0.01), 0, 0.55)); to.y = Math.max(to.y, 0.45);
-    const h = Math.hypot(at.x - to.x, at.z - to.z), yaw = h > 0.05 ? Math.atan2(-(at.x - to.x), -(at.z - to.z)) : y0, pitch = clamp(Math.atan2(at.y - to.y, h), -1.3, 1.3);
-    sfx.creak(0.1, 0, 0.3);
-    await tween(1.0, (q) => { P.cam.lerpVectors(from, to, q); P.yaw = lerpAngle(y0, yaw, q); P.pitch = lerp(p0, pitch, q); });
-    await wait(0.25);
+    // the camera comes up to the eye where you stand (no stepping in): the view turns to the spot, the viewfinder frames it, the flash
+    F.cutscene = true; F.photoHold = true; P.mode = 'cine'; P.cam.copy(camera.position);
+    const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, at = new V3(...d.at);
+    const h = Math.hypot(at.x - from.x, at.z - from.z), yaw = h > 0.05 ? Math.atan2(-(at.x - from.x), -(at.z - from.z)) : y0, pitch = clamp(Math.atan2(at.y - from.y, h), -1.3, 1.3);
+    if (env.hands) env.hands.raiseCamera();
+    await tween(0.6, (q) => { P.yaw = lerpAngle(y0, yaw, q); P.pitch = lerp(p0, pitch, q); });
+    await wait(0.3);
     const url = env.photo ? env.photo() : null;
     if (url) { photos()[k] = url; env.saveRun(); }
     UI.print && UI.print(url, d.cap); photoTaken();
     if (d.took) d.took();
-    await wait(1.1);
-    const back = new V3(P.pos.x, env.EYE, P.pos.z);
-    await tween(0.6, (q) => { P.cam.lerpVectors(to, back, q); P.pitch = lerp(pitch, clamp(pitch, -0.5, 0.5), q); });
+    await wait(0.9);
+    if (env.hands) env.hands.lowerCamera();
+    F.photoHold = false;
+    await tween(0.4, (q) => { P.pitch = lerp(pitch, clamp(pitch, -0.5, 0.5), q); });
+    P.cam.copy(from);
     if (P.mode === 'cine' && !F.dead) { P.mode = 'walk'; F.cutscene = false; }
   }
   // the line under the objective: a camera, and a print for each piece of proof tonight can leave (filled once it is taken); no numbers.
@@ -535,7 +547,10 @@ export function createNights(env) {
   const proofEl = (() => {
     const o = typeof document !== 'undefined' && document.getElementById('objective'); if (!o) return null;
     const el = document.createElement('div'); el.id = 'proof'; o.after(el);
-    el.addEventListener('click', () => { if (env.openPhotos) env.openPhotos(); });
+    let pressT = 0, longed = false;   // a tap opens the photo board; a long press brings the camera up
+    el.addEventListener('pointerdown', () => { longed = false; clearTimeout(pressT); pressT = setTimeout(() => { longed = true; if (env.hands) env.hands.toggleCamera(); }, 450); });
+    el.addEventListener('pointerup', () => clearTimeout(pressT)); el.addEventListener('pointerleave', () => clearTimeout(pressT));
+    el.addEventListener('click', () => { if (longed) { longed = false; return; } if (env.openPhotos) env.openPhotos(); });
     // under the objective while there is one, in its place while there is none
     const place = () => { const on = o.classList.contains('show'); el.classList.toggle('alone', !on); el.style.top = `${on ? o.offsetTop + o.offsetHeight + 10 : o.offsetTop}px`; };
     new MutationObserver(place).observe(o, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
@@ -569,6 +584,7 @@ export function createNights(env) {
   const proof = {
     defs: PROOF, total: Object.keys(PROOF).length, count: () => found().length, on: (n) => found().filter((k) => foundAt()[k] === n), tell: (k) => PROOF[k] && PROOF[k].tell,
     cap: (k) => PROOF[k] && PROOF[k].cap, photo: (k) => photos()[k] || null, board,
+    near: (pos) => { for (const k of pr.shown) { if (isFound(k)) continue; const a = PROOF[k].at; if (Math.hypot(pos.x - a[0], pos.z - a[2]) < 3.2) return true; } return false; },
     kinds: () => pr.kinds.slice(), pending: () => [...pr.pending.keys()], shown: () => [...pr.shown], kindsFor: proofKinds, start: proofStart, fire: proofFire, sync: proofSync, hud: proofHud, look: proofLook,
   };
 
@@ -588,7 +604,7 @@ export function createNights(env) {
     rnd = plan.r; F.plan = plan; F.typeName = TYPE_NAMES[plan.type];
     F.clock = plan.clock0; lastMin = -1; lastHr = -1; F.script = false; F.clockGlitch = 0; F.clockRateNow = 1 / plan.rate; F.holdDawn = plan.type === 'finale';
     F.nmDone = false; F.objOk = plan.type === 'poltergeist' || plan.type === 'finale'; hunter.reset(); hunter.setLevel(n + (env.RUN.objDone[n - 1] === false ? 1 : 0)); W.tvFx.set(false); W.phone.setRinging(false); proofStart(plan);
-    env.toBunk(); endStage(); gaze.clearAll(); ST.lastBeat = env.time(); ST.lastReveal = -99; ST.gap = 35 + rnd() * 20;
+    env.toBunk(); endStage(); gaze.clearAll(); if (ws) ws.reset(); ST.lastBeat = env.time(); ST.lastReveal = -99; ST.gap = 35 + rnd() * 20;
     const dialClock = clockText(F.clock);
     UI.card(dialClock, `Night ${n}`, 4.5);
     await wait(2.5); UI.fade(0, 3); await wait(2.0);
@@ -788,8 +804,8 @@ export function createNights(env) {
         W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(2.9, -3.2), 6); F.fear = Math.max(F.fear, 0.5);
         await wait(7); D.holdTv(false); W.tvFx.set(false); sfx.click();
       }, 40);
-      when(() => room() === 'living' || room() === 'dining', async () => {
-        sfx.scrape(D.pan(-1.27, 1.8)); W.moveChair(1, -0.95, 2.15, -Math.PI / 2 + 0.5); await wait(1.4); W.moveChair(0, -2.93, 2.55, Math.PI / 2 - 0.4); sfx.scrape(D.pan(-2.93, 2.2));
+      when(() => room() === 'living' || room() === 'dining' || room() === 'kitchen', async () => {   // two kitchen chairs dragged out from the table
+        sfx.scrape(D.pan(1.99, 2.08)); W.moveChair(1, 2.45, 2.4, -Math.PI / 2 + 0.5); await wait(1.4); W.moveChair(0, 0.02, 2.7, Math.PI / 2 - 0.4); sfx.scrape(D.pan(0.02, 2.7));
       }, 50);
       // every cabinet door in the kitchen at once, heard from anywhere in the house
       when(() => true, async () => {
@@ -897,5 +913,5 @@ export function createNights(env) {
   };
 
   return { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor,
-    stage: { SCARES, gaze, ST, crawlAt, photoTaken, endStage, tick: stageTick, double } };
+    stage: { SCARES, gaze, ST, crawlAt, photoTaken, endStage, tick: stageTick, double, get ws() { return ws; } } };
 }

@@ -12,6 +12,7 @@
 //        (labels, hints and when may be functions)
 import { settings } from './settings.js';
 import { input } from './input.js';
+import { PHONE } from './gfx.js';
 
 const $ = (id) => document.getElementById(id);
 const val = (v) => (typeof v === 'function' ? v() : v);
@@ -26,6 +27,7 @@ const quitApp = () => { if (window.desktop && window.desktop.quit) window.deskto
 // Restart and leaving depend on where you are: moving day is kept only once it is over, and a morning goes on to the next night
 const part = () => { const s = (H.stage && H.stage()) || 'n'; return s === 'day' ? 'day' : s[0] === 'b' ? 'morning' : 'night'; };
 const kept = () => ({ day: 'Moving day is not kept until it is over: it starts again from the beginning.', night: 'Your run is kept: you start this night again next time.', morning: `Your run is kept: you go on from night ${H.night ? H.night() : 2} next time.` }[part()]);
+const QUALITY_OPTS = [['auto', 'Auto'], ['ultra', 'Ultra'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low'], ['custom', 'Custom']];
 const KEYS = { kb: 'Up / down choose  ·  left / right change  ·  Enter select  ·  Esc back', pad: 'D-pad choose  ·  left / right change  ·  A select  ·  B back', touch: 'Tap to choose  ·  ‹ › change' };
 
 // ---------- a new game and its seed: the field starts on a random seed, and left empty it means a random one too ----------
@@ -79,11 +81,40 @@ export const MENUS = {
     { id: 'calibration', type: 'figure', label: 'Three grey squares on black, for setting the brightness', draw: calibrate },
     { id: 'fov', type: 'slider', key: 'fov', label: 'Field of view', min: 60, max: 100, step: 1, fmt: (v) => `${Math.round(v)}°` },
     { id: 'headBob', type: 'slider', key: 'headBob', label: 'Head bob', min: 0, max: 1.5, step: 0.25, hint: 'The sway of your steps while you walk. Zero holds the camera steady.' },
-    { id: 'quality', type: 'choice', key: 'quality', label: 'Graphics', options: [['auto', 'Auto'], ['ultra', 'Ultra'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low']], hint: 'Auto picks a preset for this device and steps down if it runs slowly.' },
+    { id: 'quality', type: 'choice', key: 'quality', label: 'Graphics', options: () => (PHONE ? QUALITY_OPTS.slice(0, 5) : QUALITY_OPTS), hint: 'Auto picks a preset for this device and steps down if it runs slowly. Change any setting below and it becomes Custom.' },
+    { id: 'graphics', label: 'Graphics settings', panel: 'graphics', when: () => !PHONE, hint: 'Render scale, anti-aliasing, frame rate, shadows, effects and more, one at a time.' },
     { type: 'heading', label: 'Accessibility' },
     { id: 'subtitles', type: 'toggle', key: 'subtitles', label: 'Subtitles', hint: 'The words of spoken lines. Captions and your own thoughts always show.' },
     { id: 'reduceFlashing', type: 'toggle', key: 'reduceFlashing', label: 'Reduce flashing', hint: 'Softer, slower light flicker and screen flashes. The scares stay.' },
     { id: 'defaults', label: 'Restore defaults', action: () => ask({ title: 'Restore defaults', text: 'Put every option back the way it started?', yes: 'Restore', action: () => settings.reset() }) },
+  ],
+  // the Graphics page: every setting on its own; the first group follows the preset (changing one makes it Custom), the last is yours alone
+  graphics: [
+    { id: 'g-preset', type: 'choice', key: 'quality', label: 'Preset', options: () => QUALITY_OPTS, hint: 'Auto picks for this computer. Changing anything on this page switches to Custom.' },
+    { type: 'heading', label: 'Resolution' },
+    { id: 'g-scale', type: 'slider', key: 'g_scale', label: 'Render scale', min: 0.5, max: 2, step: 0.05, hint: 'How many pixels the 3D picture is drawn with, against your screen\'s own. Above 100% is sharper and slower.' },
+    { id: 'g-aa', type: 'choice', key: 'g_aa', label: 'Anti-aliasing', options: [['off', 'Off'], ['fxaa', 'FXAA'], ['msaa2', 'MSAA 2x'], ['msaa4', 'MSAA 4x'], ['ss2', 'Supersample 2x']], hint: 'Smooths jagged edges. FXAA is cheap and a little soft; MSAA is clean on edges; Supersample draws four times the pixels and is the sharpest and slowest.' },
+    { id: 'g-cap', type: 'choice', key: 'g_cap', label: 'Frame rate cap', options: [[30, '30'], [60, '60'], [90, '90'], [120, '120'], [144, '144'], [165, '165'], [240, '240'], [0, 'Unlimited']], hint: () => `The most frames a second the game draws. A browser never goes past the display's refresh rate${H.refreshHz && H.refreshHz() ? ` (this one: ${H.refreshHz()} Hz)` : ''}, and it always waits for the display (v-sync), so Unlimited means as fast as the display allows.` },
+    { id: 'g-display', type: 'choice', key: 'g_display', label: 'Display mode', options: [['full', 'Fullscreen'], ['window', 'Windowed']], when: () => !!(window.desktop && window.desktop.toggleFullscreen), hint: 'Fullscreen or a window. F11 or Alt+Enter switches too.' },
+    { type: 'heading', label: 'Lighting' },
+    { id: 'g-shadows', type: 'choice', key: 'g_shadows', label: 'Shadows', options: [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], hint: 'Sharper, softer shadows from the sun, the moon and the lamps at higher settings. Off is much faster and much flatter.' },
+    { id: 'g-ao', type: 'choice', key: 'g_ao', label: 'Ambient occlusion', options: [['off', 'Off'], ['low', 'Low'], ['high', 'High']], hint: 'Darkens corners, creases and the gaps under furniture. One of the costlier effects.' },
+    { id: 'g-bloom', type: 'slider', key: 'g_bloom', label: 'Bloom', min: 0, max: 1, step: 0.05, fmt: (v) => (v > 0 ? `${Math.round(v * 100)}%` : 'Off'), hint: 'The glow around bright lights: lamps, the night lights, its eyes.' },
+    { type: 'heading', label: 'Effects' },
+    { id: 'g-grain', type: 'toggle', key: 'g_grain', label: 'Film grain', hint: 'A fine moving grain, heavier in the dark.' },
+    { id: 'g-ca', type: 'toggle', key: 'g_ca', label: 'Chromatic aberration', hint: 'The faint colour fringe of a cheap lens toward the corners.' },
+    { id: 'g-vignette', type: 'toggle', key: 'g_vignette', label: 'Vignette', hint: 'Darkens the edges of the picture.' },
+    { id: 'g-mblur', type: 'toggle', key: 'g_mblur', label: 'Motion blur', hint: 'A smear when you turn quickly. Some players find it uncomfortable.' },
+    { type: 'heading', label: 'Detail' },
+    { id: 'g-tex', type: 'choice', key: 'g_tex', label: 'Texture filtering', options: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], hint: 'How sharp floors and walls stay seen at a slant (2x, 4x or 16x anisotropic).' },
+    { id: 'g-grass', type: 'choice', key: 'g_grass', label: 'Grass density', options: [['off', 'Off'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], hint: 'The blades of the lawn. Off leaves only the ground; the yard is the heaviest thing in the game.' },
+    { id: 'g-draw', type: 'choice', key: 'g_draw', label: 'Draw distance', options: [['near', 'Near'], ['medium', 'Medium'], ['far', 'Far']], hint: 'How far you can see across the fields before the fog closes in.' },
+    { id: 'g-weather', type: 'choice', key: 'g_weather', label: 'Weather effects', options: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High']], hint: 'How many raindrops fall on wet nights.' },
+    { type: 'heading', label: 'Picture' },
+    { id: 'g-contrast', type: 'slider', key: 'g_contrast', label: 'Contrast', min: 0.8, max: 1.3, step: 0.05, fmt: (v) => `${Math.round(v * 100)}%`, hint: 'Brightness is under Options. Contrast and gamma need post-processing, so setting them on Low turns it on.' },
+    { id: 'g-gamma', type: 'slider', key: 'g_gamma', label: 'Gamma', min: 0.7, max: 1.4, step: 0.05, fmt: (v) => v.toFixed(2), hint: 'Lifts or deepens the mid-tones without moving black or white.' },
+    { id: 'g-cine', type: 'toggle', key: 'g_cine', label: 'Cinematic cutscenes', hint: 'When the family talks: depth of field on whoever speaks, a light on their face, sharper shadows, a film curve and a widescreen letterbox. Off also takes its three face lights out of the scene, a little faster everywhere.' },
+    { id: 'g-counter', type: 'toggle', key: 'g_counter', label: 'Show frame rate', hint: 'A small frames-per-second counter in the corner.' },
   ],
   newgame: [
     { id: 'seed', type: 'code', label: 'Seed', placeholder: 'Random', get: () => SEED.v, set: (v) => { SEED.v = seedCode(v); },
@@ -106,12 +137,13 @@ const CREDITS = `<dl class="credits">
 <dt>Fonts</dt><dd>Special Elite (Astigmatic) and Permanent Marker (Font Diner), Apache License 2.0. Courier Prime (Alan Dague-Greene) and Gloria Hallelujah (Kimberly Geswein), SIL Open Font License 1.1.</dd>
 <dt>Voices, music and sound effects</dt><dd>Generated with ElevenLabs (the night's brown noise is made with ffmpeg).</dd>
 <dt>Surfaces, models and sky</dt><dd>Poly Haven and ambientCG, CC0.</dd>
-<dt>Furniture, fixtures, the grandfather clock, the cars and the truck, the mailbox and the cans, the barn, the trees and the shrubs</dt><dd>Sketchfab models, CC BY 4.0, by Blender3D, maestronoov, whitend.3d, longtail, hippostance, goldie, glowbox3d, justincrazyeyes, jonestudio, MadeByYeshe, felixawani, nokillnando, LtxxwSibeRia, mtcollings, maxdragon, mozillareality, nickhavas, denniswoo1993, DanielZhabotinsky, AndreyUEDev, andrewriddle, lolipop_1707, yanix and MaX3Dd (each model is listed in CREDITS.md).</dd>
-<dt>Photographs in the frames</dt><dd>Public domain, via Wikimedia Commons: Arthur Rothstein (Family in a wagon, Lee County, Mississippi, 1935), Russell Lee (the England family reunion, NARA 540764), US National Park Service (Mount Rainier and lake reflection), Gorgo (Moraine Lake), NYPL (Sailing at Sunset, New Dorp Beach), Mount Rainier National Park (wildflowers).</dd>
+<dt>Furniture, fixtures, the grandfather clock, the cars and the truck, the mailbox and the cans, the barn, the trees and the shrubs, your arms</dt><dd>Sketchfab models, CC BY 4.0, by Blender3D, maestronoov, whitend.3d, longtail, hippostance, goldie, glowbox3d, justincrazyeyes, jonestudio, MadeByYeshe, felixawani, nokillnando, LtxxwSibeRia, mtcollings, maxdragon, mozillareality, nickhavas, denniswoo1993, DanielZhabotinsky, AndreyUEDev, andrewriddle, lolipop_1707, yanix, MaX3Dd, lena-wachs and mrgyarmati (each model is listed in CREDITS.md).</dd>
+<dt>Photographs in the frames</dt><dd>Public domain, via Wikimedia Commons and the Library of Congress: Russell Lee, Dorothea Lange, Arthur Rothstein and David Myers (Farm Security Administration family photographs), Bain News Service (a family group at Broad Channel; a Dutch family at Ellis Island), Arthur Rothstein (Family in a wagon, Lee County, Mississippi, 1935), Russell Lee (the England family reunion, NARA 540764), US National Park Service (Mount Rainier and lake reflection), Gorgo (Moraine Lake), NYPL (Sailing at Sunset, New Dorp Beach), Mount Rainier National Park (wildflowers).</dd>
 </dl><p class="note">The full license texts ship with the game: vendor/three/LICENSE, assets/models/LICENSE-Rocketbox.md, assets/fonts/LICENSE-fonts.md.</p>`;
 
 export const PANELS = {
   options: { title: 'Options', list: 'options' },
+  graphics: { title: 'Graphics', list: 'graphics' },
   credits: { title: 'Credits', html: CREDITS, list: 'credits' },
   controls: { title: 'Controls', list: 'controls', render: (body) => { const t = $('controls'); if (t) { t.dataset.adopted = '1'; body.appendChild(t); } } },
   newgame: { title: 'New game', list: 'newgame', focus: 1 },
@@ -148,13 +180,13 @@ function show(e, el) {   // a row's current value
   const v = settings.get(e.key), out = el.querySelector('output');
   if (e.type === 'slider') { const r = el.querySelector('input'); r.value = v; out.textContent = (e.fmt || pct)(v); r.setAttribute('aria-valuetext', out.textContent); }
   else if (e.type === 'toggle') { out.textContent = v ? 'On' : 'Off'; el.classList.toggle('on', !!v); el.setAttribute('aria-checked', String(!!v)); }
-  else if (e.type === 'choice') { const o = (e.options || []).find(([k]) => k === v); out.textContent = o ? o[1] : String(v); }
+  else if (e.type === 'choice') { const o = (val(e.options) || []).find(([k]) => k === v); out.textContent = o ? o[1] : String(v); }
 }
 function adjust(e, d, wrap = false) {
   if (e.type === 'slider') { const v = settings.get(e.key), n = Math.round((v + d * e.step) / e.step) * e.step; settings.set(e.key, +Math.min(e.max, Math.max(e.min, n)).toFixed(4)); }
   else if (e.type === 'toggle') settings.set(e.key, !settings.get(e.key));
   else if (e.type === 'choice') {
-    const ks = e.options.map(([k]) => k); let i = ks.indexOf(settings.get(e.key)) + d;
+    const ks = val(e.options).map(([k]) => k); let i = ks.indexOf(settings.get(e.key)) + d;
     i = wrap ? (i + ks.length) % ks.length : Math.max(0, Math.min(ks.length - 1, i)); settings.set(e.key, ks[i]);
   }
 }

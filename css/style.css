@@ -70,6 +70,8 @@ button:hover { background: rgba(233,226,208,0.08); }
 /* the loading screen: opacity and transform animations only, which the browser runs off the main thread, so nothing on it ever stops */
 #loading { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000; color: var(--dim); transition: opacity 0.8s; padding: 16px; box-sizing: border-box; text-align: center; }
 #loading.done { opacity: 0; pointer-events: none; }
+#fps { position: fixed; top: 8px; right: 10px; z-index: 60; font: 12px/1 "Courier Prime", monospace; color: #9fd28c; background: rgba(0,0,0,0.45); padding: 3px 6px; border-radius: 3px; pointer-events: none; }
+#fps[hidden] { display: none; }
 #loading .ld-draw { width: min(320px, 70vw); animation: ld-flicker 7s steps(1) infinite; will-change: opacity; }
 #loading .ld-draw svg { width: 100%; height: auto; display: block; }
 #loading .ld-thing, #loading .ld-eyes { animation: ld-there 11s ease-in-out infinite; will-change: opacity; }

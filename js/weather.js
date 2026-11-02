@@ -79,6 +79,7 @@ export function createWeather(scene, camera, W, sfx) {
     set(kind) { if (!S.locked) applyKind(kind); },
     lock(kind) { S.locked = kind; applyKind(kind); },
     unlock() { S.locked = null; },
+    density(k) { geo.setDrawRange(0, Math.max(0, Math.round(N * k)) * 2); },   // how many of the streaks fall (the Graphics page)
     jump() { S.k = S.goal; S.wetK = S.wetGoal; },   // no fade-in (a phase change behind a black screen)
     // one flash now: a few bursts over half a second, the thunder `delay` seconds behind it
     flash(delay = 0.8 + Math.random() * 3.2, gain = 1) {

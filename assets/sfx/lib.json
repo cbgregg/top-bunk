@@ -1,0 +1,883 @@
+{
+ "creak": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/creak_01.mp3",
+   "assets/sfx/lib/creak_02.mp3",
+   "assets/sfx/lib/creak_03.mp3",
+   "assets/sfx/lib/creak_04.mp3",
+   "assets/sfx/lib/creak_05.mp3",
+   "assets/sfx/lib/creak_06.mp3",
+   "assets/sfx/lib/creak_07.mp3",
+   "assets/sfx/lib/creak_08.mp3",
+   "assets/sfx/lib/creak_09.mp3",
+   "assets/sfx/lib/creak_10.mp3",
+   "assets/sfx/lib/creak_11.mp3",
+   "assets/sfx/lib/creak_12.mp3",
+   "assets/sfx/lib/creak_13.mp3",
+   "assets/sfx/lib/creak_14.mp3",
+   "assets/sfx/lib/creak_15.mp3",
+   "assets/sfx/lib/creak_16.mp3",
+   "assets/sfx/lib/creak_17.mp3",
+   "assets/sfx/lib/creak_18.mp3"
+  ]
+ },
+ "creak_heavy": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/creak_heavy_01.mp3",
+   "assets/sfx/lib/creak_heavy_02.mp3",
+   "assets/sfx/lib/creak_heavy_03.mp3",
+   "assets/sfx/lib/creak_heavy_04.mp3",
+   "assets/sfx/lib/creak_heavy_05.mp3",
+   "assets/sfx/lib/creak_heavy_06.mp3",
+   "assets/sfx/lib/creak_heavy_07.mp3",
+   "assets/sfx/lib/creak_heavy_08.mp3"
+  ]
+ },
+ "door_creak": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/door_creak_01.mp3",
+   "assets/sfx/lib/door_creak_02.mp3",
+   "assets/sfx/lib/door_creak_03.mp3",
+   "assets/sfx/lib/door_creak_04.mp3",
+   "assets/sfx/lib/door_creak_05.mp3",
+   "assets/sfx/lib/door_creak_06.mp3",
+   "assets/sfx/lib/door_creak_07.mp3",
+   "assets/sfx/lib/door_creak_08.mp3",
+   "assets/sfx/lib/door_creak_09.mp3"
+  ]
+ },
+ "door_open": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/door_open_01.mp3",
+   "assets/sfx/lib/door_open_02.mp3",
+   "assets/sfx/lib/door_open_03.mp3",
+   "assets/sfx/lib/door_open_04.mp3",
+   "assets/sfx/lib/door_open_05.mp3",
+   "assets/sfx/lib/door_open_06.mp3",
+   "assets/sfx/lib/door_open_07.mp3"
+  ]
+ },
+ "door_close": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/door_close_01.mp3",
+   "assets/sfx/lib/door_close_02.mp3",
+   "assets/sfx/lib/door_close_03.mp3"
+  ]
+ },
+ "door_slam": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/door_slam_01.mp3",
+   "assets/sfx/lib/door_slam_02.mp3",
+   "assets/sfx/lib/door_slam_03.mp3"
+  ]
+ },
+ "door_lock": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/door_lock_01.mp3",
+   "assets/sfx/lib/door_lock_02.mp3"
+  ]
+ },
+ "knock": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/knock_01.mp3",
+   "assets/sfx/lib/knock_02.mp3",
+   "assets/sfx/lib/knock_03.mp3",
+   "assets/sfx/lib/knock_04.mp3",
+   "assets/sfx/lib/knock_05.mp3",
+   "assets/sfx/lib/knock_06.mp3",
+   "assets/sfx/lib/knock_07.mp3"
+  ]
+ },
+ "cabinet": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/cabinet_01.mp3",
+   "assets/sfx/lib/cabinet_02.mp3",
+   "assets/sfx/lib/cabinet_03.mp3",
+   "assets/sfx/lib/cabinet_04.mp3",
+   "assets/sfx/lib/cabinet_05.mp3",
+   "assets/sfx/lib/cabinet_06.mp3",
+   "assets/sfx/lib/cabinet_07.mp3",
+   "assets/sfx/lib/cabinet_08.mp3"
+  ]
+ },
+ "drawer": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/drawer_01.mp3",
+   "assets/sfx/lib/drawer_02.mp3",
+   "assets/sfx/lib/drawer_03.mp3",
+   "assets/sfx/lib/drawer_04.mp3",
+   "assets/sfx/lib/drawer_05.mp3",
+   "assets/sfx/lib/drawer_06.mp3"
+  ]
+ },
+ "switch": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/switch_01.mp3",
+   "assets/sfx/lib/switch_02.mp3",
+   "assets/sfx/lib/switch_03.mp3",
+   "assets/sfx/lib/switch_04.mp3",
+   "assets/sfx/lib/switch_05.mp3",
+   "assets/sfx/lib/switch_06.mp3",
+   "assets/sfx/lib/switch_07.mp3",
+   "assets/sfx/lib/switch_08.mp3"
+  ]
+ },
+ "breaker": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/breaker_01.mp3",
+   "assets/sfx/lib/breaker_02.mp3",
+   "assets/sfx/lib/breaker_03.mp3",
+   "assets/sfx/lib/breaker_04.mp3",
+   "assets/sfx/lib/breaker_05.mp3",
+   "assets/sfx/lib/breaker_06.mp3",
+   "assets/sfx/lib/breaker_07.mp3"
+  ]
+ },
+ "fridge_door": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/fridge_door_01.mp3",
+   "assets/sfx/lib/fridge_door_02.mp3",
+   "assets/sfx/lib/fridge_door_03.mp3",
+   "assets/sfx/lib/fridge_door_04.mp3"
+  ]
+ },
+ "washer_lid": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/washer_lid_01.mp3",
+   "assets/sfx/lib/washer_lid_02.mp3",
+   "assets/sfx/lib/washer_lid_03.mp3",
+   "assets/sfx/lib/washer_lid_04.mp3"
+  ]
+ },
+ "metal_tap": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/metal_tap_01.mp3",
+   "assets/sfx/lib/metal_tap_02.mp3",
+   "assets/sfx/lib/metal_tap_03.mp3",
+   "assets/sfx/lib/metal_tap_04.mp3",
+   "assets/sfx/lib/metal_tap_05.mp3"
+  ]
+ },
+ "chair_scrape": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/chair_scrape_01.mp3",
+   "assets/sfx/lib/chair_scrape_02.mp3",
+   "assets/sfx/lib/chair_scrape_03.mp3",
+   "assets/sfx/lib/chair_scrape_04.mp3",
+   "assets/sfx/lib/chair_scrape_05.mp3",
+   "assets/sfx/lib/chair_scrape_06.mp3",
+   "assets/sfx/lib/chair_scrape_07.mp3"
+  ]
+ },
+ "toy_squeak": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/toy_squeak_01.mp3",
+   "assets/sfx/lib/toy_squeak_02.mp3",
+   "assets/sfx/lib/toy_squeak_03.mp3",
+   "assets/sfx/lib/toy_squeak_04.mp3",
+   "assets/sfx/lib/toy_squeak_05.mp3"
+  ]
+ },
+ "crayon": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/crayon_01.mp3",
+   "assets/sfx/lib/crayon_02.mp3",
+   "assets/sfx/lib/crayon_03.mp3",
+   "assets/sfx/lib/crayon_04.mp3",
+   "assets/sfx/lib/crayon_05.mp3",
+   "assets/sfx/lib/crayon_06.mp3",
+   "assets/sfx/lib/crayon_07.mp3"
+  ]
+ },
+ "page_turn": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/page_turn_01.mp3",
+   "assets/sfx/lib/page_turn_02.mp3",
+   "assets/sfx/lib/page_turn_03.mp3",
+   "assets/sfx/lib/page_turn_04.mp3",
+   "assets/sfx/lib/page_turn_05.mp3",
+   "assets/sfx/lib/page_turn_06.mp3",
+   "assets/sfx/lib/page_turn_07.mp3"
+  ]
+ },
+ "paper_tear": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/paper_tear_01.mp3",
+   "assets/sfx/lib/paper_tear_02.mp3",
+   "assets/sfx/lib/paper_tear_03.mp3"
+  ]
+ },
+ "cloth": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/cloth_01.mp3",
+   "assets/sfx/lib/cloth_02.mp3",
+   "assets/sfx/lib/cloth_03.mp3",
+   "assets/sfx/lib/cloth_04.mp3",
+   "assets/sfx/lib/cloth_05.mp3"
+  ]
+ },
+ "cloth_tear": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/cloth_tear_01.mp3",
+   "assets/sfx/lib/cloth_tear_02.mp3",
+   "assets/sfx/lib/cloth_tear_03.mp3",
+   "assets/sfx/lib/cloth_tear_04.mp3"
+  ]
+ },
+ "match": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/match_01.mp3",
+   "assets/sfx/lib/match_02.mp3",
+   "assets/sfx/lib/match_03.mp3"
+  ]
+ },
+ "clock_strike": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/clock_strike_01.mp3",
+   "assets/sfx/lib/clock_strike_02.mp3",
+   "assets/sfx/lib/clock_strike_03.mp3"
+  ]
+ },
+ "clock_gear": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/clock_gear_01.mp3",
+   "assets/sfx/lib/clock_gear_02.mp3"
+  ]
+ },
+ "drip": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/drip_01.mp3",
+   "assets/sfx/lib/drip_02.mp3",
+   "assets/sfx/lib/drip_03.mp3",
+   "assets/sfx/lib/drip_04.mp3",
+   "assets/sfx/lib/drip_05.mp3",
+   "assets/sfx/lib/drip_06.mp3",
+   "assets/sfx/lib/drip_07.mp3",
+   "assets/sfx/lib/drip_08.mp3",
+   "assets/sfx/lib/drip_09.mp3",
+   "assets/sfx/lib/drip_10.mp3",
+   "assets/sfx/lib/drip_11.mp3",
+   "assets/sfx/lib/drip_12.mp3",
+   "assets/sfx/lib/drip_13.mp3",
+   "assets/sfx/lib/drip_14.mp3"
+  ]
+ },
+ "phone_ring": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/phone_ring_01.mp3",
+   "assets/sfx/lib/phone_ring_02.mp3",
+   "assets/sfx/lib/phone_ring_03.mp3",
+   "assets/sfx/lib/phone_ring_04.mp3",
+   "assets/sfx/lib/phone_ring_05.mp3"
+  ]
+ },
+ "phone_hangup": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/phone_hangup_01.mp3",
+   "assets/sfx/lib/phone_hangup_02.mp3"
+  ]
+ },
+ "dial_tone": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/dial_tone_01.mp3"
+  ]
+ },
+ "busy_tone": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/busy_tone_01.mp3"
+  ]
+ },
+ "crt_off": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/crt_off_01.mp3",
+   "assets/sfx/lib/crt_off_02.mp3",
+   "assets/sfx/lib/crt_off_03.mp3",
+   "assets/sfx/lib/crt_off_04.mp3"
+  ]
+ },
+ "zap": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/zap_01.mp3"
+  ]
+ },
+ "radio_static": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/radio_static_01.mp3",
+   "assets/sfx/lib/radio_static_02.mp3",
+   "assets/sfx/lib/radio_static_03.mp3",
+   "assets/sfx/lib/radio_static_04.mp3"
+  ]
+ },
+ "radio_tune": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/radio_tune_01.mp3",
+   "assets/sfx/lib/radio_tune_02.mp3"
+  ]
+ },
+ "shutter": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/shutter_01.mp3",
+   "assets/sfx/lib/shutter_02.mp3",
+   "assets/sfx/lib/shutter_03.mp3"
+  ]
+ },
+ "winder": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/winder_01.mp3",
+   "assets/sfx/lib/winder_02.mp3",
+   "assets/sfx/lib/winder_03.mp3",
+   "assets/sfx/lib/winder_04.mp3"
+  ]
+ },
+ "step_wood": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_wood_01.mp3",
+   "assets/sfx/lib/step_wood_02.mp3",
+   "assets/sfx/lib/step_wood_03.mp3",
+   "assets/sfx/lib/step_wood_04.mp3",
+   "assets/sfx/lib/step_wood_05.mp3",
+   "assets/sfx/lib/step_wood_06.mp3",
+   "assets/sfx/lib/step_wood_07.mp3",
+   "assets/sfx/lib/step_wood_08.mp3",
+   "assets/sfx/lib/step_wood_09.mp3",
+   "assets/sfx/lib/step_wood_10.mp3",
+   "assets/sfx/lib/step_wood_11.mp3",
+   "assets/sfx/lib/step_wood_12.mp3",
+   "assets/sfx/lib/step_wood_13.mp3",
+   "assets/sfx/lib/step_wood_14.mp3",
+   "assets/sfx/lib/step_wood_15.mp3",
+   "assets/sfx/lib/step_wood_16.mp3",
+   "assets/sfx/lib/step_wood_17.mp3",
+   "assets/sfx/lib/step_wood_18.mp3",
+   "assets/sfx/lib/step_wood_19.mp3",
+   "assets/sfx/lib/step_wood_20.mp3",
+   "assets/sfx/lib/step_wood_21.mp3",
+   "assets/sfx/lib/step_wood_22.mp3"
+  ]
+ },
+ "step_carpet": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_carpet_01.mp3",
+   "assets/sfx/lib/step_carpet_02.mp3",
+   "assets/sfx/lib/step_carpet_03.mp3",
+   "assets/sfx/lib/step_carpet_04.mp3",
+   "assets/sfx/lib/step_carpet_05.mp3",
+   "assets/sfx/lib/step_carpet_06.mp3",
+   "assets/sfx/lib/step_carpet_07.mp3",
+   "assets/sfx/lib/step_carpet_08.mp3",
+   "assets/sfx/lib/step_carpet_09.mp3",
+   "assets/sfx/lib/step_carpet_10.mp3",
+   "assets/sfx/lib/step_carpet_11.mp3",
+   "assets/sfx/lib/step_carpet_12.mp3",
+   "assets/sfx/lib/step_carpet_13.mp3",
+   "assets/sfx/lib/step_carpet_14.mp3",
+   "assets/sfx/lib/step_carpet_15.mp3",
+   "assets/sfx/lib/step_carpet_16.mp3",
+   "assets/sfx/lib/step_carpet_17.mp3",
+   "assets/sfx/lib/step_carpet_18.mp3"
+  ]
+ },
+ "step_tile": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_tile_01.mp3",
+   "assets/sfx/lib/step_tile_02.mp3",
+   "assets/sfx/lib/step_tile_03.mp3",
+   "assets/sfx/lib/step_tile_04.mp3",
+   "assets/sfx/lib/step_tile_05.mp3",
+   "assets/sfx/lib/step_tile_06.mp3",
+   "assets/sfx/lib/step_tile_07.mp3",
+   "assets/sfx/lib/step_tile_08.mp3",
+   "assets/sfx/lib/step_tile_09.mp3",
+   "assets/sfx/lib/step_tile_10.mp3",
+   "assets/sfx/lib/step_tile_11.mp3"
+  ]
+ },
+ "step_gravel": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_gravel_01.mp3",
+   "assets/sfx/lib/step_gravel_02.mp3",
+   "assets/sfx/lib/step_gravel_03.mp3",
+   "assets/sfx/lib/step_gravel_04.mp3",
+   "assets/sfx/lib/step_gravel_05.mp3",
+   "assets/sfx/lib/step_gravel_06.mp3",
+   "assets/sfx/lib/step_gravel_07.mp3",
+   "assets/sfx/lib/step_gravel_08.mp3",
+   "assets/sfx/lib/step_gravel_09.mp3",
+   "assets/sfx/lib/step_gravel_10.mp3",
+   "assets/sfx/lib/step_gravel_11.mp3",
+   "assets/sfx/lib/step_gravel_12.mp3",
+   "assets/sfx/lib/step_gravel_13.mp3",
+   "assets/sfx/lib/step_gravel_14.mp3",
+   "assets/sfx/lib/step_gravel_15.mp3",
+   "assets/sfx/lib/step_gravel_16.mp3",
+   "assets/sfx/lib/step_gravel_17.mp3",
+   "assets/sfx/lib/step_gravel_18.mp3"
+  ]
+ },
+ "step_grass": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_grass_01.mp3",
+   "assets/sfx/lib/step_grass_02.mp3",
+   "assets/sfx/lib/step_grass_03.mp3",
+   "assets/sfx/lib/step_grass_04.mp3",
+   "assets/sfx/lib/step_grass_05.mp3",
+   "assets/sfx/lib/step_grass_06.mp3",
+   "assets/sfx/lib/step_grass_07.mp3",
+   "assets/sfx/lib/step_grass_08.mp3",
+   "assets/sfx/lib/step_grass_09.mp3",
+   "assets/sfx/lib/step_grass_10.mp3",
+   "assets/sfx/lib/step_grass_11.mp3",
+   "assets/sfx/lib/step_grass_12.mp3",
+   "assets/sfx/lib/step_grass_13.mp3",
+   "assets/sfx/lib/step_grass_14.mp3",
+   "assets/sfx/lib/step_grass_15.mp3",
+   "assets/sfx/lib/step_grass_16.mp3"
+  ]
+ },
+ "step_stairs": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_stairs_01.mp3",
+   "assets/sfx/lib/step_stairs_02.mp3",
+   "assets/sfx/lib/step_stairs_03.mp3",
+   "assets/sfx/lib/step_stairs_04.mp3",
+   "assets/sfx/lib/step_stairs_05.mp3",
+   "assets/sfx/lib/step_stairs_06.mp3",
+   "assets/sfx/lib/step_stairs_07.mp3",
+   "assets/sfx/lib/step_stairs_08.mp3",
+   "assets/sfx/lib/step_stairs_09.mp3",
+   "assets/sfx/lib/step_stairs_10.mp3",
+   "assets/sfx/lib/step_stairs_11.mp3",
+   "assets/sfx/lib/step_stairs_12.mp3",
+   "assets/sfx/lib/step_stairs_13.mp3",
+   "assets/sfx/lib/step_stairs_14.mp3",
+   "assets/sfx/lib/step_stairs_15.mp3"
+  ]
+ },
+ "step_heavy": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/step_heavy_01.mp3",
+   "assets/sfx/lib/step_heavy_02.mp3",
+   "assets/sfx/lib/step_heavy_03.mp3",
+   "assets/sfx/lib/step_heavy_04.mp3",
+   "assets/sfx/lib/step_heavy_05.mp3",
+   "assets/sfx/lib/step_heavy_06.mp3",
+   "assets/sfx/lib/step_heavy_07.mp3",
+   "assets/sfx/lib/step_heavy_08.mp3"
+  ]
+ },
+ "breath": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/breath_01.mp3",
+   "assets/sfx/lib/breath_02.mp3",
+   "assets/sfx/lib/breath_03.mp3",
+   "assets/sfx/lib/breath_04.mp3",
+   "assets/sfx/lib/breath_05.mp3",
+   "assets/sfx/lib/breath_06.mp3",
+   "assets/sfx/lib/breath_07.mp3",
+   "assets/sfx/lib/breath_08.mp3",
+   "assets/sfx/lib/breath_09.mp3",
+   "assets/sfx/lib/breath_10.mp3"
+  ]
+ },
+ "heartbeat": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/heartbeat_01.mp3",
+   "assets/sfx/lib/heartbeat_02.mp3",
+   "assets/sfx/lib/heartbeat_03.mp3",
+   "assets/sfx/lib/heartbeat_04.mp3",
+   "assets/sfx/lib/heartbeat_05.mp3",
+   "assets/sfx/lib/heartbeat_06.mp3",
+   "assets/sfx/lib/heartbeat_07.mp3",
+   "assets/sfx/lib/heartbeat_08.mp3"
+  ]
+ },
+ "whisper": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/whisper_01.mp3",
+   "assets/sfx/lib/whisper_02.mp3",
+   "assets/sfx/lib/whisper_03.mp3",
+   "assets/sfx/lib/whisper_04.mp3",
+   "assets/sfx/lib/whisper_05.mp3",
+   "assets/sfx/lib/whisper_06.mp3",
+   "assets/sfx/lib/whisper_07.mp3",
+   "assets/sfx/lib/whisper_08.mp3",
+   "assets/sfx/lib/whisper_09.mp3",
+   "assets/sfx/lib/whisper_10.mp3",
+   "assets/sfx/lib/whisper_11.mp3",
+   "assets/sfx/lib/whisper_12.mp3"
+  ]
+ },
+ "bone_crack": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/bone_crack_01.mp3",
+   "assets/sfx/lib/bone_crack_02.mp3",
+   "assets/sfx/lib/bone_crack_03.mp3",
+   "assets/sfx/lib/bone_crack_04.mp3",
+   "assets/sfx/lib/bone_crack_05.mp3",
+   "assets/sfx/lib/bone_crack_06.mp3",
+   "assets/sfx/lib/bone_crack_07.mp3",
+   "assets/sfx/lib/bone_crack_08.mp3",
+   "assets/sfx/lib/bone_crack_09.mp3",
+   "assets/sfx/lib/bone_crack_10.mp3",
+   "assets/sfx/lib/bone_crack_11.mp3",
+   "assets/sfx/lib/bone_crack_12.mp3",
+   "assets/sfx/lib/bone_crack_13.mp3",
+   "assets/sfx/lib/bone_crack_14.mp3"
+  ]
+ },
+ "wet_click": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/wet_click_01.mp3",
+   "assets/sfx/lib/wet_click_02.mp3",
+   "assets/sfx/lib/wet_click_03.mp3",
+   "assets/sfx/lib/wet_click_04.mp3",
+   "assets/sfx/lib/wet_click_05.mp3",
+   "assets/sfx/lib/wet_click_06.mp3"
+  ]
+ },
+ "wall_knock": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/wall_knock_01.mp3",
+   "assets/sfx/lib/wall_knock_02.mp3",
+   "assets/sfx/lib/wall_knock_03.mp3",
+   "assets/sfx/lib/wall_knock_04.mp3",
+   "assets/sfx/lib/wall_knock_05.mp3",
+   "assets/sfx/lib/wall_knock_06.mp3"
+  ]
+ },
+ "wall_scratch": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/wall_scratch_01.mp3",
+   "assets/sfx/lib/wall_scratch_02.mp3"
+  ]
+ },
+ "crawl": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/crawl_01.mp3",
+   "assets/sfx/lib/crawl_02.mp3",
+   "assets/sfx/lib/crawl_03.mp3"
+  ]
+ },
+ "drag": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/drag_01.mp3",
+   "assets/sfx/lib/drag_02.mp3"
+  ]
+ },
+ "bowed_metal": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/bowed_metal_01.mp3",
+   "assets/sfx/lib/bowed_metal_02.mp3"
+  ]
+ },
+ "sub_rumble": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/sub_rumble_01.mp3",
+   "assets/sfx/lib/sub_rumble_02.mp3"
+  ]
+ },
+ "thunder": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/thunder_01.mp3",
+   "assets/sfx/lib/thunder_02.mp3",
+   "assets/sfx/lib/thunder_03.mp3",
+   "assets/sfx/lib/thunder_04.mp3",
+   "assets/sfx/lib/thunder_05.mp3",
+   "assets/sfx/lib/thunder_06.mp3",
+   "assets/sfx/lib/thunder_07.mp3",
+   "assets/sfx/lib/thunder_08.mp3",
+   "assets/sfx/lib/thunder_09.mp3"
+  ]
+ },
+ "car_pass": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/car_pass_01.mp3",
+   "assets/sfx/lib/car_pass_02.mp3",
+   "assets/sfx/lib/car_pass_03.mp3",
+   "assets/sfx/lib/car_pass_04.mp3",
+   "assets/sfx/lib/car_pass_05.mp3",
+   "assets/sfx/lib/car_pass_06.mp3",
+   "assets/sfx/lib/car_pass_07.mp3"
+  ]
+ },
+ "dog_far": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/dog_far_01.mp3",
+   "assets/sfx/lib/dog_far_02.mp3",
+   "assets/sfx/lib/dog_far_03.mp3"
+  ]
+ },
+ "owl": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/owl_01.mp3",
+   "assets/sfx/lib/owl_02.mp3",
+   "assets/sfx/lib/owl_03.mp3",
+   "assets/sfx/lib/owl_04.mp3"
+  ]
+ },
+ "bed_house": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_house_01.mp3"
+  ]
+ },
+ "bed_fridge": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_fridge_01.mp3"
+  ]
+ },
+ "bed_heater": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_heater_01.mp3"
+  ]
+ },
+ "bed_vent": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_vent_01.mp3"
+  ]
+ },
+ "bed_drip": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_drip_01.mp3"
+  ]
+ },
+ "bed_tick": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_tick_01.mp3"
+  ]
+ },
+ "bed_wind_in": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_wind_in_01.mp3"
+  ]
+ },
+ "bed_storm_in": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_storm_in_01.mp3"
+  ]
+ },
+ "bed_rain": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_rain_01.mp3"
+  ]
+ },
+ "bed_rain_glass": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_rain_glass_01.mp3"
+  ]
+ },
+ "bed_night": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_night_01.mp3"
+  ]
+ },
+ "bed_crickets": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_crickets_01.mp3"
+  ]
+ },
+ "bed_road": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_road_01.mp3"
+  ]
+ },
+ "bed_buzz": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_buzz_01.mp3"
+  ]
+ },
+ "bed_chimes": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_chimes_01.mp3"
+  ]
+ },
+ "bed_snore": {
+  "kind": "noise",
+  "loop": true,
+  "files": [
+   "assets/sfx/lib/bed_snore_01.mp3"
+  ]
+ },
+ "clock_tick": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/clock_tick_01.mp3",
+   "assets/sfx/lib/clock_tick_02.mp3",
+   "assets/sfx/lib/clock_tick_03.mp3",
+   "assets/sfx/lib/clock_tick_04.mp3",
+   "assets/sfx/lib/clock_tick_05.mp3",
+   "assets/sfx/lib/clock_tick_06.mp3",
+   "assets/sfx/lib/clock_tick_07.mp3",
+   "assets/sfx/lib/clock_tick_08.mp3",
+   "assets/sfx/lib/clock_tick_09.mp3",
+   "assets/sfx/lib/clock_tick_10.mp3",
+   "assets/sfx/lib/clock_tick_11.mp3",
+   "assets/sfx/lib/clock_tick_12.mp3",
+   "assets/sfx/lib/clock_tick_13.mp3",
+   "assets/sfx/lib/clock_tick_14.mp3"
+  ]
+ },
+ "clock_works": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/clock_works_01.mp3",
+   "assets/sfx/lib/clock_works_02.mp3",
+   "assets/sfx/lib/clock_works_03.mp3"
+  ]
+ },
+ "metal_swell": {
+  "kind": "sfx",
+  "loop": false,
+  "files": [
+   "assets/sfx/lib/metal_swell_01.mp3",
+   "assets/sfx/lib/metal_swell_02.mp3"
+  ]
+ }
+}

@@ -8,8 +8,8 @@ export const NODES = {
   r2In: [5.42, -1.64], r2Alc: [5.67, -2.26], r2Mid: [6.42, -2.76], r2Closet: [6.76, -2.32],
   sIn: [10.46, -1.7], sMid: [10.01, -2.71], sClos: [10.46, -3.38],
   livMouth: [4.33, -0.42], livE: [3.44, -0.96], livC: [1.98, -0.9], livW: [0.41, -0.96], livMid: [-0.93, -1.02], livFar: [-1.72, -0.66], livDoor: [3.1, -3.38], livTV: [3.21, -2.37],
-  archN: [2.88, -0.36], archS: [2.88, 1.03], kit2: [1.53, 1.64], kit3: [1.42, 2.99], kit4: [3.21, 2.76],
-  dinN: [-2.05, 0.75], dinS: [-2.11, 1.25], dinW: [-2.33, 2.76], backIn: [-1.83, 4.11],
+  archN: [2.88, -0.36], archS: [2.88, 1.03], kit2: [2.75, 1.9], kit3: [1.9, 3.45], kit4: [3.21, 2.76],
+  dinN: [-2.05, 0.75], dinS: [-2.11, 1.25], dinW: [-1.55, 2.8], backIn: [-1.83, 4.11],
   // Mom and Dad's room, through the barn door: inside the door, the middle, the foot of the bed, by the dresser, the closet, the far end
   pIn: [-3.4, 1.14], pMid: [-4.63, 0.75], pFoot: [-5.19, -0.42], pDress: [-5.41, -2.71], pClos: [-4.07, -2.26], pFar: [-5.19, 3.21],
   // out the back door, down the outside stairs to the laundry, and round the west end of the house to the garage

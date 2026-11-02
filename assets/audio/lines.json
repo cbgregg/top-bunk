@@ -26,23 +26,23 @@
  },
  "mom/boxes_first": {
   "voice": "mom",
-  "say": "Not yet, sweetheart... I'm hunting for the kettle. Boxes first, okay? Then you can show me your room.",
-  "html": "<b>Mom:</b> Not yet, sweetheart, I'm hunting for the kettle. Boxes first, and then you can show me your room."
+  "say": "Hey, bud. Not yet... I'm elbow-deep in newspaper looking for the kettle. Boxes first. Then you can give me the tour.",
+  "html": "<b>Mom:</b> Hey, bud. Not yet, I'm elbow-deep in newspaper looking for the kettle. Boxes first. Then you can give me the tour."
  },
  "mom/boxes_again": {
   "voice": "mom",
-  "say": "Hm. I can hear you not carrying boxes. Go on... three. Then you've got me all evening.",
-  "html": "<b>Mom:</b> I can hear you not carrying boxes. Go on. Three. Then you've got me all evening."
+  "say": "I can hear you standing there. Three boxes... then I'm all yours. Go on.",
+  "html": "<b>Mom:</b> I can hear you standing there. Three boxes, then I'm all yours. Go on."
  },
  "mom/helper": {
   "voice": "mom",
-  "say": "There's my helper. All three? Look at you... okay. Um, we'll find your sheets tomorrow. Tonight it's the sleeping bag.",
-  "html": "<b>Mom:</b> There's my helper. All three? Look at you. Okay. We'll find your sheets tomorrow, tonight it's the sleeping bag."
+  "say": "All three? Look at you. Okay... your sheets are in a box somewhere, so tonight it's the sleeping bag. We'll call it camping.",
+  "html": "<b>Mom:</b> All three? Look at you. Okay. Your sheets are in a box somewhere, so tonight it's the sleeping bag. We'll call it camping."
  },
  "mom/landlord": {
   "voice": "mom",
-  "say": "You know what the landlord told me? Oh, don't worry about the noises... the house just talks. Like that's a selling point.",
-  "html": "<b>Mom:</b> You know what the landlord told me? \"Don't worry about the noises, the house just talks.\" Like that's a selling point."
+  "say": "Know what the landlord said? Don't mind the noises, the house just settles. ...Settles. Like it's tired.",
+  "html": "<b>Mom:</b> Know what the landlord said? \"Don't mind the noises, the house just settles.\" Settles. Like it's tired."
  },
  "dad/cheap": {
   "voice": "dad",
@@ -56,8 +56,8 @@
  },
  "mom/teeth": {
   "voice": "mom",
-  "say": "Okay. Teeth, then bed, mister. School bus is Monday, ten past seven... and we are not starting this town late. ... C'mere. Love you. Go.",
-  "html": "<b>Mom:</b> Teeth, then bed, mister. The school bus is Monday at ten past seven and we are not starting this town late. Come here. Love you. Go."
+  "say": "Okay. Teeth, then bed. Bus is Monday at ten past seven, so... we practice falling asleep. C'mere. Love you.",
+  "html": "<b>Mom:</b> Teeth, then bed. Bus is Monday at ten past seven, so we practice falling asleep. Come here. Love you."
  },
  "you/m1_a": {
   "voice": null,
@@ -65,8 +65,8 @@
  },
  "mom/m1_a": {
   "voice": "mom",
-  "say": "Oh, honey... first night in a new house. Everything creaks, and it all looks wrong in the dark. Nobody was in the hall. I promise.",
-  "html": "<b>Mom:</b> Oh, honey. First night in a new house, everything creaks, and it all looks wrong in the dark. Nobody was in the hall. I promise."
+  "say": "Oh, honey. New house, new noises. Everything looks wrong in the dark the first night. Nobody was out there.",
+  "html": "<b>Mom:</b> Oh, honey. New house, new noises. Everything looks wrong in the dark the first night. Nobody was out there."
  },
  "you/m1_b": {
   "voice": null,
@@ -79,8 +79,8 @@
  },
  "mom/m1_b": {
   "voice": "mom",
-  "say": "[quiet] Tell you what. Tonight you leave your door open, and the hall light stays on. Deal? ... Now eat. I found the good cereal.",
-  "html": "<b>Mom:</b> Tell you what. Tonight you leave your door open and the hall light stays on. Deal? Now eat, I found the good cereal."
+  "say": "Tell you what... door open tonight, hall light on. Deal? And eat something. I found the good cereal.",
+  "html": "<b>Mom:</b> Tell you what. Door open tonight, hall light on. Deal? And eat something. I found the good cereal."
  },
  "dad/n2_a": {
   "voice": "dad",
@@ -98,8 +98,8 @@
  },
  "mom/m2_a": {
   "voice": "mom",
-  "say": "[exasperated] In your room. Standing there. Smiling. Okay. And did it say anything?",
-  "html": "<b>Mom:</b> In your room. Standing there. Smiling. Okay. And did it say anything?"
+  "say": "In your room. Standing there. ...Smiling. Okay. Did it, um... did it say anything?",
+  "html": "<b>Mom:</b> In your room. Standing there. Smiling. Okay. Did it say anything?"
  },
  "dad/m2_a": {
   "voice": "dad",
@@ -108,8 +108,8 @@
  },
  "mom/m2_b": {
   "voice": "mom",
-  "say": "[cold, quiet] Don't look at me like that. There is nothing in this house. Nothing. Finish your toast.",
-  "html": "<b>Mom:</b> Don't look at me like that. There is nothing in this house. Nothing. Finish your toast."
+  "say": "Hey. Don't look at me like that. There's nothing in this house but us and a lot of boxes. Toast. Eat.",
+  "html": "<b>Mom:</b> Hey. Don't look at me like that. There's nothing in this house but us and a lot of boxes. Toast. Eat."
  },
  "mom/n3_a": {
   "voice": "mom",
@@ -173,8 +173,8 @@
  },
  "mom/m3_a": {
   "voice": "mom",
-  "say": "[tired, careful] Honey. Three nights, three different stories. I need you to hear how that sounds.",
-  "html": "<b>Mom:</b> Honey. Three nights, three different stories. I need you to hear how that sounds."
+  "say": "Sweetheart... three nights, three different things. I'm not mad. I just need you to hear how that sounds.",
+  "html": "<b>Mom:</b> Sweetheart. Three nights, three different things. I'm not mad. I just need you to hear how that sounds."
  },
  "dad/m3_a": {
   "voice": "dad",
@@ -183,8 +183,8 @@
  },
  "mom/m4_a": {
   "voice": "mom",
-  "say": "[quiet, unsettled] I looked in your closet this morning. There are scratches on the inside of the door. Low down. About your height.",
-  "html": "<b>Mom:</b> I looked in your closet this morning. There are scratches on the inside of the door. Low down. About your height."
+  "say": "I was putting your shirts away this morning. There's scratches inside your closet door. Down low... about your height.",
+  "html": "<b>Mom:</b> I was putting your shirts away this morning. There are scratches inside your closet door. Down low. About your height."
  },
  "dad/m4_a": {
   "voice": "dad",
@@ -198,8 +198,8 @@
  },
  "mom/m4_b": {
   "voice": "mom",
-  "say": "[a long pause, then quietly] Eat your breakfast.",
-  "html": "<b>Mom:</b> ...Eat your breakfast."
+  "say": "...Eat your breakfast, honey.",
+  "html": "<b>Mom:</b> ...Eat your breakfast, honey."
  },
  "dad/m5_a": {
   "voice": "dad",
@@ -208,8 +208,8 @@
  },
  "mom/m5_a": {
   "voice": "mom",
-  "say": "[quickly] That was me. I went to the bathroom.",
-  "html": "<b>Mom:</b> That was me. I went to the bathroom."
+  "say": "That was me. I got up for the bathroom.",
+  "html": "<b>Mom:</b> That was me. I got up for the bathroom."
  },
  "dad/m5_b": {
   "voice": "dad",
@@ -218,13 +218,13 @@
  },
  "mom/m5_b": {
   "voice": "mom",
-  "say": "[sharp, low] Not at the table. Not in front of him.",
-  "html": "<b>Mom:</b> Not at the table. Not in front of him."
+  "say": "Not at the table, okay? Not in front of him.",
+  "html": "<b>Mom:</b> Not at the table, okay? Not in front of him."
  },
  "mom/m6_a": {
   "voice": "mom",
-  "say": "[firm, scared] I'm calling the landlord today. Something about this house is wrong, and I'm not going to sit here and pretend it isn't.",
-  "html": "<b>Mom:</b> I'm calling the landlord today. Something about this house is wrong, and I'm not going to sit here and pretend it isn't."
+  "say": "I'm calling the landlord today. I don't care what it costs. Something's wrong with this house, and I'm done pretending it isn't.",
+  "html": "<b>Mom:</b> I'm calling the landlord today. I don't care what it costs. Something's wrong with this house, and I'm done pretending it isn't."
  },
  "dad/m6_a": {
   "voice": "dad",
@@ -233,8 +233,8 @@
  },
  "mom/m6_b": {
   "voice": "mom",
-  "say": "[quiet] Then we find the dimes somewhere else.",
-  "html": "<b>Mom:</b> Then we find the dimes somewhere else."
+  "say": "Then we find the money somewhere else. We always do.",
+  "html": "<b>Mom:</b> Then we find the money somewhere else. We always do."
  },
  "dad/m7_a": {
   "voice": "dad",
@@ -248,8 +248,8 @@
  },
  "mom/m7_a": {
   "voice": "mom",
-  "say": "[sharp] How would you know that?",
-  "html": "<b>Mom:</b> How would you know that?"
+  "say": "...How would you know that?",
+  "html": "<b>Mom:</b> ...How would you know that?"
  },
  "dad/m7_b": {
   "voice": "dad",
@@ -258,8 +258,8 @@
  },
  "mom/m8_a": {
   "voice": "mom",
-  "say": "[firm] I'm sleeping in your room tonight. Don't argue with me.",
-  "html": "<b>Mom:</b> I'm sleeping in your room tonight. Don't argue with me."
+  "say": "I'm sleeping in your room tonight. Don't argue with me, mister.",
+  "html": "<b>Mom:</b> I'm sleeping in your room tonight. Don't argue with me, mister."
  },
  "dad/m8_a": {
   "voice": "dad",
@@ -268,13 +268,13 @@
  },
  "mom/m8_b": {
   "voice": "mom",
-  "say": "[trembling] Two more nights. Then we're gone. I don't care what the lease says.",
-  "html": "<b>Mom:</b> Two more nights. Then we're gone. I don't care what the lease says."
+  "say": "Two more nights. That's it. Then we're gone, lease or no lease.",
+  "html": "<b>Mom:</b> Two more nights. That's it. Then we're gone, lease or no lease."
  },
  "mom/m9_a": {
   "voice": "mom",
-  "say": "[steady, decided] I packed the trunk. Everything we can carry. We leave in the morning, no matter what.",
-  "html": "<b>Mom:</b> I packed the trunk. Everything we can carry. We leave in the morning, no matter what."
+  "say": "Trunk's packed. Everything that matters. First light, we're gone. No matter what.",
+  "html": "<b>Mom:</b> Trunk's packed. Everything that matters. First light, we're gone. No matter what."
  },
  "dad/m9_a": {
   "voice": "dad",
@@ -288,8 +288,8 @@
  },
  "mom/m9_b": {
   "voice": "mom",
-  "say": "[softly] One more night. Stay close to us.",
-  "html": "<b>Mom:</b> One more night. Stay close to us."
+  "say": "One more night. Stay close to us, okay?",
+  "html": "<b>Mom:</b> One more night. Stay close to us, okay?"
  },
  "mom/t_thirst": {
   "voice": "mom",
@@ -580,5 +580,24 @@
   "voice": "news",
   "say": "One more thing before we go. The boy on Larch Road is not alone in the house. ... It has been standing behind him the whole time.",
   "html": "<i>(the TV)</i> ...the boy on Larch Road is not alone in the house..."
+ },
+ "mom/gift_a": {
+  "voice": "mom",
+  "say": "Oh, wait. Before I forget... I got you something at the gas station. It's, um... it's not much.",
+  "html": "<b>Mom:</b> Oh, wait. Before I forget. I got you something at the gas station. It's not much."
+ },
+ "mom/gift_b": {
+  "voice": "mom",
+  "say": "Take pictures of everything. Your room, the yard... we'll send Grandma the good ones.",
+  "html": "<b>Mom:</b> Take pictures of everything. Your room, the yard. We'll send Grandma the good ones."
+ },
+ "dad/gift": {
+  "voice": "dad",
+  "say": "Twenty-four pictures, bud. Don't spend 'em all on the dog next door.",
+  "html": "<b>Dad:</b> Twenty-four pictures, bud. Don't spend 'em all on the dog next door."
+ },
+ "you/gift": {
+  "voice": null,
+  "html": "<b>You:</b> Thanks, Mom."
  }
 }
