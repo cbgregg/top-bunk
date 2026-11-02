@@ -435,6 +435,8 @@ export class Gfx {
     const mk = (col, ang) => { const l = new THREE.SpotLight(col, 0, 6, ang, 0.85, 2); this.scene.add(l, l.target); return l; };
     this.rig = { key: mk(0xffd6aa, 0.42), fill: mk(0xaec4ff, 0.6), rim: mk(0xfff1dc, 0.4) };
   }
+  // how much of the screen's height each letterbox bar covers right now (0 out of a conversation)
+  barsNow() { const g = this.chain && this.chain.pass && this.chain.pass.grade; return g ? g.uniforms.bars.value : 0; }
   dropRig() { if (!this.rig) return; for (const k in this.rig) { const l = this.rig[k]; this.scene.remove(l, l.target); l.dispose(); } this.rig = null; }
   cineFrame(dt) {
     const ch = this.chain, k = this.cineK, cam = this.camera, f = this.cineFocus, fwd = cam.getWorldDirection(this._f);
