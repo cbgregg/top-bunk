@@ -34,7 +34,7 @@ export const loadModel = (name) => load(`assets/models/${name}.glb`);
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
-const ID = new THREE.Quaternion();
+const ID = new THREE.Quaternion(), _d = new THREE.Vector3();
 
 export class Rig {
   constructor(gltf, clips) {
@@ -128,8 +128,52 @@ export class Rig {
     if (this.env) { const i = Math.floor((this.t - this.envT0) * 30); if (i >= this.env.length) this.env = null; else open = this.env[Math.max(0, i)]; }
     this.jawOpen += (open - this.jawOpen) * Math.min(1, dt * 18);
     const jaw = this.bones.MJaw; if (!jaw) return;
-    jaw.quaternion.copy(this.restLocal.MJaw).multiply(_q.setFromAxisAngle(_a.set(0, 0, 1), this.jawOpen * 0.32 * (this.jawSign || 1)));
+    jaw.quaternion.copy(this.restLocal.MJaw).multiply(_q.setFromAxisAngle(_a.set(0, 0, 1), this.jawOpen * 0.19 * (this.jawSign || 1)));
     jaw.updateMatrix(); jaw.updateWorldMatrix(false, true);
+  }
+
+  // the face: the brows, the mouth corners, the lips and the cheeks are small bones moved off their rest positions (in metres, along
+  // the head's own up, left and forward), the eyes dart. mood: 'warm' | 'joke' | 'uneasy' | 'scared'; question lifts the brows;
+  // the lips follow the voice: open with the jaw, wide on the loud syllables and rounder on the soft ones
+  face(dt) {
+    const B = this.bones; if (!B.MJaw || !B.LInnerEyebrow) return;
+    const F = this.faceState || (this.faceState = { rest: new Map(), brow: 0, worry: 0, smile: 0, wide: 0, round: 0, sacT: 0.5, sacY: 0, sacX: 0, ph: 0 });
+    const head = B.Head; head.updateWorldMatrix(true, false);
+    const hq = head.getWorldQuaternion(new THREE.Quaternion()), rootQ = this.root.parent ? this.root.parent.getWorldQuaternion(new THREE.Quaternion()) : ID;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rootQ), left = new THREE.Vector3(1, 0, 0).applyQuaternion(rootQ), fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(rootQ);
+    let amp = 0;
+    if (this.env) { const i = Math.floor((this.t - this.envT0) * 30); amp = i >= 0 && i < this.env.length ? this.env[i] : 0; }
+    const mood = this.mood, k = Math.min(1, dt * 6);
+    F.brow += (((this.question && this.env) ? 1 : mood === 'scared' ? 0.7 : 0) + (amp > 0.7 ? 0.25 : 0) - F.brow) * k;
+    F.worry += ((mood === 'uneasy' || mood === 'scared' ? 1 : 0) - F.worry) * k;
+    F.smile += ((mood === 'joke' ? 1 : mood === 'warm' ? 0.55 : 0) - F.smile) * Math.min(1, dt * 3);
+    F.ph += dt * (amp > 0.2 ? 7 : 2);
+    F.wide += ((amp > 0.55 ? 0.8 + 0.2 * Math.sin(F.ph) : 0) - F.wide) * Math.min(1, dt * 14);
+    F.round += ((amp > 0.15 && amp <= 0.55 ? 0.7 + 0.3 * Math.sin(F.ph * 1.3) : 0) - F.round) * Math.min(1, dt * 14);
+    const mv = (name, u, l, f) => {
+      const b = B[name]; if (!b) return;
+      if (!F.rest.has(b)) F.rest.set(b, b.position.clone());
+      const sc = b.parent.getWorldScale(_d).x || 1, inv = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+      const off = new THREE.Vector3().addScaledVector(up, u).addScaledVector(left, l).addScaledVector(fwd, f).applyQuaternion(inv).divideScalar(sc);
+      b.position.copy(F.rest.get(b)).add(off); b.updateMatrix();
+    };
+    const br = F.brow * 0.004, wo = F.worry, sm = F.smile;
+    mv('LInnerEyebrow', br + wo * 0.004, -wo * 0.0015, 0); mv('RInnerEyebrow', br + wo * 0.004, wo * 0.0015, 0);
+    mv('MMiddleEyebrow', br * 0.8 + wo * 0.002, 0, 0);
+    mv('LOuterEyebrow', br * 0.7 - wo * 0.0012, 0, 0); mv('ROuterEyebrow', br * 0.7 - wo * 0.0012, 0, 0);
+    const wide = F.wide * 0.002, rnd = F.round * 0.003;
+    mv('LMouthCorner', sm * 0.003 - wo * 0.0012, sm * 0.002 + wide - rnd, -rnd * 0.4); mv('RMouthCorner', sm * 0.003 - wo * 0.0012, -(sm * 0.002 + wide - rnd), -rnd * 0.4);
+    mv('LCheek', sm * 0.0022, 0, 0); mv('RCheek', sm * 0.0022, 0, 0);
+    mv('MUpperLip', amp * 0.001, 0, rnd * 0.6); mv('LUpperlip', amp * 0.0008, 0, rnd * 0.4); mv('RUpperlip', amp * 0.0008, 0, rnd * 0.4);
+    mv('MBottomLip', -amp * 0.001, 0, rnd * 0.6);
+    // the eyes: small quick moves every half second to two seconds, settling back toward where the head points
+    F.sacT -= dt;
+    if (F.sacT <= 0) { F.sacT = (this.env ? 0.35 : 0.6) + Math.random() * 1.4; F.sacY = (Math.random() - 0.5) * 0.12; F.sacX = (Math.random() - 0.5) * 0.06; }
+    for (const n of ['LEye', 'REye']) {
+      const b = B[n]; if (!b) continue;
+      if (!this.saved.has(b)) this.saved.set(b, b.quaternion.clone());
+      this.rotateWorld(b, new THREE.Quaternion().setFromEuler(new THREE.Euler(F.sacX, F.sacY, 0)).premultiply(hq).multiply(hq.clone().invert()));
+    }
   }
 
   // The mixer only rewrites a bone when its clip value changes, so put the adjusted bones back first or the lean/look would pile up.

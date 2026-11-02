@@ -37,6 +37,7 @@ MODELS = {
     'desk_lamp':    dict(uid='d934c6b791c34e0fafc30e9625b4c55c', by='maxdragon', title='office lamp', tex=512, tris=2000),
     # the parents' room
     'dresser':      dict(uid='25134a84c07e420b93cae181731fd7a0', by='mozillareality', title='Dresser - modern light wood', tex=512, tris=1000),
+    'sofa_plaid':   dict(uid='9feaf83034ca4382a099c18cec5aecb3', by='lena-wachs', title='Old Plaid Sofa', tex=1024, tris=8000),
     'table_lamp':   dict(uid='6c395859886f405fb065b31b3e41d680', by='nickhavas', title='Table Lamp 01', tex=512, tris=1500),
     # wall plates (one pack, split in two)
     'outlet':       dict(uid='2bb10b5967624d659c83e5ee1701fe56', by='denniswoo1993', title='Free Wall outlets and switches pack', tex=512, tris=800, keep='Wall outlet'),
@@ -61,6 +62,8 @@ MODELS = {
     'fir2_far':     dict(uid='f58e8b6d733e4b0586e5b7db847b89e7', by='lolipop_1707', title='Realistic fir trees pack (LODS, gameready)', tex=256, tris=2500, keep='Christmas tree_2_LOD2_'),
     'maple':        dict(uid='b5d2833c258f4054a01ee2b4ef85adf0', by='lolipop_1707', title='Maple trees pack (lowpoly, game ready, LODs)', tex=512, tris=10000, keep='Acer_large_1_LOD0_'),
     'tree_bare':    dict(uid='33ccce6111604656a4b5709483670ec3', by='MaX3Dd', title='Dead Tree', tex=512, tris=3300),
+    # the kid's own arms in the bottom of the view (rigged, with finger bones)
+    'fp_arms':      dict(uid='76f4c7ae0b3e4cf9a57613ab991fad06', by='mrgyarmati', title='Rigged Arms', tex=1024, tris=9000),
 }
 LICENSE_SLUG = 'by'
 LICENSE_NAME = 'CC BY 4.0'

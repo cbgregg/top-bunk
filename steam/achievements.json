@@ -19,7 +19,7 @@
   {"apiName": "HOLD_BREATH", "displayName": "Not a sound", "description": "Hold your breath until the meter runs red.", "hidden": false},
   {"apiName": "STARE_DOWN", "displayName": "Don't blink", "description": "Keep your eyes on it while it creeps toward you, until it gives up.", "hidden": false},
   {"apiName": "PHOTO_FELL", "displayName": "Off the wall", "description": "Be there when the photo in the hall comes down.", "hidden": false},
-  {"apiName": "NOT_DAD", "displayName": "That isn't Dad", "description": "Walk up to Dad in front of the TV.", "hidden": true},
+  {"apiName": "NOT_DAD", "displayName": "That isn't Dad", "description": "Follow Dad's voice to the end of the hall.", "hidden": true},
   {"apiName": "GRANDPA", "displayName": "Grandpa", "description": "Go to grandpa's chair at the end of the hall.", "hidden": true},
   {"apiName": "GLOVE_BOX", "displayName": "Eyes on the road", "description": "Wake up from the drive without opening the glove box.", "hidden": true},
   {"apiName": "FIRST_TRY", "displayName": "Not a scratch", "description": "Survive a night without getting caught.", "hidden": false},

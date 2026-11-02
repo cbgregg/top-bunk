@@ -5,6 +5,7 @@
 //   whenLookAt(p, fn, minDot)    fn once the player looks straight at p (facing within acos(minDot)); returns a cancel function
 //   whenLookAway(p, fn, hold)    fn once p has been out of view for hold seconds
 //   glanceTime(p)                how long p has been in view, summed over the night (spots are keyed to a 0.5 m grid)
+//   looking(p, minDot)           faced and on screen, without the line-of-sight test (things seen through a window)
 import * as THREE from 'three';
 
 export function createGaze({ camera, P, los, roomAt, colliders }) {
@@ -57,6 +58,8 @@ export function createGaze({ camera, P, los, roomAt, colliders }) {
   function whenLookAt(p, fn, minDot = 0.9) { const w = { p, fn, kind: 'at', minDot }; watchers.push(w); return () => { w.dead = true; }; }
   function whenLookAway(p, fn, hold = 0.25) { const w = { p, fn, kind: 'away', hold, off: 0 }; watchers.push(w); return () => { w.dead = true; }; }
   const glanceTime = (p) => glance.get(key(p)) || 0;
+  // looking at p through glass: on screen and faced, with no line-of-sight test (the wall the window is in would block it)
+  const looking = (p, minDot = 0.8, margin = 0.95) => onScreen(p, margin) && facing(p) > minDot;
   function update(dt) {
     t += dt; acc += dt;
     if (acc > 0.08) { acc = 0; const f = fwd(); hist.push({ t, x: camera.position.x, z: camera.position.z, fx: f.x, fz: f.z }); while (hist.length && t - hist[0].t > 4.5) hist.shift(); }
@@ -70,5 +73,5 @@ export function createGaze({ camera, P, los, roomAt, colliders }) {
     }
   }
   const clearAll = () => { for (const w of watchers) w.dead = true; watchers.length = 0; };
-  return { update, behind, inView, onScreen, facing, sawRecently, whenLookAt, whenLookAway, glanceTime, clearAll, free, eyeY };
+  return { update, behind, inView, onScreen, facing, looking, sawRecently, whenLookAt, whenLookAway, glanceTime, clearAll, free, eyeY };
 }

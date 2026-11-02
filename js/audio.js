@@ -2,28 +2,83 @@
 // layer on top when they load; every call falls back to the synth if a file is missing.
 // Every source goes through one of three buses (music, sfx, voice) on its way to the master, each with its own reverb send so its
 // volume covers its share of the reverb too. Synthesized sounds are sfx; a file's bus comes from its id (vo/ and music/) or its sfx.json kind.
+// The house's own sounds are recordings (assets/sfx/lib/, CC0) where one exists. A sound given a place (see place()) is heard from
+// there through an HRTF panner, behind walls if the occluder says so, in the room's own reverb (setRoom()).
 export const BUSES = ['music', 'sfx', 'voice'];
 // how hard the piano slam hits: a glimpse, a jolt, a full scare. appear() adds APPEAR_BOOST on top
 export const SLAM = { hit: 1, jolt: 1.4, full: 1.6 };
 const APPEAR_BOOST = 1.5;
+
+// ---- the recorded library: assets/sfx/lib.json (tools/assets/fetch_sfx.py), each key a set of takes picked at random ----
+// these load with the game; any other key loads the first time it is asked for, and the synth covers that first time
+const WARM = ['step_wood', 'step_carpet', 'step_tile', 'step_grass', 'step_gravel', 'step_stairs', 'step_heavy', 'creak', 'creak_heavy', 'door_open', 'door_close', 'door_creak',
+  'knock', 'wall_knock', 'wall_scratch', 'clock_tick', 'clock_gear', 'clock_strike', 'heartbeat', 'breath', 'whisper', 'cabinet', 'switch', 'shutter', 'winder', 'drip',
+  'page_turn', 'sub_rumble', 'metal_swell', 'bowed_metal', 'radio_static', 'phone_ring', 'door_slam', 'chair_scrape'];
+const LONG = { car_pass: 3, thunder: 4 };   // keys of long takes: only this many of them are kept in memory
+const SURFACE = { wood: 'step_wood', carpet: 'step_carpet', tile: 'step_tile', gravel: 'step_gravel', grass: 'step_grass', stairs: 'step_stairs' };
+// how loud each key sits next to the synth it replaces (every take is first evened out, see even())
+const LEVEL = { step_carpet: 1.1, step_tile: 0.72, step_grass: 0.71, step_gravel: 0.65, step_wood: 0.8, step_stairs: 0.8, step_heavy: 1.9, creak: 0.34, creak_heavy: 0.4,
+  door_open: 0.35, door_creak: 0.35, door_close: 1.3, door_slam: 1.2, knock: 1.1, clock_tick: 0.43, clock_strike: 3.4, clock_gear: 1.5, heartbeat: 1.4, whisper: 0.42,
+  cabinet: 1.2, wall_scratch: 4, phone_ring: 5, radio_static: 3, chair_scrape: 0.33, shutter: 0.35, switch: 0.5, thunder: 1.6 };
+// what is between you and a sound (sfx.occluder answers): 0 nothing, 1 a corner or an open door, 2 a wall or a shut door, 3 another floor
+const OCCLUDE = [null, { f: 2600, g: 0.75, wet: 0.08 }, { f: 520, g: 0.32, wet: 0.2 }, { f: 300, g: 0.4, wet: 0.25 }];
+const VOICES = 32;   // positional voices at once; past that a sound falls back to plain stereo
+// each room's acoustics: rt the seconds a sound takes to die away, damp how much soft stuff eats the highs, er the first reflections (ms, level)
+const ACOUSTIC = {
+  small: { rt: 0.45, damp: 0.75, er: [[3, 0.5], [6, 0.35], [10, 0.25]] },   // bedrooms: beds, curtains, carpet
+  bare: { rt: 0.8, damp: 0.35, er: [[4, 0.6], [8, 0.45], [13, 0.3]] },      // the room nobody unpacked
+  bath: { rt: 1.0, damp: 0.12, er: [[2, 0.7], [5, 0.55], [8, 0.4]] },
+  hall: { rt: 0.75, damp: 0.5, er: [[2, 0.6], [11, 0.4], [19, 0.3]] },
+  living: { rt: 0.65, damp: 0.6, er: [[5, 0.5], [12, 0.35], [21, 0.25]] },
+  kitchen: { rt: 0.8, damp: 0.3, er: [[4, 0.55], [9, 0.4], [15, 0.3]] },
+  cellar: { rt: 1.3, damp: 0.3, er: [[3, 0.6], [7, 0.5], [12, 0.4]] },
+  garage: { rt: 1.5, damp: 0.25, er: [[6, 0.55], [14, 0.45], [25, 0.3]] },
+  out: { rt: 0.3, damp: 0.55, er: [[38, 0.3], [95, 0.18]] },                // open air: a slap off the house and the garage
+};
+// each room: its acoustics and the beds heard in it (night: only at night, day: only by day). Neighbours leak in quietly.
+const ROOM = {
+  bed: { ac: 'small', beds: { bed_house: 0.3, bed_wind_in: 0.22, bed_heater: 0.05 } },
+  bath: { ac: 'bath', beds: { bed_vent: 0.22, bed_drip: 0.3, bed_house: 0.15 } },
+  hall: { ac: 'hall', beds: { bed_house: 0.3, bed_heater: 0.14, bed_fridge: 0.04, bed_drip: 0.04 } },
+  spare: { ac: 'bare', beds: { bed_house: 0.25, bed_wind_in: 0.3 } },
+  room2: { ac: 'small', beds: { bed_house: 0.3, bed_heater: 0.06 } },
+  living: { ac: 'living', beds: { bed_house: 0.35, bed_fridge: 0.06, bed_road: 0.05 } },
+  kitchen: { ac: 'kitchen', beds: { bed_fridge: 0.3, bed_house: 0.2 } },
+  dining: { ac: 'kitchen', beds: { bed_fridge: 0.14, bed_house: 0.25 } },
+  parents: { ac: 'small', beds: { bed_house: 0.25, bed_tick: 0.14, night: { bed_snore: 0.1 } } },
+  laundry: { ac: 'cellar', beds: { bed_heater: 0.3, bed_drip: 0.12 } },
+  garage: { ac: 'garage', beds: { bed_buzz: 0.06, bed_wind_in: 0.12 } },
+  stoop: { ac: 'out', beds: { bed_night: 0.3, night: { bed_crickets: 0.25, bed_chimes: 0.05 } } },
+  out: { ac: 'out', beds: { bed_night: 0.35, night: { bed_crickets: 0.3, bed_chimes: 0.04 } } },
+};
 export class Sound {
   constructor() { this.ctx = null; this.level = 0.85; this.vol = { music: 1, sfx: 1, voice: 1 }; }
 
-  init() {
+  init(given) {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
-    const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = this.ctx = given || new (window.AudioContext || window.webkitAudioContext)();
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -14; this.comp.ratio.value = 6;
     this.master = ctx.createGain(); this.master.gain.value = this.level;
     this.master.connect(this.comp).connect(ctx.destination);
     this.reverb = ctx.createConvolver(); this.reverb.buffer = this.impulse(2.4, 2.6);
     this.reverb.connect(this.master);
-    this.buses = {}; this.sends = {};
-    for (const k of BUSES) { (this.buses[k] = ctx.createGain()).connect(this.master); (this.sends[k] = ctx.createGain()).connect(this.reverb); this.buses[k].gain.value = this.sends[k].gain.value = this.vol[k]; }
+    // the room's reverb: sfx and voices go through it; until a room is set it is the long reverb above, and stingers always use that one
+    this.roomIn = ctx.createGain(); this.roomNone = ctx.createGain(); this.roomIn.connect(this.roomNone).connect(this.reverb); this.verbs = {};
+    this.buses = {}; this.sends = {}; this.bigSends = {};
+    for (const k of BUSES) {
+      (this.buses[k] = ctx.createGain()).connect(this.master);
+      (this.sends[k] = ctx.createGain()).connect(k === 'music' ? this.reverb : this.roomIn);
+      (this.bigSends[k] = ctx.createGain()).connect(this.reverb);
+      this.buses[k].gain.value = this.sends[k].gain.value = this.bigSends[k].gain.value = this.vol[k];
+    }
+    this.pool = []; this.made = 0; this.libBuf = {}; this.lastPick = {};
+    for (let i = 0; i < 4; i++) this.pool.push(this.panner());   // made now so the HRTF data is loaded before the first placed sound
+    this.small = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     const len = ctx.sampleRate * 2; this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.startBeds();
-    this.loadFiles();
+    this.filesReady = this.loadFiles();
   }
   suspend() { this.ctx && this.ctx.suspend(); }
   resume() { this.ctx && this.ctx.resume(); }
@@ -34,7 +89,7 @@ export class Sound {
     const to = (p) => { p.cancelScheduledValues(this.now); p.value = v; };
     if (bus === 'master') { this.level = v; if (this.ctx) to(this.master.gain); return; }
     if (!(bus in this.vol)) return;
-    this.vol[bus] = v; if (this.ctx) { to(this.buses[bus].gain); to(this.sends[bus].gain); }
+    this.vol[bus] = v; if (this.ctx) { to(this.buses[bus].gain); to(this.sends[bus].gain); to(this.bigSends[bus].gain); }
   }
   kindOf(id) { return id.startsWith('vo/') ? 'voice' : id.startsWith('music/') || (this.kinds && this.kinds[id] === 'music') ? 'music' : 'sfx'; }
 
@@ -43,37 +98,99 @@ export class Sound {
     for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); }
     return b;
   }
+  // a room's impulse: a few early reflections, then a tail that loses its highs as it dies (soft rooms lose them faster)
+  roomImpulse({ rt, damp, er }) {
+    const ctx = this.ctx, sr = ctx.sampleRate, n = Math.ceil(sr * (rt * 1.1 + 0.03)), b = ctx.createBuffer(2, n, sr), k = 6.91 / (rt * sr);
+    for (let c = 0; c < 2; c++) {
+      const d = b.getChannelData(c); let lp = 0;
+      for (let i = 0; i < n; i++) {
+        const a = 0.12 + 0.88 * (1 - damp) * Math.exp(-i / (sr * rt * 0.35));   // the filter closes as the tail goes on
+        lp += a * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.exp(-k * i) * (i < sr * 0.004 ? i / (sr * 0.004) : 1);
+      }
+      for (const [ms, g] of er) { const i = Math.floor(sr * (ms + c * 0.7 + Math.random()) / 1000); if (i < n) d[i] += (Math.random() < 0.5 ? -g : g) * 1.6; }
+    }
+    return b;
+  }
+  verb(name) {
+    let v = this.verbs[name]; if (v) return v;
+    const c = this.ctx.createConvolver(); c.buffer = this.roomImpulse(ACOUSTIC[name]);
+    const g = this.ctx.createGain(); g.gain.value = 0; this.roomIn.connect(c).connect(g).connect(this.master);
+    return (this.verbs[name] = { c, g });
+  }
+  // a sound's place: pass place(pan, pos) wherever a pan goes and the sound is heard from pos (it still works as a number)
+  place(pan, pos) { if (!pos) return pan; const p = new Number(pan); p.at = { x: pos.x, y: pos.y ?? 1.2, z: pos.z }; return p; }
+  // the listener follows the camera, each frame
+  listen(cam) {
+    if (!this.ctx || !cam) return;
+    const e = cam.matrixWorld.elements, L = this.ctx.listener;
+    if (L.positionX) {
+      L.positionX.value = e[12]; L.positionY.value = e[13]; L.positionZ.value = e[14];
+      L.forwardX.value = -e[8]; L.forwardY.value = -e[9]; L.forwardZ.value = -e[10]; L.upX.value = e[4]; L.upY.value = e[5]; L.upZ.value = e[6];
+    } else { L.setPosition(e[12], e[13], e[14]); L.setOrientation(-e[8], -e[9], -e[10], e[4], e[5], e[6]); }
+    this.ear = { x: e[12], y: e[13], z: e[14] };
+  }
+  // a pooled HRTF panner (null when VOICES are already playing: that sound falls back to plain stereo)
+  panner() {
+    let p = this.pool.pop();
+    if (!p) {
+      if (this.made >= VOICES) return null;
+      this.made++; p = this.ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.maxDistance = 60;
+    }
+    return p;
+  }
   // output bus: gain -> panner -> the kind's bus, plus reverb send. Auto-disconnects.
-  bus(gain = 1, pan = 0, wet = 0.25, life = 3, kind = 'sfx') {
-    const ctx = this.ctx, g = ctx.createGain(); g.gain.value = gain;
-    const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
-    const s = ctx.createGain(); s.gain.value = wet;
-    g.connect(p).connect(this.buses[kind] || this.buses.sfx); p.connect(s).connect(this.sends[kind] || this.sends.sfx);
-    setTimeout(() => { try { g.disconnect(); p.disconnect(); s.disconnect(); } catch (e) { /* ignore */ } }, (life + 3) * 1000);
+  // o: { at: {x,y,z} heard from there (falls off with distance: ref, roll), big: the long reverb, not the room's }
+  bus(gain = 1, pan = 0, wet = 0.25, life = 3, kind = 'sfx', o = null) {
+    const ctx = this.ctx, g = ctx.createGain(), s = ctx.createGain(), nodes = [g, s];
+    const at = (o && o.at) || (pan && pan.at), out = this.buses[kind] || this.buses.sfx, send = ((o && o.big) ? this.bigSends : this.sends)[kind] || this.sends.sfx;
+    let head = g, p = null;
+    if (at && this.ear) {
+      const occ = this.occluder ? this.occluder(at.x, at.y, at.z) | 0 : 0, O = OCCLUDE[occ];
+      if (O) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = O.f; lp.Q.value = 0.5; gain *= O.g; wet += O.wet; head = g.connect(lp); nodes.push(lp); }
+      p = this.panner();
+      if (p) {
+        // a pan from place() carries the caller's own distance fall-off, so only the direction is used; o.at falls off here
+        const own = !!(o && o.at); p.refDistance = own ? o.ref ?? 1.5 : 1; p.rolloffFactor = own ? o.roll ?? 1 : 0;
+        if (p.positionX) { p.positionX.value = at.x; p.positionY.value = at.y; p.positionZ.value = at.z; } else p.setPosition(at.x, at.y, at.z);
+      } else pan = this.stereoOf(at);
+    }
+    g.gain.value = gain; s.gain.value = wet;
+    if (!p) { p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, +pan || 0)); nodes.push(p); }
+    head.connect(p).connect(out); p.connect(s).connect(send);
+    setTimeout(() => {
+      for (const n of nodes) try { n.disconnect(); } catch (e) { /* ignore */ }
+      if (p instanceof PannerNode) { try { p.disconnect(); } catch (e) { /* ignore */ } this.pool.push(p); }
+    }, (life + 3) * 1000);
     return g;
+  }
+  // left/right of a point for the plain stereo fallback
+  stereoOf(at) {
+    const L = this.ctx.listener; if (!L.forwardX || !this.ear) return 0;
+    const fx = L.forwardX.value, fz = L.forwardZ.value, dx = at.x - this.ear.x, dz = at.z - this.ear.z, d = Math.hypot(dx, dz) || 1;
+    return Math.max(-1, Math.min(1, (fx * dz - fz * dx) / d)) * 0.9;
   }
   env(param, t, a, peak, dur, end = 0.0001) {
     param.cancelScheduledValues(t); param.setValueAtTime(0.0001, t);
     param.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + a);
     param.exponentialRampToValueAtTime(end, t + a + dur);
   }
-  noiseHit({ dur = 0.1, type = 'lowpass', f = 800, f2 = null, q = 0.7, gain = 0.5, pan = 0, wet = 0.2, attack = 0.003, delay = 0 } = {}) {
+  noiseHit({ dur = 0.1, type = 'lowpass', f = 800, f2 = null, q = 0.7, gain = 0.5, pan = 0, wet = 0.2, attack = 0.003, delay = 0, big = false } = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = this.now + delay, src = ctx.createBufferSource(); src.buffer = this.noise;
     src.playbackRate.value = 0.8 + Math.random() * 0.4;
     const fl = ctx.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
     if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
     const g = ctx.createGain(); this.env(g.gain, t, attack, gain, dur);
-    src.connect(fl).connect(g).connect(this.bus(1, pan, wet, dur));
+    src.connect(fl).connect(g).connect(this.bus(1, pan, wet, dur + delay, 'sfx', big ? { big } : null));
     src.start(t, Math.random() * 1.5); src.stop(t + attack + dur + 0.05);
   }
-  tone({ type = 'sine', f = 220, f2 = null, dur = 0.3, gain = 0.3, pan = 0, wet = 0.2, attack = 0.005, delay = 0, detune = 0 } = {}) {
+  tone({ type = 'sine', f = 220, f2 = null, dur = 0.3, gain = 0.3, pan = 0, wet = 0.2, attack = 0.005, delay = 0, detune = 0, big = false } = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = this.now + delay, o = ctx.createOscillator(); o.type = type;
     o.frequency.setValueAtTime(f, t); o.detune.value = detune;
     if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + attack + dur);
     const g = ctx.createGain(); this.env(g.gain, t, attack, gain, dur);
-    o.connect(g).connect(this.bus(1, pan, wet, dur)); o.start(t); o.stop(t + attack + dur + 0.05);
+    o.connect(g).connect(this.bus(1, pan, wet, dur + delay, 'sfx', big ? { big } : null)); o.start(t); o.stop(t + attack + dur + 0.05);
   }
 
   // ---- beds (continuous) ----
@@ -115,16 +232,23 @@ export class Sound {
     bz.connect(bzf).connect(this.buzzGain).connect(this.buses.sfx); bz.start();
   }
   // v: 0 dry .. 1 a downpour; `inside` muffles it (heard through the walls and the glass)
+  // with the recordings, the synth only fills in under them: rain on the terrace outside, on the glass inside (louder by a window, see setRoom)
   rain(v, inside = false, t = 2) {
     if (!this.ctx) return;
-    this.set(this.rainGain.gain, v * (inside ? 0.11 : 0.3), t);
+    const rec = this.has('bed_rain') ? 0.35 : 1;
+    this.set(this.rainGain.gain, v * (inside ? 0.11 : 0.3) * rec, t);
     this.set(this.rainLp.frequency, inside ? 700 : 1800 + 2400 * v, t);
+    this.rainState = { v, inside }; this.mixAmbience(t);
   }
   buzz(v, t = 0.3) { this.ctx && this.set(this.buzzGain.gain, v * 0.05, t); }
   // a roll of thunder: a low noise swell that breaks up as it dies, `delay` seconds after the flash (the distance), and a rumble under it
   thunder(delay = 2, gain = 1) {
     if (!this.ctx) return;
     const near = Math.max(0, 1 - delay / 6);
+    // a recorded roll, darker the further off it is, with the synth's sub rumble under it
+    if (this.pick('thunder', { gain: 0.9 * gain * (0.5 + near * 0.5), wet: 0.15, delay, lp: 500 + near * near * 6000, big: true, jitter: 0.08 })) {
+      this.tone({ type: 'sine', f: 42, f2: 30, dur: 3.5 + delay * 0.3, gain: 0.25 * gain * (0.4 + near * 0.6), attack: 0.3, wet: 0.5, delay, big: true }); return;
+    }
     this.noiseHit({ dur: 2.2 + delay * 0.4, type: 'lowpass', f: 160 + near * 400, f2: 60, q: 0.8, gain: 0.9 * gain, attack: 0.08 + (1 - near) * 0.5, wet: 0.6, delay });
     this.noiseHit({ dur: 3.5, type: 'lowpass', f: 90, q: 1.2, gain: 0.6 * gain, attack: 0.9, wet: 0.7, delay: delay + 0.6 });
     for (let i = 0; i < 4; i++) this.noiseHit({ dur: 0.5 + Math.random() * 0.8, type: 'bandpass', f: 120 + Math.random() * 200, q: 1.5, gain: 0.3 * gain * (1 - i * 0.18), attack: 0.1, wet: 0.6, delay: delay + 1 + i * 0.7 + Math.random() * 0.4 });
@@ -134,27 +258,81 @@ export class Sound {
   wind(v, t) { this.ctx && this.set(this.windGain.gain, v, t); }
   drone(v, t) { if (!this.ctx) return; this.set(this.droneGain.gain, v, t); this.bed('sfx/night_brown_noise', v * 40, t); }
   tension(v, t) { if (!this.ctx) return; this.set(this.tensionGain.gain, v * 2.2, t); }
-  hum(v, t) { this.ctx && this.set(this.humGain.gain, v, t); }
+  hum(v, t) { if (!this.ctx) return; this.set(this.humGain.gain, v, t); const night = v > 0; if (night !== !!this.night) { this.night = night; this.mixAmbience(t); } }   // only the night has the hum
 
   // ---- recorded files ----
   async loadFiles() {
     this.buf = {}; this.want = {}; this.live = {};
     const json = async (p) => { try { const r = await fetch(p); return r.ok ? await r.json() : null; } catch (e) { return null; } };
-    const load = async (id, path) => {
+    const load = async (id, path, low = false) => {
       try {
         const r = await fetch(path); if (!r.ok) return;
-        this.buf[id] = await this.ctx.decodeAudioData(await r.arrayBuffer());
+        this.buf[id] = await (low ? this.decoder() : this.ctx).decodeAudioData(await r.arrayBuffer());
         if (this.want[id]) this.applyBed(id);
       } catch (e) { /* ignore */ }
     };
-    const [vo, sfx, music] = await Promise.all([json('assets/audio/manifest.json'), json('assets/sfx/sfx.json'), json('assets/music/tracks.json')]);
+    this.loadOne = load;
+    const [vo, sfx, music, lib] = await Promise.all([json('assets/audio/manifest.json'), json('assets/sfx/sfx.json'), json('assets/music/tracks.json'), json('assets/sfx/lib.json')]);
+    this.lib = lib || {};
     this.kinds = {}; for (const [k, m] of Object.entries(sfx || {})) this.kinds['sfx/' + k] = m.kind;   // which bus each file plays on
+    for (const id in this.want) if (id.startsWith('lib/')) this.bed(id, this.want[id].v, this.want[id].time);   // beds asked for before the list arrived
     const first = [];
     for (const f of (vo && vo.files) || []) first.push(load(f, `assets/audio/${f}.mp3`));
     for (const [k, m] of Object.entries(sfx || {})) first.push(load('sfx/' + k, m.file));
     await Promise.all(first);
     for (const [k, m] of Object.entries(music || {})) load('music/' + k, m.file);   // the big loops arrive in the background
+    for (const k of WARM) await this.libLoad(k);   // one key at a time, so the house's sounds don't hold up the rest
   }
+  // the takes of a library key, decoding them the first time they're wanted
+  libLoad(key) {
+    const m = this.lib && this.lib[key]; if (!m) return Promise.resolve();
+    if (this.libBuf[key]) return this.libBuf[key].ready;
+    let files = m.files.slice();
+    const cap = LONG[key] || (this.small ? 4 : 0);   // a phone keeps fewer takes of each
+    if (cap) files = files.sort(() => Math.random() - 0.5).slice(0, cap);
+    const set = this.libBuf[key] = [];
+    set.ready = Promise.all(files.map(async (f) => {
+      try { const r = await fetch(f); if (r.ok) set.push(this.even(await this.decoder().decodeAudioData(await r.arrayBuffer()))); } catch (e) { /* ignore */ }
+    }));
+    return set.ready;
+  }
+  // the library decodes at 32 kHz (the files hold nothing above 16 kHz), which keeps a third of the memory free
+  decoder() {
+    if (!this.dec) { const O = window.OfflineAudioContext || window.webkitOfflineAudioContext; try { this.dec = O ? new O(1, 1, 32000) : this.ctx; } catch (e) { this.dec = this.ctx; } }
+    return this.dec;
+  }
+  // the takes of a key are evened out: each gets a gain that brings its loudest tenth of a second to the same level
+  even(b) {
+    const d = b.getChannelData(0), w = Math.floor(b.sampleRate / 10), hop = Math.floor(w / 4); let best = 0;
+    for (let i = 0; i + w <= d.length || i === 0; i += hop) { let e = 0; const n = Math.min(w, d.length - i); for (let j = 0; j < n; j++) e += d[i + j] * d[i + j]; best = Math.max(best, e / Math.max(1, n)); if (i + w > d.length) break; }
+    b.norm = Math.max(0.25, Math.min(4, 0.126 / Math.sqrt(best || 1e-6)));
+    return b;
+  }
+  has(key) { return !!(this.lib && this.lib[key]); }
+  // one take of a library key, chosen at random (never the same one twice running), a little off in pitch and level each time.
+  // returns its length in seconds, or 0 if none is loaded yet (the caller falls back to the synth).
+  // o: gain, pan, wet, delay, rate, jitter (pitch spread), at / ref / roll / big (see bus), muffle, lp (a low-pass, Hz), offset and dur (play a stretch),
+  // maxLen (only the takes shorter than that)
+  pick(key, { gain = 1, pan = 0, wet = 0.2, delay = 0, rate = 1, jitter = 0.05, at = null, ref, roll, big = false, muffle = false, lp = 0, offset = 0, dur = 0, maxLen = 0 } = {}) {
+    if (!this.ctx || !this.lib) return 0;
+    let set = this.libBuf[key]; if (!set) { this.libLoad(key); return 0; }
+    if (maxLen) set = set.filter((b) => b.duration <= maxLen);
+    if (!set.length) return 0;
+    let i = Math.floor(Math.random() * set.length); if (set.length > 1 && i === this.lastPick[key]) i = (i + 1) % set.length;
+    this.lastPick[key] = i;
+    const b = set[i], ctx = this.ctx, src = ctx.createBufferSource(); src.buffer = b;
+    const r = rate * (1 + (Math.random() * 2 - 1) * jitter); src.playbackRate.value = r;
+    const len = Math.max(0.01, (dur || b.duration - offset) / r), t = this.now + delay;
+    gain *= (b.norm ?? 1) * (LEVEL[key] ?? 1) * (0.9 + Math.random() * 0.2) * (muffle ? 0.7 : 1);
+    let head = src;
+    if (muffle || lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = muffle ? Math.min(650, lp || 650) : lp; f.Q.value = 0.5; head = src.connect(f); }
+    const out = this.bus(gain, pan, wet + (muffle ? 0.1 : 0), len + delay, 'sfx', at || big ? { at, ref, roll, big } : null);
+    if (dur) { const e = ctx.createGain(); e.gain.setValueAtTime(1, t + len - Math.min(0.15, len * 0.3)); e.gain.linearRampToValueAtTime(0, t + len); head = head.connect(e); }
+    head.connect(out); src.start(t, offset, dur ? dur + 0.02 : undefined);
+    return len;
+  }
+  // a library key heard from a point in the world, falling off with distance (ref: full level within it, roll: how fast it fades)
+  emit(key, at, o = {}) { return this.pick(key, { ...o, at }); }
   // plays a loaded file once; returns its length in seconds (0 if it isn't loaded, so callers can fall back)
   play(id, { gain = 1, pan = 0, wet = 0.15, delay = 0, muffle = false } = {}) {
     const b = this.buf && this.buf[id]; if (!this.ctx || !b) return 0;
@@ -169,7 +347,8 @@ export class Sound {
   // a loaded file that moves across the stereo field; without the file, a synthesized stand-in
   moving(id, { gain = 1, from = 0.8, to = -0.8, dur = 0 } = {}) {
     if (!this.ctx) return 0;
-    const b = this.buf && this.buf[id];
+    const cars = id.includes('car_pass') && this.libBuf.car_pass; if (id.includes('car_pass') && !cars) this.libLoad('car_pass');
+    const b = (cars && cars.length && cars[Math.floor(Math.random() * cars.length)]) || (this.buf && this.buf[id]);
     if (!b) return this.movingSynth(id, from, to, dur || 4);
     const ctx = this.ctx, src = ctx.createBufferSource(); src.buffer = b;
     const g = ctx.createGain(); g.gain.value = gain; const p = ctx.createStereoPanner(), t = this.now, len = dur || b.duration;
@@ -202,7 +381,11 @@ export class Sound {
   // a looping file held at a level; asking again moves the level (and starts it once it has loaded)
   bed(id, v, time = 2) {
     if (!this.ctx || !this.want) return;
-    this.want[id] = { v, time }; this.applyBed(id);
+    this.want[id] = { v, time };
+    if (id.startsWith('lib/') && !(id in this.buf) && v > 0 && this.lib) {   // a library bed loads the first time it is turned up
+      const m = this.lib[id.slice(4)]; this.buf[id] = undefined; if (m) this.loadOne(id, m.files[0], true);
+    }
+    this.applyBed(id);
   }
   applyBed(id) {
     const b = this.buf[id], w = this.want[id]; if (!b || !w) return;
@@ -214,11 +397,63 @@ export class Sound {
       l = this.live[id] = { src, g };
     }
     this.set(l.g.gain, w.v, w.time);
+    // a library bed left silent is let go after a while (it loads again if it is wanted)
+    clearTimeout(l.drop);
+    if (w.v <= 0 && id.startsWith('lib/')) l.drop = setTimeout(() => { if (this.want[id].v > 0) return; try { l.src.stop(); l.g.disconnect(); } catch (e) { /* ignore */ } delete this.live[id]; delete this.buf[id]; }, (w.time + 20) * 1000);
+  }
+
+  // ---- the room you are in ----
+  // room: a name from world.js's roomAt. near: distances in metres, { road } to the road (outside), { window } to the nearest window (inside, for rain on the glass)
+  setRoom(room, near = null) {
+    if (!this.ctx) return;
+    const R = ROOM[room] || ROOM.living, changed = room !== this.room;
+    this.room = room; if (near) this.near = near;
+    if (changed) {
+      for (const k in this.verbs) this.set(this.verbs[k].g.gain, 0, 0.8);
+      this.set(this.verb(R.ac).g.gain, 1, 0.8); this.set(this.roomNone.gain, 0.3, 0.8);   // a little of the long reverb stays under every room
+      if (!this.ambTimer) this.ambTimer = setInterval(() => this.ambTick(), 1000);
+    }
+    this.mixAmbience(changed ? 1.6 : 0.8);
+  }
+  // overall level of the ambience beds (0 for a cutscene that brings its own)
+  ambience(v, t = 2) { this.ambLevel = v; this.mixAmbience(t); }
+  // every ambience bed at once: the room's own (by night or by day), the rain, and outside the road by how near it is
+  mixAmbience(t = 1.5) {
+    if (!this.ctx || !this.room) return;
+    const R = ROOM[this.room] || ROOM.living, out = R.ac === 'out', n = this.near || {}, want = {};
+    const add = (k, v) => { want[k] = (want[k] || 0) + v; };
+    for (const [k, v] of Object.entries(R.beds)) {
+      if (k !== 'night' && k !== 'day') add(k, v);
+      else if ((k === 'night') === !!this.night) for (const [k2, v2] of Object.entries(v)) add(k2, v2);
+    }
+    if (out && n.road != null) add('bed_road', 0.45 / (1 + Math.max(0, n.road - 4) * 0.12));   // louder walking down toward it
+    const rain = this.rainState ? this.rainState.v : 0;
+    if (rain > 0) {
+      if (out) { add('bed_rain', 0.5 * rain); delete want.bed_crickets; }
+      else {
+        const w = n.window != null ? 1 / (1 + Math.max(0, n.window - 0.6) * 0.7) : 0.35;
+        add('bed_rain_glass', 0.4 * rain * w); add('bed_rain', 0.06 * rain); add('bed_storm_in', 0.1 * rain);
+      }
+    }
+    const amb = this.ambLevel ?? 1; this.ambKeys ||= new Set();
+    for (const k of Object.keys(want)) this.ambKeys.add(k);
+    for (const k of this.ambKeys) this.bed('lib/' + k, (want[k] || 0) * amb, t);
+  }
+  // now and then at night, something out in the dark: an owl, a dog a long way off (behind the walls when you are inside)
+  ambTick() {
+    if (!this.ctx || !this.night || (this.ambLevel ?? 1) <= 0 || Math.random() > 1 / 45) return;
+    const key = Math.random() < 0.6 ? 'owl' : 'dog_far', a = Math.random() * Math.PI * 2, d = 35 + Math.random() * 40, e = this.ear;
+    if (e) this.emit(key, { x: e.x + Math.cos(a) * d, y: 5, z: e.z + Math.sin(a) * d }, { gain: key === 'owl' ? 0.5 : 0.35, ref: 8, roll: 0.7, wet: 0.3 });
+    else this.pick(key, { gain: 0.06, pan: Math.random() * 1.6 - 0.8, wet: 0.3, lp: 1800 });
   }
 
   // ---- one-shots ----
   // a footfall is a heel strike then the ball of the foot, a few ms apart, and it sounds different on each floor (each one slightly different from the last)
+  // surface: carpet, wood, tile, gravel, grass or stairs (false is tile, for old callers); recorded steps first
   footstep(gain = 0.35, pan = 0, wet = 0.15, surface = 'carpet') {
+    const key = SURFACE[surface] || (surface === false ? 'step_tile' : 'step_carpet');
+    if (this.pick(key, { gain, pan, wet, jitter: 0.07 })) { if (key === 'step_carpet' && Math.random() < 0.08) this.creak(gain * 0.35, pan, 0.05); return; }
+    if (surface === 'gravel' || surface === 'grass') { this.grassStep(gain, pan); return; }
     const v = 0.88 + Math.random() * 0.26, side = (Math.random() - 0.5) * 0.12, gap = 0.055 + Math.random() * 0.025;
     if (surface === 'tile' || surface === false) {   // hard floor: a sharp heel click, a hollow body and a lighter toe tick
       this.noiseHit({ type: 'bandpass', f: 2100 * v, q: 1.4, dur: 0.03, gain: gain * 1.0, pan: pan + side, wet: wet + 0.12, attack: 0.001 });
@@ -233,13 +468,16 @@ export class Sound {
       if (Math.random() < 0.1) this.creak(gain * 0.22, pan);   // a board somewhere under the carpet
     }
   }
-  grassStep(gain = 0.3, pan = 0) { this.noiseHit({ dur: 0.12, type: 'highpass', f: 1800, gain: gain * 0.5, pan, wet: 0.02 }); }
+  grassStep(gain = 0.3, pan = 0) { if (!this.pick('step_grass', { gain, pan, wet: 0.03, jitter: 0.08 })) this.noiseHit({ dur: 0.12, type: 'highpass', f: 1800, gain: gain * 0.5, pan, wet: 0.02 }); }
+  // its steps: a slow, heavy foot on the boards, with a low thud under it you feel more than hear
   heavyStep(gain = 0.6, pan = 0) {
+    if (this.pick('step_heavy', { gain, pan, wet: 0.3, jitter: 0.06 })) { this.tone({ f: 62, f2: 30, dur: 0.2, gain: gain * 0.45, pan, wet: 0.2 }); return; }
     this.tone({ f: 70, f2: 30, dur: 0.22, gain, pan, wet: 0.35 });
     this.noiseHit({ dur: 0.12, f: 350, gain: gain * 0.7, pan, wet: 0.35 });
   }
   creak(gain = 0.25, pan = 0, delay = 0) {
     if (!this.ctx) return;
+    if (this.pick(gain > 0.3 && Math.random() < 0.5 ? 'creak_heavy' : 'creak', { gain, pan, wet: 0.35, delay, jitter: 0.08 })) return;
     const ctx = this.ctx, t = this.now + delay, o = ctx.createOscillator(); o.type = 'sawtooth';
     const base = 120 + Math.random() * 120; o.frequency.setValueAtTime(base, t); o.frequency.linearRampToValueAtTime(base * 0.7, t + 0.8);
     const am = ctx.createOscillator(); am.frequency.value = 18 + Math.random() * 14; const amg = ctx.createGain(); amg.gain.value = 0.5;
@@ -250,6 +488,7 @@ export class Sound {
     o.start(t); am.start(t); o.stop(t + 1); am.stop(t + 1);
   }
   heartbeat(gain = 0.5) {
+    if (this.pick('heartbeat', { gain, wet: 0, jitter: 0.03, lp: 900 })) return;
     this.tone({ f: 58, f2: 38, dur: 0.12, gain, wet: 0 });
     this.tone({ f: 52, f2: 34, dur: 0.14, gain: gain * 0.8, wet: 0, delay: 0.17 });
   }
@@ -267,6 +506,7 @@ export class Sound {
   }
   // a kitchen cabinet door thrown shut: a hollow wood clap, then a rattle of dishes
   cabinet(pan = 0, gain = 1) {
+    if (this.pick('cabinet', { gain: gain * 0.9, pan, wet: 0.25 })) return;
     this.noiseHit({ dur: 0.05, type: 'bandpass', f: 1800, q: 1.2, gain: 1.1 * gain, pan, attack: 0.001, wet: 0.2 });
     this.tone({ type: 'triangle', f: 210, f2: 120, dur: 0.14, gain: 0.7 * gain, pan, wet: 0.15 });
     this.noiseHit({ dur: 0.5, type: 'highpass', f: 3000, gain: 0.25 * gain, pan, wet: 0.3 });
@@ -274,10 +514,10 @@ export class Sound {
   // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it (trailer/gen_music.js renders the same notes)
   pianoSlam(k = 1) {
     if (!this.ctx) return;
-    for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16 * k, attack: 0.002, wet: 0.45 });
-    for (const f of [40, 46]) this.tone({ type: 'sawtooth', f, f2: f * 0.5, dur: 1.4, gain: 0.22 * k, wet: 0.3 });
-    this.tone({ type: 'sine', f: 36.7, f2: 30, dur: 2.2, gain: 0.5 * k, attack: 0.002, wet: 0.2 });   // the low note under the cluster
-    this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1 * k, attack: 0.001, wet: 0.35 });
+    for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16 * k, attack: 0.002, wet: 0.45, big: true });
+    for (const f of [40, 46]) this.tone({ type: 'sawtooth', f, f2: f * 0.5, dur: 1.4, gain: 0.22 * k, wet: 0.3, big: true });
+    this.tone({ type: 'sine', f: 36.7, f2: 30, dur: 2.2, gain: 0.5 * k, attack: 0.002, wet: 0.2, big: true });   // the low note under the cluster
+    this.noiseHit({ dur: 0.35, type: 'lowpass', f: 900, gain: 1.1 * k, attack: 0.001, wet: 0.35, big: true });
   }
   // the thing is suddenly there: the low piano note and the strings under it
   appear(k = 1) { this.pianoSlam(APPEAR_BOOST * k); }
@@ -285,10 +525,19 @@ export class Sound {
   // violins(v): 0 silences them, 1 is the full storm. A looping recording, or a synthesized stand-in: detuned sawtooth "violins" with frantic vibrato.
   // no strings any more: what used to call for the violins gets a slow low drone, and the reveals are the piano alone
   violins(v, t = 1.5) { if (!this.ctx) return; this.set(this.tensionGain.gain, v * 0.12, t); this.bed('sfx/violin_storm', 0, 0.3); }
-  // a reveal: the low piano slam and nothing else
-  stab() { this.pianoSlam(1.3); }
+  // a reveal: the low piano slam, sometimes with a low rumble or a slowed gong ringing on under it
+  stab() {
+    this.pianoSlam(1.3); const r = Math.random();
+    if (r < 0.25) this.pick('sub_rumble', { gain: 0.9, wet: 0.2, big: true });
+    else if (r < 0.5) this.pick('bowed_metal', { gain: 0.45, wet: 0.35, big: true, delay: 0.05 });
+  }
+  // a slowed, reversed gong rising out of nothing for `sec` seconds, to land on a hit
+  rise(sec = 1.5, gain = 0.8) {
+    const set = this.libBuf.metal_swell; if (!set || !set.length) { this.libLoad('metal_swell'); return 0; }
+    const len = set[0].duration; return this.pick('metal_swell', { gain, wet: 0.3, big: true, jitter: 0, offset: Math.max(0, len - sec), dur: 0 });
+  }
   // the slam with the room gone quiet a beat before it: ambience ducks, then the low note
-  quietSlam(k = 1.3, quiet = 1.5) { this.hush(quiet); if (!this.ctx) return; setTimeout(() => { this.unhush(); this.pianoSlam(k); }, quiet * 1000); }
+  quietSlam(k = 1.3, quiet = 1.5) { this.hush(quiet); if (!this.ctx) return; this.rise(quiet, 2.4); setTimeout(() => { this.unhush(); this.pianoSlam(k); }, quiet * 1000); }
   // the house goes quiet and stays quiet until unhush() (a scare waiting behind you)
   holdHush() { if (!this.ctx) return; const g = this.master.gain, t = this.now; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(this.level * 0.2, t + 0.6); }
   unhush() { if (!this.ctx) return; const g = this.master.gain, t = this.now; g.cancelScheduledValues(t); g.setValueAtTime(this.level, t); }
@@ -303,11 +552,11 @@ export class Sound {
     src.start(this.now); return b.duration;
   }
 
-  swell() { if (!this.play('sfx/violin_swell', { gain: 1, wet: 0.1 })) this.tone({ type: 'sawtooth', f: 900, f2: 2400, dur: 6, gain: 0.06, attack: 5, wet: 0.5 }); }
+  swell() { if (!this.rise(5, 0.7) && !this.play('sfx/violin_swell', { gain: 1, wet: 0.1 })) this.tone({ type: 'sawtooth', f: 900, f2: 2400, dur: 6, gain: 0.06, attack: 5, wet: 0.5 }); }
   dread(v, t = 3) { if (!this.ctx) return; this.bed('sfx/low_drone', v, t); this.bed('sfx/whispers', v * 0.8, t); }
-  scratch(pan = 0) { if (!this.play('sfx/closet_scratch', { gain: 0.9, pan, wet: 0.3 })) for (let i = 0; i < 7; i++) this.noiseHit({ dur: 0.25, type: 'highpass', f: 2500, gain: 0.18, pan, wet: 0.3, delay: i * 0.35 }); }
-  ceilingThump() { if (!this.play('sfx/ceiling_thump', { gain: 1.8, wet: 0.35 })) this.tone({ f: 70, f2: 30, dur: 0.5, gain: 0.8, wet: 0.5 }); }
-  slamFar(pan = 0) { if (!this.play('sfx/door_slam_far', { gain: 1.7, pan, wet: 0.4 })) { this.tone({ f: 90, f2: 40, dur: 0.4, gain: 0.7, pan, wet: 0.6 }); this.noiseHit({ dur: 0.2, f: 500, gain: 0.5, pan, wet: 0.6 }); } }
+  scratch(pan = 0) { if (!this.pick('wall_scratch', { gain: 0.8, pan, wet: 0.3, lp: 2200 }) && !this.play('sfx/closet_scratch', { gain: 0.9, pan, wet: 0.3 })) for (let i = 0; i < 7; i++) this.noiseHit({ dur: 0.25, type: 'highpass', f: 2500, gain: 0.18, pan, wet: 0.3, delay: i * 0.35 }); }
+  ceilingThump() { if (!this.play('sfx/ceiling_thump', { gain: 1.8, wet: 0.35 }) && !this.pick('step_heavy', { gain: 1.2, wet: 0.35, muffle: true, rate: 0.85 })) this.tone({ f: 70, f2: 30, dur: 0.5, gain: 0.8, wet: 0.5 }); }
+  slamFar(pan = 0) { if (!this.pick('door_slam', { gain: 0.9, pan, wet: 0.45, lp: 1400 }) && !this.play('sfx/door_slam_far', { gain: 1.7, pan, wet: 0.4 })) { this.tone({ f: 90, f2: 40, dur: 0.4, gain: 0.7, pan, wet: 0.6 }); this.noiseHit({ dur: 0.2, f: 500, gain: 0.5, pan, wet: 0.6 }); } }
   pop() {
     this.noiseHit({ dur: 0.05, type: 'highpass', f: 2500, gain: 0.7, wet: 0.4 });
     this.tone({ f: 1400, f2: 200, dur: 0.06, gain: 0.25, wet: 0.4 });
@@ -316,25 +565,43 @@ export class Sound {
   splash() { this.noiseHit({ dur: 0.9, type: 'bandpass', f: 1600, f2: 900, q: 0.6, gain: 0.35, attack: 0.08, wet: 0.35 }); }
   whoosh(pan = 0) { this.noiseHit({ dur: 0.7, type: 'bandpass', f: 300, f2: 2400, q: 1.2, gain: 0.45, attack: 0.15, pan, wet: 0.3 }); }
   gasp() { this.noiseHit({ dur: 0.45, type: 'bandpass', f: 1300, f2: 700, q: 1.1, gain: 0.6, attack: 0.04, wet: 0.15 }); }
-  breath(inhale = true, gain = 0.12) { this.noiseHit({ dur: inhale ? 0.9 : 1.1, type: 'bandpass', f: inhale ? 900 : 700, f2: inhale ? 1300 : 450, q: 0.8, gain, attack: 0.45, wet: 0.05 }); }
+  breath(inhale = true, gain = 0.12) { if (!this.pick('breath', { gain, wet: 0.03, jitter: 0.04, rate: inhale ? 1 : 0.96 })) this.noiseHit({ dur: inhale ? 0.9 : 1.1, type: 'bandpass', f: inhale ? 900 : 700, f2: inhale ? 1300 : 450, q: 0.8, gain, attack: 0.45, wet: 0.05 }); }
   whisper(pan = 0, gain = 0.2) {
+    if (this.pick('whisper', { gain, pan, wet: 0.45, jitter: 0.04, lp: 5000 })) return;
     for (let i = 0; i < 6; i++) this.noiseHit({ dur: 0.12 + Math.random() * 0.15, type: 'bandpass', f: 2500 + Math.random() * 2500, q: 3, gain: gain * (0.5 + Math.random() * 0.5), attack: 0.03, pan, wet: 0.5, delay: i * 0.17 + Math.random() * 0.05 });
   }
   giggle(pan = 0) {
     for (let i = 0; i < 5; i++) this.tone({ type: 'triangle', f: 520 - i * 25, f2: 470 - i * 25, dur: 0.07, gain: 0.05, attack: 0.01, pan, wet: 0.6, delay: i * 0.13 });
   }
-  knock(pan = 0, gain = 0.4) { for (let i = 0; i < 3; i++) { this.tone({ f: 140, f2: 70, dur: 0.1, gain, pan, wet: 0.45, delay: i * 0.32 }); this.noiseHit({ dur: 0.05, f: 700, gain: gain * 0.6, pan, wet: 0.45, delay: i * 0.32 }); } }
+  // three knocks, on a door or inside a wall
+  knock(pan = 0, gain = 0.4) {
+    if (this.pick('knock', { gain: gain * 1.4, pan, wet: 0.4, maxLen: 1 })) {
+      for (let i = 1; i < 3; i++) this.pick('knock', { gain: gain * 1.4 * (1 - i * 0.08), pan, wet: 0.4, maxLen: 1, delay: i * (0.3 + Math.random() * 0.06) });
+      return;
+    }
+    for (let i = 0; i < 3; i++) { this.tone({ f: 140, f2: 70, dur: 0.1, gain, pan, wet: 0.45, delay: i * 0.32 }); this.noiseHit({ dur: 0.05, f: 700, gain: gain * 0.6, pan, wet: 0.45, delay: i * 0.32 }); } }
   chirp(pan = 0) {
     const n = 2 + Math.floor(Math.random() * 3), base = 2600 + Math.random() * 1600;
     for (let i = 0; i < n; i++) this.tone({ f: base, f2: base * (1.2 + Math.random() * 0.4), dur: 0.06, gain: 0.04, attack: 0.005, pan, wet: 0.05, delay: i * 0.11 });
   }
-  thump() { this.tone({ f: 90, f2: 40, dur: 0.15, gain: 0.5, wet: 0.2 }); this.noiseHit({ dur: 0.08, f: 600, gain: 0.35 }); }
-  // the grandfather clock: a dry wooden tick (the tock a shade lower), and the hour struck on a soft bell after the four-note phrase
+  thump() { if (this.pick('wall_knock', { gain: 0.8, wet: 0.25, lp: 900 })) return; this.tone({ f: 90, f2: 40, dur: 0.15, gain: 0.5, wet: 0.2 }); this.noiseHit({ dur: 0.08, f: 600, gain: 0.35 }); }
+  // the grandfather clock: its pendulum's beat (the tock a shade lower), and on the hour the works whirring, a four-note phrase and the strikes.
+  // recorded (BigSoundBank 1567, 3360, 3361, 1568); the phrase is rung on the clock's own bell, retuned
   clockTick(gain = 0.2, pan = 0, tock = false) {
+    if (this.pick('clock_tick', { gain, pan, wet: 0.12, rate: tock ? 0.94 : 1, jitter: 0.012 })) return;
     this.noiseHit({ dur: 0.012, type: 'bandpass', f: tock ? 1700 : 2300, q: 1.2, gain: gain * 1.6, pan, wet: 0.08, attack: 0.001 });
     this.tone({ type: 'triangle', f: tock ? 520 : 640, f2: tock ? 260 : 330, dur: 0.035, gain: gain * 0.5, pan, wet: 0.1, attack: 0.001 });
   }
   chime(count = 1, gain = 0.25, pan = 0) {
+    const strikes = this.libBuf.clock_strike;
+    if (strikes && strikes.length) {
+      let t = this.pick('clock_gear', { gain: gain * 1.4, pan, wet: 0.3, jitter: 0.02 }) * 0.92;
+      for (const r of [1.26, 1.122, 1, 0.749]) { this.pick('clock_strike', { gain: gain * 0.5, pan, wet: 0.4, rate: r, jitter: 0.003, delay: t, dur: 2.4 }); t += 0.62; }   // G#, F#, E, B
+      t += 1.3;
+      for (let i = 0; i < count; i++) { this.pick('clock_strike', { gain: gain * 0.9, pan, wet: 0.45, rate: 0.5, jitter: 0.004, delay: t }); t += 1.5; }   // the hour bell, an octave under the phrase
+      return t;
+    }
+    if (this.lib && this.lib.clock_strike) this.libLoad('clock_strike');
     const bell = (f, at, g, dur) => {
       this.tone({ f, dur, gain: g, pan, wet: 0.45, attack: 0.004, delay: at });
       this.tone({ f: f * 2.76, dur: dur * 0.5, gain: g * 0.22, pan, wet: 0.45, attack: 0.002, delay: at });
@@ -347,8 +614,8 @@ export class Sound {
     return t;
   }
   // doors: a long hinge creak and a latch click when one opens, a thud when it shuts
-  doorOpen(pan = 0, gain = 0.4) { this.creak(gain, pan, 0); this.noiseHit({ dur: 0.03, type: 'highpass', f: 2500, gain: gain * 0.5, pan, wet: 0.1 }); }
-  doorClose(pan = 0, gain = 0.6) { this.tone({ f: 100, f2: 45, dur: 0.18, gain: gain * 0.9, pan, wet: 0.3 }); this.noiseHit({ dur: 0.1, f: 800, gain: gain * 0.5, pan, wet: 0.3 }); this.noiseHit({ dur: 0.02, type: 'highpass', f: 3500, gain: gain * 0.4, pan, wet: 0.05, delay: 0.12 }); }
+  doorOpen(pan = 0, gain = 0.4) { if (this.pick(Math.random() < 0.3 ? 'door_creak' : 'door_open', { gain: gain * 1.1, pan, wet: 0.3, jitter: 0.06 })) return; this.creak(gain, pan, 0); this.noiseHit({ dur: 0.03, type: 'highpass', f: 2500, gain: gain * 0.5, pan, wet: 0.1 }); }
+  doorClose(pan = 0, gain = 0.6) { if (this.pick('door_close', { gain: gain * 1.2, pan, wet: 0.3, jitter: 0.06 })) return; this.tone({ f: 100, f2: 45, dur: 0.18, gain: gain * 0.9, pan, wet: 0.3 }); this.noiseHit({ dur: 0.1, f: 800, gain: gain * 0.5, pan, wet: 0.3 }); this.noiseHit({ dur: 0.02, type: 'highpass', f: 3500, gain: gain * 0.4, pan, wet: 0.05, delay: 0.12 }); }
   // ---- more of the house ----
   // a person muttering: voiced syllables through two formants. Stands in for the recorded lines until a line has its own file; returns the mouth envelope.
   mumble(voice = 'mom', dur = 2, { muffle = false, gain = 0.55, pan = 0 } = {}) {
@@ -383,6 +650,7 @@ export class Sound {
   }
   phoneRing(pan = 0) {   // a 2002 bell: a high tone chopped at 20 Hz, twice
     if (!this.ctx) return;
+    if (this.pick('phone_ring', { gain: 0.45, pan, wet: 0.35, dur: 1.3, maxLen: 4, jitter: 0.01 })) return;
     for (const d of [0, 0.5]) {
       const ctx = this.ctx, t = this.now + d, o = ctx.createOscillator(), o2 = ctx.createOscillator(), am = ctx.createOscillator(), amg = ctx.createGain(), g = ctx.createGain();
       o.frequency.value = 1980; o2.frequency.value = 2310; am.type = 'square'; am.frequency.value = 22; amg.gain.value = 0.5; am.connect(amg).connect(g.gain);
@@ -393,12 +661,16 @@ export class Sound {
   }
   staticBurst(pan = 0, dur = 2) {
     if (!this.ctx) return;
+    if (this.has('radio_static') && this.libBuf.radio_static && this.libBuf.radio_static.length) {
+      for (let t = 0; t < dur - 0.05; t += 3.4) this.pick('radio_static', { gain: 0.5, pan, wet: 0.15, delay: t, offset: Math.random() * 0.3, dur: Math.min(3.6, dur - t) });
+      return;
+    }
     this.noiseHit({ dur, type: 'bandpass', f: 3200, q: 0.5, gain: 0.34, pan, wet: 0.15, attack: 0.02 });
     this.noiseHit({ dur, type: 'highpass', f: 6000, gain: 0.18, pan, wet: 0.1, attack: 0.02 });
     for (let i = 0; i < dur * 8; i++) this.noiseHit({ dur: 0.03, type: 'highpass', f: 2000, gain: 0.25, pan, wet: 0.1, delay: Math.random() * dur });
   }
   scrape(pan = 0) {   // a chair dragged across lino
-    if (!this.ctx) return; this.noiseHit({ dur: 0.7, type: 'bandpass', f: 700, f2: 450, q: 2, gain: 0.35, pan, wet: 0.35, attack: 0.05 }); this.tone({ type: 'sawtooth', f: 160, f2: 110, dur: 0.6, gain: 0.07, pan, wet: 0.3 });
+    if (!this.ctx || this.pick('chair_scrape', { gain: 0.7, pan, wet: 0.35 })) return; this.noiseHit({ dur: 0.7, type: 'bandpass', f: 700, f2: 450, q: 2, gain: 0.35, pan, wet: 0.35, attack: 0.05 }); this.tone({ type: 'sawtooth', f: 160, f2: 110, dur: 0.6, gain: 0.07, pan, wet: 0.3 });
   }
   flush(pan = 0) { if (!this.ctx) return; this.noiseHit({ dur: 2.6, type: 'bandpass', f: 800, f2: 2200, q: 0.6, gain: 0.3, pan, wet: 0.3, attack: 0.4 }); }
 
@@ -444,21 +716,27 @@ export class Sound {
   }
   honk(pan = 0) { if (!this.ctx) return; this.tone({ type: 'square', f: 420, dur: 0.35, gain: 0.12, pan, wet: 0.3 }); this.tone({ type: 'square', f: 520, dur: 0.35, gain: 0.1, pan, wet: 0.3 }); }
 
-  click() { this.noiseHit({ dur: 0.02, type: 'highpass', f: 3000, gain: 0.3, wet: 0.02 }); }
+  click() { if (!this.pick('switch', { gain: 0.3, wet: 0.02, maxLen: 0.6 })) this.noiseHit({ dur: 0.02, type: 'highpass', f: 3000, gain: 0.3, wet: 0.02 }); }
+
+  pageTurn() { if (!this.pick('page_turn', { gain: 0.35, wet: 0.04, jitter: 0.04 })) { this.noiseHit({ dur: 0.2, type: 'bandpass', f: 2200, gain: 0.16, wet: 0.04 }); this.noiseHit({ dur: 0.12, type: 'highpass', f: 4200, gain: 0.08, wet: 0.04, delay: 0.09 }); } }
 
   // ---- the disposable camera: the shutter's clack, the flash's whine, the thumbwheel winding on ----
   shutter() {
     if (!this.ctx) return;
+    if (this.pick('shutter', { gain: 0.6, wet: 0.04, maxLen: 1, jitter: 0.02 })) { this.tone({ type: 'sine', f: 5200, f2: 7800, dur: 0.5, gain: 0.02, wet: 0.05, delay: 0.1 }); return; }
     this.noiseHit({ dur: 0.018, type: 'highpass', f: 2600, gain: 0.55, wet: 0.04 });
     this.noiseHit({ dur: 0.05, type: 'bandpass', f: 1400, q: 3, gain: 0.35, wet: 0.05, delay: 0.012 });
     this.tone({ type: 'square', f: 1900, f2: 1500, dur: 0.03, gain: 0.05, wet: 0.03, delay: 0.004 });
     this.tone({ type: 'sine', f: 5200, f2: 7800, dur: 0.5, gain: 0.025, wet: 0.05, delay: 0.08 });   // the flash charging back up
   }
-  winder() { if (!this.ctx) return; for (let i = 0; i < 9; i++) this.noiseHit({ dur: 0.012, type: 'highpass', f: 3600 + (i % 2) * 600, gain: 0.22, wet: 0.03, delay: 0.25 + i * 0.075 }); }
+  winder() { if (!this.ctx || this.pick('winder', { gain: 0.5, wet: 0.03, delay: 0.3 })) return; for (let i = 0; i < 9; i++) this.noiseHit({ dur: 0.012, type: 'highpass', f: 3600 + (i % 2) * 600, gain: 0.22, wet: 0.03, delay: 0.25 + i * 0.075 }); }
   // what gives a piece of proof away, from its direction; gain falls off with distance in nights.js
   proofCue(kind, pan = 0, gain = 1) {
     if (!this.ctx || gain <= 0) return;
-    const g = gain;
+    const g = gain, o = { pan, wet: 0.35 };
+    const rec = { scratch: ['wall_scratch', 0.5, { dur: 1.3 }], drip: ['drip', 0.35], hiss: ['radio_static', 0.3, { dur: 1.1 }], crayon: ['crayon', 0.45], chair: ['chair_scrape', 0.6],
+      dial: ['dial_tone', 0.15, { dur: 1.2 }], metal: ['metal_tap', 0.4], tear: ['paper_tear', 0.5], lid: ['washer_lid', 0.6], match: ['match', 0.6] }[kind];
+    if (rec && this.pick(rec[0], { ...o, ...rec[2], gain: rec[1] * g })) return;
     switch (kind) {
       case 'scratch': for (let i = 0; i < 4; i++) this.noiseHit({ dur: 0.22, type: 'highpass', f: 2400, gain: 0.16 * g, pan, wet: 0.35, delay: i * 0.3 }); break;
       case 'drip': for (let i = 0; i < 3; i++) this.tone({ f: 1500, f2: 700, dur: 0.07, gain: 0.12 * g, pan, wet: 0.5, delay: i * 0.7 }); break;

@@ -13,7 +13,7 @@ const PORT = +opt('--port', 9391), TOL = +opt('--tol', 0.03), JSON_OUT = opt('--
 const FRONT = {
   default: [0, 0, 1],
   washer: [-1, 0, 0], dryer: [1, 0, 0], grandfather: [1, 0, 0], bookcase: [0, 0, 1], filing: [0, 0, 1], dresser: [0, 0, 1], dresser_old: [0, 0, 1],
-  cabinet: [0, 0, 1], fridge: [1, 0, 0], stove: [0, 0, 1], tv: [0, 0, 1], sofa: [0, 0, 1], armchair: [0, 0, 1], chair: [0, 0, 1], office_chair: [0, 0, 1],
+  cabinet: [0, 0, 1], fridge: [1, 0, 0], stove: [0, 0, 1], tv: [0, 0, 1], sofa: [0, 0, 1], sofa_plaid: [1, 0, 0], armchair: [0, 0, 1], chair: [0, 0, 1], office_chair: [0, 0, 1],
   desk: [0, 0, 1], toilet: [0, 0, 1], crt_pc: [1, 0, 0], mirror: [0, 0, 1], bunk: null, table: null, table_round: null, plant1: null, plant2: null,
   kettle: null, pot: null, table_lamp: null, desk_lamp: null, teddy: null, outlet: null, switch: null, clock_wall: [0, 0, 1],
 };
