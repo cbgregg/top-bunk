@@ -1,86 +1,86 @@
 {
  "dad/welcome": {
   "voice": "dad",
-  "say": "There he is. Okay... three boxes in the truck, they've got your name on 'em. Big marker, you can't miss 'em. End of the hall, bud... go.",
-  "html": "<b>Dad:</b> There he is. Three boxes in the truck with your name on 'em, big marker, can't miss 'em. End of the hall, bud. Go."
+  "say": "Three boxes in the truck with your name on 'em. Your room's the last one. End of the hall.",
+  "html": "<b>Dad:</b> Three boxes in the truck with your name on 'em. Your room's the last one. End of the hall."
  },
  "dad/line_1": {
   "voice": "dad",
-  "say": "Hey. Uh... if you find the one with the coffee maker in it? You're officially my favorite kid.",
-  "html": "<b>Dad:</b> Hey. If you find the one with the coffee maker in it, you're officially my favorite kid."
+  "say": "Watch the second step. It's soft.",
+  "html": "<b>Dad:</b> Watch the second step. It's soft."
  },
  "dad/line_2": {
   "voice": "dad",
-  "say": "Truck's gotta be back at the rental place by six, or they, uh... they charge us a whole other day. So, you know. Light a fire under it.",
-  "html": "<b>Dad:</b> Truck's gotta be back at the rental place by six or they charge us a whole other day. So, you know. Light a fire under it."
+  "say": "Truck goes back at six. ...Just keep moving, bud.",
+  "html": "<b>Dad:</b> Truck goes back at six. Just keep moving, bud."
  },
  "dad/line_3": {
   "voice": "dad",
-  "say": "Guy next door's got a dog the size of a pony. Don't go petting it till we've met it, okay? Oh... and the bunk's already up in your room. Came with the place.",
-  "html": "<b>Dad:</b> Guy next door's got a dog the size of a pony. Don't go petting it till we've met it. Oh, and the bunk's already up in your room. Came with the place."
+  "say": "Bunk was already in there when we came. Top one's yours.",
+  "html": "<b>Dad:</b> Bunk was already in there when we came. Top one's yours."
  },
  "dad/mom_looking": {
   "voice": "dad",
-  "say": "That's the last of yours. Go find your mom... she's in the kitchen swearing at boxes. Don't tell her I said swearing.",
-  "html": "<b>Dad:</b> That's the last of yours. Go find your mom, she's in the kitchen swearing at boxes. Don't tell her I said swearing."
+  "say": "That's all of yours. Go see your mom.",
+  "html": "<b>Dad:</b> That's all of yours. Go see your mom."
  },
  "mom/boxes_first": {
   "voice": "mom",
-  "say": "Hey, bud. Not yet... I'm elbow-deep in newspaper looking for the kettle. Boxes first. Then you can give me the tour.",
-  "html": "<b>Mom:</b> Hey, bud. Not yet, I'm elbow-deep in newspaper looking for the kettle. Boxes first. Then you can give me the tour."
+  "say": "Not yet, hon. Boxes first.",
+  "html": "<b>Mom:</b> Not yet, hon. Boxes first."
  },
  "mom/boxes_again": {
   "voice": "mom",
-  "say": "I can hear you standing there. Three boxes... then I'm all yours. Go on.",
-  "html": "<b>Mom:</b> I can hear you standing there. Three boxes, then I'm all yours. Go on."
+  "say": "Boxes, bud. Then I'm all yours.",
+  "html": "<b>Mom:</b> Boxes, bud. Then I'm all yours."
  },
  "mom/helper": {
   "voice": "mom",
-  "say": "All three? Look at you. Okay... your sheets are in a box somewhere, so tonight it's the sleeping bag. We'll call it camping.",
-  "html": "<b>Mom:</b> All three? Look at you. Okay. Your sheets are in a box somewhere, so tonight it's the sleeping bag. We'll call it camping."
+  "say": "That's all of them? ...Okay. Sheets are in a box somewhere. Sleeping bag tonight.",
+  "html": "<b>Mom:</b> That's all of them? Okay. Sheets are in a box somewhere. Sleeping bag tonight."
  },
  "mom/landlord": {
   "voice": "mom",
-  "say": "Know what the landlord said? Don't mind the noises, the house just settles. ...Settles. Like it's tired.",
-  "html": "<b>Mom:</b> Know what the landlord said? \"Don't mind the noises, the house just settles.\" Settles. Like it's tired."
+  "say": "Landlord said don't mind the noises. Old house. ...He said it twice.",
+  "html": "<b>Mom:</b> Landlord said don't mind the noises. Old house. ...He said it twice."
  },
  "dad/cheap": {
   "voice": "dad",
-  "say": "[quiet] ...Eleven hundred a month. It can sing, for all I care. ... We'll make it nice. Give it a week.",
-  "html": "<b>Dad:</b> ...Eleven hundred a month, it can sing for all I care. We'll make it nice. Give it a week."
+  "say": "[quiet] It's what we could get.",
+  "html": "<b>Dad:</b> It's what we could get."
  },
  "dad/leftovers": {
   "voice": "dad",
-  "say": "People before us left half their stuff in the back room. A crib... a lamp. Whole box of Christmas lights. Never came back for any of it.",
-  "html": "<b>Dad:</b> People before us left half their stuff in the back room. A crib, a lamp, a whole box of Christmas lights. Never came back for any of it."
+  "say": "People before us left in a hurry. Back room's still full of their stuff.",
+  "html": "<b>Dad:</b> People before us left in a hurry. Back room's still full of their stuff."
  },
  "mom/teeth": {
   "voice": "mom",
-  "say": "Okay. Teeth, then bed. Bus is Monday at ten past seven, so... we practice falling asleep. C'mere. Love you.",
-  "html": "<b>Mom:</b> Teeth, then bed. Bus is Monday at ten past seven, so we practice falling asleep. Come here. Love you."
+  "say": "Teeth, then bed. Door stays open. Hall light stays on. ...Okay?",
+  "html": "<b>Mom:</b> Teeth, then bed. Door stays open. Hall light stays on. Okay?"
  },
  "you/m1_a": {
   "voice": null,
-  "html": "<b>You:</b> Mom... there was somebody standing at the end of the hallway last night."
+  "html": "<b>You:</b> Something got in the bottom bunk last night."
  },
  "mom/m1_a": {
   "voice": "mom",
-  "say": "Oh, honey. New house, new noises. Everything looks wrong in the dark the first night. Nobody was out there.",
-  "html": "<b>Mom:</b> Oh, honey. New house, new noises. Everything looks wrong in the dark the first night. Nobody was out there."
+  "say": "I heard you talking. I came in. ...It sounded like two people, bud.",
+  "html": "<b>Mom:</b> I heard you talking. I came in. It sounded like two people, bud."
  },
  "you/m1_b": {
   "voice": null,
-  "html": "<b>You:</b> I wasn't asleep."
+  "html": "<b>You:</b> It wasn't me."
  },
  "dad/m1_a": {
   "voice": "dad",
-  "say": "This thing's got two buttons and, uh... neither one of 'em makes coffee. Bud. It was the furnace kicking on. Scared me too. Eat up.",
-  "html": "<b>Dad:</b> This thing has two buttons and neither one of 'em makes coffee. Bud, it was the furnace kicking on. Scared me too. Eat up."
+  "say": "[flat, tired] I put that box out by the road last night. It's back in your room.",
+  "html": "<b>Dad:</b> I put that box out by the road last night. It's back in your room."
  },
  "mom/m1_b": {
   "voice": "mom",
-  "say": "Tell you what... door open tonight, hall light on. Deal? And eat something. I found the good cereal.",
-  "html": "<b>Mom:</b> Tell you what. Door open tonight, hall light on. Deal? And eat something. I found the good cereal."
+  "say": "[quiet] ...Eat something. Please.",
+  "html": "<b>Mom:</b> ...Eat something. Please."
  },
  "dad/n2_a": {
   "voice": "dad",
@@ -583,21 +583,55 @@
  },
  "mom/gift_a": {
   "voice": "mom",
-  "say": "Oh, wait. Before I forget... I got you something at the gas station. It's, um... it's not much.",
-  "html": "<b>Mom:</b> Oh, wait. Before I forget. I got you something at the gas station. It's not much."
+  "say": "Oh. Here. Gas station had these by the register.",
+  "html": "<b>Mom:</b> Oh. Here. Gas station had these by the register."
  },
  "mom/gift_b": {
   "voice": "mom",
-  "say": "Take pictures of everything. Your room, the yard... we'll send Grandma the good ones.",
-  "html": "<b>Mom:</b> Take pictures of everything. Your room, the yard. We'll send Grandma the good ones."
+  "say": "Take pictures of the new place. For Grandma.",
+  "html": "<b>Mom:</b> Take pictures of the new place. For Grandma."
  },
  "dad/gift": {
   "voice": "dad",
-  "say": "Twenty-four pictures, bud. Don't spend 'em all on the dog next door.",
-  "html": "<b>Dad:</b> Twenty-four pictures, bud. Don't spend 'em all on the dog next door."
+  "say": "Twenty-four pictures. That's all you get.",
+  "html": "<b>Dad:</b> Twenty-four pictures. That's all you get."
  },
  "you/gift": {
   "voice": null,
   "html": "<b>You:</b> Thanks, Mom."
+ },
+ "you/box4": {
+  "voice": null,
+  "html": "<b>You:</b> There's another box in my room. It's got my name on it."
+ },
+ "dad/box4": {
+  "voice": "dad",
+  "say": "[flat, quiet] ...That's not one of ours. I'll put it out by the road.",
+  "html": "<b>Dad:</b> ...That's not one of ours. I'll put it out by the road."
+ },
+ "mom/n1_call_a": {
+  "voice": "mom",
+  "say": "[sweet, sleepy, through a door] Bud? Come here a sec, honey.",
+  "html": "<b>Mom:</b> <i>(through their door)</i> Bud? Come here a sec, honey."
+ },
+ "mom/n1_call_b": {
+  "voice": "mom",
+  "say": "[sweet, slow, through a door] Come here. I want to show you something.",
+  "html": "<b>Mom:</b> <i>(through their door)</i> Come here. I want to show you something."
+ },
+ "mom/n1_door_a": {
+  "voice": "mom",
+  "say": "[sleepy, worried, quiet] Bud? ...You okay?",
+  "html": "<b>Mom:</b> Bud? ...You okay?"
+ },
+ "mom/n1_door_b": {
+  "voice": "mom",
+  "say": "[quiet, uneasy] Who were you talking to?",
+  "html": "<b>Mom:</b> Who were you talking to?"
+ },
+ "mom/sit": {
+  "voice": "mom",
+  "say": "[tired, gentle] Hey. Sit down, please.",
+  "html": "<b>Mom:</b> Hey. Sit down, please."
  }
 }

@@ -1,0 +1,74 @@
+<!doctype html><meta charset=utf-8>
+<!-- bakes the Quaternius Universal Animation Library clips (CC0) onto the Rocketbox skeleton: see body.js and README.md -->
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const P = new URLSearchParams(location.search), FPS = 30;
+const load = (u) => new Promise((res, rej) => new GLTFLoader().load(u, res, undefined, rej));
+// [Rocketbox bone, UAL bone, Rocketbox child, UAL child]: the child pair lines the two bones up (the rest poses differ)
+const MAP = [
+  ['Bip01_Pelvis', 'pelvis', 'Bip01_Spine1', 'spine_02'],
+  ['Bip01_Spine', 'spine_01', 'Bip01_Spine1', 'spine_02'],
+  ['Bip01_Spine1', 'spine_02', 'Bip01_Spine2', 'spine_03'],
+  ['Bip01_Spine2', 'spine_03', 'Bip01_Neck', 'neck_01'],
+  ['Bip01_Neck', 'neck_01', 'Bip01_Head', 'Head'],
+  ['Bip01_Head', 'Head'],
+  ...['L', 'R'].flatMap((s) => { const u = s.toLowerCase(); return [
+    [`Bip01_${s}_Clavicle`, `clavicle_${u}`, `Bip01_${s}_UpperArm`, `upperarm_${u}`],
+    [`Bip01_${s}_UpperArm`, `upperarm_${u}`, `Bip01_${s}_Forearm`, `lowerarm_${u}`],
+    [`Bip01_${s}_Forearm`, `lowerarm_${u}`, `Bip01_${s}_Hand`, `hand_${u}`],
+    [`Bip01_${s}_Hand`, `hand_${u}`, `Bip01_${s}_Finger2`, `middle_01_${u}`],
+    [`Bip01_${s}_Thigh`, `thigh_${u}`, `Bip01_${s}_Calf`, `calf_${u}`],
+    [`Bip01_${s}_Calf`, `calf_${u}`, `Bip01_${s}_Foot`, `foot_${u}`],
+    [`Bip01_${s}_Foot`, `foot_${u}`, `Bip01_${s}_Toe0`, `ball_${u}`],
+  ]; }),
+];
+const wq = (o) => o.getWorldQuaternion(new THREE.Quaternion()), wp = (o) => o.getWorldPosition(new THREE.Vector3());
+const byName = (root) => { const m = {}; root.traverse((o) => { if (!m[o.name]) m[o.name] = o; }); return m; };
+function bake(tgt, src, clip, name) {
+  const T = byName(tgt), S = byName(src), mixer = new THREE.AnimationMixer(src);
+  src.updateMatrixWorld(true); tgt.updateMatrixWorld(true);
+  const rest = MAP.map(([tn, sn, tc, sc]) => {
+    const t = T[tn], s = S[sn]; if (!t || !s) throw new Error('missing bone ' + tn + ' / ' + sn);
+    const A = new THREE.Quaternion();
+    if (tc && sc && T[tc] && S[sc]) A.setFromUnitVectors(wp(T[tc]).sub(wp(t)).normalize(), wp(S[sc]).sub(wp(s)).normalize());
+    return { t, s, A, restS: wq(s), restT: wq(t), restLocal: t.quaternion.clone() };
+  });
+  const n = Math.max(2, Math.round(clip.duration * FPS)), times = [], vals = rest.map(() => []);
+  const action = mixer.clipAction(clip); action.play();
+  const q = new THREE.Quaternion(), qp = new THREE.Quaternion(), dW = new THREE.Quaternion();
+  for (let i = 0; i <= n; i++) {
+    const tt = (i / n) * clip.duration; times.push(tt);
+    mixer.setTime(tt); src.updateMatrixWorld(true);
+    rest.forEach((r, k) => {
+      dW.copy(wq(r.s)).multiply(r.restS.clone().invert());
+      q.copy(dW).multiply(r.A).multiply(r.restT);
+      r.t.parent.updateWorldMatrix(true, false); qp.copy(wq(r.t.parent)).invert();
+      r.t.quaternion.copy(qp.multiply(q)); r.t.updateMatrix(); r.t.updateMatrixWorld(true);
+      const a = r.t.quaternion.toArray(), prev = vals[k].length ? vals[k].slice(-4) : null;
+      if (prev && prev[0] * a[0] + prev[1] * a[1] + prev[2] * a[2] + prev[3] * a[3] < 0) for (let j = 0; j < 4; j++) a[j] = -a[j];   // one hemisphere, so blends never go the long way round
+      vals[k].push(...a);
+    });
+  }
+  action.stop(); mixer.uncacheRoot(src);
+  rest.forEach((r) => r.t.quaternion.copy(r.restLocal)); tgt.updateMatrixWorld(true);
+  return { name, duration: clip.duration, fps: FPS, bones: rest.map((r) => r.t.name.replace(/^Bip01_/, '')), frames: n + 1, vals };
+}
+(async () => {
+  const tgt = (await load('/assets/models/dad.glb')).scene;
+  const jobs = JSON.parse(P.get('jobs'));   // [[file, sourceClip, ourName], ...]
+  const srcs = {}, out = [], info = {};
+  for (const [file, sc, name] of jobs) {
+    if (!srcs[file]) { const g = await load(file); srcs[file] = g;
+      // both skeletons must face the same way in their rest poses (the bake copies world rotations): turn the source round if they do not
+      const S = byName(g.scene), T = byName(tgt); g.scene.updateMatrixWorld(true); tgt.updateMatrixWorld(true);
+      const fs = wp(S.ball_l).sub(wp(S.foot_l)).setY(0).normalize(), ft = wp(T.Bip01_L_Toe0).sub(wp(T.Bip01_L_Foot)).setY(0).normalize();
+      info[file] = { facing: fs.dot(ft) }; if (fs.dot(ft) < 0) { g.scene.rotation.y += Math.PI; g.scene.updateMatrixWorld(true); }
+    }
+    const clip = srcs[file].animations.find((a) => a.name === sc); if (!clip) throw new Error('no clip ' + sc);
+    out.push(bake(tgt, srcs[file].scene, clip, name));
+  }
+  window.out = out; window.info = info; window.done = true;
+})().catch((e) => { window.err = String(e.stack || e); window.done = true; });
+</script>

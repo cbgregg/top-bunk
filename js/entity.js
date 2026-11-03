@@ -285,6 +285,7 @@ export class Entity {
       }
     }
     this.relaxHands(r);
+    if (this.post) this.post(r, dt);   // a scene's own pose on top (night one's bedside: an arm reaching a point, the head put somewhere)
     r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 6 });
     // now and then, while it stands, it cocks its head: quick over, held a moment, eased back. at most once per 11 s, timed from the
     // clock alone so a replay matches (after the look, which would straighten it out)

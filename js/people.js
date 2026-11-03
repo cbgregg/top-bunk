@@ -1,6 +1,6 @@
 // The family: Rocketbox models (assets/models), with low-poly stand-ins until they load.
 import * as THREE from 'three';
-import { Rig, loadModel, loadAnims } from './rig.js';
+import { Rig, loadModel, loadAnims, loadBody } from './rig.js';
 
 function makeLowPoly({ height = 1.75, shirt = '#6a7a8a', pants = '#2f3644', hair = '#3a2a1e', skin = '#d6a882', longHair = false, cap = null } = {}) {
   const g = new THREE.Group();
@@ -55,6 +55,7 @@ const CURL = {
   relaxed: [[0.32, 0.42, 0.24], [0.38, 0.48, 0.28], [0.44, 0.54, 0.32], [0.5, 0.6, 0.36], [0.22, 0.18, 0.14]],
   grip:    [[0.95, 1.2, 0.6], [1.0, 1.25, 0.65], [1.05, 1.3, 0.7], [1.1, 1.3, 0.7], [0.5, 0.45, 0.35]],
   flat:    [[0.12, 0.18, 0.1], [0.14, 0.2, 0.12], [0.16, 0.22, 0.14], [0.18, 0.24, 0.14], [0.2, 0.15, 0.1]],
+  soft:    [[0.18, 0.22, 0.12], [0.2, 0.24, 0.13], [0.21, 0.25, 0.13], [0.23, 0.27, 0.14], [0.22, 0.14, 0.1]],   // an open hand while talking: nearly straight, the fingers curled alike (a graded curl reads as a fan)
 };
 const WRIST_FLEX = 0.2;     // the relaxed wrist: this far off the forearm's line (the clips come in with the hands bent nearly 60 degrees at the wrist)
 const WRIST_ROLL = 1.1;     // how far grip may turn the hand about the forearm
@@ -77,14 +78,20 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     update(t, dt = 0.016) {
       if (!this.rig) { lp.update(t); return; }
       const r = this.rig;
+      this.bodyLang(r, dt);
       r.update(dt);
       // a body-only pose (sitting, a lean) leaves the arms to the listening poses
       let p = this.pose; if (!p || (!p.sleep && !(p.hold || p.reach || p.reachLocal || p.L || p.R))) { const ip = this.idlePose(dt); if (ip) p = p ? { ...p, ...ip } : ip; }
       // seated with nothing in them, the hands rest on the table or the thighs (and still lift to talk)
-      if (p && p.sit && this.sitNow > 0.5 && !(p.hold || p.reach || p.reachLocal || p.L || p.R)) { const at = p.rest || this.lap; if (at) p = { ...p, restHands: true, L: { reachLocal: at.L, palm: 'down', grip: 0.15 }, R: { reachLocal: at.R, palm: 'down', grip: 0.15 } }; }   // (p.rest: on the table)
-      const idleA = r.actions.idle;
+      if (p && p.sit && this.sitNow > 0.5 && !this.folding && !this.armsFree && !(p.hold || p.reach || p.reachLocal || p.L || p.R)) { const at = p.rest || this.lap; if (at) { const h = this.handsFromClip(r, at, !!p.rest, dt), mv = (S) => (h.move ? h.move[S] : 0);
+          // talking: an open hand, fingers together and nearly straight, closing a little as it moves (never the cupped claw a relaxed
+          // curl makes once the wrist rolls the palm up); quiet: a loose hand resting on the table
+          const hand = (S) => (r.env ? { reachLocal: h[S], palm: 'in', grip: 0.15 + mv(S) * 0.25, soft: true } : { reachLocal: h[S], palm: 'down', grip: 0.15 });   // (talking: the palms toward each other, the way hands explain across a table)
+          p = { ...p, restHands: true, L: hand('L'), R: hand('R') }; } }   // (p.rest: on the table)
+      const idleA = r.actions[(r.alias && r.alias.idle) || 'idle'];
       this.sitNow += ((p && p.sit || 0) - this.sitNow) * Math.min(1, dt * 3.5);
-      r.life(dt, { still: idleA ? idleA.getEffectiveWeight() : 1, talking: !!r.env, asleep: !!(p && p.sleep) });
+      // (the standing clip has a body's own sway and shifts: the procedural ones only add a little under it)
+      r.life(dt, { still: idleA ? idleA.getEffectiveWeight() * (r.alias ? 0.35 : 1) : 1, talking: !!r.env, asleep: !!(p && p.sleep) });
       this.relaxHands(r);
       if (!r.legLen && !(p && p.sleep)) this.legs(r, 0, 0);   // measure the legs (and set the root's height) once, standing
       if (p && p.sleep) this.applyPose(r, p, 1, 0);
@@ -96,14 +103,23 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
           dl = Math.min(0.55, this.duck * 2.2); const rest = Math.max(0, this.duck - 0.72 * (1 - Math.cos(dl)));
           ds = Math.min(0.9, Math.acos(Math.max(-1, 1 - rest / (r.legLen || 0.9))) / 1.1);
         }
-        this.leanNow += (Math.max(p && p.lean || 0, dl) - this.leanNow) * k; this.squatNow += (Math.max(p && p.squat || 0, ds) - this.squatNow) * k; this.kneelNow += ((p && p.kneel || 0) - this.kneelNow) * k;
+        this.leanNow += (Math.max(p && p.lean && !this.folding ? p.lean : 0, dl) - this.leanNow) * k;   // (arms folded, they sit back from the table) this.squatNow += (Math.max(p && p.squat || 0, ds) - this.squatNow) * k; this.kneelNow += ((p && p.kneel || 0) - this.kneelNow) * k;
         const sit = this.sitNow > 1e-3 ? this.sitNow : 0;
         if (want) this.applyPose(r, sit || p.sit ? { ...p, sit } : p, 1, this.leanNow, this.squatNow, this.kneelNow);
-        else if (Math.abs(this.leanNow) + this.squatNow + this.kneelNow + sit > 1e-3 || r.root.position.y !== (r.rootY0 || 0)) this.applyPose(r, sit ? { sit, seat: p && p.seat } : {}, 0, this.leanNow, this.squatNow, this.kneelNow);
+        else if (Math.abs(this.leanNow) + this.squatNow + this.kneelNow + sit > 1e-3 || r.root.position.y !== (r.rootY0 || 0)) this.applyPose(r, sit ? { sit, seat: p && p.seat, tuck: p && p.tuck } : {}, 0, this.leanNow, this.squatNow, this.kneelNow);
         // gestures while talking, when the hands are free
         if (!want || p.restHands || !(p.L || p.R || p.hold || p.reach || p.reachLocal)) this.gesture(r, dt);
         else this.gest.w = 0;
-        this.easeArms(r, dt, this.poseKey(p));
+        // the table guard: on the targets (so the easing heads for arms clear of the table), then once more on the arms as they will be
+        // drawn, since the easing lags its targets by a few frames: that last fix goes on at most 6 degrees a bone a frame (no snap)
+        const guard = p && p.sit && this.sitNow > 0.5 && !p.hold && !this.folding;
+        if (guard) this.tableGuard(r, p);
+        this.easeArms(r, dt, this.poseKey(p) + (this.armsFree ? 'free' : ''));
+        if (guard && this.tableGuard(r, p)) {
+          const cap = 0.105;
+          for (const b of this.armBones) { const sh = this.shown.get(b); if (!sh) continue; if (sh.angleTo(b.quaternion) > cap) sh.rotateTowards(b.quaternion, cap); else sh.copy(b.quaternion); b.quaternion.copy(sh); b.updateMatrix(); }
+          r.root.updateMatrixWorld(true);
+        }
       }
       r.lookAt(this.lookAt, dt);
       r.updateJaw(dt); r.face(dt);
@@ -133,11 +149,12 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     idlePose(dt) {
       if (!this.listening || this.sleeping || this.inCar || !this.rig) { this.fidget = 0; return null; }
       const s = (this.group.userData.h || 1.75) / 1.75, dy = this.sitDrop || 0;   // seated, the chest is lower by the drop onto the seat
-      if (this.mood === 'uneasy' || this.mood === 'scared') return { L: { reachLocal: new THREE.Vector3(-0.12 * s, 1.17 * s - dy, 0.17 * s), palm: 'in', grip: 0.55 }, R: { reachLocal: new THREE.Vector3(0.12 * s, 1.13 * s - dy, 0.2 * s), palm: 'in', grip: 0.55 } };
+      if (this.mood === 'uneasy' || this.mood === 'scared') { if (this.rig.actions.fold) return null; return { L: { reachLocal: new THREE.Vector3(-0.12 * s, 1.17 * s - dy, 0.17 * s), palm: 'in', grip: 0.55 }, R: { reachLocal: new THREE.Vector3(0.12 * s, 1.13 * s - dy, 0.2 * s), palm: 'in', grip: 0.55 } }; }   // (the fold clip, when it is there: bodyLang)
       if (this.rubsNeck) {
         this.fidgetT = (this.fidgetT ?? 3 + Math.random() * 4) - dt;
         if (this.fidgetT <= 0) { this.fidget = 2.4; this.fidgetT = 9 + Math.random() * 8; }
-        if (this.fidget > 0) { this.fidget -= dt; return { R: { reachLocal: new THREE.Vector3(-0.06 * s, 1.5 * s - dy, -0.05 * s), palm: 'fwd', grip: 0.4 } }; }
+        // (seated, the back of the neck would swing the elbow back into the chair's back: he rubs his jaw instead)
+        if (this.fidget > 0) { this.fidget -= dt; return this.sitNow > 0.5 ? { R: { reachLocal: new THREE.Vector3(-0.03 * s, 1.47 * s - dy, 0.13 * s), palm: 'in', grip: 0.45 } } : { R: { reachLocal: new THREE.Vector3(-0.06 * s, 1.5 * s - dy, -0.05 * s), palm: 'fwd', grip: 0.4 } }; }
       }
       return null;
     },
@@ -152,19 +169,23 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     // never faster than a hand can move. Nothing snaps: not a reach starting, not a grip changing, not letting go back to the clip
     easeArms(r, dt, key) {
       if (!this.armBones) this.armBones = Object.keys(r.bones).filter((n) => /^[LR]_(Clavicle|UpperArm|Forearm|Hand|Finger)/.test(n)).map((n) => r.bones[n]);
-      if (key !== this.lastKey) { this.blendT = this.lastKey === undefined ? 0 : 0.34; this.lastKey = key; }
-      this.blendT = Math.max(0, (this.blendT || 0) - dt);
-      // once settled on something carried, the arms follow it (still capped, so nothing snaps): any lag lets the walk's sway push the hands into the box
-      const slow = this.blendT > 0, close = !slow && this.pose && this.pose.hold;
-      const share = close ? 1 : 1 - Math.exp(-dt * (slow ? 9 : 30)), cap = (slow ? 260 : close ? 900 : 600) * Math.PI / 180 * dt;
+      if (key !== this.lastKey) { this.blendT = this.lastKey === undefined ? 0 : Math.max(0.34, this.longBlend || 0); this.lastKey = key; }
+      this.blendT = Math.max(0, (this.blendT || 0) - dt); this.longBlend = Math.max(0, (this.longBlend || 0) - dt);
+      // once settled on something carried, the arms follow it (still capped, so nothing snaps): any lag lets the walk's sway push the hands into the box.
+      // the slow blend lasts until the arms have arrived (any bone still more than 12 degrees off what it is going to), not just for its time
+      const slow = this.blendT > 0 || (this.farGap || 0) > 0.21, close = !slow && this.pose && this.pose.hold;
+      const share = close ? 1 : 1 - Math.exp(-dt * (slow ? (this.longBlend > 0 ? 5 : 9) : 30)), cap = (slow ? (this.longBlend > 0 ? 120 : 200) : close ? 900 : 600) * Math.PI / 180 * dt;
+      let gap = 0;
       for (const b of this.armBones) {
         let s = this.shown.get(b);
         if (!s) { this.shown.set(b, b.quaternion.clone()); continue; }
         if (!r.saved.has(b)) r.saved.set(b, b.quaternion.clone());
+        gap = Math.max(gap, s.angleTo(b.quaternion));
         _qt.copy(s).slerp(b.quaternion, share);
         if (s.angleTo(_qt) > cap) s.rotateTowards(b.quaternion, cap); else s.copy(_qt);
         b.quaternion.copy(s); b.updateMatrix();
       }
+      this.farGap = this.blendT > 0 || this.farGap > 0.21 ? gap : 0;   // (only after a change of pose: a carried box swinging is followed closely)
       r.root.updateMatrixWorld(true);
     },
     // two-bone arm IK: the hand lands on the target and the elbow bends toward the pole, so hands rest ON things instead of passing through them.
@@ -245,11 +266,38 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         let along = knuckles();
         const fa = GA.copy(RH).sub(RE).normalize(), flex = fa.angleTo(along);
         if (flex > WRIST_FLEX + 0.02) { const axis = GF.crossVectors(along, fa); if (axis.lengthSq() > 1e-8) { r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(axis.normalize(), flex - WRIST_FLEX)); along = knuckles(); } }
-        // the palm side is the side the thumb's root sits on: its offset from the knuckle line with the across- and along-hand parts taken out
-        const lat = GD.copy(RT).sub(RS).normalize();
-        GB.copy(RA).sub(RS).lerp(GF.copy(RA).sub(RT), 0.5).addScaledVector(lat, -GB.dot(lat)).addScaledVector(along, -GB.dot(along)).normalize();
-        this.curl(r, side, this.curlAxis(r, side, GB, GC), CURL.relaxed);
+        this.curl(r, side, this.curlAxis(r, side, this.palmSide(r, side, new THREE.Vector3()), GC), CURL.relaxed);
+        this.fingerSpread(r, side);
       }
+    },
+    // which way this hand's palm really faces: the side the thumb's root sits on (its offset from the knuckle line, with the across- and
+    // along-hand parts taken out). Every finger curl is measured about this, so a curl and its undoing never go opposite ways
+    palmSide(r, side, out) {
+      const B = r.bones, hand = B[side + '_Hand'], th = B[side + '_Finger0'], i1 = B[side + '_Finger1'], i4 = B[side + '_Finger4'];
+      for (const b of [hand, th, i1, i4]) b.updateWorldMatrix(true, false);
+      const h = hand.getWorldPosition(new THREE.Vector3()), a = i1.getWorldPosition(new THREE.Vector3()), b4 = i4.getWorldPosition(new THREE.Vector3()), t = th.getWorldPosition(new THREE.Vector3());
+      const along = a.clone().add(b4).multiplyScalar(0.5).sub(h).normalize(), lat = b4.clone().sub(a).normalize();
+      out.copy(t).sub(a).lerp(t.clone().sub(b4), 0.5); out.addScaledVector(lat, -out.dot(lat)).addScaledVector(along, -out.dot(along));
+      return out.normalize();
+    },
+    // the clips and the rest pose fan the fingers wide (a claw round an invisible ball): each finger is brought in toward the middle one,
+    // across the palm, to no more than a few degrees off it (the pinky a little more), and the thumb rests a little across toward the
+    // index finger's first joint, as a loose hand's does
+    fingerSpread(r, side) {
+      const B = r.bones, mid = B[side + '_Finger2'], mid1 = B[side + '_Finger21'], th = B[side + '_Finger0'], th1 = B[side + '_Finger01'], ix1 = B[side + '_Finger11'];
+      if (!mid || !mid1) return;
+      const n = new THREE.Vector3(); this.palm(side, null, n); const P = (b) => { b.updateWorldMatrix(true, false); return b.getWorldPosition(new THREE.Vector3()); };
+      const flat = (v) => v.addScaledVector(n, -v.dot(n)).normalize();
+      const dm = flat(P(mid1).sub(P(mid))), across = new THREE.Vector3().crossVectors(n, dm), m0 = P(mid);
+      // each finger turned (across the palm) to lean in toward the middle one by a few degrees: the knuckles sit apart on this model, so
+      // fingers merely parallel still show gaps; leaning in, they touch the way a loose hand's do. Never fanned out past that.
+      for (const [f, lean] of [['1', 0.05], ['3', 0.05], ['4', 0.09]]) {
+        const a = B[side + '_Finger' + f], a1 = B[side + '_Finger' + f + '1']; if (!a || !a1) continue;
+        const sOut = Math.sign(across.dot(P(a).sub(m0))) || 1;   // which side of the middle finger this one is on
+        const d = flat(P(a1).sub(P(a))), out = Math.atan2(n.dot(new THREE.Vector3().crossVectors(dm, d)), dm.dot(d)) * sOut;   // fanned out: positive
+        if (out > -lean) r.rotateWorld(a, new THREE.Quaternion().setFromAxisAngle(n, (-lean - out) * sOut));
+      }
+      if (th && th1 && ix1) { const T = P(ix1).addScaledVector(n, 0.012), b = P(th); r.aim(th, th1, T.sub(b).normalize(), 0.3); }
     },
     // Wrist roll and finger curl: turn the hand about the forearm so the palm faces `c` (the way the fingers should close), within the
     // wrist's range, then close the fingers toward it: `amount` 0..1 blends the relaxed hand to a full grip; `flat` presses the palm open
@@ -265,8 +313,8 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const lp = GE.copy(lat).addScaledVector(fa, -lat.dot(fa)).normalize(), tp = latT.addScaledVector(fa, -latT.dot(fa)).normalize();
       const roll = THREE.MathUtils.clamp(Math.atan2(GF.crossVectors(lp, tp).dot(fa), lp.dot(tp)), -WRIST_ROLL, WRIST_ROLL);
       if (Math.abs(c.dot(fa)) < 0.95) r.rotateWorld(hand, new THREE.Quaternion().setFromAxisAngle(fa, roll * w));   // no roll to speak of when the palm should face along the forearm
-      const ax = this.curlAxis(r, side, cp, GC);
-      const k = THREE.MathUtils.clamp(amount, 0, 1), to = flat ? CURL.flat : CURL.relaxed.map((f, i) => f.map((a, j) => a + (CURL.grip[i][j] - a) * k));
+      const ax = this.curlAxis(r, side, this.palmSide(r, side, new THREE.Vector3()), GC);   // (the real palm side, as relaxHands curled about: not the wished-for one)
+      const k = THREE.MathUtils.clamp(amount, 0, 1), to = flat === 'soft' ? CURL.soft.map((f, i) => f.map((a, j) => a + (CURL.relaxed[i][j] - a) * k)) : flat ? CURL.flat : CURL.relaxed.map((f, i) => f.map((a, j) => a + (CURL.grip[i][j] - a) * k));   // (soft: open, toward relaxed by amount)
       this.curl(r, side, ax, to, CURL.relaxed, w);
     },
     applyPose(r, p, w = 1, lean = p.lean || 0, squat = p.squat || 0, kneel = p.kneel || 0) {
@@ -277,7 +325,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         return;
       }
       this.legs(r, squat, kneel);
-      if (p.sit) { const drop = this.sit(r, p.sit, p.seat); r.root.position.y = (r.rootY0 || 0) - drop; r.root.updateMatrixWorld(true); this.sitDrop = drop * (r.root.parent ? r.root.parent.matrixWorld.getMaxScaleOnAxis() / this.group.matrixWorld.getMaxScaleOnAxis() : 1); }
+      if (p.sit) { const drop = this.sit(r, p.sit, p.seat, p.tuck || 0); r.root.position.y = (r.rootY0 || 0) - drop; r.root.updateMatrixWorld(true); this.sitDrop = drop * (r.root.parent ? r.root.parent.matrixWorld.getMaxScaleOnAxis() / this.group.matrixWorld.getMaxScaleOnAxis() : 1); }
       else this.sitDrop = 0;
       if (lean) r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], lean);
       // standing, the thighs hang from the spine bone in this skeleton: give them back its share so a lean does not push a foot into the floor
@@ -307,7 +355,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         if (!T || w <= 0.005) continue;
         const pole = RPole.copy(left).multiplyScalar(sg * (p.hold ? 1.2 : 0.7)).addScaledVector(fwd, -0.3).add(RDown).clone(), pc = palm.clone();   // (round a box the elbows go wide, so the forearms clear its sides)
         this.ik(r, s, T, pole, w);
-        this.grip(r, s, pc, close, w, flat);
+        this.grip(r, s, pc, close, w, own && own.soft ? 'soft' : flat);
         if (!own && p.hold) this.onFace(r, s, p.hold, left.clone().multiplyScalar(sg), T, pole, pc, w);
       }
     },
@@ -342,7 +390,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     // sitting on a chair whose seat is `seat` m off the floor: the hip joints a buttock's thickness above it, the thighs along it to the
     // front edge, the shins straight down and the feet flat as they stand (each limb aimed in world space, so the clip's hip sway cannot
     // turn the knees off to one side). Returns how far the root came down; this.lap keeps where the hands can rest on the thighs.
-    sit(r, k, seat = 0.46) {
+    sit(r, k, seat = 0.46, tuck = 0) {
       if (k < 1e-3) return 0;
       const B = r.bones, s = (this.group.userData.h || 1.75) / 1.75;
       this.group.updateWorldMatrix(true, false); r.root.updateMatrixWorld(true);
@@ -361,7 +409,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         const kneeY = floor + r.calfLen + foot[S].h, dy = Math.min(r.thighLen * 0.95, Math.max(-r.thighLen * 0.95, GB.y - kneeY)), dx = Math.sqrt(r.thighLen * r.thighLen - dy * dy);
         const knee = GC.copy(GB).addScaledVector(fwd, dx).addScaledVector(side, sg * 0.03 * s); knee.y = GB.y - dy;
         r.aim(th, ca, GD.copy(knee).sub(GB).normalize(), k);
-        r.aim(ca, fo, GD.set(0, -1, 0).addScaledVector(fwd, -0.02).normalize(), k);   // shins plumb, the feet a touch back under the knees
+        r.aim(ca, fo, GD.set(0, -1, 0).addScaledVector(fwd, -0.02 - 0.12 * tuck).normalize(), k);   // shins plumb, the feet a touch back under the knees (tucked well back, close in to a table)
         r.aim(fo, toe, foot[S].dir, k);
         // the top of the thigh, a little past halfway to the knee: where a hand rests
         th.getWorldPosition(GB); ca.getWorldPosition(GC);
@@ -380,9 +428,9 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         const rising = amp > 0.55 && G.prevAmp <= 0.55;
         if (rising && G.cool <= 0 && G.w < 0.2) {
           const q = this.talkOpts && this.talkOpts.question && G.shrugDone !== r.envT0;
-          G.kind = q && (t - r.envT0) > 0.4 ? 'shrug' : (this.talkOpts && this.talkOpts.to && this.talkOpts.to !== 'you' && G.pointDone !== r.envT0) ? 'point' : Math.random() < 0.6 ? 'beat' : 'open';
+          G.kind = q && (t - r.envT0) > 0.4 ? 'shrug' : r.actions.talk ? null : (this.talkOpts && this.talkOpts.to && this.talkOpts.to !== 'you' && G.pointDone !== r.envT0) ? 'point' : Math.random() < 0.6 ? 'beat' : 'open';   // (with the talking clips, the arms are theirs)
           if (G.kind === 'shrug') G.shrugDone = r.envT0; if (G.kind === 'point') G.pointDone = r.envT0;
-          G.side = Math.random() < (this.handedL ? 0.65 : 0.35) ? 'L' : 'R'; G.t = 0; G.len = G.kind === 'beat' ? 0.55 : 0.9; G.cool = 0.5 + Math.random() * 0.9; G.w = 1e-3;
+          G.side = Math.random() < (this.handedL ? 0.65 : 0.35) ? 'L' : 'R'; G.t = 0; G.len = G.kind === 'beat' ? 0.55 : 0.9; G.cool = 0.5 + Math.random() * 0.9; G.w = G.kind ? 1e-3 : 0;
         }
         G.prevAmp = amp;
       }
@@ -393,7 +441,7 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         const w = G.w, sg = G.side === 'L' ? 1 : -1, S = G.side;
         if (G.kind === 'beat') { r.bend([S + '_UpperArm'], [1], [1, 0, 0], -0.32 * w); r.bend([S + '_Forearm'], [1], [1, 0, 0], -0.85 * w); r.bend([S + '_Forearm'], [1], [0, 0, 1], 0.25 * sg * w); }
         else if (G.kind === 'open') { for (const [s2, g2] of [['L', 1], ['R', -1]]) { r.bend([s2 + '_UpperArm'], [1], [1, 0, 0], -0.22 * w); r.bend([s2 + '_Forearm'], [1], [1, 0, 0], -0.7 * w); r.bend([s2 + '_Forearm'], [1], [0, 0, 1], 0.35 * g2 * w); } }
-        else if (G.kind === 'shrug') { r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 0, 1], 0.12 * w); for (const [s2, g2] of [['L', 1], ['R', -1]]) { r.bend([s2 + '_Forearm'], [1], [1, 0, 0], -0.75 * w); r.bend([s2 + '_UpperArm'], [1], [0, 0, 1], 0.25 * g2 * w); } r.bend(['Head'], [1], [0, 0, 1], 0.12 * w); }
+        else if (G.kind === 'shrug') { r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 0, 1], 0.12 * w); if (!r.actions.talk) for (const [s2, g2] of [['L', 1], ['R', -1]]) { r.bend([s2 + '_Forearm'], [1], [1, 0, 0], -0.75 * w); r.bend([s2 + '_UpperArm'], [1], [0, 0, 1], 0.25 * g2 * w); } r.bend(['Head'], [1], [0, 0, 1], 0.12 * w); }
         else if (G.kind === 'point') { r.bend([S + '_UpperArm'], [1], [1, 0, 0], -0.75 * w); r.bend([S + '_Forearm'], [1], [1, 0, 0], -0.3 * w); }
       }
       // listening: someone else is talking to or near this one
@@ -403,6 +451,87 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
         if (G.nod > 0) { G.nod -= dt; const k = Math.sin(Math.PI * Math.max(0, Math.min(1, 1 - G.nod / 0.6))); r.bend(['Head'], [1], [1, 0, 0], 0.1 * k); }
         r.bend(['Head'], [1], [0, 0, 1], (G.tilt || 0));
       }
+    },
+    // ---- body language: the clips (assets/models/body.bin) laid over the standing one by what this person is doing ----
+    // Talking: the talking clip, its share of the body and its speed following the voice (the loud stretches move more and faster);
+    // every line starts on the other mirror of the clip at a fresh point in it, so no two lines move the same. Seated: the seated
+    // clips (the legs stay where sit() puts them; the hands go through handsFromClip). Listening while uneasy: arms folded.
+    bodyLang(r, dt) {
+      const B = this.bl || (this.bl = { line: null, v: Math.random() < 0.5 ? 1 : 0, amp: 0 });
+      this.folding = false; this.armsFree = false;
+      const p = this.pose, cur = r.cur, standing = cur === 'stand' || cur === 'idle';
+      if (!r.actions.talk) return;
+      if (!standing) { if (r.ov) for (const [, o] of r.ov) o.rate = 8; return; }   // walking (or anything else): the standing layers go at once
+      // asleep, in the car, or at work with the hands (stirring, a mug, a box, the camera held out): the old idle under it all, which
+      // those poses were fitted to
+      const working = !!(p && (p.hold || p.reach || p.reachLocal || ((p.L || p.R) && !p.sit)));
+      if (this.sleeping || this.inCar || (p && p.sleep) || working) { if (cur === 'stand') r.overlay('idle', 0.97, { rate: this.sleeping || (p && p.sleep) ? 50 : 8 }); return; }
+      let amp = 0; if (r.env) { const i = Math.floor((r.t - r.envT0) * 30); amp = i >= 0 && i < r.env.length ? r.env[i] || 0 : 0; }
+      B.amp += (amp - B.amp) * Math.min(1, dt * 3);
+      if (r.env && r.envT0 !== B.line) { B.line = r.envT0; B.v = 1 - B.v; B.off = Math.random(); }
+      const m = B.v ? '_m' : '', seated = !!(p && p.sit) && this.sitNow > 0.3, held = !!(p && (p.hold || p.reach || p.reachLocal || p.L || p.R));
+      const uneasy = this.mood === 'uneasy' || this.mood === 'scared';
+      if (r.env) {
+        if (seated && !held) {   // the seated body sways with the talk; the arms gesture over the table (see tableGuard)
+          r.overlay('sit_talk' + m, 0.55 + 0.4 * B.amp, { rate: 2.5, speed: 0.8 + 0.35 * B.amp, offset: B.off });
+          r.overlay('sit_talk_arms' + m, 0.9, { rate: 2.2, speed: 0.8 + 0.35 * B.amp, offset: B.off });
+          this.armsFree = !(p && p.rest) && r.ovShare('sit_talk_arms' + m) > 0.15;   // (at a table the hands go where handsFromClip says, over the top)
+        } else if (seated) r.overlay('sit_talk' + m, 0.55 + 0.4 * B.amp, { rate: 2.5, speed: 0.8 + 0.35 * B.amp, offset: B.off });
+        else r.overlay('talk' + m, 0.5 + 0.48 * B.amp, { rate: 3, speed: 0.85 + 0.35 * B.amp, offset: B.off });
+      } else if (this.listening && uneasy && !held) { r.overlay('fold' + m, 0.92, { rate: 1.4, offset: B.off ?? 0 }); this.folding = r.ovShare('fold' + m) > 0.3; if (seated) r.overlay('sit_idle' + m, 0.8, { rate: 2, speed: 0.8 }); }
+      else if (seated) r.overlay('sit_idle' + m, 0.8, { rate: 2, speed: 0.8 });
+      if (this.folding !== B.wasFolding) { B.wasFolding = this.folding; this.longBlend = 0.9; }   // (into or out of folded arms: the arms go the long way, slowly)
+    },
+    // seated hands: where they rest (on the table, or the thighs) moved by what the clip's own hands are doing, measured from the chest,
+    // around their recent average: a gesture lifts and opens a hand off the table and puts it back down. The arms are then solved onto
+    // these points, so they reach forward to them: the elbows stay in front of the chair's back, the hands never go into the table.
+    handsFromClip(r, at, onTable, dt) {
+      const H = this.hc || (this.hc = { mean: { L: null, R: null }, L: new THREE.Vector3(), R: new THREE.Vector3(), lift: { L: 0, R: 0 } });
+      const chest = r.bones.Spine2; chest.updateWorldMatrix(true, false); const c = this.group.worldToLocal(chest.getWorldPosition(GA));
+      const s = (this.group.userData.h || 1.75) / 1.75, k = Math.min(1, dt * 0.6), talking = !!r.env;
+      for (const S of ['L', 'R']) {
+        const hb = r.bones[S + '_Hand']; hb.updateWorldMatrix(true, false);
+        const h = this.group.worldToLocal(hb.getWorldPosition(GB)).sub(c);
+        if (!H.mean[S]) H.mean[S] = h.clone(); else H.mean[S].lerp(h, k);
+        // (soft limits: tanh keeps the hand moving the way the clip's does, ever more slowly toward the edge of its room)
+        const d = GC.copy(h).sub(H.mean[S]).multiplyScalar(talking ? 1.25 : 0.5), soft = (v, lo, hi) => (v >= 0 ? hi * Math.tanh(v / hi) : -lo * Math.tanh(-v / lo));
+        d.x = soft(d.x, 0.09 * s, 0.09 * s); d.z = soft(d.z, 0.06 * s, 0.06 * s);   // (a moderate reach: the hands stay near where they rest)
+        d.y = soft(d.y, onTable ? 0.0001 : 0.02, 0.09 * s);   // up off the table (a few centimetres, not up to the face), never down into it
+        const prev = H.prev && H.prev[S] ? H.prev[S] : null; H.prev = H.prev || {};
+        const v = prev && dt > 0 ? prev.distanceTo(d) / dt : 0; H.prev[S] = d.clone();
+        H.move = H.move || { L: 0, R: 0 }; H.move[S] += (Math.min(1, v / 0.35) - H.move[S]) * Math.min(1, dt * 6);   // how fast the hand is going (0..1), smoothed
+        H[S].copy(at[S]).add(d); H.lift[S] = Math.max(0, d.y) / (0.09 * s);
+      }
+      return H;
+    },
+    // seated at the table, whatever the arms are doing (resting on it, or the clip's gestures): the table top is a floor for the hand and
+    // the forearm. Points along each arm (the forearm from the elbow to the wrist, the hand, a little past each fingertip) that are over the
+    // table must clear its top by the flesh around the bone; a hand that does not is lifted onto it (and a forearm low across the edge is
+    // drawn back toward the body), the arm solved again, three times at most. The elbows are aimed out and down, in front of the chair back.
+    tableGuard(r, p) {
+      const rest = p.rest; if (!rest) return false;
+      const top = this.group.localToWorld(GD.copy(rest.L)).y - 0.06, edge = (rest.edge ?? rest.L.z - 0.1) - 0.05;   // (rest: 6 cm above the top; a hand within 5 cm of the rim counts as over it)
+      this.group.getWorldQuaternion(RQ); const left = RL.set(1, 0, 0).applyQuaternion(RQ).clone(), fwd = RF.set(0, 0, 1).applyQuaternion(RQ).clone();
+      const B = r.bones, L = new THREE.Vector3(), W = new THREE.Vector3(), E = new THREE.Vector3(), H = new THREE.Vector3(); let moved = false;
+      for (const [S, sg] of [['L', 1], ['R', -1]]) {
+        const fo = B[S + '_Forearm'], hand = B[S + '_Hand'], tips = ['Finger02', 'Finger12', 'Finger22', 'Finger32', 'Finger42'].map((n) => B[S + '_' + n]).filter(Boolean);
+        let T = null;
+        for (let it = 0; it < 3; it++) {
+          hand.updateWorldMatrix(true, true); fo.getWorldPosition(E); hand.getWorldPosition(H);
+          let need = 0, back = 0;
+          const test = (w, clear, nearElbow) => { L.copy(w); this.group.worldToLocal(L); if (L.z < edge) return; const d = top + clear - w.y; if (d > need) { need = d; back = nearElbow ? 1 : back; } };
+          for (let k = 0; k <= 4; k++) test(W.copy(E).lerp(H, k / 4), 0.042, k < 2);   // the forearm: the bone runs about 4 cm inside
+          test(H, 0.04, false);
+          for (const b of tips) { b.getWorldPosition(W); b.parent.getWorldPosition(L); test(W.clone().addScaledVector(W.clone().sub(L), 0.5), 0.024, false); test(L.clone(), 0.026, false); b.parent.parent.getWorldPosition(L); test(L.clone(), 0.028, false); }
+          if (need <= 0.002) break;
+          moved = true;
+          if (!T) { T = this.palm(S, new THREE.Vector3()); }
+          T.y += need + 0.004; if (back) T.addScaledVector(fwd, -0.035);
+          const pole = RPole.copy(left).multiplyScalar(sg * 0.8).addScaledVector(fwd, -0.15).add(RDown).clone();
+          this.ik(r, S, T, pole, 1);   // (the arm only: the wrist keeps the turn it had, so a hand talking palm-in is not rolled over)
+        }
+      }
+      return moved;
     },
     // opts: { question, to: 'you' | 'mom' | 'dad', mood: 'warm' | 'joke' | 'uneasy' | 'scared' } shape the gestures and the face
     talk(env, opts = {}) { this.talkOpts = opts; if (this.rig) { this.rig.talk(env); this.rig.mood = opts.mood || this.mood || null; this.rig.question = !!opts.question; } },
@@ -415,8 +544,12 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
     b.map = on ? person.nightMap : person.dayMap; b.needsUpdate = true;
   };
   if (model) {
-    Promise.all([loadModel(model), loadAnims()]).then(([gltf, clips]) => {
-      const rig = new Rig(gltf, clips).setHeight(height);
+    Promise.all([loadModel(model), loadAnims(), loadBody().catch((e) => { console.warn('no body language clips:', e); return []; })]).then(([gltf, clips, body]) => {
+      // the standing clip's legs: the idle clip's stance, held (its legs move under a degree), so the parents stand as they always have
+      const idle = clips.find((c) => c.name === 'idle'), stand = body.find((c) => c.name === 'stand');
+      if (idle && stand) for (const t of idle.tracks) if (/(Thigh|Calf|Foot|Toe0)\.quaternion$/.test(t.name)) stand.tracks.push(new THREE.QuaternionKeyframeTrack(t.name, [0, stand.duration], [...t.values.slice(0, 4), ...t.values.slice(0, 4)]));
+      const rig = new Rig(gltf, [...clips, ...body]).setHeight(height);
+      if (rig.actions.stand) rig.alias = { idle: 'stand' };   // the parents stand with the body-language clips' own idle
       rig.hideMaterials(/NONE/);
       g.add(rig.root); lp.group.visible = false;
       rig.play('idle', { fade: 0, offset: Math.random() });

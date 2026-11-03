@@ -276,7 +276,7 @@ export function createNights(env) {
   // a photo was taken (here, or of a piece of proof): with the folded one in view, it is the flash that sets it off
   function photoTaken() { const st = ST.on; if (st && st.kind === 'crumple' && st.seen && !st.crawl && gaze.inView(st.p)) crawlAt(st); }
   const beatGap = (n) => (n <= 1 ? 75 + rnd() * 40 : n <= 3 ? 55 + rnd() * 35 : n <= 7 ? 45 + rnd() * 30 : 40 + rnd() * 25);
-  const quietTypes = new Set(['vigil', 'car', 'finale']);
+  const quietTypes = new Set(['vigil', 'car', 'finale', 'poltergeist']);   // night one is scripted end to end
   function stageTick(dt) {
     gaze.update(dt); if (ws) ws.tick(dt);
     for (const k in doubles) { const d = doubles[k]; if (d.group.visible) d.update(env.time(), dt); }
@@ -634,7 +634,7 @@ export function createNights(env) {
 
   async function dawn(n) {
     env.RUN.objDone[n] = !!F.objOk;
-    F.live = false; F.script = true; director.stop(); tok++; endStage();
+    F.live = false; F.script = true; director.stop(); tok++; endStage(); env.FN.reset(E);
     env.vigil.stop(); hunter.dismiss(); sfx.violins(0, 3); sfx.tension(0, 2); sfx.drone(0.04, 4); UI.objective(null); UI.hint(null); W.tvFx.set(false); W.phone.setRinging(false);
     proofSync(); pr.kinds = [];
     F.breathCheck = false; F.chase = false; F.echo = false; W.nightLights.forEach((x) => { x.dead = false; }); F.blackout = false; env.nlMult(1, false);
@@ -645,6 +645,16 @@ export function createNights(env) {
     await wait(3.2); UI.fade(1, 2.5); await wait(3);
     F.script = false; UI.clock(null);
     env.RUN.night = n + 1; env.saveRun();
+  }
+
+  // the evening after moving day: your three boxes unpacked and stacked on the one on the floor, so the bottom bunk is clear
+  function tidyKidBoxes() {
+    const bs = (env.kidBoxes || []).filter((b) => b.parent), h = (b) => (b.geometry.parameters && b.geometry.parameters.height) || 0.44;
+    if (!bs.length) return;
+    const base = bs.find((b) => b.position.y < 0.35) || bs[0], rest = bs.filter((b) => b !== base);
+    base.position.y = h(base) / 2;
+    let y = h(base);
+    rest.forEach((b, i) => { b.position.set(base.position.x + (i ? -0.03 : 0.04), y + h(b) / 2, base.position.z + (i ? 0.02 : -0.03)); b.rotation.set(0, base.rotation.y + (i ? -0.12 : 0.1), 0); y += h(b); });
   }
 
   // ---------- what each kind of night is about ----------
@@ -758,89 +768,287 @@ export function createNights(env) {
     },
 
     // NIGHT ONE: the house wakes up. Nothing is ever seen; things creep and move, and at the end everything stops and something walks around your bunk.
+    // Night one: one presence, learning the house. It is never seen (once, maybe, in a camera flash) and it never kills. It goes quiet; it
+    // turns off the hall light Mom left on; it lies down in the bottom bunk under you; it walks up the hall and stands at your door; it calls
+    // you in Mom's voice while she snores; it draws itself into the drawing; it sits down at the table; and at the end it comes to the bed.
+    // A beat every half minute or so, wherever you are (none of them needs you to be anywhere), with silence between them.
     async poltergeist(plan, t) {
-      const c0 = plan.clock0, at = (m) => atClock(t, c0 + m), room = () => env.roomAt(P.pos.x, P.pos.z);
+      if ((window.__clockMul || 1) > 50) return;   // the tests run the clock fast to reach dawn and the save; the script is real time
+      director.stop(); F.holdDawn = true;
+      const FN = env.FN, T0 = env.time(), since = () => env.time() - T0;
+      const free = () => !F.script && !F.cutscene && P.mode !== 'cine';
+      const at = (x, y, z) => ({ x, y, z });
+      const rampT = async (dur, fn) => { const n = Math.max(2, Math.round(dur * 30)); for (let i = 1; i <= n; i++) { fn(i / n); await wait(dur / n); if (!alive(t)) return false; } return true; };
       if (W.hallFrame) W.hallFrame.reset();
-      const ramp = async (dur, fn) => { const n = Math.max(2, Math.round(dur * 60)); for (let i = 1; i <= n; i++) { fn(i / n); await wait(dur / n); if (!alive(t)) return; } };
-      let seen = 0;
-      const when = (cond, fn, minM = 0) => (async () => {
-        const m0 = minM + (minM > 0 ? rnd() * 9 : 0);   // jitter each timed beat by up to 9 game minutes (seeded)
-        await until(t, () => F.clock >= c0 + m0 && !F.script && cond()); if (!alive(t)) return;
-        seen++; await fn();
-      })();
-      (async () => {   // from the bunk
-        await at(4); if (!alive(t)) return; sfx.creak(0.3, -0.4); await wait(2.4); if (!alive(t)) return;
-        W.teddy.fling(W.teddy.rest.pos, { x: 0.85, y: 0.9, z: -0.25 }, 0.02, 6); await wait(0.8); sfx.thump(); F.fear = Math.max(F.fear, 0.4);
-      })();
-      when(() => room() === 'bed' && W.doors.kid.target === 1 && Math.hypot(P.pos.x - 9.79, P.pos.z - 0.3) > 1.5, async () => { W.setDoor('kid', false); F.fear = Math.max(F.fear, 0.5); }, 11);
-      when(() => true, async () => {
-        for (let i = 0; i < 3; i++) { sfx.knock(D.pan(7.99, 0.86), 0.3); await wait(1.1); }
-        await wait(1.2); sfx.scratch(D.pan(7.99, 0.86)); F.fear = Math.max(F.fear, 0.6);
-      }, 20);
-      when(() => true, async () => {
-        sfx.staticBurst(0.5, 1.2); await wait(0.9); sfx.whisper(-0.6, 0.28); F.fear = Math.max(F.fear, 0.5);
-      }, 33);
-      // the photo in the hall comes down only while you are looking at it, close by: a held silence, a tilt, a held breath, then the drop
+      // the evening: your boxes unpacked and stacked on the floor, the box that was not yours gone (Dad took it out), your door open, the hall light on
+      tidyKidBoxes(); FN.box.hide(); FN.dent.set(0); if (FN.renderer) FN.covers.warm(FN.renderer); { const d = W.doors.kid; d.a = d.target = 1; d.apply(); }
+      const hall = [W.nightLights[0], W.nightLights[1]].filter(Boolean);
+      for (const n of hall) n.dead = false; env.nlMult(1, false);
+      const chairs0 = W.chairs.map((c) => [c.holder.position.x, c.holder.position.z, c.holder.rotation.y]);
+      const amb0 = sfx.ambLevel ?? 1;
+      let lastEnd = 0;
+      const next = async (minT, gap = 9) => { await until(t, () => since() >= minT && since() - lastEnd >= gap && free()); return alive(t); };
+      const done = () => { lastEnd = since(); };
+      const hallOn = () => {   // Mom's hand on the switch: the hall light, brighter than it was, and warm
+        for (const n of hall) n.dead = false; F.flicker = false; env.nlMult(1, false);
+        if (hall[0]) { hall[0].light.intensity = hall[0].base * 3.2; hall[0].mat.emissiveIntensity = 3.2; }
+        sfx.pick('switch', { at: hall[0] ? at(hall[0].pos.x, 1.3, hall[0].pos.z) : null, gain: 0.55, wet: 0.15 }) || sfx.click();
+      };
+      const restore = () => {
+        sfx.ambience(amb0, 3); if (W.clock) W.clock.silent = false; F.flicker = false;
+        W.chairs.forEach((c, i) => W.moveChair(i, ...chairs0[i])); FN.covers.stop(); E.post = null; FN.dent.set(0);
+        F.flashFx = null; F.holdDawn = false;
+      };
+
+      // ---- the camera: the first flash tonight shows it at the end of whatever you are pointing at, for as long as the flash lasts;
+      // the print shows it nearer than it was
+      let flashed = false, spot = null;
+      const showE = (p) => { E.visible = true; E.mode = 'idle'; E.root.scale.setScalar(1); E.snap = 0; E.root.position.copy(p); E.faceTowards(camera.position.x, camera.position.z, 1); E.lookTarget = camera.position; E.update(0.0001); };
+      const flashSpot = () => {
+        camera.getWorldDirection(tmp); const l = Math.hypot(tmp.x, tmp.z); if (l < 0.6 || P.mode !== 'walk') return null;
+        const ux = tmp.x / l, uz = tmp.z / l, x0 = camera.position.x, z0 = camera.position.z;
+        let d = 0.5;
+        for (; d < 9; d += 0.12) {
+          const x = x0 + ux * d, z = z0 + uz * d;
+          if (W.colliders.some((c) => c.on !== false && x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ && (c.minY === undefined || (P.pos.y + 1 >= c.minY && P.pos.y + 1 <= c.maxY)))) break;
+        }
+        if (d < 3.4) return null;
+        const far = d - 0.6, near = Math.max(1.5, far * 0.42);
+        return { far: new V3(x0 + ux * far, P.pos.y, z0 + uz * far), near: new V3(x0 + ux * near, P.pos.y, z0 + uz * near) };
+      };
+      F.flashFx = (stage) => {
+        if (flashed || !alive(t)) return 0;
+        if (stage === 'print') { spot = flashSpot(); if (spot) showE(spot.near); return 0; }
+        if (stage === 'after' && spot) {
+          flashed = true; showE(spot.far); F.fear = 1;
+          setTimeout(() => { if (!flashed || F.dead) return; hideE(); }, 240);
+          later(0.5, () => { sfx.ambience(0, 0.1); later(4, () => { if (alive(t) && !F.script) sfx.ambience(lastEnd > 15 ? 0 : amb0, 2); }); });
+          return 240;
+        }
+        return 0;
+      };
+
+      // ---- the hall photo comes down only while you are looking at it, close by (kept from before: it is a good one)
       const frameSeen = () => {
-        const hf = W.hallFrame; if (!hf || hf.fallen || room() !== 'hall') return false;
+        const hf = W.hallFrame; if (!hf || hf.fallen || env.roomAt(P.pos.x, P.pos.z) !== 'hall') return false;
         const dx = hf.g.position.x - P.pos.x, dz = hf.g.position.z - P.pos.z, d = Math.hypot(dx, dz);
         if (d < 1.0 || d > 3.0) return false;
         return (dx * -Math.sin(P.yaw) + dz * -Math.cos(P.yaw)) / d > 0.82;
       };
-      when(frameSeen, async () => {
+      (async () => {
+        await until(t, () => since() > 50 && free() && frameSeen()); if (!alive(t)) return;
         const hf = W.hallFrame; F.script = true; F.fear = Math.max(F.fear, 0.6);
-        sfx.hush(1.4); sfx.drone(0, 1.2);
-        await wait(1.4); if (!alive(t)) return;                              // the silence: it is just hanging there
-        await ramp(0.35, (k) => hf.tilt(0.1 * k)); sfx.creak(0.3, D.pan(6.48, -1.02));
-        await wait(0.7); if (!alive(t)) return;                              // the held breath before it goes
-        await ramp(0.26, (k) => hf.pose(k)); hf.fall();
-        sfx.stab(); sfx.thump(); sfx.noiseHit({ dur: 0.3, type: 'highpass', f: 3500, gain: 0.5, wet: 0.2 }); env.addShake(1.5); D.flicker(2.2); F.fear = 1;
-        await wait(1.0); F.script = false;
-      }, 14);
-      when(() => room() === 'bath', async () => {
-        sfx.faucet(6, D.pan(6.42, 1.64)); await wait(3.2); W.mirrorFx.show('writing'); sfx.whisper(0.6, 0.18); await wait(4); W.mirrorFx.hide(); F.fear = Math.max(F.fear, 0.6);
-      }, 25);
-      when(() => room() === 'living', async () => {
-        W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(2.9, -3.2), 6); F.fear = Math.max(F.fear, 0.5);
-        await wait(7); D.holdTv(false); W.tvFx.set(false); sfx.click();
-      }, 40);
-      when(() => room() === 'living' || room() === 'dining' || room() === 'kitchen', async () => {   // two kitchen chairs dragged out from the table
-        sfx.scrape(D.pan(1.99, 2.08)); W.moveChair(1, 2.45, 2.4, -Math.PI / 2 + 0.5); await wait(1.4); W.moveChair(0, 0.02, 2.7, Math.PI / 2 - 0.4); sfx.scrape(D.pan(0.02, 2.7));
-      }, 50);
-      // every cabinet door in the kitchen at once, heard from anywhere in the house
-      when(() => true, async () => {
-        for (let i = 0; i < 5; i++) sfx.cabinet(D.pan(1.64 + i * 0.78, 4.22), 1);
-        await wait(0.1); sfx.cabinet(D.pan(2.32, 4.0), 0.8); F.fear = Math.max(F.fear, 0.7); env.addShake(0.6);
-      }, 45);
-      when(() => Math.hypot(P.pos.x + 2.5, P.pos.z - 1.1) < 3.0, async () => {   // near their door, off the dining room
-        W.setDoor('parents', true); await wait(1.2); env.say('mom/mutter_b', { muffle: true }); F.fear = Math.max(F.fear, 0.6);
-      }, 30);
-      when(() => room() === 'hall' && Math.hypot(P.pos.x - 7.63, P.pos.z - 0.18) < 2.2, () => D.drawingChange(), 30);
-      // ---- the crescendo: it goes quiet, then everything happens at once and you have to be under the covers ----
-      await until(t, () => F.clock >= c0 + 135 || (seen >= 6 && F.clock >= c0 + 75)); if (!alive(t)) return;
-      await until(t, () => !F.script); if (!alive(t)) return;
-      F.script = true; director.stop(); UI.objective(null); UI.hint(null); sfx.violins(0, 1.5); sfx.drone(0, 1.5); sfx.hush(5); await wait(5.5); if (!alive(t)) return;
-      for (const d of Object.keys(W.doors)) W.setDoor(d, false);
-      env.nlMult(0, false); F.flicker = true; sfx.jolt(1); sfx.slamFar(-0.7); sfx.slamFar(0.7); env.addShake(1.0); F.fear = 1;
-      sfx.violins(1, 0.3); sfx.whisper(0, 0.4);
+        await wait(1.4); if (!alive(t)) return;
+        await rampT(0.35, (k) => hf.tilt(0.1 * k)); sfx.creak(0.3, D.pan(6.48, -1.02));
+        await wait(0.7); if (!alive(t)) return;
+        await rampT(0.26, (k) => hf.pose(k)); hf.fall();
+        sfx.thump(); sfx.noiseHit({ dur: 0.3, type: 'highpass', f: 3500, gain: 0.5, wet: 0.2 }); env.addShake(1.2); F.fear = 1;
+        await wait(1.0); F.script = false; done();
+      })();
+
+      // ---- 1. it goes quiet: the fridge, the furnace, the clock in the living room, all at once. Then the hall light clicks off
+      if (!await next(12, 0)) return;
+      F.script = true;
+      sfx.ambience(0, 0.2); sfx.dread(0, 0.3); if (W.clock) W.clock.silent = true;
+      await wait(5.5); if (!alive(t)) return;
+      sfx.pick('switch', { at: hall[0] ? at(hall[0].pos.x, 1.3, hall[0].pos.z) : null, gain: 0.45, wet: 0.2 }) || sfx.click();
+      for (const n of hall) n.dead = true; env.nlMult(1, false); F.fear = Math.max(F.fear, 0.45);
+      F.script = false; done();
+
+      // ---- 2. the bottom bunk under you takes a weight. Your bear tips off it. A long breath out, from under you. Lean over and look,
+      // and nothing is there: only the shape it left in the quilt, slowly letting go
+      if (!await next(36)) return;
+      {
+        F.script = true;
+        const bed = at(8.42, 0.62, 3.72), bedV = new V3(bed.x, 0.2, bed.z);
+        sfx.pick('creak_heavy', { at: bed, gain: 1.0, wet: 0.12 });
+        await rampT(1.3, (k) => FN.dent.set(k * k * (3 - 2 * k))); if (!alive(t)) return;
+        sfx.pick('creak_heavy', { at: bed, gain: 0.6, wet: 0.12, rate: 0.85 });
+        if (W.teddy && W.teddy.visible && W.teddy.position.y > 0.3) { W.teddy.fling(W.teddy.position.clone(), { x: 0.15, y: 0.5, z: -1.05 }, 0.02, 4); later(0.6, () => sfx.thump()); }
+        await wait(2.6); if (!alive(t)) return;
+        sfx.pick('breath', { at: bed, gain: 0.6, wet: 0.06, rate: 0.8 }); F.fear = Math.max(F.fear, 0.7);
+        F.script = false;
+        const t1 = env.time(); let seen = false, nb = env.time() + 5;
+        await until(t, () => {
+          if ((F.leanK || 0) > 0.75 || (P.mode === 'walk' && gaze.inView(bedV))) seen = true;
+          if (!seen && env.time() > nb) { nb = env.time() + 4.5 + Math.random() * 2; sfx.pick('breath', { at: bed, gain: 0.5, wet: 0.06, rate: 0.78 + Math.random() * 0.06 }); }
+          return seen || env.time() - t1 > 30;
+        });
+        if (!alive(t)) return;
+        FN.dent.relax(seen ? 7 : 14);
+        if (seen) { F.fear = Math.max(F.fear, 0.85); later(2.4, () => sfx.creak(0.1, D.pan(bed.x, bed.z))); }
+        done();
+      }
+
+      // ---- 3. slow, heavy steps up the hall from the far end, and they stop at your door. Watch the door and it closes, by itself, a
+      // little at a time; look away and it is open again when you look back
+      if (!await next(70)) return;
+      {
+        F.script = true;
+        const path = [[4.5, -0.45], [5.2, -0.43], [5.9, -0.41], [6.6, -0.38], [7.3, -0.35], [8.0, -0.3], [8.7, -0.26], [9.3, -0.22], [9.72, -0.14]];
+        for (let i = 0; i < path.length; i++) {
+          const [x, z] = path[i]; sfx.heavyStep(0.5 + i * 0.035, D.pan(x, z)); if (i % 3 === 2) sfx.creak(0.12, D.pan(x, z));
+          F.fear = Math.max(F.fear, 0.3 + i * 0.06); await wait(i < 6 ? 1.05 : 1.45); if (!alive(t)) return;
+        }
+        await wait(4); if (!alive(t)) return;
+        F.script = false;
+        const door = W.doors.kid, dp = new V3(door.mid.x, 0, door.mid.z), seesDoor = () => gaze.inView(dp) && gaze.facing(dp) > 0.86;
+        const t1 = env.time(); let cycles = 0;
+        while (alive(t) && cycles < 2 && env.time() - t1 < 45) {
+          await until(t, () => seesDoor() || env.time() - t1 > 45); if (!alive(t) || env.time() - t1 > 45) break;
+          await wait(0.8); if (!alive(t)) return;
+          if (!seesDoor()) continue;
+          sfx.pick('door_creak', { at: at(dp.x, 1.2, dp.z), gain: 0.3, wet: 0.2, rate: 0.55 });
+          let away = 0;
+          while (alive(t) && door.a > 0.12 && away < 0.3) { await wait(1 / 30); if (seesDoor()) { away = 0; door.a = door.target = Math.max(0.12, door.a - 0.0035); door.apply(); } else away += 1 / 30; }
+          await until(t, () => !gaze.inView(dp)); if (!alive(t)) return;
+          door.a = door.target = 1; door.apply(); cycles++;   // open again, without a sound
+          F.fear = Math.max(F.fear, 0.7);
+        }
+        door.a = door.target = 1; door.apply();
+        done();
+      }
+
+      // ---- 4. Mom's voice, sweet, through their door, calling you to her, while you can hear them both snoring in there
+      if (!await next(105)) return;
+      {
+        const pb = W.parentsBed, bedP = pb ? at((pb.mom.x + pb.dad.x) / 2, 0.75, (pb.mom.z + pb.dad.z) / 2) : at(-6.9, 0.75, 0.1);
+        sfx.pick('bed_snore', { at: bedP, gain: 1.0, wet: 0.08, ref: 2, dur: 10 });
+        await wait(3.2); if (!alive(t)) return;
+        await env.say('mom/n1_call_a', { muffle: true }); if (!alive(t)) return;
+        await wait(4.5); if (!alive(t)) return;
+        sfx.pick('bed_snore', { at: bedP, gain: 1.0, wet: 0.08, ref: 2, offset: 12, dur: 3.2 });   // and it stops dead when she stops
+        await env.say('mom/n1_call_b', { muffle: true }); if (!alive(t)) return;
+        F.fear = Math.max(F.fear, 0.6); done();
+      }
+
+      // ---- 5. crayon, in the hall: somebody drawing, hard, on the drawing on the wall. The new one is in it the next time you look
+      if (!await next(135)) return;
+      {
+        const dpos = W.drawingMesh.getWorldPosition(new V3()), a3 = at(dpos.x, dpos.y, dpos.z); dpos.y = 0.2;
+        for (let i = 0; i < 6; i++) { sfx.pick('crayon', { at: a3, gain: 0.6, wet: 0.15, jitter: 0.1 }); await wait(0.8 + Math.random() * 0.8); if (!alive(t)) return; }
+        await until(t, () => !gaze.inView(dpos)); if (!alive(t)) return;
+        F.drawn = true; W.drawingMat.map = W.T.drawing2 || (W.T.drawing2 = FN.drawing()); W.drawingMat.needsUpdate = true;
+        done();
+      }
+
+      // ---- 6. the kitchen chairs, pulled out one after another, as if someone sat down with your family; then one of them rocks
+      if (!await next(160)) return;
+      {
+        const C = W.chairs, mid = C.reduce((a, c) => a.add(c.holder.position), new V3()).multiplyScalar(1 / Math.max(1, C.length));
+        const order = [3, 1, 0, 2], gaps = [1.2, 0.7, 1.7, 0.9];
+        for (let j = 0; j < order.length; j++) {
+          const i = order[j], c = C[i]; if (!c) continue;
+          const h = c.holder.position, dx = h.x - mid.x, dz = h.z - mid.z, l = Math.hypot(dx, dz) || 1;
+          sfx.scrape(D.pan(h.x, h.z)); W.moveChair(i, h.x + dx / l * 0.34, h.z + dz / l * 0.34, c.holder.rotation.y + (j % 2 ? 0.22 : -0.18));
+          await wait(gaps[j]); if (!alive(t)) return;
+        }
+        await wait(2.6); if (!alive(t)) return;
+        FN.rock(2, 0.11);
+        for (let i = 0; i < 150; i++) { FN.rockClicks((p, k) => sfx.pick('wall_knock', { at: at(p.x, 0.1, p.z), gain: 0.35 * k, wet: 0.2, lp: 1800, maxLen: 0.5 })); await wait(1 / 15); if (!alive(t)) return; }
+        done();
+      }
+
+      // ---- the end of it: everything at once, then you have to be under the covers, and it comes to the bed
+      if (!await next(195, 10)) return;
+      F.script = true; obj(null); UI.hint(null); sfx.drone(0, 1.5);
+      await wait(4); if (!alive(t)) return;
+      for (const d of Object.keys(W.doors)) if (d !== 'kid') W.setDoor(d, false);
+      env.nlMult(0, false); F.flicker = true; sfx.slamFar(-0.7); sfx.slamFar(0.7); sfx.pianoSlam(0.9); env.addShake(0.9); F.fear = 1;
       obj('<b class="red">Hide.</b> Get under the covers (' + env.lightLabel().toLowerCase() + ' off)');
       F.script = false;
-      const t0 = env.time();
-      await until(t, () => P.mode === 'hide' || env.time() - t0 > 55);
+      { const t0 = env.time(); await until(t, () => P.mode === 'hide' || env.time() - t0 > 50); }
       if (!alive(t)) return;
-      if (P.mode !== 'hide') {
-        // the first night never kills: if you stay out, it passes you in the dark, close enough to feel, and is gone
-        F.script = true; obj(null); sfx.heavyStep(1, 0); await wait(0.5); sfx.whisper(0, 0.6); env.addShake(0.8); F.fear = 1; sfx.gasp(); await wait(1.2);
-        sfx.ceilingThump(); F.flicker = false; env.nlMult(1, false); F.fear = 0.5; F.script = false;
-      } else {
-      obj(`Hold <b>${L('breath')}</b> until it passes`); F.breathUI = true; F.script = true; await wait(1.4);
-      // the first night only teaches it: letting go is answered by something at the bed, never by a death
-      F.breathTeach = true; F.breathCheck = true; F.grace = 2.4; UI.hint(`Hold <b>${L('breath')}</b> (or tap it once) and don't let go`, 8);
-      for (let i = 0; i < 7; i++) { sfx.heavyStep(0.8, Math.sin(i * 0.9) * 0.8); if (i % 2) sfx.knock(Math.sin(i) * 0.7, 0.3); if (i === 3) sfx.scratch(0); if (i === 4) { env.addShake(0.5); sfx.creak(0.4, 0); } F.fear = 1; await wait(0.95); }
-      F.breathCheck = false; F.breathTeach = false; UI.hint(null); obj(null);
-      sfx.violins(0, 0.05); sfx.ceilingThump(); await wait(0.4); sfx.whisper(0, 0.3); F.flicker = false; env.nlMult(1, false); F.fear = 0.4; F.script = false;
+      F.script = true; obj(null);
+      if (P.mode === 'hide' && !P.pod) await atTheBed();
+      else if (P.mode === 'hide') await pastThePod();
+      else await pastYou();
+      if (!alive(t)) return;
+      await momAtTheDoor();
+      restore();
+      if (alive(t)) { F.script = false; F.clock = DAWN; }
+
+      // under the covers: it walks in, its shadow comes into the light on the blanket, it bends over you, a hand comes down and the
+      // fingers press in, the corner by your face lifts and an eye is there; and then the hall light snaps on and it is gone
+      async function atTheBed() {
+        const C = FN.covers, s = C.s, BS = FN.bedside;
+        UI.blanket(false); C.start(camera.position.clone(), 0);
+        sfx.pick('cloth', { gain: 0.35, wet: 0.02 });
+        if (!await rampT(1.6, (k) => { s.light = 0.75 * k; })) return;
+        obj(`Hold <b>${L('breath')}</b>`); F.breathUI = true; F.breathTeach = true; F.breathCheck = true; F.grace = 2.4;
+        UI.hint(`Hold <b>${L('breath')}</b> (or tap it once) and don't let go`, 8);
+        // it comes in from the door and stops at the side of the bed, between the hall light and you: you see it come into the light
+        // on the cloth as a shadow
+        const door = W.doors.kid, stand = new V3(8.25, 0, 3.08), from = new V3(door.mid.x - 0.1, 0, door.mid.z + 0.5);
+        E.visible = true; E.mode = 'walk'; E.speed = 0.4; E.root.scale.setScalar(1); E.lean = 0; E.reach = 0; E.snap = 0; E.lookTarget = null; E.root.position.copy(from);
+        E.post = BS.post(E); BS.set({ clear: { eye: camera.position.clone(), r: 0.88 } });   // its head (the face reaches well forward of the bone) never into the cloth
+        for (let i = 0; i < 3; i++) {
+          const a0 = E.root.position.clone(), a1 = from.clone().lerp(stand, (i + 1) / 3);
+          E.faceTowards(a1.x, a1.z, 1); sfx.heavyStep(0.85, D.pan(a1.x, a1.z)); env.addShake(0.12);
+          if (!await rampT(1.3, (k) => { E.root.position.lerpVectors(a0, a1, k); })) return;
+        }
+        E.mode = 'idle'; E.faceTowards(8.38, 4.0, 1);   // square to the bunk
+        await wait(1.6); if (!alive(t)) return;
+        sfx.pick('breath', { at: at(8.62, 2.2, 3.1), gain: 0.55, rate: 0.72, wet: 0.04 });
+        // it bends down over the bunk, over you, and looks at where you are under it
+        E.lookTarget = camera.position;
+        if (!await rampT(4.4, (k) => { E.lean = 0.95 * k * k * (3 - 2 * k); })) return;
+        sfx.whisper(0, 0.45); F.fear = 1;
+        await wait(1.4); if (!alive(t)) return;
+        // its hand comes down onto the cloth over your face, the fingertips touching, then pressing in
+        // (the target is the middle fingertip: on the cloth, then pressed in)
+        const touch = C.at(0.3, 0.05, 0.43), out = touch.clone().sub(camera.position).normalize(), wrist = (push) => touch.clone().addScaledVector(out, 0.012 - push);
+        const high = wrist(-0.4).add(new V3(0.1, 0.3, -0.1)), tgt = new V3();
+        if (!await rampT(2.8, (k) => { BS.set({ reach: tgt.copy(high).lerp(wrist(0.03), k * k * (3 - 2 * k)) }); C.dimple(BS.fingertips(E)); })) return;
+        sfx.pick('cloth', { gain: 0.6, wet: 0.02, rate: 0.85 }); env.addShake(0.25);
+        if (!await rampT(3.2, (k) => { BS.set({ reach: tgt.copy(wrist(0.03 + 0.07 * k)) }); C.dimple(BS.fingertips(E)); })) return;   // aimed through the cloth: the hand presses in and the cloth gives under it
+        for (let i = 0; i < 50; i++) { C.dimple(BS.fingertips(E)); await wait(0.04); if (!alive(t)) return; }
+        // the corner by your face lifts, and its face is there in the gap, close, looking in at you
+        sfx.pick('cloth', { gain: 0.5, wet: 0.02, rate: 0.7 });
+        const face = C.at(0.62, -0.2, 0.86), keep = BS;   // its eyes in the gap
+        if (!await rampT(3.4, (k) => { const e = k * k * (3 - 2 * k); s.lift = 0.95 * e; keep.set({ reach: e > 0.25 ? C.at(-0.6, 0.5, 0.95) : wrist(0.1), head: e > 0.25 ? face : null, clear: e > 0.25 ? null : { eye: camera.position.clone(), r: 0.88 } }); C.dimple(BS.fingertips(E)); })) return;   // the hand lets go and draws back; the face comes down to the gap
+        W.faceLight.position.copy(C.at(0.52, -0.02, 0.55)); W.faceLight.intensity = 0.9; W.faceLight.distance = 1.4;
+        sfx.heartbeat(0.75);
+        for (let i = 0; i < 90; i++) { C.dimple(BS.fingertips(E)); await wait(0.04); if (!alive(t)) return; }
+        // the hall light snaps on, and it is gone
+        F.breathCheck = false; F.breathTeach = false; F.breathUI = false; UI.hint(null); obj(null);
+        E.post = null; hideE(); C.dimple([]); s.lift = 0; W.faceLight.intensity = 0;
+        hallOn(); s.warm = 1; s.light = 1;
+        await wait(1.0);
       }
-      await wait(4); F.clock = Math.max(F.clock, 350);
+      async function pastThePod() {   // hidden somewhere else: it walks past, close, and stops, and goes
+        obj(`Hold <b>${L('breath')}</b> until it passes`); F.breathUI = true; F.breathTeach = true; F.breathCheck = true; F.grace = 2.4;
+        UI.hint(`Hold <b>${L('breath')}</b> (or tap it once) and don't let go`, 8);
+        for (let i = 0; i < 6; i++) { sfx.heavyStep(0.8, Math.sin(i * 0.9) * 0.8); if (i === 3) sfx.whisper(0, 0.35); F.fear = 1; await wait(1.5); if (!alive(t)) return; }
+        F.breathCheck = false; F.breathTeach = false; F.breathUI = false; UI.hint(null); obj(null); hallOn();
+      }
+      async function pastYou() {   // out in the open: it passes you in the dark, close enough to feel, and is gone
+        sfx.heavyStep(1, 0); await wait(0.5); sfx.whisper(0, 0.6); env.addShake(0.8); F.fear = 1; sfx.gasp(); await wait(1.4);
+        hallOn();
+      }
+      // Mom, in the doorway in her night things, the hall light behind her: "Bud? You okay?" ... "Who were you talking to?"
+      async function momAtTheDoor() {
+        const door = W.doors.kid; door.a = door.target = 1; door.apply();
+        mom.sleeping = false; mom.busy = true; mom.pose = null; if (mom.group.rotation.order === 'YXZ') mom.group.rotation.order = 'XYZ';
+        mom.setNight(true); mom.group.visible = true; mom.group.position.set(door.mid.x + 0.02, 0, door.mid.z + 0.42);
+        env.faceTo(mom, 8.5, 3.4); mom.lookAt = camera.position; if (mom.rig) mom.rig.play('idle', { fade: 0, speed: 1 });
+        const first = env.say('mom/n1_door_a');
+        await wait(0.3);
+        FN.covers.stop(); UI.blanket(false); F.breathUI = false;
+        if (P.mode === 'hide' && P.pod) await exitHide();
+        else if (P.mode === 'hide' || P.mode === 'bunk') {   // you come out from under it and sit up, and she is there
+          P.mode = 'cine'; P.cam.copy(camera.position); const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
+          const head = mom.head.getWorldPosition(new V3()), to = env.BUNK_SEAT, want = Math.atan2(-(head.x - to.x), -(head.z - to.z)), up = Math.atan2(head.y - to.y, Math.hypot(head.x - to.x, head.z - to.z));
+          await tween(1.3, (k) => { P.cam.lerpVectors(from, to, k); P.yaw = lerpAngle(y0, want, k); P.pitch = lerp(p0, up, k); });
+        }
+        await first; if (!alive(t)) return;
+        await wait(0.9); if (!alive(t)) return;
+        await env.say('mom/n1_door_b'); if (!alive(t)) return;
+        await wait(1.8);
+        UI.fade(1, 2.2); await wait(2.5);
+        mom.busy = false; mom.lookAt = null; mom.group.visible = false;
+        if (P.mode === 'cine') env.toBunk();
+      }
     },
     // the end: it comes down the hall, and they see it too
     async finale(plan, t) {

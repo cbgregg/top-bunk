@@ -1,5 +1,6 @@
 {
 "files": [
+"vo/dad/box4",
 "vo/dad/call_a",
 "vo/dad/call_b",
 "vo/dad/call_c",
@@ -84,6 +85,10 @@
 "vo/mom/mimic_c",
 "vo/mom/mutter_a",
 "vo/mom/mutter_b",
+"vo/mom/n1_call_a",
+"vo/mom/n1_call_b",
+"vo/mom/n1_door_a",
+"vo/mom/n1_door_b",
 "vo/mom/n2_a",
 "vo/mom/n3_a",
 "vo/mom/ph_high_a",
@@ -92,6 +97,7 @@
 "vo/mom/ph_low_b",
 "vo/mom/ph_mid_a",
 "vo/mom/ph_mid_b",
+"vo/mom/sit",
 "vo/mom/t_car",
 "vo/mom/t_hunted",
 "vo/mom/t_mimic",

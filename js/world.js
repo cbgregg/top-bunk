@@ -731,7 +731,7 @@ export function buildWorld(scene) {
     rbox(x0 + 0.04, 5.71, 1.35, 2.15, z1, z1 + 0.02, M.cabLine, 0.006);
     solid(x0 - 0.05, x1 + 0.05, z0 - 0.1, z1 + 0.05);
   }
-  let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null; const chairs = [];
+  let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null, lowerBunk = null; const chairs = [];
   {
     // your bear sits on the bottom bunk. the group's origin is under its seat, so it can be set down anywhere (setDown) and tipped over;
     // a ball-and-sphere bear stands in until the model loads. teddy.rest is where it belongs.
@@ -1379,8 +1379,9 @@ export function buildWorld(scene) {
   { const bg = new THREE.Group(); bg.position.set(6.08, 0, 2.89); house.add(bg); defParent = bg; const X = -6.08, Z = -2.89;
     for (const [top, hang, seed] of [[0.527, 0.2, 0], [1.555, 0, 2.1]]) {
       rbox(5.15 + X, 7.02 + X, top - 0.002, top + 0.008, 2.35 + Z, 3.435 + Z, M.bedLinen, 0.004);
-      drape({ x0: 5.16 + X, x1: 7.02 + X, zWall: 3.44 + Z, zEdge: 2.345 + Z, top: top + 0.008, mat: M.comforter, hang, band: 0.55, seed });
-      pillow(5.19 + X, 5.64 + X, top + 0.107, 2.5 + Z, 3.28 + Z, 0.06 - seed * 0.05);
+      const quilt = drape({ x0: 5.16 + X, x1: 7.02 + X, zWall: 3.44 + Z, zEdge: 2.345 + Z, top: top + 0.008, mat: M.comforter, hang, band: 0.55, seed });
+      const pil = pillow(5.19 + X, 5.64 + X, top + 0.107, 2.5 + Z, 3.28 + Z, 0.06 - seed * 0.05);
+      if (!seed) lowerBunk = { quilt, pillow: pil, top };   // the bottom bunk's bedding, which night one presses a body into
     }
     defParent = null; }
   const kidTv = prop('tv', { x: 5.33, y: 0.55, z: 0.95, rot: PI / 2 }, { tag: 'kidtv', after: () => plainTv(kidTv) });
@@ -2331,7 +2332,7 @@ export function buildWorld(scene) {
     colliders, onDrive, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
     doors, setDoor, tick, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
-    get hallFrame() { return hallFrame; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
+    get hallFrame() { return hallFrame; }, get lowerBunk() { return lowerBunk; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.setDown(x, y, z, { facing: teddy.rotation.y, settle: false }); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,

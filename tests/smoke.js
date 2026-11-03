@@ -20,7 +20,7 @@ const ARGV = process.argv.slice(2);
 const opt = (name, def) => { const i = ARGV.indexOf(name); return i >= 0 && ARGV[i + 1] !== undefined ? ARGV[i + 1] : def; };
 const PORT = +opt('--port', process.env.SMOKE_PORT || 0);
 // the checks by name, so --only takes either 10 or gamepad
-const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19 };
+const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20 };
 const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map((t) => (t in NAMES ? NAMES[t] : Number(t)))) : null;
 if (ONLY && [...ONLY].some(Number.isNaN)) { console.error('--only takes check numbers or names: ' + Object.keys(NAMES).join(', ')); process.exit(2); }
 const want = (...ns) => !ONLY || ns.some((n) => ONLY.has(n));
@@ -152,7 +152,7 @@ let BASE = '';
 
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
-  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
   if (!chromium) {
     for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
@@ -271,6 +271,7 @@ let BASE = '';
       const s = await page.evaluate(() => { const g = window.__game; return { t: g.gameTime, mode: g.P.mode, obj: document.getElementById('objective').textContent, x: g.P.pos.x, z: g.P.pos.z, fov: g.camera.fov, set: g.settings.get('fov') }; });
       ok(s.mode === 'walk', `P.mode is ${s.mode}`);
       ok(/Carry your boxes/.test(s.obj), `objective is "${s.obj}"`);
+      ok(await page.evaluate(() => !window.__game.FN.showing(window.__game.E) && !window.__game.E.visible), 'night one\'s bedside scene (the cloth, the thing\'s reaching pose) shows by day');
       await page.keyboard.down('KeyW'); await playFor(page, 1.5, 60e3); await page.keyboard.up('KeyW');
       const moved = await page.evaluate(([x, z]) => Math.hypot(window.__game.P.pos.x - x, window.__game.P.pos.z - z), [s.x, s.z]);
       ok(moved > 0.5, `holding W moved the player only ${moved.toFixed(2)} m`);
@@ -742,6 +743,42 @@ let BASE = '';
       clean(w); clean(o.w);
       return `typed seed ${typed} replays as ${r.seed}, nights 2-4: ${r.plan.join(', ')}`;
     }), 300e3);
+
+    // ---------- 20: breakfast: you walk to the table and sit; they talk while you look where you like ----------
+    await check(20, 'breakfast', () => alone(browser, async (c) => {
+      const { page, w } = await openGame(c, '/index.html#breakfast');
+      await page.evaluate(() => { const g = window.__game; g.renderer.compileAsync = async () => {}; g.startGame(); });
+      await until(page, () => window.__game.F.stage === 'b1' && window.__game.F.breakfastWait && window.__game.P.mode === 'bunk', null, 240e3);
+      const obj = await page.evaluate(() => document.getElementById('objective').textContent.trim());
+      ok(/Breakfast/.test(obj), `objective is "${obj}"`);
+      ok(await page.evaluate(() => !window.__game.FN.showing(window.__game.E) && !window.__game.E.visible), 'night one\'s bedside scene (the cloth, the thing\'s reaching pose) shows at breakfast');
+      await sleep(2500);
+      ok(await page.evaluate(() => !/Something got in/.test(document.getElementById('subtitle')?.textContent || '')), 'the talk started before you sat down');
+      await climbDown(page);
+      // to your chair, facing it, and Sit
+      await stand(page, 2.75, 2.08, 1.99, 2.08);
+      await until(page, () => /Sit/.test(document.getElementById('prompt').textContent), null, 20e3);
+      await page.keyboard.press('KeyE');
+      await until(page, () => { const g = window.__game; return g.P.mode === 'seat' && g.seat && !g.seat.tween; }, null, 20e3);
+      const sat = await page.evaluate(() => { const g = window.__game; return { y: g.camera.position.y, cine: g.gfx.cineOn ? 1 : 0 }; });
+      ok(sat.y > 0.9 && sat.y < 1.25, `seated eye height ${sat.y.toFixed(2)}`);
+      // free look, but a seated range: a big turn is held to about 100 degrees either side of the table
+      const turn = await page.evaluate(async () => { const g = window.__game; g.P.yaw = g.seat.yaw + 3; await new Promise((r) => setTimeout(r, 300)); let d = g.P.yaw - g.seat.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; });
+      ok(Math.abs(turn) <= 1.76, `seated yaw went ${turn.toFixed(2)} rad from the table`);
+      await until(page, () => /Something got in/.test(document.getElementById('subtitle')?.textContent || ''), null, 30e3);
+      const cine = await page.evaluate(() => (window.__game.gfx.cineOn ? 1 : 0));
+      ok(!cine, 'the conversation look came on at breakfast');
+      // stand up in the middle of it: they wait, Mom asks you to sit, and it goes on once you do
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.P.mode === 'walk', null, 10e3);
+      await until(page, () => /Sit down, please/.test(document.getElementById('subtitle')?.textContent || ''), null, 40e3);
+      await stand(page, 2.75, 2.08, 1.99, 2.08);
+      await until(page, () => /Sit/.test(document.getElementById('prompt').textContent), null, 20e3);
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.F.stage === 'n2', null, 120e3);
+      clean(w);
+      return `objective "${obj}", Sit at eye height ${sat.y.toFixed(2)} m, look held to ${Math.abs(turn).toFixed(2)} rad, no conversation look, stood up and was asked to sit, then on to night 2`;
+    }), 420e3);
 
     await browser.close();
     server.close();

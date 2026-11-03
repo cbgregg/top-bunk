@@ -28,7 +28,8 @@ SETTINGS = {'stability': 1.0, 'similarity_boost': 0.8, 'style': 0.0}
 # lines that are one conversation, in order; each is read with its neighbours as context so it is not delivered as an announcement
 SCENES = [
     ['dad/welcome', 'dad/line_1', 'dad/line_2', 'dad/line_3', 'mom/boxes_first', 'mom/boxes_again', 'dad/mom_looking',
-     'mom/helper', 'mom/gift_a', 'you/gift', 'dad/gift', 'mom/gift_b', 'mom/landlord', 'dad/cheap', 'dad/leftovers', 'mom/teeth'],
+     'mom/helper', 'you/box4', 'dad/box4', 'mom/gift_a', 'you/gift', 'dad/gift', 'mom/gift_b', 'mom/landlord', 'dad/cheap', 'dad/leftovers', 'mom/teeth'],
+    ['mom/n1_call_a', 'mom/n1_call_b'], ['mom/n1_door_a', 'mom/n1_door_b'],
     ['you/m1_a', 'mom/m1_a', 'you/m1_b', 'dad/m1_a', 'mom/m1_b'],
     ['you/m2_a', 'mom/m2_a', 'dad/m2_a', 'mom/m2_b'], ['you/m3_a', 'mom/m3_a', 'dad/m3_a'], ['mom/m4_a', 'dad/m4_a', 'you/m4_a', 'mom/m4_b'],
     ['dad/m5_a', 'mom/m5_a', 'dad/m5_b', 'mom/m5_b'], ['mom/m6_a', 'dad/m6_a', 'mom/m6_b'], ['dad/m7_a', 'you/m7_a', 'mom/m7_a', 'dad/m7_b'],

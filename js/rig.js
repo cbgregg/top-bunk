@@ -32,6 +32,38 @@ function seamless(clip) {
 }
 export const loadModel = (name) => load(`assets/models/${name}.glb`);
 
+// The parents' body language (assets/models/body.bin, built by tools/models/body.cjs from Quaternius's Universal Animation Library, CC0):
+// standing, talking, sitting, sitting and talking, and arms folded. A JSON header
+// (each clip's name, length, frames and bones) and then every value as an int16. Each talking clip also comes mirrored (left for right),
+// so a line never repeats the last one's movements.
+let bodyP = null;
+export const loadBody = () => (bodyP ||= fetch('assets/models/body.bin').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('body.bin ' + r.status)))).then((buf) => {
+  const dv = new DataView(buf), hl = dv.getUint32(4, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, hl)));
+  const data = new Int16Array(buf, 8 + hl), clips = []; let o = 0;
+  for (const c of head) {
+    const times = Float32Array.from({ length: c.frames }, (_, i) => (i / (c.frames - 1)) * c.duration), tracks = [];
+    for (const b of c.bones) { const v = new Float32Array(c.frames * 4); for (let i = 0; i < v.length; i++) v[i] = data[o++] / 32767; normQ(v); tracks.push(new THREE.QuaternionKeyframeTrack('Bip01_' + b + '.quaternion', times, v)); }
+    // standing clips keep only the body above the hips' children: the legs are the steady idle stance's (people.js), so a clip's own
+    // stride never moves a foot into the stove or the bed; the seated ones are put where sit() puts them anyway
+    const legs = /(Thigh|Calf|Foot|Toe0)\.quaternion$/;
+    const clip = new THREE.AnimationClip(c.name, c.duration, /^sit_/.test(c.name) ? tracks : tracks.filter((t) => !legs.test(t.name))); clips.push(clip);
+    if (/talk|stand|fold|sit_idle/.test(c.name)) seamless(clip);   // (the loops' ends meet)
+    if (/^sit_/.test(c.name)) {
+      clip.userData = { additive: true };   // seated: only the movement, laid on an upright body (the clips slouch far back in their chair)
+      // ...and the arms on their own, played as they are: a seated person's hands talking over a table (people.js keeps them above it)
+      const arms = new THREE.AnimationClip(c.name + '_arms', c.duration, tracks.filter((t) => /(Clavicle|UpperArm|Forearm|Hand)\.quaternion$/.test(t.name)));
+      clips.push(arms, mirror(arms, c.name + '_arms_m'));
+    }
+    if (/talk|sit_idle|stand|fold/.test(c.name)) clips.push(mirror(clip, c.name + '_m'));
+  }
+  return clips;
+}));
+function normQ(v) { for (let i = 0; i < v.length; i += 4) { const l = Math.hypot(v[i], v[i + 1], v[i + 2], v[i + 3]) || 1; v[i] /= l; v[i + 1] /= l; v[i + 2] /= l; v[i + 3] /= l; } }
+// left for right: each side's track goes to the other side's bone, and every rotation is reflected through the body's middle plane
+// (x is across the body in the rest pose: the reflection keeps x and negates y and z of a local rotation measured from rest,
+// which the rest quaternions undo and redo). The rest pose is needed, so the mirror is made against the skeleton when it is bound (Rig).
+function mirror(clip, name) { const m = clip.clone(); m.name = name; m.userData = { ...clip.userData, mirrorOf: clip.name }; return m; }
+
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 const ID = new THREE.Quaternion(), _d = new THREE.Vector3();
@@ -47,16 +79,55 @@ export class Rig {
     });
     const box = new THREE.Box3().setFromObject(this.root); this.cmHeight = box.max.y - box.min.y;
     this.mixer = new THREE.AnimationMixer(this.root);
-    this.actions = {}; for (const c of clips) this.actions[c.name] = this.mixer.clipAction(c);
+    this.clips = Object.fromEntries(clips.map((c) => [c.name, c]));
+    this.actions = {};
+    for (const c of clips) {
+      let clip = c.userData && c.userData.mirrorOf ? this.mirrored(c) : c;
+      const add = !!(c.userData && c.userData.additive);
+      // an additive clip is its change from its first frame (made on a copy: the plain one is what its mirror is made from)
+      if (add) { clip = THREE.AnimationUtils.makeClipAdditive(clip === c ? c.clone() : clip, 0); clip.name = c.name; }
+      const a = this.mixer.clipAction(clip, null, add ? THREE.AdditiveAnimationBlendMode : THREE.NormalAnimationBlendMode); this.actions[c.name] = a;
+    }
     this.cur = null; this.t = 0;
     this.look = new THREE.Vector3(); this.lookW = 0; this.hasLook = false;
     this.env = null; this.envT0 = 0; this.jawOpen = 0;
     this.saved = new Map();   // bones the procedural layer moved this frame -> their clip rotation
   }
   setHeight(m) { this.scale = m / this.cmHeight; this.root.scale.setScalar(this.scale); return this; }
+  // a clip played left for right: each bone takes the other side's turn away from its rest pose, reflected through the body's middle
+  // plane (x is across the body: a rotation (x, y, z, w) reflects to (x, -y, -z, w)), worked out down the skeleton frame by frame
+  mirrored(clip) {
+    const src = this.clips[clip.userData.mirrorOf] || clip;
+    const key = (n) => n.replace(/^Bip01_?/, '') || 'Root', other = (k) => k.replace(/^L_/, '#').replace(/^R_/, 'L_').replace(/^#/, 'R_');
+    const tracks = {}; for (const t of src.tracks) tracks[key(t.name.replace(/\.quaternion$/, ''))] = t;
+    const order = []; this.root.traverse((o) => { if (o.isBone) order.push(o); });
+    const n = src.tracks[0].times.length, times = src.tracks[0].times, out = {}; for (const k in tracks) out[k] = new Float32Array(n * 4);
+    const W = new Map(), Wm = new Map(), q = new THREE.Quaternion(), d = new THREE.Quaternion(), loc = new THREE.Quaternion();
+    // the top bone's parent (a plain node, never animated) turns it in model space: start from that, as restQ does
+    const tops = new Map(), top = (b) => { if (!tops.has(b)) { this.root.updateMatrixWorld(true); tops.set(b, b.parent ? b.parent.getWorldQuaternion(new THREE.Quaternion()) : ID.clone()); } return tops.get(b); };
+    for (let f = 0; f < n; f++) {
+      for (const b of order) {   // the clip's pose in model space
+        const k = key(b.name), t = tracks[k]; loc.copy(this.restLocal[k]); if (t) loc.fromArray(t.values, f * 4);
+        const pw = W.get(b.parent) || top(b); W.set(b, (W.get(b) || new THREE.Quaternion()).copy(pw).multiply(loc));
+      }
+      for (const b of order) {   // the mirror, from the top down
+        const k = key(b.name), pw = Wm.get(b.parent) || top(b), mine = Wm.get(b) || new THREE.Quaternion(); Wm.set(b, mine);
+        if (!tracks[k]) { mine.copy(pw).multiply(this.restLocal[k]); continue; }
+        const ok = other(k), ob = this.bones[ok] && tracks[ok] ? this.bones[ok] : b, okk = ob === b ? k : ok;
+        d.copy(W.get(ob)).multiply(q.copy(this.restQ[okk]).invert());   // the other side's turn from its rest
+        d.set(d.x, -d.y, -d.z, d.w);
+        mine.copy(d).multiply(this.restQ[k]);
+        loc.copy(pw).invert().multiply(mine);
+        const o = out[k], i = f * 4; if (f && o[i - 4] * loc.x + o[i - 3] * loc.y + o[i - 2] * loc.z + o[i - 1] * loc.w < 0) loc.set(-loc.x, -loc.y, -loc.z, -loc.w);
+        loc.toArray(o, i);
+      }
+    }
+    return new THREE.AnimationClip(clip.name, src.duration, Object.entries(out).map(([k, v]) => new THREE.QuaternionKeyframeTrack('Bip01_' + k + '.quaternion', times, v)));
+  }
   hideMaterials(re) { this.root.traverse((o) => { if (o.isSkinnedMesh) [].concat(o.material).forEach((m) => { if (re.test(m.name)) m.visible = false; }); }); }
 
   play(name, { fade = 0.3, speed = 1, offset = null } = {}) {
+    if (this.alias && this.alias[name] && this.actions[this.alias[name]]) name = this.alias[name];   // (the parents stand with their own idle)
     const a = this.actions[name]; if (!a) return;
     a.timeScale = speed;
     if (this.cur === name) return;
@@ -176,10 +247,36 @@ export class Rig {
     }
   }
 
+  // ---- overlays: clips laid over the current one, each by its share of the pose (0..1), eased in and out ----
+  // Call it every frame a clip is wanted; one not asked for in a frame eases out and stops. The mixer blends by weight and divides by
+  // the sum, so each overlay's weight is worked out from the shares: share s of the pose takes weight s / (1 - all the shares).
+  overlay(name, share, { rate = 3, speed = 1, offset = null } = {}) {
+    const a = this.actions[name]; if (!a) return 0;
+    const L = this.ov || (this.ov = new Map());
+    let o = L.get(name); if (!o) { o = { w: 0, next: 0, rate }; L.set(name, o); }
+    o.next = Math.max(o.next, share); o.rate = rate; a.timeScale = speed;
+    if (!a.isRunning() || !a.enabled) { a.reset(); a.enabled = true; a.setEffectiveWeight(0); if (offset !== null) a.time = offset * a.getClip().duration; a.play(); }
+    return o.w;
+  }
+  ovShare(name) { const o = this.ov && this.ov.get(name); return o ? o.w : 0; }
+  applyOverlays(dt) {
+    if (!this.ov) return;
+    let S = 0;
+    for (const [, o] of this.ov) { o.w += (o.next - o.w) * Math.min(1, dt * o.rate); if (o.next === 0 && o.w < 0.004) o.w = 0; S += o.w; }
+    for (const [name, o] of this.ov) if (this.actions[name].blendMode === THREE.AdditiveAnimationBlendMode) S -= o.w;   // (an additive clip adds its movement on top: its weight is just its share)
+    const k = S > 0.97 ? 0.97 / S : 1, rest = 1 - S * k;
+    for (const [name, o] of this.ov) {
+      const a = this.actions[name];
+      if (o.w <= 0) { a.stop(); this.ov.delete(name); continue; }
+      a.setEffectiveWeight(a.blendMode === THREE.AdditiveAnimationBlendMode ? o.w : (o.w * k) / rest); o.next = 0;
+    }
+  }
+
   // The mixer only rewrites a bone when its clip value changes, so put the adjusted bones back first or the lean/look would pile up.
   update(dt) {
     for (const [b, q] of this.saved) b.quaternion.copy(q);
     this.saved.clear();
+    this.applyOverlays(dt);
     this.t += dt; this.mixer.update(dt); this.root.updateMatrixWorld(true);
   }
 
