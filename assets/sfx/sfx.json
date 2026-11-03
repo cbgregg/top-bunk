@@ -100,5 +100,11 @@
   "kind": "sfx",
   "loop": false,
   "len": 3.03
+ },
+ "piano_sting": {
+  "file": "assets/sfx/piano_sting.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 7.032
  }
 }
