@@ -20,7 +20,7 @@ const ARGV = process.argv.slice(2);
 const opt = (name, def) => { const i = ARGV.indexOf(name); return i >= 0 && ARGV[i + 1] !== undefined ? ARGV[i + 1] : def; };
 const PORT = +opt('--port', process.env.SMOKE_PORT || 0);
 // the checks by name, so --only takes either 10 or gamepad
-const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20 };
+const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20, lights: 21 };
 const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map((t) => (t in NAMES ? NAMES[t] : Number(t)))) : null;
 if (ONLY && [...ONLY].some(Number.isNaN)) { console.error('--only takes check numbers or names: ' + Object.keys(NAMES).join(', ')); process.exit(2); }
 const want = (...ns) => !ONLY || ns.some((n) => ONLY.has(n));
@@ -152,7 +152,7 @@ let BASE = '';
 
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
-  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
   if (!chromium) {
     for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
@@ -778,6 +778,53 @@ let BASE = '';
       await until(page, () => window.__game.F.stage === 'n2', null, 120e3);
       clean(w);
       return `objective "${obj}", Sit at eye height ${sat.y.toFixed(2)} m, look held to ${Math.abs(turn).toFixed(2)} rad, no conversation look, stood up and was asked to sit, then on to night 2`;
+    }), 420e3);
+
+    // ---------- 21: the light switches ----------
+    // a switch by its own prompt, the room lit; every switch in the house on and off twice over with the frame drawn each time, and not one
+    // shader built after the first round (switching only changes how bright the pooled lights are); the breaker and the dawn
+    await check(21, 'lights', () => alone(browser, async (c) => {
+      const { page, w } = await nightPage(c, '#night2');
+      await page.evaluate(() => { const g = window.__game; g.nights.director.stop(); g.nights.hunter.dismiss(); });
+      const sw = await page.evaluate(() => { const s = window.__game.lights.rooms.bed.switches[0]; return [s.at.x, s.at.z, s.pos.x, s.pos.z]; });
+      await page.evaluate(() => { const g = window.__game; g.P.mode = 'walk'; g.F.cutscene = false; g.F.script = false; });
+      await stand(page, sw[0] + (sw[0] - sw[2]) * 4, sw[1] + (sw[1] - sw[3]) * 4, sw[2], sw[3]);
+      await page.evaluate(() => { window.__game.P.pitch = -0.12; });
+      await until(page, () => /Turn on the light/.test(document.getElementById('prompt').textContent), null, 20e3);
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.lights.isOn('bed'), null, 10e3);
+      await until(page, () => window.__game.lights.rooms.bed.out > 0.5, null, 10e3);
+      const lever = await page.evaluate(() => window.__game.lights.rooms.bed.switches[0].pivot.rotation.x);
+      ok(lever < 0, `the bedroom switch's lever is at ${lever.toFixed(2)} (up is on)`);
+      const lit = await page.evaluate(() => { const g = window.__game, R = g.lights.rooms.bed; return g.lights.levelAt(R.c.x, R.c.z); });
+      ok(lit > 0.5, `the bedroom reads as lit at ${lit}`);
+      // the breaker: nothing lights while the power is off, and the room comes back when it is on again
+      const black = await page.evaluate(() => { const g = window.__game; g.lights.set('hall', true, { silent: true }); g.F.blackout = true; for (let i = 0; i < 10; i++) g.lights.update(0.1); const a = g.lights.rooms.hall.out; g.F.blackout = false; for (let i = 0; i < 10; i++) g.lights.update(0.1); return [a, g.lights.rooms.hall.out]; });
+      ok(black[0] === 0 && black[1] > 0.5, `blackout: the hall at ${black[0]} with the power off, ${black[1]} after`);
+      const dawn = await page.evaluate(() => { const g = window.__game; g.setPhase('morning', true); return Object.values(g.lights.rooms).filter((r) => r.on).length; });
+      ok(dawn === 0, `${dawn} rooms still lit in the morning`);
+      clean(w); await page.close();
+      // the shaders: drawn in a still page (a live night drawn in the software renderer runs it out of memory), at night, every switch
+      const S = await openGame(c, '/index.html#shot');
+      const cycles = await S.page.evaluate(() => {
+        const g = window.__game; g.start(); g.F.phase = 'x'; g.gfx.setQuality('low', { save: false }); g.setPhase('night', true);
+        const names = Object.keys(g.lights.rooms), res = [], count = () => { let n = 0; g.scene.traverse((o) => { if (o.isLight && o.visible) n++; }); return n; }, before = count();
+        const draw = () => { g.lights.update(0.2); g.gfx.render(0.016); };
+        for (let c = 0; c < 2; c++) {
+          for (const n of names) {
+            const R = g.lights.rooms[n]; g.camera.position.set(R.c.x, 1.5, R.c.z); g.camera.lookAt(R.c.x + 1, 1, R.c.z + 0.3); g.camera.updateMatrixWorld();
+            g.lights.set(n, true, { silent: true }); draw(); g.lights.set(n, false, { silent: true }); draw();
+          }
+          for (const n of names) g.lights.set(n, true, { silent: true }); draw();
+          for (const n of names) g.lights.set(n, false, { silent: true }); draw();
+          res.push(g.renderer.info.programs.length);
+        }
+        return { res, before, after: count() };
+      });
+      ok(cycles.res[0] === cycles.res[1], `shaders were built while switching: ${cycles.res.join(' -> ')} programs`);
+      ok(cycles.before === cycles.after, `the number of lights changed with the switches: ${cycles.before} -> ${cycles.after}`);
+      clean(S.w);
+      return `the bedroom switch by its prompt (lever up, room lit ${lit.toFixed(2)}); blackout and dawn; every room switched twice with the frame drawn, ${cycles.res.join(' = ')} programs, ${cycles.before} lights throughout`;
     }), 420e3);
 
     await browser.close();

@@ -76,7 +76,30 @@ export function createNights(env) {
     onTurn: () => { F.fear = 1; env.addShake(0.5); },
     survived: () => { UI.hint(null); F.fear = 0.3; env.addShake(0.2); },
     hint: () => { UI.hint(`Hold <b>${L('breath')}</b> to hold your breath (tap it once to keep holding)`, 8); },
+    lit: (x, z, y) => (env.lights ? env.lights.levelAt(x, z, y) : 0),
+    onEdge: (t, x, z) => lightEdge(t, x, z),
   });
+  // it waits at the edge of a lit room while you watch it. The first time, the kid works out why; after a few seconds the bulb browns out
+  // and dies (lights.js flickers it as it stands near), and then it comes in
+  let edgeKill = 0;
+  function lightEdge(t, x, z) {
+    if (t < 0.1) edgeKill = (F.night >= 6 ? 2.5 : 3.6) + rnd() * 3;
+    if (t > 1.2 && !(env.RUN.rules && env.RUN.rules.lights)) UI.hint("It won't come into the light while you're looking at it.", 5);
+    if (edgeKill && t > edgeKill) { const room = env.roomAt(x, z); env.lights.kill(room === 'dining' ? 'kitchen' : room); edgeKill = 0; }
+  }
+  // what the house's own use of the lights needs to know (lights.js house())
+  const lightCtx = () => ({
+    n: F.night || 1, quiet: !F.live || F.dead || F.script || F.cutscene || !F.plan || ['poltergeist', 'vigil', 'car'].includes(F.plan.type),
+    calm: D.calm(), hunting: hunter.busy,
+    looking: (x, z, cos) => hunter.looking(x, z, cos), los: (ax, az, bx, bz) => hunter.los(ax, az, bx, bz),
+    revealCool: () => D.revealCool(), revealed: () => revealed(),
+    show: (x, z) => { E.root.position.set(x, 0, z); E.visible = true; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0.25; E.lookTarget = camera.position; E.faceTowards(P.pos.x, P.pos.z, 1); },
+    hide: () => { if (!hunter.busy) { E.visible = false; E.lookTarget = null; } },
+    sting: () => { sfx.pianoSlam(1); env.addShake(0.5); },
+    fear: (v) => { F.fear = Math.max(F.fear, v); },
+    near: hunter.busy && E.visible && ['hunt', 'search', 'stalk', 'leave'].includes(hunter.state) ? E.root.position : null,
+  });
+  if (env.lights) env.lights.onFlip = (name, on, by) => env.lights.flipped(name, on, by, F.live ? lightCtx() : null);
 
   // ---------- helpers every event can use (see director.js) ----------
   const D = {
@@ -279,6 +302,7 @@ export function createNights(env) {
   const quietTypes = new Set(['vigil', 'car', 'finale', 'poltergeist']);   // night one is scripted end to end
   function stageTick(dt) {
     gaze.update(dt); if (ws) ws.tick(dt);
+    if (env.lights && F.live && !F.dead) env.lights.house(dt, lightCtx());
     for (const k in doubles) { const d = doubles[k]; if (d.group.visible) d.update(env.time(), dt); }
     if (F.dead || !F.live) { if (ST.on) endStage(); return; }
     const st = ST.on, now = env.time();
@@ -853,6 +877,7 @@ export function createNights(env) {
       await wait(5.5); if (!alive(t)) return;
       sfx.pick('switch', { at: hall[0] ? at(hall[0].pos.x, 1.3, hall[0].pos.z) : null, gain: 0.45, wet: 0.2 }) || sfx.click();
       for (const n of hall) n.dead = true; env.nlMult(1, false); F.fear = Math.max(F.fear, 0.45);
+      if (env.lights) env.lights.allOff();   // and any light you put on: you hear each switch go, wherever it is
       F.script = false; done();
 
       // ---- 2. the bottom bunk under you takes a weight. Your bear tips off it. A long breath out, from under you. Lean over and look,
@@ -954,6 +979,7 @@ export function createNights(env) {
       F.script = true; obj(null); UI.hint(null); sfx.drone(0, 1.5);
       await wait(4); if (!alive(t)) return;
       for (const d of Object.keys(W.doors)) if (d !== 'kid') W.setDoor(d, false);
+      if (env.lights) env.lights.allOff({ silent: true });
       env.nlMult(0, false); F.flicker = true; sfx.slamFar(-0.7); sfx.slamFar(0.7); sfx.pianoSlam(0.9); env.addShake(0.9); F.fear = 1;
       obj('<b class="red">Hide.</b> Get under the covers (' + env.lightLabel().toLowerCase() + ' off)');
       F.script = false;

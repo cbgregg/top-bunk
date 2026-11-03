@@ -1541,12 +1541,9 @@ export function buildWorld(scene) {
   const fixture = (name, x, z, intensity = 9) => {
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.lamp.clone());
     dome.rotation.x = Math.PI; dome.position.set(x, H - 0.005, z); house.add(dome);
-    // a downward cone from under the shade (so the ceiling right above it isn't blown out); no separate bounce light, every light costs every pixel
-    const spot = new THREE.SpotLight(0xffd29a, 0, 11, 1.3, 1.0, 2); spot.position.set(SX(x), H - 0.3, SZ(z)); spot.target.position.set(SX(x), 0, SZ(z));
-    scene.add(spot, spot.target);
-    // visibility only changes with the story phase: a changing number of lights recompiles every shader
-    const L = { get intensity() { return spot.intensity / 1.7; }, set intensity(v) { spot.intensity = v * 1.7; }, set visible(v) { spot.visible = v; } };
-    bulbs[name] = { light: L, dome, base: intensity };
+    // the light itself is not here: lights.js lends the nearest lit fixtures a light each from a fixed pool, so the number of lights never
+    // changes (a change recompiles every shader) and a dark house costs nothing
+    bulbs[name] = { dome, base: intensity, pos: new THREE.Vector3(SX(x), H - 0.3, SZ(z)), room: name.startsWith('hall') ? 'hall' : name };
   };
   fixture('bed', 6.5, 1.4); fixture('hall1', 4.8, -0.9); fixture('hall2', 7.0, -0.9); fixture('bath', 4.15, 1.0, 7);
   fixture('living', 0, -2.4, 10); fixture('kitchen', 0.3, 1.5, 10); fixture('spare', 7.0, -3.1, 8); fixture('room2', 4.55, -3.1, 8); fixture('parents', -5.7, -0.3, 9);
@@ -1579,14 +1576,32 @@ export function buildWorld(scene) {
   outlet(3.405, 0.34, 1.0, 1, 0, true);        // bathroom
   outlet(0.85, 0.34, -0.38, 0, -1, true);      // living room, on the arch wall
   for (const [x, y, z, nx, nz] of [[0.4, 0.33, -0.38, 0, -1], [8.02, 0.33, 1.6, -1, 0], [4.6, 0.3, -1.42, 0, 1], [2.6, 1.1, 3.52, 0, -1], [4.0, 0.33, -4.42, 0, 1], [5.72, 0.33, -2.4, -1, 0], [-8.02, 0.33, 2.2, 1, 0], [-3.38, 0.33, -0.7, -1, 0], [-8.02, 0.33, -2.6, 1, 0]]) outlet(x, y, z, nx, nz, false);
-  // light switches inside each door, knob side, 1.2 m up
-  function switchAt(px, pz, nx, nz, y = 1.2) {
-    const g = new THREE.Group(); g.position.set(px, y, pz); g.rotation.y = Math.atan2(nx, nz); house.add(g);
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.12, 0.01), outletMat); plate.position.z = 0.005; g.add(plate);
-    place(house, 'switch', { x: px, y, z: pz, rot: g.rotation.y, s: 0.01, wall: true, hide: [plate] });
+  // light switches inside each door, latch side, 1.2 m up: an ivory toggle plate with its two screws and a lever that flips (lights.js works
+  // them; up is on). room: the fixtures it works (null: it does nothing)
+  const switches = [];
+  const swPlateGeo = (() => {
+    const w = 0.07, h = 0.114, r = 0.006, sh = new THREE.Shape();
+    sh.moveTo(-w / 2 + r, -h / 2); sh.lineTo(w / 2 - r, -h / 2); sh.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r); sh.lineTo(w / 2, h / 2 - r);
+    sh.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2); sh.lineTo(-w / 2 + r, h / 2); sh.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r); sh.lineTo(-w / 2, -h / 2 + r); sh.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2);
+    return new THREE.ExtrudeGeometry(sh, { depth: 0.003, bevelEnabled: true, bevelThickness: 0.0025, bevelSize: 0.0025, bevelSegments: 2, curveSegments: 4 });
+  })();
+  const swMat = std({ color: 0xebe3cf, roughness: 0.34 }), swSlot = std({ color: 0x1b1813, roughness: 0.85 }), swScrew = std({ color: 0xc9c0ae, roughness: 0.32, metalness: 0.85 });
+  const swLeverGeo = new THREE.BoxGeometry(0.0092, 0.0125, 0.0155); swLeverGeo.translate(0, 0, 0.0075);
+  const swScrewGeo = new THREE.CylinderGeometry(0.0032, 0.0032, 0.0016, 10); swScrewGeo.rotateX(Math.PI / 2);
+  function switchAt(px, pz, nx, nz, room, y = 1.2) {
+    const g = new THREE.Group(); g.position.set(px, y, pz); g.rotation.y = Math.atan2(nx, nz); house.add(g);   // local +Z points into the room
+    const plate = new THREE.Mesh(swPlateGeo, swMat); plate.position.z = 0.0025; plate.castShadow = true; plate.receiveShadow = true; g.add(plate);
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(0.011, 0.027, 0.002), swSlot); slot.position.z = 0.0075; g.add(slot);
+    for (const sy of [0.039, -0.039]) { const sc = new THREE.Mesh(swScrewGeo, swScrew); sc.position.set(0, sy, 0.0082); sc.rotation.z = sy * 30; g.add(sc); }
+    const pivot = new THREE.Group(); pivot.position.z = 0.007; g.add(pivot);
+    const lever = new THREE.Mesh(swLeverGeo, swMat); lever.castShadow = true; pivot.add(lever);
+    pivot.rotation.x = 0.36;   // down: off
+    switches.push({ room, g, pivot, normal: new THREE.Vector3(nx, 0, nz) });
   }
-  switchAt(7.7, -0.22, 0, 1); switchAt(4.75, -0.2, 0, 1); switchAt(8.02, -1.8, -1, 0); switchAt(4.5, -1.58, 0, -1);   // your room, bathroom, the spare room (on the end wall by the latch side of its door), the office
-  switchAt(2.55, -4.42, 0, 1); switchAt(-3.38, 1.15, -1, 0); switchAt(-9.0, PLACES.garage[3] - 0.12, 0, -1);   // by the front door, inside Mom and Dad's door, the garage (inside, on the sheathing)
+  switchAt(7.7, -0.22, 0, 1, 'bed'); switchAt(4.75, -0.2, 0, 1, 'bath'); switchAt(8.02, -1.8, -1, 0, 'spare'); switchAt(4.5, -1.58, 0, -1, 'room2');   // your room, bathroom, the spare room (on the end wall by the latch side of its door), the office
+  switchAt(2.55, -4.42, 0, 1, 'living'); switchAt(-3.38, 1.15, -1, 0, 'parents'); switchAt(-9.0, PLACES.garage[3] - 0.12, 0, -1, null);   // by the front door, inside Mom and Dad's door, the garage (inside, on the sheathing)
+  switchAt(3.47, -0.38, 0, -1, 'hall'); switchAt(8.02, -0.62, -1, 0, 'hall');   // the hall, a switch at each end (either one works it)
+  switchAt(2.58, -0.38, 0, -1, 'kitchen');   // the kitchen's, on the living room side of the arch (the fridge stands against the other side)
 
   // for the night event: the face's glow, and a passing car's headlights (a shadow-casting spot, so the light only comes in through the windows)
   const faceLight = new THREE.PointLight(0xdce6ff, 0, 20, 2); faceLight.visible = false; scene.add(faceLight);
@@ -2329,7 +2344,7 @@ export function buildWorld(scene) {
   }
 
   return {
-    colliders, onDrive, T, M, house, yard, bulbs, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
+    colliders, onDrive, T, M, house, yard, bulbs, switches, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
     doors, setDoor, tick, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
     get hallFrame() { return hallFrame; }, get lowerBunk() { return lowerBunk; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },

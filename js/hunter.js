@@ -44,7 +44,9 @@ export function createHunter(ctx) {
   const ep = () => E.root.position;
   const settle = () => { if (W.groundAt) ep().y = W.groundAt(ep().x, ep().z, ep().y); };   // on the stairs and in the laundry it stands on the floor there
   const gap = () => Math.hypot(P.pos.x - ep().x, P.pos.z - ep().z);
-  const sees = (maxD = 14) => !hidden() && gap() < maxD && los(ep().x, ep().z, P.pos.x, P.pos.z, ep().y, P.pos.y);
+  // light gives you away: standing in a lit room it sees you from half as far again
+  const litBoost = () => (ctx.lit ? 1 + 0.5 * ctx.lit(P.pos.x, P.pos.z, P.pos.y) : 1);
+  const sees = (maxD = 14) => !hidden() && gap() < maxD * litBoost() && los(ep().x, ep().z, P.pos.x, P.pos.z, ep().y, P.pos.y);
   const hidden = () => ctx.hidden();
   const playerNode = () => nearestNode(P.pos.x, P.pos.z, (k) => los(P.pos.x, P.pos.z, NODES[k][0], NODES[k][1], P.pos.y, NODES[k][2] || 0), P.pos.y) || nearestNode(P.pos.x, P.pos.z, null, P.pos.y);
   const doorClosed = (name) => W.doors[name] && W.doors[name].target === 0;
@@ -75,7 +77,19 @@ export function createHunter(ctx) {
     return true;
   }
   // walk along S.path at `spd`; returns true on arrival
+  // the edge of the light: it will not walk into a lit room while you are watching it. It stops in the dark just short of the light and
+  // waits, looking at you (ctx.onEdge hears how long, and may take the light away); look away, or lose the light, and it comes on
+  function edgeHold(dt) {
+    if (!ctx.lit || S.pi >= S.path.length || !E.visible) { S.edge = 0; return false; }
+    const [tx, tz] = NODES[S.path[S.pi]], dx = tx - ep().x, dz = tz - ep().z, d = Math.hypot(dx, dz) || 1, a = Math.min(0.75, d);
+    const ax = ep().x + dx / d * a, az = ep().z + dz / d * a;
+    if (ctx.lit(ax, az, ep().y) < 0.45 || ctx.lit(ep().x, ep().z, ep().y) > 0.3 || !looking(ep().x, ep().z, 0.6, 1.6)) { S.edge = 0; return false; }
+    S.edge = (S.edge || 0) + dt; E.mode = 'idle'; E.speed = 0.3; E.faceTowards(P.pos.x, P.pos.z, Math.min(1, dt * 5)); E.lookTarget = camera.position;
+    if (ctx.onEdge) ctx.onEdge(S.edge, ax, az);
+    return true;
+  }
   function follow(dt, spd) {
+    if (edgeHold(dt)) return false;
     if (S.doorWait > 0) {   // opening a door in the way
       S.doorWait -= dt; E.mode = 'idle'; if (S.doorWait <= 0 && S.doorName) { W.setDoor(S.doorName, true); S.doorName = null; S.doorWait = 0.45; return false; }
       return false;
