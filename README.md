@@ -6,7 +6,7 @@ A short first-person horror game made with [three.js](https://threejs.org). Your
 
 ## Story
 
-Moving day: carry your three boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Someone left a crayon drawing taped up in the hall. At 2:47 that night the house wakes up. Your bear falls off the bunk, your door shuts by itself, something scratches inside the closet and the photo in the hall comes off the wall, but you never see what does it. When it all goes quiet, get under the covers and hold your breath. At breakfast nobody believes you.
+Moving day: carry your three boxes from the truck to your room, the back-left corner room at the end of the hall, next to the bathroom. Someone left a crayon drawing taped up in the hall, and someone measured a boy called Ben on the side of your closet until he was seven. By the time you bring in your last box there is a fourth one in your room with your name on it in a little kid's crayon. At 2:47 that night the house goes quiet, the hall light Mom promised to leave on clicks off, and something lies down in the bottom bunk under you. It walks up the hall and stands at your door, it calls you in Mom's voice while she snores, it draws itself into the drawing and pulls out the kitchen chairs, and at the end it comes to your bed, and you hold your breath under the covers while it leans over you. In the morning you walk down to the table, sit, and tell them; nobody believes you.
 
 From night two the whole house is open, a clock runs toward dawn, and the thing in the hall hunts you. You run, shut doors, hide and hold your breath. The run's seed decides what each night is about (the phone, the TV, Mom calling from the kitchen while she's asleep, the blackout, the drive, the vigil and others), and most nights leave something behind: a sound gives it away, and you photograph it with your disposable camera to lay on the breakfast table in the morning (Tab, or Select on a controller, shows your photos). Get caught and you play the night again. On night ten it comes down the hall, and how many photos you showed them decides which of the three endings you get.
 
@@ -96,11 +96,11 @@ To change a line, edit `lines.json` and run `ELEVENLABS_API_KEY=... python3 tool
 
 | Who | Model | Animation |
 |---|---|---|
-| Mom, Dad | [Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) adults (`Female_Adult_01`, `Male_Adult_05`), MIT | Idle clip, head follows you when you're near, mouth moves with their voice |
+| Mom, Dad | [Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) adults (`Female_Adult_01`, `Male_Adult_05`), MIT | Body-language clips for standing, talking, sitting and folded arms (talking follows the loudness of the voice, and each line starts on the other mirror of the clip), hands kept on or above the table when seated, head follows you when you're near, mouth moves with their voice |
 | Grandpa | Rocketbox `Male_Adult_03`, without his hair cards, MIT | One seated clip for the vigil chair (`tools/models/sit.js`) |
 | The thing | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze |
 
-The walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`) retargeted onto the Rocketbox skeleton; `tools/models/` rebuilds them. Without the model files the game falls back to low-poly people and a low-poly thing. Credits and licences: [CREDITS.md](CREDITS.md).
+The parents' body language is Quaternius's Universal Animation Library (CC0) and the walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`), both retargeted onto the Rocketbox skeleton; `tools/models/` rebuilds them. Without the model files the game falls back to low-poly people and a low-poly thing. Credits and licences: [CREDITS.md](CREDITS.md).
 
 ## Graphics
 

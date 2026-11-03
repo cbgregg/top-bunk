@@ -132,7 +132,7 @@ export const MENUS = {
 // condensed from CREDITS.md (kept in the page: nothing is fetched at runtime)
 const CREDITS = `<dl class="credits">
 <dt>Characters</dt><dd>Microsoft Rocketbox Avatar Library, MIT License, © 2020 Microsoft (Female_Adult_01, Male_Adult_05, Male_Adult_06).</dd>
-<dt>Animation</dt><dd>Idle, walk, run and gesture clips from Mixamo (Adobe), as shipped in the three.js example Xbot.glb, retargeted onto the Rocketbox skeleton.</dd>
+<dt>Animation</dt><dd>Mom and Dad's body language: Universal Animation Library 1 and 2 by Quaternius (quaternius.com), CC0 1.0. Walk, run and idle clips from Mixamo (Adobe), as shipped in the three.js example Xbot.glb. All retargeted onto the Rocketbox skeleton.</dd>
 <dt>3D engine</dt><dd>three.js r170, MIT License, © 2010–2024 three.js authors.</dd>
 <dt>Fonts</dt><dd>Special Elite (Astigmatic) and Permanent Marker (Font Diner), Apache License 2.0. Courier Prime (Alan Dague-Greene) and Gloria Hallelujah (Kimberly Geswein), SIL Open Font License 1.1.</dd>
 <dt>Voices, music and sound effects</dt><dd>Generated with ElevenLabs (the night's brown noise is made with ffmpeg).</dd>

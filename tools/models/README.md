@@ -7,3 +7,11 @@
 3. `node export.js <this folder> <out>` (needs Playwright) loads them in a headless browser, bakes the Xbot clips (idle, walk, run, agree, headShake, sneak, sad) onto the Rocketbox skeleton (`rblib.js`: matches each bone's rest direction, then copies the world rotation), and writes the five GLBs. Grandpa (`Male_Adult_03`, for the vigil) is built without his hair cards and carries one clip of his own, `sit`: a seated pose that `sit.js` fits to the vigil chair (seat top 0.485 m) at `setHeight(1.70)`, since the shared clips all stand.
 
 The game finds the bones by name (`Bip01_*`), so any Rocketbox adult works in place of the ones above.
+
+## The parents' body language (`assets/models/body.bin`)
+
+Standing, talking, sitting, talking seated and arms folded come from Quaternius's Universal Animation Library 1 and 2 (CC0, the free "Standard" downloads from quaternius.com or itch.io). Put `UAL1_Standard.glb` and `UAL2_Standard.glb` (from each zip's `Unreal-Godot` folder) in one folder and run, from the repo root:
+
+    node tools/models/body.cjs <that folder>
+
+It opens `body.html` in headless Chromium (needs Playwright), bakes each clip onto the Rocketbox skeleton (the same world-rotation copy as `rblib.js`, with the bone map for the UAL rig) and writes `assets/models/body.bin`: a JSON header and 16-bit quaternions. The game mirrors the clips left for right when it loads them (`js/rig.js`), and the seated ones are played as the change from their first frame, on an upright body.

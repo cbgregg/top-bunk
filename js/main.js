@@ -22,6 +22,7 @@ import { achievements } from './achievements.js';
 import { store } from './store.js';
 import { createHands } from './hands.js';
 import { createJournal } from './journal.js';
+import { createFirstNight } from './firstnight.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -82,6 +83,7 @@ camera.rotation.order = 'YXZ';
 scene.add(camera);
 
 const W = buildWorld(scene);
+const FN = createFirstNight({ W, scene, camera }); FN.renderer = renderer;   // moving day's and night one's own props and effects
 const hands = createHands();   // the kid's hands, drawn over the frame (see the end of loop())
 LOAD.set(0.12, 'Unpacking the boxes');
 await tick();
@@ -127,10 +129,13 @@ function grabPrint() {
 function takePhoto() {
   bulb.position.copy(camera.position); camera.getWorldDirection(tmp); bulb.position.addScaledVector(tmp, -0.25); bulb.intensity = 3.2;   // a cheap flash: bright up close, gone by the far wall
   let url = null;
+  // F.flashFx (night one): something is put into the print before it is taken, and into the room for the flash after it
+  if (F.flashFx) F.flashFx('print');
   try { camera.updateMatrixWorld(); gfx.render(0); url = grabPrint(); } catch (e) { url = null; }   // the frame the flash lit, read before the browser shows it (the hands are drawn after it, so they are not in the print)
+  const held = F.flashFx ? F.flashFx('after') : 0;   // how long the flash shows it (ms)
   hands.snap();
-  UI.flash(settings.get('reduceFlashing') ? 'rgba(255,250,240,0.45)' : 'rgba(255,250,240,0.95)', 0.5); sfx.shutter(); sfx.winder();
-  setTimeout(() => { bulb.intensity = 0; }, 120);
+  UI.flash(settings.get('reduceFlashing') ? 'rgba(255,250,240,0.45)' : held ? 'rgba(255,250,240,0.6)' : 'rgba(255,250,240,0.95)', held ? 0.35 : 0.5); sfx.shutter(); sfx.winder();
+  setTimeout(() => { bulb.intensity = 0; }, held || 120);
   return url;
 }
 // the journal (js/journal.js): it writes itself from what happens; J, the right stick pressed in, the pause menu or the notebook on a touch screen
@@ -257,7 +262,7 @@ const look = { s: settings.get('sensitivity'), y: settings.get('invertY') ? -1 :
 settings.on('sensitivity', (v) => { look.s = v; }); settings.on('invertY', (v) => { look.y = v ? -1 : 1; });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== canvas || paused || F.cutscene) return;
-  if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car')) return;
+  if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat')) return;
   P.yaw -= e.movementX * 0.0022 * look.s; P.pitch = clamp(P.pitch - e.movementY * 0.0022 * look.s * look.y, -1.45, 1.45);
 });
 // the pause menu says where you are and the run's seed, so it can be shared or played again
@@ -274,7 +279,7 @@ function setPause(on) {
 function confirmPress() {
   if (uiMode === 'title' && !started) startGame(); else if (uiMode === 'pause') setPause(false); else if (uiMode === 'death') retry(); else if (uiMode === 'end') location.reload();
 }
-const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car');
+const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
 initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos(), journal: () => openJournal() });
 // the controls table and the "begin" line follow whichever device you last used
@@ -332,6 +337,7 @@ function sleepers(on) {
 
 // ---------- phases (lighting) ----------
 function setPhase(p, silent = false) {
+  if (p !== 'night') FN.reset(E);   // the bedside scene belongs to a night: by day, at the title and in the morning none of it is there
   F.phase = p; W.sun.shadow.needsUpdate = true;
   const day = p === 'day', night = p === 'night' || p === 'title', morn = p === 'morning';
   gfx.setPhase(p);
@@ -362,7 +368,8 @@ function setPhase(p, silent = false) {
   weather.set(wx); if (silent || p !== 'night') weather.jump();
   W.bathSpot.intensity = 0;
   W.frontDoor.setOpen(day);
-  W.drawingMat.map = (p === 'night' || morn) ? W.T.drawing1 : W.T.drawing0; W.drawingMat.needsUpdate = true;
+  // the drawing changes in the night: on night one someone draws a new figure into it (F.drawn), from night two it is the one where he pushes
+  W.drawingMat.map = !(p === 'night' || morn) ? W.T.drawing0 : (F.night || 0) <= 1 ? (F.drawn ? (W.T.drawing2 || (W.T.drawing2 = FN.drawing())) : W.T.drawing0) : W.T.drawing1; W.drawingMat.needsUpdate = true;
   setExposure(EXPOSURE[day ? 'day' : night ? 'night' : 'morning']);
   if (p === 'night') sleepers(true); else { sleepers(false); mom.group.visible = dad.group.visible = day; }
   if (sfx.ctx && !silent) {
@@ -419,6 +426,8 @@ function updateInteract() {
       if (F.carPrompt) { label = F.carPrompt.label; act = F.carPrompt.act; }
     } else if (P.mode === 'hide') {
       if (F.live && nights && nights.canComeOut() && !F.breathCheck) { label = P.pod ? 'Come out' : 'Come out from under the covers'; act = () => nights.exitHide(); }
+    } else if (P.mode === 'seat') {
+      if (seat && !seat.tween) { label = 'Stand up'; act = standUp; }
     } else if (P.mode === 'bunk') {
       if (F.phase === 'morning') { if (F.morningReady) { label = 'Climb down'; act = climbDown; } }
       else { label = 'Climb down'; act = climbDown; if (F.live) extra = ` &nbsp;·&nbsp; <b>${L('breath')}</b> Hide under the covers`; }
@@ -483,10 +492,11 @@ function pickUp(b) {
   sfx.thump();
   if (F.boxes === 0) UI.hint('Carrying slows you down', 3);
 }
+const kidBoxes = [];   // your three, where you put them down (night one finds them unpacked and stacked on the floor)
 function dropBox() {
   const b = P.carrying, spot = W.dropSpots[Math.min(F.boxes, W.dropSpots.length - 1)];
   camera.remove(b); W.house.add(b); b.position.set(spot.x, spot.y + 0.22, spot.z); b.rotation.set(0, (Math.random() - 0.5) * 0.6, 0);
-  P.carrying = null; F.boxes++; sfx.thump();
+  P.carrying = null; F.boxes++; sfx.thump(); kidBoxes.push(b);
   if (F.boxes < 3) UI.objective(`Carry your boxes to your room <span>${F.boxes} / 3</span>`);
   if (F.boxes === 1) UI.subtitle('<i>Top bunk is yours. The bottom one is for boxes.</i>', 4);
 }
@@ -522,15 +532,15 @@ function speak(id, { muffle = false, hold = 0.45 } = {}) {
 }
 // lines the parents say to each other rather than to you (the rest are to you)
 const LINE_TO = {
-  'dad/cheap': 'mom', 'dad/m4_a': 'mom', 'mom/m5_a': 'dad', 'dad/m5_b': 'mom', 'mom/m5_b': 'dad', 'dad/m6_a': 'mom', 'mom/m6_b': 'dad',
+  'dad/cheap': 'mom', 'dad/m4_a': 'mom', 'dad/box4': 'mom', 'mom/m5_a': 'dad', 'dad/m5_b': 'mom', 'mom/m5_b': 'dad', 'dad/m6_a': 'mom', 'mom/m6_b': 'dad',
   'mom/m7_a': 'dad', 'dad/m7_b': 'mom', 'dad/m8_a': 'mom', 'mom/m8_b': 'dad',
   'mom/ph_high_a': 'dad', 'dad/ph_high_a': 'mom',
 };
 // how a line is said: the face and the hands take it from here (questions are found from the text)
 const MOOD = {
-  'dad/welcome': 'warm', 'dad/line_1': 'joke', 'dad/line_2': 'joke', 'dad/line_3': 'warm', 'dad/mom_looking': 'joke', 'dad/cheap': 'joke', 'dad/leftovers': null,
-  'mom/boxes_first': 'warm', 'mom/boxes_again': 'joke', 'mom/helper': 'warm', 'mom/landlord': 'joke', 'mom/teeth': 'warm', 'mom/gift_a': 'warm', 'mom/gift_b': 'warm', 'dad/gift': 'joke',
-  'mom/m1_a': 'warm', 'dad/m1_a': 'joke', 'mom/m1_b': 'warm', 'mom/m2_a': 'uneasy', 'dad/m2_a': null, 'mom/m2_b': 'uneasy', 'mom/m3_a': 'uneasy', 'mom/m4_a': 'uneasy', 'mom/m4_b': 'uneasy',
+  'dad/welcome': null, 'dad/line_1': null, 'dad/line_2': null, 'dad/line_3': null, 'dad/mom_looking': null, 'dad/cheap': null, 'dad/leftovers': 'uneasy', 'dad/box4': 'uneasy',
+  'mom/boxes_first': 'warm', 'mom/boxes_again': null, 'mom/helper': 'warm', 'mom/landlord': 'uneasy', 'mom/teeth': 'warm', 'mom/gift_a': 'warm', 'mom/gift_b': 'warm', 'dad/gift': null,
+  'mom/m1_a': 'uneasy', 'dad/m1_a': 'uneasy', 'mom/m1_b': 'uneasy', 'mom/n1_door_a': 'uneasy', 'mom/n1_door_b': 'scared', 'mom/m2_a': 'uneasy', 'dad/m2_a': null, 'mom/m2_b': 'uneasy', 'mom/m3_a': 'uneasy', 'mom/m4_a': 'uneasy', 'mom/m4_b': 'uneasy',
 };
 const talkNow = { who: null, to: null, until: 0 };
 // every frame: the speaker looks at whoever the line is for, the other parent looks at the speaker and turns a little toward them
@@ -668,7 +678,9 @@ function updateCamera(dt) {
     camera.position.y += Math.sin(gameTime * (keys.Space || input.breath ? 0.6 : 2.4)) * 0.006;
   }
   if (P.mode === 'bunk') P.pitch = clamp(P.pitch, -1.2, 0.9);
+  if (P.mode === 'seat' && seat) { P.yaw = seat.yaw + clamp(angDiff(seat.yaw, P.yaw), -1.75, 1.75); P.pitch = clamp(P.pitch, -0.8, 0.55); }   // turning in a chair, not in a turret
   camera.rotation.set(P.pitch, P.mode === 'car' ? car.baseYaw() + P.yaw : P.yaw, P.roll);
+  leanOver(dt);
   handheld(dt);
   if (shake > 0) {
     camera.position.x += (Math.random() - 0.5) * shake * 0.07;
@@ -679,6 +691,20 @@ function updateCamera(dt) {
   holdBox(dt);
 }
 
+// on the top bunk, looking right down over the room side hangs your head over the edge, and your eyes go to the bottom bunk under you
+// (F.leanK 0..1: night one listens for it)
+const LOWER_BUNK = new V3(8.42, 0.6, 3.82), leanQ = new THREE.Quaternion(), leanM = new THREE.Matrix4();
+function leanOver(dt) {
+  const want = P.mode === 'bunk' && !F.cutscene && Math.abs(angDiff(HIDE_YAW, P.yaw)) < 1.25 ? THREE.MathUtils.smoothstep(-P.pitch, 0.62, 1.12) : 0;
+  F.leanK = (F.leanK || 0) + (want - (F.leanK || 0)) * Math.min(1, dt * 3.2);
+  const k = F.leanK; if (k < 0.002) return;
+  const e = k * k * (3 - 2 * k);
+  // the head goes out past the rail (the top bunk's edge is at z 3.35) and then hangs down over the side, below the top mattress, so you see
+  // under it into the bottom bunk
+  camera.position.z -= 0.9 * e; camera.position.y -= 0.86 * e * e; camera.position.x += 0.06 * e;
+  leanM.lookAt(camera.position, LOWER_BUNK, camera.up); leanQ.setFromRotationMatrix(leanM);
+  camera.quaternion.slerp(leanQ, e * 0.9);
+}
 // the camera is never perfectly still: breathing, a rolling gait, and a tremor that grows with fear (F.fear, 0..1)
 // baseFov and bobK follow the options menu (field of view; head bob scales the walking gait, not the breathing or the fear tremor)
 let baseFov = settings.get('fov'), fovNow = baseFov, fovOff = 0, bobK = +settings.get('headBob');   // fovOff: the nightmare swings the lens
@@ -722,7 +748,7 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
 }
 
 function resetNight() {
-  vigil.stop(); WF.stop();
+  vigil.stop(); WF.stop(); FN.reset(E);
   F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false;
   F.splashed = false; F.morningReady = false; P.breath = 1; P.stamina = 1; P.exhausted = false; shake = 0;
   carEnd(); F.live = false; F.script = false; F.blackout = false; F.clockGlitch = 0; F.fear = 0; P.pod = null; P.podYaw = HIDE_YAW; UI.pod(null); UI.clock(null); F.flashOn = false; flash.intensity = 0;
@@ -1087,10 +1113,11 @@ async function dayScript() {
   startChores();
   UI.objective('Carry your boxes to your room <span>0 / 3</span>');
   UI.hint(`<b>${L('move')}</b> move &nbsp;·&nbsp; <b>${L('sprint')}</b> sprint &nbsp;·&nbsp; <b>${L('interact')}</b> interact`, 8);
+  dayStrange();
   await waitFor(() => F.boxes >= 3);
   chore.stop = true;   // Dad finishes the box he is carrying, then walks to the kitchen on his own
   await wait(0.8);
-  UI.subtitle("<i>That's the last one.</i>", 3);
+  UI.subtitle(FN.box.mesh.visible ? "<i>That's three. ...There are four.</i>" : "<i>That's the last one.</i>", 3.5);
   UI.objective('Find Mom in the kitchen');
   F.momReady = true;
   await waitFor(() => F.talkedMom);
@@ -1101,10 +1128,50 @@ async function dayScript() {
   faceParent(mom);
   UI.objective(null);
   F.talkCam = true;   // the view follows whoever is talking
-  await say('mom/helper'); await cameraGift(); await say('mom/landlord'); await say('dad/cheap'); await say('dad/leftovers'); await say('mom/teeth');
+  await say('mom/helper');
+  if (FN.box.mesh.visible) { await say('you/box4'); await say('dad/box4'); }
+  await cameraGift(); await say('mom/landlord'); await say('dad/cheap'); await say('dad/leftovers'); await say('mom/teeth');
   UI.fade(1, 2.5); await wait(3);
   F.talkCam = false; F.birds = false; F.cutscene = false; endChores();
+  FN.box.hide(); box4Col.on = false;   // Dad carries it out to the road after dinner
   RUN.dayDone = true; saveRun();
+}
+// the day's own wrongness, alongside the chores: the dog under your window, a fourth box in your room that nobody carried in, and pencil
+// marks on the side of your closet. Nothing here is announced; it is there if you look
+const BOX4 = new V3(10.02, 0, 3.05), box4Col = { minX: BOX4.x - 0.27, maxX: BOX4.x + 0.27, minZ: BOX4.z - 0.27, maxZ: BOX4.z + 0.27, on: false, dressing: true };
+W.colliders.push(box4Col);
+function placeBox4() { FN.box.place(BOX4.x, BOX4.z, Math.PI - 0.35); box4Col.on = true; }
+addI({ obj: FN.box.mesh, r: 2.2, label: 'Look in the box', when: () => FN.box.mesh.visible && !F.box4Seen && (F.phase === 'day' || F.phase === 'morning') && P.mode === 'walk', act: async () => {
+  F.box4Seen = true; sfx.pick('cloth', { gain: 0.3, wet: 0.05 }) || sfx.thump();
+  UI.subtitle('<i>A drawing in crayon. A bunk bed, and something very tall standing beside it.</i>', 4.5);
+  await wait(4.6); UI.subtitle('<i>Under the drawing is your school picture. The one Mom keeps in her wallet.</i>', 5);
+  journal.note('n1', 'There was a box in my room with my name on it. Not one of ours. My school picture was in it.');
+} });
+addI({ obj: FN.marks.mesh, r: 1.9, label: 'Look at the pencil marks', when: () => FN.marks.mesh.visible && P.mode === 'walk' && F.phase !== 'title', act: async () => {
+  if (F.marksSeen) { UI.subtitle('<i>BEN 5. BEN 6. BEN 7.</i>', 2.5); return; }
+  F.marksSeen = true; UI.subtitle('<i>Pencil marks on the side of the closet, the way you measure a kid. BEN 5. BEN 6. BEN 7.</i>', 5);
+  await wait(5.1); UI.subtitle('<i>Nothing after seven.</i>', 3); sfx.creak(0.1, 0.4, 0.6);
+} });
+async function dayStrange() {
+  FN.marks.place();
+  // the neighbour's dog, right under your window: it goes for the house, then stops dead in the middle of a bark and backs off
+  (async () => {
+    await waitFor(() => (F.boxes >= 1 && P.carrying && roomAt(P.pos.x, P.pos.z) === 'bed') || F.boxes >= 2 || F.stage !== 'day');
+    if (F.stage !== 'day') return;
+    const w = W.windows.filter((x) => x.pane).map((x) => ({ x, p: x.pane.getWorldPosition(new V3()) })).find((o) => roomAt(o.p.x, o.p.z) === 'bed' || roomAt(o.p.x - 0.3, o.p.z) === 'bed' || roomAt(o.p.x, o.p.z + 0.3) === 'bed');
+    const at = w ? w.p.clone() : new V3(10.8, 0, 3.0), out = w ? (w.x.alongX ? new V3(0, 0, -w.x.inside) : new V3(-w.x.inside, 0, 0)) : new V3(1, 0, 0);
+    at.addScaledVector(out, 2.6); at.y = 0.45;
+    await wait(0.6);
+    let d = sfx.pick('dog_far', { at, gain: 1.1, wet: 0.05, ref: 2.5 }) || 2;
+    await wait(d * 0.95);
+    d = sfx.pick('dog_far', { at, gain: 1.15, wet: 0.05, ref: 2.5, dur: 1.15 }) || 1;   // cut off
+    await wait(d + 2.2);
+    at.addScaledVector(out, 12); sfx.pick('dog_far', { at, gain: 0.22, wet: 0.2, dur: 0.5, rate: 1.15 });   // far off, going
+  })();
+  // the fourth box: put down while you are out of the room, after your second
+  await waitFor(() => F.boxes >= 2 || F.stage !== 'day');
+  await waitFor(() => F.stage !== 'day' || roomAt(P.pos.x, P.pos.z) !== 'bed');
+  if (F.stage === 'day' && F.boxes < 3) placeBox4();
 }
 // Mom's move-in present: a disposable camera from the gas station. She holds it out until you take it (or after a while
 // puts it in your hand anyway); from then on it is yours (RUN.hasCamera)
@@ -1137,8 +1204,8 @@ function faceParent(who) {
   tween(0.8, (k) => { P.yaw = lerpAngle(y0, want, k); P.pitch = lerp(P.pitch, 0.18, k); });
 }
 
-// ---------- the mornings: you walk to the kitchen and tell them, and the camera follows the conversation ----------
-// The view turns to whoever speaks (with a lag and a slight overshoot), creeps in as they talk, and drops to your plate for your own lines.
+// ---------- the mornings: you wake up, walk to the table and sit down, and they talk to you; you look wherever you like ----------
+// (lookAtPerson turns the view for the finale, which still frames its own shots)
 function lookAtPerson(who, dur = 0.75) {
   who.head.getWorldPosition(tmp);
   const cx = P.pos.x, cz = P.pos.z, y0 = P.yaw, p0 = P.pitch;
@@ -1146,32 +1213,23 @@ function lookAtPerson(who, dur = 0.75) {
   const over = angDiff(y0, want) * 0.12;   // overshoots a touch and settles
   return tween(dur, (k) => { P.yaw = y0 + angDiff(y0, want) * k + over * Math.sin(k * Math.PI) * 0.6; P.pitch = lerp(p0, clamp(up, -0.3, 0.45), k); }, ease.inOut);
 }
-function lookDown(dur = 0.7) { const p0 = P.pitch; return tween(dur, (k) => { P.pitch = lerp(p0, -0.34, k); }); }
-// closeups: the camera drifts in to a face, slightly off-axis, and pulls back for your lines
-const CU_DIST = 0.8;
-function closeFrame(p) {
-  p.head.getWorldPosition(tmp); const h = tmp.clone();
-  const dx = P.pos.x - h.x, dz = P.pos.z - h.z, l = Math.hypot(dx, dz) || 1;
-  const pos = new V3(h.x + dx / l * CU_DIST, EYE - 0.08, h.z + dz / l * CU_DIST);
-  return { pos, yaw: Math.atan2(-(h.x - pos.x), -(h.z - pos.z)), pitch: clamp(Math.atan2(h.y - pos.y, Math.hypot(h.x - pos.x, h.z - pos.z)), -0.3, 0.3) };
-}
-async function closeOn(p, dur = 1.1) {
-  const f = closeFrame(p), from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
-  await tween(dur, (k) => { P.cam.lerpVectors(from, f.pos, k); P.yaw = lerpAngle(y0, f.yaw, k); P.pitch = lerp(p0, f.pitch, k); }, ease.inOut);
-}
-async function wideShot(dur = 0.8) {
-  const from = P.cam.clone(), to = new V3(P.pos.x, EYE, P.pos.z);
-  await tween(dur, (k) => { P.cam.lerpVectors(from, to, k); }, ease.inOut);
-}
+// the morning talk: you are in your chair and look wherever you like; they look at whoever is talking (talkGaze) and at you. Stand up in
+// the middle of it and they stop, and Mom asks you to sit back down
 async function conversation(lines) {
-  P.mode = 'cine'; P.cam.copy(camera.position);
   for (const step of lines) {
-    if (typeof step === 'function') { await step(); continue; }   // a beat that runs its own shots
+    await seated();
+    if (typeof step === 'function') { await step(); continue; }
     const [who, key] = step, id = `${who}/${key}`;
-    if (who === 'you') { await wideShot(); await lookDown(); await say(id); await wait(0.25); }
-    else { await closeOn(who === 'mom' ? mom : dad, 0.6); await say(id); await wait(0.3); }
+    await say(id); await wait(who === 'you' ? 0.25 : 0.35);
   }
-  P.mode = 'walk';
+}
+let askedToSit = 0;
+async function seated() {
+  if (P.mode === 'seat') return;
+  await wait(1.2);
+  if (P.mode !== 'seat' && gameTime - askedToSit > 12) { askedToSit = gameTime; await say('mom/sit'); }
+  await waitFor(() => P.mode === 'seat' && seat && !seat.tween);
+  await wait(0.6);
 }
 // a day talk: they stop whatever they are doing and turn to you; the camera stays where you stand and settles on their face
 async function talkTo(p, id) {
@@ -1236,8 +1294,8 @@ function kitchenLife() {
       } else {
         // turned to you: the spoon is down on the counter, the mug held low in both hands
         if (spoon.parent !== scene) { scene.attach(spoon); spoon.position.copy(mom.group.localToWorld(new V3(0.1 * bm, 0.95 * bm, 0.5 * bm))); spoon.rotation.set(0, mom.group.rotation.y + 0.4, 0); }
-        if (kitchen.seated) {   // at the table: the mug is down in front of him and both have their hands free to talk with
-          if (mug.parent !== scene) { scene.attach(mug); mug.position.copy(dad.group.localToWorld(new V3(0.12, 0, 0.42))); mug.position.y = kitchen.tableY; mug.rotation.set(0, dad.group.rotation.y, 0); spoon.visible = false; }
+        if (kitchen.seated) {   // at the table: the mug is down past his right hand (clear of where his hands rest and talk) and both have their hands free
+          if (mug.parent !== scene) { scene.attach(mug); mug.position.copy(dad.group.localToWorld(new V3(-0.32, 0, 0.56))); mug.position.y = kitchen.tableY; mug.rotation.set(0, dad.group.rotation.y, 0); spoon.visible = false; }
           for (const p of [mom, dad]) if (!p.pose || !p.pose.sit) p.pose = { sit: 1, seat: p.seatAt || 0.46 };   // (seatOn set it, with where the hands rest)
         } else {
           mom.pose = null;
@@ -1255,31 +1313,81 @@ async function breakfast(n) {
   E.visible = false; F.chase = false;
   toBunk(); P.yaw = HIDE_YAW + 0.15; P.pitch = -0.12;
   sleepers(false); mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = false;
-  for (const [p, [x, z, ry]] of [[mom, KSPOT.mom], [dad, KSPOT.dad]]) { p.group.position.set(x, 0, z); p.group.rotation.y = ry; }   // Mom at the stove, Dad back against the counter by the sink
-  kitchenLife();
+  W.chairs.forEach((c, i) => W.moveChair(i, c.x, c.z, c.rot));   // the table as it should be, whatever the night did to it
+  kitchenLife(); seatThem();   // they are already at the table when you come down
+  if (n === 1) placeBox4();   // Dad put it out by the road last night. It is back by your bed
   F.birds = true;
   UI.card('6:58 AM', n === 1 ? 'Morning' : `Morning ${n}`, 3.5);
   await wait(2.2); UI.fade(0, 3); await wait(2.4);
   UI.subtitle(n === 1 ? '<i>You hardly slept.</i>' : n < 6 ? '<i>You did not sleep at all.</i>' : '<i>You are so tired it feels like a fever.</i>', 3.5);
-  UI.objective('Go to the kitchen');
-  F.morningReady = true;
-  await waitFor(() => P.mode === 'walk' && Math.hypot(P.pos.x - mom.group.position.x, P.pos.z - mom.group.position.z) < 3.4);
-  UI.objective(null); F.cutscene = true; P.vel.set(0, 0, 0);
-  // walk you to your mark between them, then the conversation; they put down what they are doing and turn to you
-  { const x0 = P.pos.x, z0 = P.pos.z; await tween(1.2, (k) => { P.pos.set(lerp(x0, 1.98, k), 0, lerp(z0, 1.25, k)); }); }
-  kitchen.talking = true; mom.busy = dad.busy = false;
+  UI.objective('Breakfast');
+  F.morningReady = true; F.breakfastWait = true;
   // Mom's face and arms follow how the run has gone: brushed off, then uneasy, then scared
   { const reg = REG(nights ? nights.proof.count() : 0); mom.mood = reg === 'high' || n >= 6 ? 'scared' : reg === 'mid' || n >= 3 ? 'uneasy' : null; }
-  await sitDown();
-  await wait(0.5);
+  const murmur = kitchenMurmur();
+  await waitFor(() => P.mode === 'seat' && seat && !seat.tween);
+  murmur.stop(); UI.objective(null);
+  await wait(0.9);
   const lines = [...(MORN[n] || MORN[3])];
   const tl = n >= 2 && nights && TYPE_LINE[nights.plan(n).type]; if (tl) lines.push(tl);
   const fresh = nights ? nights.proof.on(n) : []; if (fresh.length) lines.unshift(() => photoBeat(fresh));   // the photos first, then the usual talk
   await conversation(lines);
+  await wait(1.2);
   UI.fade(1, 2.5); await wait(3);
-  F.birds = false; F.cutscene = false; F.morningReady = false;
+  F.birds = false; F.cutscene = false; F.morningReady = false; F.breakfastWait = false;
+  if (P.mode === 'seat') { P.mode = 'walk'; seat = null; }
   kitchen.run++; kitchen.seated = false; mom.pose = dad.pose = null; mom.mood = null; mom.sitNow = dad.sitNow = 0; for (const o of kitchen.things) if (o.parent) o.parent.remove(o); kitchen.things.length = 0;
   mom.group.visible = dad.group.visible = false;
+}
+// your chair: the east one, nearest the hall. Mom sits on your left and Dad on your right
+const MY_CHAIR = 1;
+let seat = null;   // while you are in your chair: { yaw (facing the table), tween (sitting down) }
+function tableMid() { const C = W.chairs || []; return C.reduce((a, c) => a.add(c.holder.getWorldPosition(new V3())), new V3()).multiplyScalar(1 / Math.max(1, C.length)); }
+function seatThem() {
+  const C = (W.chairs || []).map((c, i) => ({ i, p: c.holder.getWorldPosition(new V3()) }));
+  if (C.length < 3) return;
+  const mid = tableMid(), mine = C[MY_CHAIR] || C[0];
+  const dir = (c) => Math.atan2(c.p.x - mid.x, c.p.z - mid.z), side = (c) => Math.abs(Math.abs(angDiff(dir(mine), dir(c))) - Math.PI / 2);
+  const [a, b] = C.filter((c) => c !== mine).sort((x, y) => side(x) - side(y));
+  const toward = new V3(mid.x - mine.p.x, 0, mid.z - mine.p.z).normalize(), leftOf = (c) => new V3(c.p.x - mine.p.x, 0, c.p.z - mine.p.z).cross(toward).y > 0;
+  const [mc, dc] = leftOf(a) ? [a, b] : [b, a];
+  kitchen.talking = true; kitchen.seated = true; kitchen.tableY = topAt(mid.x, mid.z) ?? 0.78; mom.busy = dad.busy = false;
+  seatOn(mom, mc.i, mid); seatOn(dad, dc.i, mid);
+}
+// sitting down: the view lowers into the chair at a kid's seated eye height, facing the table; nothing else moves
+addI({ p: new V3(1.99, 0.75, 2.08), r: 2.3, label: 'Sit', when: () => F.breakfastWait && F.phase === 'morning', act: sitInChair });
+function sitSpot() {
+  const c = W.chairs[MY_CHAIR], p = c.holder.getWorldPosition(new V3()), mid = tableMid(), t = new V3(mid.x - p.x, 0, mid.z - p.z).normalize();
+  return { eye: new V3(p.x + t.x * 0.04, seatHeight(c) + 0.62, p.z + t.z * 0.04), yaw: Math.atan2(-t.x, -t.z), back: new V3(p.x - t.x * 0.55, 0, p.z - t.z * 0.55) };
+}
+async function sitInChair() {
+  if (P.mode !== 'walk') return;
+  const s0 = sitSpot(), from = camera.position.clone(), y0 = P.yaw, p0 = P.pitch;
+  seat = { yaw: s0.yaw, tween: true, back: s0.back }; P.vel.set(0, 0, 0); P.cam.copy(from); P.mode = 'seat';
+  sfx.scrape(panFor(tmp.set(s0.eye.x, 0.4, s0.eye.z))); later(0.6, () => sfx.creak(0.12, 0, 0));
+  await tween(0.9, (k) => { P.cam.lerpVectors(from, s0.eye, k); P.cam.y = lerp(from.y, s0.eye.y, k) - Math.sin(k * Math.PI) * 0.04; P.yaw = lerpAngle(y0, s0.yaw, k * 0.85); P.pitch = lerp(p0, -0.12, k); }, ease.inOut);
+  P.pos.set(s0.eye.x, 0, s0.eye.z); seat.tween = false;
+}
+function standUp() {
+  if (P.mode !== 'seat' || !seat) return;
+  P.pos.copy(seat.back); P.mode = 'walk'; seat = null; sfx.scrape(panFor(tmp.set(P.pos.x, 0.4, P.pos.z)));
+}
+// before you sit down, the two of them talk under their breath at the table, heads together; it stops when you come in
+function kitchenMurmur() {
+  let on = true;
+  (async () => {
+    let turn = 0;
+    while (on && F.breakfastWait) {
+      await wait(2.5 + Math.random() * 3);
+      if (!on || !F.breakfastWait) break;
+      const near = Math.hypot(P.pos.x - 1.18, P.pos.z - 2.08) < 2.6; if (near) continue;
+      const who = turn++ % 2 ? dad : mom, other = who === mom ? dad : mom, d = 1.6 + Math.random() * 1.6;
+      const env = sfx.mumble(who === mom ? 'mom' : 'dad', d, { gain: 0.3, pan: panFor(who.head.getWorldPosition(tmp)) });
+      who.talk(env, { to: other === mom ? 'mom' : 'dad', mood: 'uneasy' });
+      talkNow.who = who === mom ? 'mom' : 'dad'; talkNow.to = other === mom ? 'mom' : 'dad'; talkNow.until = gameTime + d;
+    }
+  })();
+  return { stop() { on = false; talkNow.until = 0; } };
 }
 // sit who on chair i, facing `toward` (the table's middle): the hips over the back half of the seat, at the seat's own height (found by
 // dropping a ray onto the chair), so the thighs lie along it and the knees clear its front edge
@@ -1291,51 +1399,41 @@ function seatHeight(c) {
   const hit = seatRay.intersectObject(c.holder, true).find((h) => h.point.y > 0.3 && h.point.y < 0.7);
   return hit ? hit.point.y : 0.46;
 }
+// the height of a table (or any top a hand can rest on, 0.55..0.9 m) straight down at x, z, or null: solid, visible meshes only (not the
+// dust in the air, not a person or what they hold, not the hidden collision boxes)
+function topAt(x, z) {
+  scene.updateMatrixWorld();   // (things moved this frame, a chair put back, are not where the ray would look yet)
+  seatRay.set(new V3(x, 1.2, z), new V3(0, -1, 0)); seatRay.far = 0.7;
+  const people = (o) => { for (let n = o; n; n = n.parent) if (n === mom.group || n === dad.group) return true; return false; };
+  const hit = seatRay.intersectObjects(scene.children, true).find((h) => h.object.isMesh && !h.object.isSkinnedMesh && !h.object.isInstancedMesh && shown(h.object) && !people(h.object) && h.point.y > 0.55 && h.point.y < 0.9);
+  return hit ? hit.point.y : null;
+}
 function seatOn(who, i, toward) {
-  const c = W.chairs[i], p = c.holder.getWorldPosition(new V3()), r = Math.atan2(toward.x - p.x, toward.z - p.z);
+  const c = W.chairs[i];
+  const p = c.holder.getWorldPosition(new V3()), r = Math.atan2(toward.x - p.x, toward.z - p.z);
   who.group.position.set(p.x - Math.sin(r) * 0.07, 0, p.z - Math.cos(r) * 0.07); who.group.rotation.set(0, r, 0);
   who.seatAt = seatHeight(c);
   // the hands on the table when it is in reach: the first top found straight down in front of them, the hands just past its edge
   let rest = null;
-  for (let d = 0.3; d <= 0.62 && !rest; d += 0.04) {
-    const x = who.group.position.x + Math.sin(r) * d, z = who.group.position.z + Math.cos(r) * d;
-    seatRay.set(new V3(x, 1.2, z), new V3(0, -1, 0)); seatRay.far = 0.7;
-    const hit = seatRay.intersectObjects(scene.children, true).find((h) => !h.object.isSkinnedMesh && shown(h.object) && h.point.y > 0.6 && h.point.y < 0.9);
-    if (hit) { const s = bscale(who), y = hit.point.y + 0.06, f = d + 0.07; rest = { L: new V3(0.11 * s, y, f), R: new V3(-0.11 * s, y, f) }; }
+  for (let d = 0.14; d <= 0.62 && !rest; d += 0.03) {
+    const y0 = topAt(who.group.position.x + Math.sin(r) * d, who.group.position.z + Math.cos(r) * d);
+    if (y0 !== null) { const s = bscale(who), y = y0 + 0.06, f = d + 0.01; rest = { L: new V3(0.12 * s, y, f), R: new V3(-0.12 * s, y, f), edge: d - 0.03 }; }   // (edge: how far in front of them the top begins)
   }
-  who.pose = { sit: 1, seat: who.seatAt, rest, lean: rest ? 0.12 : 0 }; who.sitNow = 1;   // leaning in a little to the table
-}
-// the talk happens at the table: a quick cut, and they are sitting down with you. The chairs are wherever the house put them: you stand
-// at the one nearest the kitchen, Mom and Dad take the two either side of it
-async function sitDown() {
-  const C = (W.chairs || []).map((c, i) => ({ i, p: c.holder.getWorldPosition(new V3()), rot: c.holder.rotation.y }));
-  if (C.length < 3) return;
-  const mid = C.reduce((a, c) => a.add(c.p), new V3()).multiplyScalar(1 / C.length);
-  const near = (c) => Math.hypot(c.p.x - P.pos.x, c.p.z - P.pos.z), mine = C.slice().sort((a, b) => near(a) - near(b))[0];
-  const dir = (c) => Math.atan2(c.p.x - mid.x, c.p.z - mid.z), side = (c) => Math.abs(Math.abs(angDiff(dir(mine), dir(c))) - Math.PI / 2);
-  const [a, b] = C.filter((c) => c !== mine).sort((x, y) => side(x) - side(y));
-  UI.fade(1, 0.35); await wait(0.4);
-  kitchen.seated = true; kitchen.tableY = 0.78;
-  // Mom on your left, Dad on your right, each a little back from the chair's centre so the knees clear the table
-  const toward = new V3(mid.x - mine.p.x, 0, mid.z - mine.p.z).normalize(), leftOf = (c) => new V3(c.p.x - mine.p.x, 0, c.p.z - mine.p.z).cross(toward).y > 0;
-  const [mc, dc] = leftOf(a) ? [a, b] : [b, a];
-  seatOn(mom, mc.i, mid); seatOn(dad, dc.i, mid);
-  P.pos.set(mine.p.x - toward.x * 0.3, 0, mine.p.z - toward.z * 0.3); P.yaw = Math.atan2(-toward.x, -toward.z); P.pitch = -0.08;
-  await wait(0.15); UI.fade(0, 0.5);
+  // leaning in to the table (the more, the further its edge), so the hands reach the top with the elbows bent, not the arms out straight
+  who.pose = { sit: 1, seat: who.seatAt, rest, lean: rest ? Math.min(0.26, 0.12 + Math.max(0, rest.L.z - 0.3) * 1.2) : 0 }; who.sitNow = 1;
 }
 // last night's photos go on the table one at a time; you say what each one is, and one of them answers. How they take it depends on how much
 // there has been in the whole run: brushed off, then uneasy, then scared (the same thresholds the ending uses, never shown)
 const REG = (c) => (c < 3 ? 'low' : c < 7 ? 'mid' : 'high');
 async function photoBeat(ids) {
   ids = ids.slice(-4); const total = nights.proof.count();
-  await wideShot(); await lookDown();
   UI.subtitle('<i>You put the photos on the table.</i>', 2.6); await wait(1.4);
   for (const [i, id] of ids.entries()) {
     UI.tablePhoto(nights.proof.photo(id), nights.proof.cap(id), i); sfx.click(); await wait(0.7);
     await say(`<b>You:</b> ${nights.proof.tell(id)}`); await wait(0.25);
     const reg = REG(total - (ids.length - 1 - i)), who = (i + kitchen.run) % 2 ? 'dad' : 'mom', ab = Math.floor(i / 2) % 2 ? 'b' : 'a';
-    await closeOn(who === 'mom' ? mom : dad, 0.6); await say(`${who}/ph_${reg}_${ab}`); await wait(0.35);
-    if (i < ids.length - 1) { await wideShot(0.5); await lookDown(0.4); }
+    await say(`${who}/ph_${reg}_${ab}`); await wait(0.35);
+    if (i < ids.length - 1) await seated();
   }
   await wait(0.4); UI.tablePhoto(null);
 }
@@ -1635,7 +1733,7 @@ function update(dt) {
       }
     }
   }
-  cineTick(dt);
+  cineTick(dt); FN.tick(dt);
   W.tick(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt);
   if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
   WF.update(dt); dust.update(dt);
@@ -1748,7 +1846,7 @@ function handsTick(dt) {
     if (wasFake && !dad.fake) journal.learn('dad'); wasFake = !!dad.fake;
   }
   const holding = P.mode === 'hide' && (!!keys.Space || input.breath || breathLatch);
-  const hidden = !started || paused || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || (uiMode !== 'playing' && uiMode !== 'test');
+  const hidden = !started || paused || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || P.mode === 'seat' || (uiMode !== 'playing' && uiMode !== 'test');
   const walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0;
   hands.update(dt, camera, { hasCamera: hasCamera(), cameraNear: !!(nights && nights.proof && nights.proof.near && F.live && nights.proof.near(P.pos)), keepCamera: !!F.photoHold, mode: P.mode, pod: P.pod, flashOn: F.flashOn && flash.intensity > 0, holding, fear: F.fear, walk, bob: P.bob, hidden: hidden && !hands.busy, world: scene, blocked: sightBlocked, outdoors: roomAt(P.pos.x, P.pos.z, P.pos.y) === 'out', night: F.phase === 'night' });
   // the beam comes out of the torch in the hand when it shows, else from beside the eye
@@ -1824,7 +1922,7 @@ nights = createNights({
   addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); },
   holding: () => !!keys.Space || input.breath || breathLatch,
   addShake: (v) => { shake = Math.max(shake, v); },
-  scene, photo: takePhoto, openPhotos, hands,
+  scene, photo: takePhoto, openPhotos, hands, FN, kidBoxes, faceTo: (who, x, z) => { who.group.rotation.set(0, Math.atan2(x - who.group.position.x, z - who.group.position.z), 0); },
   clockRate: 1 / 1.1, lightLabel: () => L('light'),
 });
 UI.makeGrain();
@@ -1862,4 +1960,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 requestAnimationFrame(loop);
 boot();
-window.__game = { vigil, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { vigil, FN, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };

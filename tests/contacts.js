@@ -175,7 +175,11 @@ function auditLib(TOL) {
     };
     // several frames' hits together: each part and object once, at its deepest
     const merge = (a, b) => { const m = new Map(a.map((h) => [h.part + '|' + h.obj, h])); for (const h of b) { const o = m.get(h.part + '|' + h.obj); if (!o || (h.depth === 'through' || (o.depth !== 'through' && h.depth > o.depth))) m.set(h.part + '|' + h.obj, h); } return [...m.values()]; };
-    window.__contacts = { THREE, V3, check, step, body, rec, merge, openSeen };
+    // the largest turn of any arm bone between two frames, in degrees (a snap reads as a jump in the pose)
+    const armBones = (root) => { const a = []; root.traverse((o) => { if (o.isBone && /(Clavicle|UpperArm|Forearm|Hand)$/.test(o.name)) a.push(o); }); return a; };
+    const snapper = (root) => { const bones = armBones(root), last = new Map(); let worst = 0, at = '';
+      return { take() { for (const b of bones) { const q = b.getWorldQuaternion(new THREE.Quaternion()), p = last.get(b); if (p) { const d = p.angleTo(q) * 180 / Math.PI; if (d > worst) { worst = d; at = b.name; } } last.set(b, q); } }, get worst() { return worst; }, get at() { return at; } }; };
+    window.__contacts = { THREE, V3, check, step, body, rec, merge, openSeen, snapper };
   });
 }
 
@@ -204,6 +208,61 @@ const SCENES = {
     }, [who, i]));
     return out;
   },
+  // the real breakfast: both seated by the game's own seatThem() with the kitchen's life running, Mom uneasy (arms folded while she
+  // listens), each talking in turn through both mirrors of the talking clips, every third frame over six seconds checked against the
+  // chairs (backs, posts, seats), the table and each other; and the largest arm-bone turn between frames (a snap) over 15 degrees
+  breakfast: async (page) => page.evaluate(async () => {
+    const g = window.__game, { V3, check, step, rec, merge, snapper } = window.__contacts, out = [], m = g.mom, d = g.dad;
+    g.setPhase('morning', true); g.F.stage = 'b1';
+    g.W.chairs.forEach((c, i) => g.W.moveChair(i, c.x, c.z, c.rot));
+    for (const p of [m, d]) { p.group.visible = true; p.busy = false; p.talk(null); p.listening = false; }
+    g.kitchenLife(); g.seatThem();
+    { // what the kitchen's loop does once they sit (its clock is stopped here): the spoon put away, the mug down on the table in front of Dad
+      const [spoon, mug] = g.kitchen.things; spoon.visible = false; g.scene.attach(mug); mug.position.copy(d.group.localToWorld(new V3(-0.32, 0, 0.56))); mug.position.y = g.kitchen.tableY; mug.rotation.set(0, d.group.rotation.y, 0); }
+    step([m, d], 60);
+    const C = g.W.chairs.map((c) => c.holder.getWorldPosition(new V3())), mid = C.reduce((a, c) => a.add(c), new V3()).multiplyScalar(1 / C.length);
+    const env = (n) => Array.from({ length: n }, (_, k) => Math.max(0, Math.min(1, 0.5 + 0.45 * Math.sin(k * 0.41) + 0.25 * Math.sin(k * 0.13))));
+    const camOf = (p) => { const a = p.group.position, f = new V3().subVectors(a, mid).setY(0).normalize(); return [[a.x + f.z * 1.6 + f.x * 0.6, 1.1, a.z - f.x * 1.6 + f.z * 0.6], [a.x, 0.75, a.z]]; };
+    for (const [mood, tag] of [[null, 'calm'], ['uneasy', 'uneasy']]) {
+      m.mood = mood;
+      for (const [talker, listener, n] of [[m, d, 'Mom'], [d, m, 'Dad'], [m, d, 'Mom'], [d, m, 'Dad']]) {
+        talker.listening = false; listener.listening = true; talker.talk(env(200), { to: 'you' }); listener.talk(null);
+        const sm = snapper(m.group), sd = snapper(d.group);
+        let wm = [], wd = []; step([m, d], 180, (k) => { sm.take(); sd.take(); if (k % 3 === 2) { wm = merge(wm, check(m.group)); wd = merge(wd, check(d.group)); } });
+        const snaps = [[sm, 'Mom'], [sd, 'Dad']].filter(([s]) => s.worst > 15).map(([s, w]) => ({ part: `${w} ${s.at}`, obj: 'snap', depth: +s.worst.toFixed(1), n: 1 }));
+        out.push(rec({ label: `Breakfast (${tag}), ${n} talking: Mom`, hits: [...wm, ...snaps.filter((h) => h.part.startsWith('Mom'))], cam: camOf(m), who: 'mom' }));
+        out.push(rec({ label: `Breakfast (${tag}), ${n} talking: Dad`, hits: [...wd, ...snaps.filter((h) => h.part.startsWith('Dad'))], cam: camOf(d), who: 'dad' }));
+        talker.talk(null);
+      }
+    }
+    m.mood = null; m.listening = d.listening = false; g.kitchen.run++; g.kitchen.seated = false; m.pose = d.pose = null; m.sitNow = d.sitNow = 0;
+    for (const o of g.kitchen.things) if (o.parent) o.parent.remove(o); g.kitchen.things.length = 0;
+    return out;
+  }),
+  // standing talk and listening (the evening spots), every third frame through both mirrors of the talking clip, and the folded arms
+  stand: async (page) => page.evaluate(async () => {
+    const g = window.__game, { V3, check, step, rec, merge, snapper } = window.__contacts, out = [], m = g.mom, d = g.dad;
+    g.setPhase('day', true);
+    for (const p of [m, d]) { p.group.visible = true; p.busy = true; p.pose = null; p.sitNow = 0; p.listening = false; p.talk(null); }
+    const you = new V3(2.4, 0, 1.6), face = (p, at) => { p.group.position.copy(at); p.group.rotation.set(0, Math.atan2(you.x - at.x, you.z - at.z), 0); };
+    face(m, g.EVE_MOM); face(d, g.DAD_HOME); step([m, d], 40);
+    const cam = (at) => { const k = new V3(you.x - at.x, 0, you.z - at.z).normalize(); return [[at.x + k.x * 1.8, 1.3, at.z + k.z * 1.8], [at.x, 0.95, at.z]]; };
+    const env = (n) => Array.from({ length: n }, (_, k) => Math.max(0, Math.min(1, 0.5 + 0.45 * Math.sin(k * 0.37) + 0.25 * Math.sin(k * 0.17))));
+    for (const mood of [null, 'uneasy']) {
+      m.mood = mood;
+      for (const [talker, listener, n] of [[m, d, 'Mom'], [d, m, 'Dad'], [m, d, 'Mom'], [d, m, 'Dad']]) {
+        talker.listening = false; listener.listening = true; talker.talk(env(200), { to: 'you' }); listener.talk(null);
+        const sm = snapper(m.group), sd = snapper(d.group);
+        let wm = [], wd = []; step([m, d], 180, (k) => { sm.take(); sd.take(); if (k % 3 === 2) { wm = merge(wm, check(m.group)); wd = merge(wd, check(d.group)); } });
+        const sn = (s, w) => (s.worst > 15 ? [{ part: `${w} ${s.at}`, obj: 'snap', depth: +s.worst.toFixed(1), n: 1 }] : []);
+        out.push(rec({ label: `Standing${mood ? ' (uneasy)' : ''}, ${n} talking: Mom`, hits: [...wm, ...sn(sm, 'Mom')], cam: cam(g.EVE_MOM), who: 'mom' }));
+        out.push(rec({ label: `Standing${mood ? ' (uneasy)' : ''}, ${n} talking: Dad`, hits: [...wd, ...sn(sd, 'Dad')], cam: cam(g.DAD_HOME), who: 'dad' }));
+        talker.talk(null);
+      }
+    }
+    m.mood = null; m.listening = d.listening = false;
+    return out;
+  }),
   // Mom stirring at the stove, Dad at the counter with his mug (resting, a sip, and both hands while you talk)
   stove: async (page) => page.evaluate(async () => {
     const g = window.__game, { V3, check, step, rec, merge } = window.__contacts, out = [];
