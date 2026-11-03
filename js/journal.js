@@ -15,7 +15,7 @@ export const RULES = [
   { id: 'still', text: 'In the closet, stay still and keep quiet. It goes past.', when: null },
   { id: 'photo', text: 'Take pictures. They can\'t say a picture is a dream.', when: /take a photo/i },
   { id: 'stare', text: 'Don\'t look at it too long.', when: /don.t look|stop looking|look away/i },
-  { id: 'lights', text: 'Lights off when it\'s looking for you.', when: /lights? off/i },
+  { id: 'lights', text: 'The lights help it find me. But it won\'t come into a lit room while I\'m looking at it. It waits right where the light stops.', when: /into the light/i },
   { id: 'flash', text: 'It hates the camera flash.', when: /flash/i },
   { id: 'dad', text: 'If Dad calls you at night, it isn\'t Dad.', when: null },
 ];
