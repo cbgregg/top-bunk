@@ -20,7 +20,7 @@ const ARGV = process.argv.slice(2);
 const opt = (name, def) => { const i = ARGV.indexOf(name); return i >= 0 && ARGV[i + 1] !== undefined ? ARGV[i + 1] : def; };
 const PORT = +opt('--port', process.env.SMOKE_PORT || 0);
 // the checks by name, so --only takes either 10 or gamepad
-const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20, lights: 21 };
+const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20, lights: 21, firstnight: 22 };
 const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map((t) => (t in NAMES ? NAMES[t] : Number(t)))) : null;
 if (ONLY && [...ONLY].some(Number.isNaN)) { console.error('--only takes check numbers or names: ' + Object.keys(NAMES).join(', ')); process.exit(2); }
 const want = (...ns) => !ONLY || ns.some((n) => ONLY.has(n));
@@ -152,7 +152,7 @@ let BASE = '';
 
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
-  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
   if (!chromium) {
     for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
@@ -783,6 +783,46 @@ let BASE = '';
     // ---------- 21: the light switches ----------
     // a switch by its own prompt, the room lit; every switch in the house on and off twice over with the frame drawn each time, and not one
     // shader built after the first round (switching only changes how bright the pooled lights are); the breaker and the dawn
+    // ---------- 22: night one plays to where you are: three ways through it, no drawing ----------
+    await check(22, 'night one, three ways', async () => {
+      const runs = [];
+      for (const how of ['bunk', 'kitchen', 'wander']) {
+        const r = await alone(browser, async (c) => {
+          const { page, w } = await openGame(c, '/index.html#night1');
+          await page.evaluate(() => { const g = window.__game; window.__n1fast = 0.3; g.renderer.compileAsync = async () => {}; g.startGame(); });
+          await until(page, () => window.__game.F.stage === 'n1' && window.__game.F.live && Array.isArray(window.__n1log), null, 240e3);
+          const kitchen = [3.0, 0.4, 3.6, 0.4];   // by the hall wall, the table behind you
+          const tour = [[8.6, 1.4, 8.6, 3.6], [6.6, -0.9, 9.6, -0.9], [4.2, 1.6, 4.2, 3.4], [6.0, -0.9, 3.0, -0.9], [0.5, -2.4, -2.5, -2.4], [3.0, 0.4, 3.6, 0.4], [-2.4, 1.6, -2.4, 3.4], [7.2, -0.9, 9.6, -0.9]];
+          if (how !== 'bunk') { await climbDown(page); if (how === 'kitchen') await stand(page, ...kitchen); }
+          let stop = 0, objShown = false, i = 0;
+          const t0 = Date.now();
+          while (Date.now() - t0 < 600e3) {
+            const st = await page.evaluate(() => ({ log: window.__n1log.map((e) => e.id), dead: window.__game.F.dead, obj: document.getElementById('objective').classList.contains('show') && document.getElementById('objective').textContent.trim() }));
+            if (st.obj) objShown = st.obj;
+            if (st.dead) throw new Error(`${how}: caught on night one`);
+            if (st.log.includes('mom')) { stop = 1; break; }
+            if (how === 'wander' && !(await page.evaluate(() => window.__game.F.script))) { const p = tour[i++ % tour.length]; await stand(page, ...p); }
+            if (how === 'kitchen') await stand(page, ...kitchen);
+            await sleep(how === 'wander' ? 9000 : 3000);
+          }
+          const out = await page.evaluate(() => ({ log: window.__n1log, rooms: window.__n1rooms }));
+          clean(w); await page.close();
+          ok(stop, `${how}: night one never reached Mom (beats: ${out.log.map((e) => e.id).join(', ')})`);
+          ok(!objShown, `${how}: the night told the player what to do: "${objShown}"`);
+          const wrong = out.log.filter((e) => out.rooms[e.id] && !out.rooms[e.id].includes(e.room));
+          ok(!wrong.length, `${how}: a beat played where it does not fit: ${JSON.stringify(wrong)}`);
+          ok(out.log.some((e) => e.id === 'crescendo'), `${how}: no end`);
+          if (how === 'kitchen') ok(out.log.every((e) => !['dent', 'door', 'bath'].includes(e.id)), `${how}: a bedroom or bathroom beat played in the kitchen`);
+          if (how === 'kitchen') ok(out.log.some((e) => e.id === 'inRoom' && e.room === 'kitchen'), `${how}: the end did not come to the kitchen`);
+          if (how === 'bunk') ok(out.log.some((e) => e.id === 'bedside' || e.id === 'covers'), `${how}: the end did not come to the bunk`);
+          console.log(`  [${how}] ` + out.log.map((e) => `${e.id}@${e.room}${e.gap !== undefined ? ` +${e.gap}s` : ''}`).join(' | '));
+          return out.log.map((e) => e.id).join('>');
+        });
+        runs.push(`${how}: ${r}`);
+      }
+      return runs.join('; ');
+    }, 1900e3);
+
     await check(21, 'lights', () => alone(browser, async (c) => {
       const { page, w } = await nightPage(c, '#night2');
       await page.evaluate(() => { const g = window.__game; g.nights.director.stop(); g.nights.hunter.dismiss(); });

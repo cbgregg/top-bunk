@@ -1165,7 +1165,7 @@ async function dayStrange() {
   FN.marks.place();
   // the neighbour's dog, right under your window: it goes for the house, then stops dead in the middle of a bark and backs off
   (async () => {
-    await waitFor(() => (F.boxes >= 1 && P.carrying && roomAt(P.pos.x, P.pos.z) === 'bed') || F.boxes >= 2 || F.stage !== 'day');
+    await waitFor(() => (F.boxes >= 1 && roomAt(P.pos.x, P.pos.z) === 'bed') || F.stage !== 'day');   // only with you in your room, where the window is
     if (F.stage !== 'day') return;
     const w = W.windows.filter((x) => x.pane).map((x) => ({ x, p: x.pane.getWorldPosition(new V3()) })).find((o) => roomAt(o.p.x, o.p.z) === 'bed' || roomAt(o.p.x - 0.3, o.p.z) === 'bed' || roomAt(o.p.x, o.p.z + 0.3) === 'bed');
     const at = w ? w.p.clone() : new V3(10.8, 0, 3.0), out = w ? (w.x.alongX ? new V3(0, 0, -w.x.inside) : new V3(-w.x.inside, 0, 0)) : new V3(1, 0, 0);
