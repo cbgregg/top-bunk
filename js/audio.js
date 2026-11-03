@@ -522,6 +522,8 @@ export class Sound {
   // a piano hammered at the bottom of the keys: a dissonant cluster let ring, a dead thump under it (trailer/gen_music.js renders the same notes)
   pianoSlam(k = 1) {
     if (!this.ctx) return;
+    // the recording: a grand piano's lowest A struck as hard as it goes, doubled, with the hammer and a sub thump under it (tools/piano_sting.sh)
+    if (this.buf && this.buf['sfx/piano_sting']) { this.play('sfx/piano_sting', { gain: 1.25 * k, wet: 0.12 }); return; }
     for (const f of [41.2, 43.7, 55, 58.3, 82.4, 87.3, 110, 116.5, 164.8, 174.6]) this.tone({ type: 'triangle', f, dur: 2.8, gain: 0.16 * k, attack: 0.002, wet: 0.45, big: true });
     for (const f of [40, 46]) this.tone({ type: 'sawtooth', f, f2: f * 0.5, dur: 1.4, gain: 0.22 * k, wet: 0.3, big: true });
     this.tone({ type: 'sine', f: 36.7, f2: 30, dur: 2.2, gain: 0.5 * k, attack: 0.002, wet: 0.2, big: true });   // the low note under the cluster
