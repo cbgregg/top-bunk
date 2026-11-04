@@ -18,5 +18,10 @@
   "file": "assets/music/morning.mp3",
   "loop": true,
   "len": 120.059
+ },
+ "cartoon": {
+  "file": "assets/music/cartoon.mp3",
+  "loop": false,
+  "len": 79.177
  }
 }

@@ -633,5 +633,105 @@
   "voice": "mom",
   "say": "[tired, gentle] Hey. Sit down, please.",
   "html": "<b>Mom:</b> Hey. Sit down, please."
+ },
+ "cartoon/c_hello": {
+  "voice": "announcer",
+  "say": "Say, kids! It's Mister Buttons, the bear who knows his bedtime manners!",
+  "html": "Say, kids! It's Mister Buttons, the bear who knows his bedtime manners!"
+ },
+ "cartoon/c_creep": {
+  "voice": "announcer",
+  "say": "Now, when the lights go out, and something comes a-creepin' up to your bed...",
+  "html": "Now, when the lights go out, and something comes a-creepin' up to your bed..."
+ },
+ "cartoon/c_duck": {
+  "voice": "announcer",
+  "say": "...you duck right under those covers, quick as a wink!",
+  "html": "...you duck right under those covers, quick as a wink!"
+ },
+ "cartoon/c_hold": {
+  "voice": "announcer",
+  "say": "Then hold your breath! Press that button and keep it down. Or give it one little tap, and you'll keep right on holding!",
+  "html": "Then hold your breath! Press that button and keep it down. Or give it one little tap, and you'll keep right on holding!"
+ },
+ "cartoon/c_quiet": {
+  "voice": "announcer",
+  "say": "And don't you let go 'til it's good and gone, kids. It can hear you breathe!",
+  "html": "And don't you let go 'til it's good and gone, kids. It can hear you breathe!"
+ },
+ "cartoon/c_meter": {
+  "voice": "announcer",
+  "say": "Keep an eye on your breath meter! When she runs low, Mister Buttons gets mighty blue in the face!",
+  "html": "Keep an eye on your breath meter! When she runs low, Mister Buttons gets mighty blue in the face!"
+ },
+ "cartoon/c_try": {
+  "voice": "announcer",
+  "say": "Now you try it, kids! Go on, hold your breath!",
+  "html": "Now you try it, kids! Go on, hold your breath!"
+ },
+ "cartoon/c_holdit": {
+  "voice": "announcer",
+  "say": "Hold it... hold it... hold it...",
+  "html": "Hold it... hold it... hold it..."
+ },
+ "cartoon/c_whoops": {
+  "voice": "announcer",
+  "say": "Whoops! You let go! Let's try that again!",
+  "html": "Whoops! You let go! Let's try that again!"
+ },
+ "cartoon/c_good": {
+  "voice": "announcer",
+  "say": "Golly! You're a natural!",
+  "html": "Golly! You're a natural!"
+ },
+ "cartoon/c_night": {
+  "voice": "announcer",
+  "say": "So sleep tight, little sailors. Mister Buttons will be right here, keeping watch.",
+  "html": "So sleep tight, little sailors. Mister Buttons will be right here, keeping watch."
+ },
+ "cartoon/c_remember": {
+  "voice": "announcer",
+  "say": "[slowly, quietly] And remember, kids... it can hear you.",
+  "html": "And remember, kids... it can hear you."
+ },
+ "dad/goodnight": {
+  "voice": "dad",
+  "say": "[quiet, tired, warm] Goodnight, son.",
+  "html": "<b>Dad:</b> Goodnight, son."
+ },
+ "buttons/b_aww": {
+  "voice": "buttons",
+  "say": "[excited] Aww yeah!",
+  "html": "<i>Mister Buttons:</i> Aww yeah!"
+ },
+ "buttons/b_hup": {
+  "voice": "buttons",
+  "say": "[effort] Hup!",
+  "html": "<i>Mister Buttons:</i> Hup!"
+ },
+ "buttons/b_eep": {
+  "voice": "buttons",
+  "say": "[startled, tiny] Eep!",
+  "html": "<i>Mister Buttons:</i> Eep!"
+ },
+ "buttons/b_whoa": {
+  "voice": "buttons",
+  "say": "[spinning, wailing] Whoaaaaaa!",
+  "html": "<i>Mister Buttons:</i> Whoaaaaaa!"
+ },
+ "buttons/b_hee": {
+  "voice": "buttons",
+  "say": "[giggling] Hee hee hee!",
+  "html": "<i>Mister Buttons:</i> Hee hee hee!"
+ },
+ "buttons/b_sigh": {
+  "voice": "buttons",
+  "say": "[contented sigh] Ahhh...",
+  "html": "<i>Mister Buttons:</i> Ahhh..."
+ },
+ "buttons/b_scream": {
+  "voice": "buttons",
+  "say": "[screaming in terror] AAAAAAAAAHHHHHHH!",
+  "html": "<i>Mister Buttons:</i> AAAAAAAAAHHH!"
  }
 }

@@ -8,7 +8,7 @@ import { Gfx, PHONE, contactShadow } from './gfx.js';
 import { WindowFace } from './windowface.js';
 import { Dust } from './dust.js';
 import * as UI from './ui.js';
-import { input, label as L, initInput, controlsTable } from './input.js';
+import { input, label as L, bindingLabel, initInput, controlsTable } from './input.js';
 import { createNights } from './nights.js';
 import { newSeed } from './rng.js';
 import { createCar } from './cars.js';
@@ -24,6 +24,7 @@ import { createHands } from './hands.js';
 import { createJournal } from './journal.js';
 import { createFirstNight } from './firstnight.js';
 import { createLights } from './lights.js';
+import { createCartoon } from './cartoon.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -266,7 +267,7 @@ const look = { s: settings.get('sensitivity'), y: settings.get('invertY') ? -1 :
 settings.on('sensitivity', (v) => { look.s = v; }); settings.on('invertY', (v) => { look.y = v ? -1 : 1; });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== canvas || paused || F.cutscene) return;
-  if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat')) return;
+  if (!(P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat' || P.mode === 'lie')) return;
   P.yaw -= e.movementX * 0.0022 * look.s; P.pitch = clamp(P.pitch - e.movementY * 0.0022 * look.s * look.y, -1.45, 1.45);
 });
 // the pause menu says where you are and the run's seed, so it can be shared or played again
@@ -283,7 +284,7 @@ function setPause(on) {
 function confirmPress() {
   if (uiMode === 'title' && !started) startGame(); else if (uiMode === 'pause') setPause(false); else if (uiMode === 'death') retry(); else if (uiMode === 'end') location.reload();
 }
-const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat');
+const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat' || P.mode === 'lie');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
 initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos(), journal: () => openJournal() });
 // the controls table and the "begin" line follow whichever device you last used
@@ -435,6 +436,8 @@ function updateInteract() {
       if (F.carPrompt) { label = F.carPrompt.label; act = F.carPrompt.act; }
     } else if (P.mode === 'hide') {
       if (F.live && nights && nights.canComeOut() && !F.breathCheck) { label = P.pod ? 'Come out' : 'Come out from under the covers'; act = () => nights.exitHide(); }
+    } else if (P.mode === 'lie') {
+      if (F.sleepy) { label = 'Close your eyes'; act = () => { F.sleepy = false; }; }
     } else if (P.mode === 'seat') {
       if (seat && !seat.tween) { label = 'Stand up'; act = standUp; }
     } else if (P.mode === 'bunk') {
@@ -687,6 +690,7 @@ function updateCamera(dt) {
     camera.position.y += Math.sin(gameTime * (keys.Space || input.breath ? 0.6 : 2.4)) * 0.006;
   }
   if (P.mode === 'bunk') P.pitch = clamp(P.pitch, -1.2, 0.9);
+  if (P.mode === 'lie') { P.yaw = lieYaw + clamp(angDiff(lieYaw, P.yaw), -1.25, 1.25); P.pitch = clamp(P.pitch, -0.75, 0.7); }   // on your back: the head turns, the body does not
   if (P.mode === 'seat' && seat) { P.yaw = seat.yaw + clamp(angDiff(seat.yaw, P.yaw), -1.75, 1.75); P.pitch = clamp(P.pitch, -0.8, 0.55); }   // turning in a chair, not in a turret
   camera.rotation.set(P.pitch, P.mode === 'car' ? car.baseYaw() + P.yaw : P.yaw, P.roll);
   leanOver(dt);
@@ -843,6 +847,7 @@ async function startGame() {
   mark('stage begins');
   if (DEBUG === 'night' || DEBUG === 'night1') { await playFrom('n1'); return; }
   if (DEBUG === 'breakfast') { await playFrom('b1'); return; }
+  if (DEBUG === 'bedtime') { RUN.dayDone = true; await bedtime(); await playFrom('n1'); return; }   // Dad's goodnight, falling asleep, the cartoon, then night one
   if (/^n\d+$/.test(DEBUG) || /^night\d+$/.test(DEBUG)) { await playFrom('n' + DEBUG.replace(/\D/g, '')); return; }
   if (/^b[2-9]$/.test(DEBUG)) { await playFrom(DEBUG); return; }   // a morning after a night (#b3), with whatever the saved run holds
   if (DEBUG === 'morning') { await endingScript(); return; }
@@ -1144,6 +1149,94 @@ async function dayScript() {
   F.talkCam = false; F.birds = false; F.cutscene = false; endChores();
   FN.box.hide(); box4Col.on = false;   // Dad carries it out to the road after dinner
   RUN.dayDone = true; saveRun();
+  await bedtime();
+}
+
+// ---------- bedtime: Dad says goodnight at your door and pulls it almost shut, you fall asleep, and you dream the cartoon ----------
+// (the cartoon, js/cartoon.js, teaches holding your breath: Mister Buttons, your own bear, in an old safety picture that ends wrong)
+const cartoon = createCartoon({
+  audio: sfx, lines: LINES,
+  getLabel: () => ({ text: bindingLabel('breath'), scheme: input.scheme, pad: input.padType }),   // the breath control as set, on the device in use (live)
+  breathDown: () => !!keys.Space || input.breath, skipDown: () => !!keys.Escape || !!input.start, subtitles: () => settings.get('subtitles'),
+});
+const LIE = new V3(BUNK_LIE.x, 2.03, BUNK_LIE.z);   // on your back on the top bunk, the head on the pillow
+let lieYaw = 0;
+// the knob of a hinged door, wherever the leaf has swung to: on its hall face, waist high
+function knobOf(d, along = 0.72, off = 0.15) { const a = d.g.rotation.y; return new V3(d.hx + Math.cos(a) * along - Math.sin(a) * off, 0.98, d.hz - Math.sin(a) * along - Math.cos(a) * off); }
+// where someone stands to hold that knob in the left hand: an arm's length out from the leaf's hall face, turned to it (never into the latch-side jamb)
+function atKnob(d, reach = 0.4) {
+  const a = d.g.rotation.y, n = new V3(-Math.sin(a), 0, -Math.cos(a)), k = knobOf(d), right = new V3(n.z, 0, -n.x);   // (his right, facing the leaf)
+  const p = new V3(k.x + n.x * reach + right.x * 0.17, 0, k.z + n.z * reach + right.z * 0.17);   // the knob in front of his left shoulder
+  if (p.z < d.mid.z + 0.25) p.x = Math.min(p.x, d.mid.x);   // in the doorway: on the middle line, so the arm goes through the gap clear of the jamb
+  if (Math.abs(p.z - d.mid.z) < 0.36) p.y = 0.022;   // a foot on the threshold strip (2 cm)
+  return { knob: k, stand: p, yaw: Math.atan2(-n.x, -n.z) };
+}
+async function bedtime() {
+  const kd = W.doors.kid, door = new V3(kd.mid.x, 0, kd.mid.z);
+  setPhase('night', true); lights.set('hall', true, { silent: true });   // the hall light on, warm; your room dark
+  nlBase = 0.12; nlMult(nlBase, false);   // the plug-in night lights barely show under the hall light (night one puts them back)
+  kd.a = kd.target = 1; kd.apply();
+  // you: on your back, the pillow under your head, turned toward the door
+  lieYaw = Math.atan2(-(door.x - LIE.x), -(door.z - LIE.z));
+  P.cam.copy(LIE); P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.yaw = lieYaw; P.pitch = -0.14; P.roll = 0.1; P.pod = null; P.mode = 'lie';
+  F.cutscene = false; UI.objective(null); UI.hint(null); sfx.ambience(0.8, 1);
+  // Dad, in his night things, comes up the hall from the living-room end
+  dad.sleeping = false; dad.busy = true; dad.pose = null; dad.lookAt = null; dad.group.rotation.order = 'XYZ'; dad.group.rotation.set(0, Math.PI / 2, 0);
+  dad.group.position.set(5.4, 0, -0.42); dad.group.visible = true; dad.setNight(true); if (dad.rig) dad.rig.play('idle', { fade: 0, speed: 1 });
+  UI.fade(0, 2.5); await wait(1.2);
+  const spot = new V3(door.x + 0.06, 0, door.z + 0.45);   // a step into your room, beside the open door
+  await walkTo(dad, [new V3(door.x - 0.4, 0, -0.42), new V3(door.x + 0.1, 0, -0.42), new V3(door.x + 0.08, 0, door.z - 0.1), spot], 1.05);
+  await turnToward(dad, LIE.x, LIE.z, 0.55);
+  dad.lookAt = camera.position;
+  await wait(0.5);
+  await say('dad/goodnight');
+  await wait(0.4);
+  // he turns to the door, takes the knob and draws it to, almost shut: a hand's width of hall light left. He keeps an arm's length from
+  // the leaf the whole way, so he backs out of the room into the hall as it swings
+  // (the left hand on the knob; the right rests by his hip)
+  const hand = (p, k) => ({ lean: 0.1 * k, L: { reach: p, palm: 'in', grip: 0.7 * k }, ...(k > 0.05 ? { R: { reachLocal: new V3(-0.12, 0.93, 0.1), palm: 'in', grip: 0.35 } } : {}) });
+  dad.lookAt = null;
+  { const s0 = atKnob(kd), g0 = dad.group.position.clone(), y0 = dad.group.rotation.y, from = palmAt(dad, 'L');
+    await htween(dad, 0.9, (k) => { dad.group.position.lerpVectors(g0, s0.stand, k); dad.group.rotation.y = lerpAngle(y0, s0.yaw, k); dad.pose = hand(from.clone().lerp(knobOf(kd), k), k); }); }
+  const a0 = kd.a, a1 = 0.32;   // he lets go here, and it drifts the last bit on its own
+  sfx.pick('door_creak', { at: { x: door.x, y: 1.2, z: door.z }, gain: 0.3, wet: 0.15, rate: 0.8 });
+  await htween(dad, 2.6, (k) => {
+    kd.a = kd.target = lerp(a0, a1, k); kd.apply();
+    const s1 = atKnob(kd); dad.group.position.copy(s1.stand); dad.group.rotation.y = s1.yaw; dad.pose = hand(s1.knob, 1);
+  }, ease.inOut);
+  { const k0 = knobOf(kd), g0 = dad.group.position.clone(), back = new V3(door.x + 0.05, 0, door.z - 0.55);
+    await htween(dad, 0.8, (k) => {
+      kd.a = kd.target = lerp(0.32, 0.15, ease.out(k)); kd.apply();
+      dad.group.position.lerpVectors(g0, back, k); dad.pose = hand(k0.clone().lerp(new V3(dad.group.position.x + 0.22, 0.85, dad.group.position.z + 0.05), k), 1 - k);
+    }); }
+  sfx.pick('creak', { at: { x: door.x, y: 1.0, z: door.z }, gain: 0.12, wet: 0.1 });   // it stops short of the latch
+  dad.pose = null;
+  // and he goes back down the hall to bed
+  await walkTo(dad, [new V3(door.x - 0.4, 0, -0.42), new V3(5.2, 0, -0.42)], 1.1);
+  dad.busy = false; sleepers(true);
+  // falling asleep: close your eyes when you like (or the day takes you)
+  F.sleepy = true;
+  { const t0 = gameTime; await waitFor(() => !F.sleepy || gameTime - t0 > 40); }
+  F.sleepy = false; F.cutscene = true; UI.prompt(null);
+  const c0 = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, r0 = P.roll;
+  sfx.ambience(0.25, 7);
+  // settling: the head sinks into the pillow and rolls toward the door, a slow breath out
+  sfx.breath(false, 0.12);
+  await tween(2.2, (k) => { P.cam.lerpVectors(c0, LIE.clone().add(new V3(0, -0.045, 0)), k); P.yaw = lerpAngle(y0, lieYaw, k); P.pitch = lerp(p0, -0.04, k); P.roll = lerp(r0, 0.32, k); }, ease.inOut);
+  // heavy blinks, each longer and slower than the last
+  for (const [shut, hold, open, gap] of [[0.35, 0.25, 0.7, 1.6], [0.5, 0.6, 1.0, 1.8], [0.7, 1.1, 1.4, 1.5]]) {
+    UI.fade(1, shut); await wait(shut + hold); UI.fade(0, open); sfx.breath(true, 0.06); await wait(open + gap);
+  }
+  UI.fade(1, 2.2); sfx.ambience(0, 2.5); await wait(2.6);
+  // the dream
+  if (settings.get('bedtimeCartoon') && !window.__noCartoon) {
+    const prev = uiMode; uiMode = 'cartoon'; unlock(); for (const k in keys) keys[k] = false;
+    const how = await cartoon.play({ firstTime: !RUN.cartoonSeen, skipLabel: input.scheme === 'pad' ? 'Start' : input.scheme === 'touch' ? 'SKIP' : 'Esc' });
+    RUN.cartoonSeen = true; RUN.cartoon = how; saveRun();
+    uiMode = prev === 'cartoon' ? 'playing' : prev; if (input.scheme === 'kb' && uiMode === 'playing') lock();
+  }
+  F.cutscene = false; P.roll = 0;
+  F.doorCrack = true;   // night one keeps the crack he left
 }
 // the day's own wrongness, alongside the chores: the dog under your window, a fourth box in your room that nobody carried in, and pencil
 // marks on the side of your closet. Nothing here is announced; it is there if you look
@@ -1832,7 +1925,7 @@ function loop(now) {
   if (frameN % 3 === 0) W.sun.shadow.needsUpdate = true;
   if (W.bathSpot.intensity > 0) W.bathSpot.shadow.needsUpdate = true;
   handsTick(dt);
-  if (!window.__norender && booted && !warming) {
+  if (!window.__norender && booted && !warming && !cartoon.opaque) {
     gfx.render(dt);
     // the hands over the frame: the depth is cleared first, so a wall right in front of you never cuts through them
     if (hands.visible()) {
@@ -1969,4 +2062,4 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 requestAnimationFrame(loop);
 boot();
-window.__game = { vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
