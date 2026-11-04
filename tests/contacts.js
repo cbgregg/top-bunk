@@ -298,6 +298,26 @@ const SCENES = {
     d.rig.play('idle', { fade: 0.2 }); step([d], 20); box.parent.remove(box); d.pose = null; g.mom.group.visible = true;
     return out;
   }),
+  // bedtime: Dad at your door, his hand on the knob, drawing it to from inside the room out into the hall (main.js bedtime())
+  door: async (page) => page.evaluate(async () => {
+    const g = window.__game, { V3, check, step, rec } = window.__contacts, out = [], d = g.dad, kd = g.W.doors.kid, door = new V3(kd.mid.x, 0, kd.mid.z);
+    g.setPhase('night', true); g.mom.group.visible = false;
+    d.sleeping = false; d.busy = true; d.pose = null; d.sitNow = 0; d.listening = false; d.group.visible = true; d.group.rotation.order = 'XYZ'; d.group.rotation.set(0, 0, 0);
+    const spot = new V3(door.x + 0.06, 0, door.z + 0.45), hall = new V3(door.x + 0.2, 0, door.z - 0.5), bunk = new V3(8.38, 0, 4.0);
+    d.group.position.copy(spot); d.group.rotation.set(0, Math.atan2(bunk.x - spot.x, bunk.z - spot.z), 0);
+    const cam = [[door.x + 1.3, 1.45, door.z + 1.3], [door.x - 0.1, 0.95, door.z + 0.2]];
+    kd.a = kd.target = 1; kd.apply(); step([d], 60);
+    out.push(rec({ label: 'Dad in your doorway, saying goodnight', hits: check(d.group), cam, who: 'dad' }));
+    for (const a of [1, 0.7, 0.5, 0.32]) {
+      kd.a = kd.target = a; kd.apply(); g.scene.updateMatrixWorld(true);
+      const s = g.atKnob(kd); d.group.position.copy(s.stand); d.group.rotation.set(0, s.yaw, 0);
+      step([d], 40, () => { d.pose = { lean: 0.1, L: { reach: s.knob, palm: 'in', grip: 0.7 }, R: { reachLocal: new V3(-0.12, 0.93, 0.1), palm: 'in', grip: 0.35 } }; });
+      const palm = d.palm('L', new V3()), miss = palm.distanceTo(s.knob);
+      const hits = check(d.group); if (miss > 0.07) hits.push({ part: 'L hand', obj: 'off the knob', depth: +(miss * 100).toFixed(1), n: 1 });
+      out.push(rec({ label: `Dad drawing the door to (open ${Math.round(a * 100)}%)`, hits, cam: [[s.stand.x + 1.2, 1.5, s.stand.z + 0.9], [s.knob.x, 0.95, s.knob.z]], who: 'dad' }));
+    }
+    d.pose = null; return out;
+  }),
   // the evening talk on moving day, both standing where the day leaves them, and Mom holding the camera out
   evening: async (page) => page.evaluate(async () => {
     const g = window.__game, { V3, check, step, rec, merge } = window.__contacts, out = [], m = g.mom, d = g.dad, bm = (m.group.userData.h || 1.75) / 1.75;

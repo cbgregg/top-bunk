@@ -20,7 +20,7 @@ const ARGV = process.argv.slice(2);
 const opt = (name, def) => { const i = ARGV.indexOf(name); return i >= 0 && ARGV[i + 1] !== undefined ? ARGV[i + 1] : def; };
 const PORT = +opt('--port', process.env.SMOKE_PORT || 0);
 // the checks by name, so --only takes either 10 or gamepad
-const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20, lights: 21, firstnight: 22 };
+const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20, lights: 21, firstnight: 22, bedtime: 23 };
 const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map((t) => (t in NAMES ? NAMES[t] : Number(t)))) : null;
 if (ONLY && [...ONLY].some(Number.isNaN)) { console.error('--only takes check numbers or names: ' + Object.keys(NAMES).join(', ')); process.exit(2); }
 const want = (...ns) => !ONLY || ns.some((n) => ONLY.has(n));
@@ -152,7 +152,7 @@ let BASE = '';
 
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
-  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
   if (!chromium) {
     for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
@@ -822,6 +822,41 @@ let BASE = '';
       }
       return runs.join('; ');
     }, 1900e3);
+
+    // ---------- 23: bedtime: Dad's goodnight, falling asleep, the cartoon that waits for a held breath, then night one ----------
+    await check(23, 'bedtime cartoon', () => alone(browser, async (c) => {
+      const { page, w } = await openGame(c, '/index.html#bedtime');
+      await page.evaluate(() => { const g = window.__game; g.renderer.compileAsync = async () => {}; g.startGame(); });
+      await until(page, () => window.__game.P.mode === 'lie', null, 60e3);
+      // Dad comes to the door and draws it to; then you close your eyes yourself
+      await until(page, () => window.__game.F.sleepy, null, 120e3);
+      const door = await page.evaluate(() => +window.__game.W.doors.kid.a.toFixed(2));
+      ok(door > 0.12 && door < 0.2, `Dad left the door at ${door} (want a crack, about 0.15)`);
+      await page.keyboard.press('KeyE');
+      await until(page, () => window.__game.cartoon.active, null, 60e3);
+      // it waits at "now you try it" for as long as you don't hold your breath
+      await until(page, () => window.__game.cartoon.state.seg === 'try', null, 120e3);
+      await sleep(4000);
+      let st = await page.evaluate(() => window.__game.cartoon.state);
+      ok(st.seg === 'try' && !st.passed, `the cartoon went on without the breath: ${JSON.stringify(st)}`);
+      ok(!st.skippable, 'the first time, skipping is offered before the lesson is passed');
+      // a held breath of a second is not enough: let go and it waits again
+      await page.keyboard.down('Space'); await sleep(1200); await page.keyboard.up('Space'); await sleep(600);
+      st = await page.evaluate(() => window.__game.cartoon.state);
+      ok(st.seg === 'try' && st.tries >= 1 && !st.passed, `letting go early passed it: ${JSON.stringify(st)}`);
+      await page.keyboard.down('Space'); await until(page, () => window.__game.cartoon.state.passed, null, 20e3); await page.keyboard.up('Space');
+      st = await page.evaluate(() => window.__game.cartoon.state);
+      ok(st.skippable, 'once passed, the rest can be skipped');
+      // hold Esc to skip the rest; night one follows, the door at the crack Dad left
+      await page.keyboard.down('Escape'); await until(page, () => !window.__game.cartoon.active, null, 10e3); await page.keyboard.up('Escape');
+      const paused = await page.evaluate(() => !document.getElementById('pause').classList.contains('hidden'));
+      ok(!paused, 'Esc during the cartoon opened the pause menu');
+      await until(page, () => { const g = window.__game; return g.F.stage === 'n1' && g.F.live; }, null, 120e3);
+      const n1 = await page.evaluate(() => { const g = window.__game; return { door: +g.W.doors.kid.a.toFixed(2), seen: g.RUN.cartoonSeen, how: g.RUN.cartoon, mode: g.P.mode }; });
+      ok(n1.door > 0.12 && n1.door < 0.2 && n1.seen && n1.how === 'skipped' && n1.mode === 'bunk', `night one after the cartoon: ${JSON.stringify(n1)}`);
+      clean(w); await page.close();
+      return `Dad drew the door to ${door}; the cartoon held at "now you try it" (no breath, then a 1.2 s breath: ${st.tries} tries) until a held breath passed it, then Esc skipped it without pausing; night one live in the bunk, the door at ${n1.door}`;
+    }), 600e3);
 
     await check(21, 'lights', () => alone(browser, async (c) => {
       const { page, w } = await nightPage(c, '#night2');

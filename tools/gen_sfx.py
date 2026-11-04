@@ -51,6 +51,25 @@ SFX = {
     'music_box': ('music', 'Instrumental only. A haunted detuned music box playing a slow, simple lullaby melody, slightly out '
                   'of tune, winding down and slowing, with faint reverb and a cold distant atmosphere. Quiet and eerie. '
                   'Even throughout so it can loop.', 45, -24, True),
+    # the bedtime cartoon: the projector, and the cartoon's own noises
+    'projector': ('sfx', 'An old 16mm film projector running: steady mechanical clatter of the film gate at 24 frames a second, '
+                  'motor whirr and fan hum, constant from start to finish', 12, -26, True),
+    'projector_stop': ('sfx', 'An old film projector winding down and stopping: the clatter slows, the motor whines down to nothing, '
+                       'a final clunk', 3.5, -18, False),
+    'slide_up': ('sfx', 'A cartoon slide whistle zipping quickly upward, bright and silly, 1930s cartoon', 1.0, -16, False),
+    'slide_down': ('sfx', 'A cartoon slide whistle sliding quickly downward, bright and silly, 1930s cartoon', 1.0, -16, False),
+    'boing': ('sfx', 'A bouncy cartoon boing spring sound, wobbly and springy, old cartoon', 1.0, -16, False),
+    'applause': ('sfx', 'A small studio audience clapping and cheering happily, warm applause, then it dies down', 4.0, -18, False),
+    'film_burn': ('sfx', 'Film catching fire in a projector gate: a sharp crackle and sizzle, then the projector bulb hum cuts out',
+                  2.5, -16, False),
+    'inhale': ('sfx', 'A single quick sharp cartoon inhale, a short clean sucked-in gasp of air, comedic, 1930s cartoon sound effect, no voice', 0.6, -16, False),
+    'balloon_stretch': ('sfx', 'A balloon slowly being over-inflated: rising rubbery squeaks and creaks of stretched rubber under tension, getting tighter, cartoon', 4.5, -20, False),
+    'ticktock': ('sfx', 'A slow, tense cartoon clock tick-tock, steady and dry, a suspense cue, nothing else', 4.5, -20, False),
+    'deflate': ('sfx', 'A satisfying cartoon breath let out: a long relieved pfffoo of air rushing out, a soft deflating whoosh', 1.2, -16, False),
+    'cloth_rip': ('sfx', 'A heavy cotton blanket being torn open violently by something strong: a long ripping tear of fabric, then a fast whoosh of it being pulled away',
+                  1.6, -14, False),
+    'gate_catch': ('sfx', 'An old film projector jamming: the film catches in the gate with a hard mechanical stutter and clatter, a frantic chattering judder',
+                   1.2, -14, False),
 }
 
 

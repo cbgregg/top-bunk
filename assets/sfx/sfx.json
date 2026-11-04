@@ -106,5 +106,83 @@
   "kind": "sfx",
   "loop": false,
   "len": 7.032
+ },
+ "projector": {
+  "file": "assets/sfx/projector.mp3",
+  "kind": "sfx",
+  "loop": true,
+  "len": 12.042
+ },
+ "projector_stop": {
+  "file": "assets/sfx/projector_stop.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 3.527
+ },
+ "slide_up": {
+  "file": "assets/sfx/slide_up.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 1.045
+ },
+ "slide_down": {
+  "file": "assets/sfx/slide_down.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 1.045
+ },
+ "boing": {
+  "file": "assets/sfx/boing.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 1.045
+ },
+ "applause": {
+  "file": "assets/sfx/applause.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 4.049
+ },
+ "film_burn": {
+  "file": "assets/sfx/film_burn.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 2.508
+ },
+ "cloth_rip": {
+  "file": "assets/sfx/cloth_rip.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 1.62
+ },
+ "gate_catch": {
+  "file": "assets/sfx/gate_catch.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 1.228
+ },
+ "inhale": {
+  "file": "assets/sfx/inhale.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 0.627
+ },
+ "balloon_stretch": {
+  "file": "assets/sfx/balloon_stretch.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 4.519
+ },
+ "ticktock": {
+  "file": "assets/sfx/ticktock.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 4.519
+ },
+ "deflate": {
+  "file": "assets/sfx/deflate.mp3",
+  "kind": "sfx",
+  "loop": false,
+  "len": 1.228
  }
 }

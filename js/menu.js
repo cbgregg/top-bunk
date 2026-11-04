@@ -86,6 +86,7 @@ export const MENUS = {
     { type: 'heading', label: 'Accessibility' },
     { id: 'subtitles', type: 'toggle', key: 'subtitles', label: 'Subtitles', hint: 'The words of spoken lines. Captions and your own thoughts always show.' },
     { id: 'reduceFlashing', type: 'toggle', key: 'reduceFlashing', label: 'Reduce flashing', hint: 'Softer, slower light flicker and screen flashes. The scares stay.' },
+    { id: 'bedtimeCartoon', type: 'toggle', key: 'bedtimeCartoon', label: 'Bedtime cartoon', hint: 'The old cartoon you dream after moving day, which shows how to hold your breath. Off: a short hint instead.' },
     { id: 'defaults', label: 'Restore defaults', action: () => ask({ title: 'Restore defaults', text: 'Put every option back the way it started?', yes: 'Restore', action: () => settings.reset() }) },
   ],
   // the Graphics page: every setting on its own; the first group follows the preset (changing one makes it Custom), the last is yours alone
@@ -136,6 +137,7 @@ const CREDITS = `<dl class="credits">
 <dt>3D engine</dt><dd>three.js r170, MIT License, © 2010–2024 three.js authors.</dd>
 <dt>Fonts</dt><dd>Special Elite (Astigmatic) and Permanent Marker (Font Diner), Apache License 2.0. Courier Prime (Alan Dague-Greene) and Gloria Hallelujah (Kimberly Geswein), SIL Open Font License 1.1.</dd>
 <dt>Voices, music and sound effects</dt><dd>Generated with ElevenLabs (the night's brown noise is made with ffmpeg).</dd>
+<dt>The bedtime cartoon</dt><dd>Mister Buttons in "Hush-a-Bye!", drawn and animated for this game. The announcer and Mister Buttons' own voice made with ElevenLabs Voice Design; the hot-jazz score and the sound effects generated with ElevenLabs.</dd>
 <dt>Recorded sounds</dt><dd>Joseph Sardin, BigSoundBank (bigsoundbank.com), CC0 1.0.</dd>
 <dt>Piano</dt><dd>Salamander Grand Piano by Alexander Holm, CC BY 3.0.</dd>
 <dt>Surfaces, models and sky</dt><dd>Poly Haven and ambientCG, CC0.</dd>

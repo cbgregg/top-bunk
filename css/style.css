@@ -301,3 +301,15 @@ body[data-scheme="touch"] #proof.show { pointer-events: auto; cursor: pointer; p
 #jbtn i::after { content: ''; position: absolute; left: 5px; top: 6px; right: 5px; height: 8px; background: #f3efe2; }
 body[data-scheme="touch"] #jbtn { display: block; }
 @media (max-width: 700px) { .nb-pages { grid-template-columns: 1fr; } .nb-page { padding: 22px 14px 18px 46px; } .nb-page + .nb-page { display: none; } }
+
+/* the bedtime cartoon (js/cartoon.js): a canvas over everything, the skip bar, and on a touch screen its own two buttons */
+#cartoon { position: fixed; inset: 0; z-index: 90; display: none; background: #000; touch-action: none; user-select: none; }
+#cartoon.show { display: block; }
+#cartoon canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#cartoon .skip { position: absolute; left: 18px; bottom: 14px; color: #bbb; font: 13px 'Courier Prime', monospace; letter-spacing: 0.04em; opacity: 0; transition: opacity 0.6s; }
+#cartoon .skip b { color: #eee; }
+#cartoon .skip span { display: block; width: 120px; height: 3px; margin-top: 6px; background: rgba(255,255,255,0.18); }
+#cartoon .skip i { display: block; height: 100%; width: 0; background: #eee; }
+#cartoon .ctouch button { position: absolute; border: 2px solid rgba(255,255,255,0.75); background: rgba(0,0,0,0.45); color: #eee; font: bold 13px 'Courier Prime', monospace; border-radius: 50%; touch-action: none; }
+#cartoon .cbreath { right: 22px; bottom: 22px; width: 92px; height: 92px; }
+#cartoon .cskip { right: 22px; top: 18px; width: 56px; height: 56px; font-size: 11px; }

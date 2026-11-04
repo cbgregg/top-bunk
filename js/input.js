@@ -1,11 +1,11 @@
 // Game controller and touch input, merged into one analog state that the game reads next to the keyboard and mouse.
 //   input.fx / input.fy   move (right / forward, -1..1)      input.lookX / input.lookY   look speed (right stick, -1..1)
-//   input.run / input.breath   held buttons                  input.scheme   which device was used last: 'kb' | 'pad' | 'touch'
+//   input.run / input.breath / input.start   held buttons                  input.scheme   which device was used last: 'kb' | 'pad' | 'touch'
 //   input.menuActive() / input.onMenu(action)   set by js/menu.js: while a menu is up the controller drives it ('menuUp' 'menuDown' 'menuLeft'
 //   'menuRight' 'menuConfirm' 'menuBack', once per press, directions repeating while held) and A no longer interacts or confirms
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const input = {
-  fx: 0, fy: 0, lookX: 0, lookY: 0, run: false, breath: false, scheme: 'kb', touchDevice: false, onScheme: null,
+  fx: 0, fy: 0, lookX: 0, lookY: 0, run: false, breath: false, start: false, padType: 'xbox', bindings: null, scheme: 'kb', touchDevice: false, onScheme: null,
   setUse() {}, setBreathVisible() {}, rumble() {}, menuActive: null, onMenu: null,
 };
 
@@ -20,8 +20,19 @@ const LABELS = {
   photos: { kb: 'Tab', pad: 'Select', touch: 'the camera at the top' },
   journal: { kb: 'J', pad: 'R3', touch: 'the notebook at the top' },
 };
-export const label = (action) => LABELS[action][input.scheme];
-export const controlsTable = () => ['move', 'look', 'sprint', 'interact', 'breath', 'light', 'photos', 'journal', 'pause'].map((a) => [a === 'move' && input.scheme === 'touch' ? 'Left thumb' : a === 'look' && input.scheme === 'touch' ? 'Right thumb' : LABELS[a][input.scheme],
+// a PlayStation pad's names for the Xbox-style buttons above
+const PS = { LT: 'L2', RT: 'R2', A: '✕', Y: '△', Start: 'Options', Select: 'Create', R3: 'R3', 'Left stick': 'Left stick', 'Right stick': 'Right stick' };
+// what to show for an action's control on the device in use: the one place the prompts read it, so remapped controls (when the
+// bindings table is editable) show up everywhere at once. touch: the on-screen button's own name
+const TOUCH_NAMES = { breath: 'HOLD BREATH' };
+export function bindingLabel(action, scheme = input.scheme) {
+  const b = (input.bindings && input.bindings[action] && input.bindings[action][scheme]) || LABELS[action][scheme];
+  if (scheme === 'pad' && input.padType === 'ps') return PS[b] || b;
+  if (scheme === 'touch' && TOUCH_NAMES[action]) return TOUCH_NAMES[action];
+  return b;
+}
+export const label = (action) => bindingLabel(action);
+export const controlsTable = () => ['move', 'look', 'sprint', 'interact', 'breath', 'light', 'photos', 'journal', 'pause'].map((a) => [a === 'move' && input.scheme === 'touch' ? 'Left thumb' : a === 'look' && input.scheme === 'touch' ? 'Right thumb' : bindingLabel(a),
   { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact / take a photo', breath: 'Hold your breath / hide', light: 'Flashlight', photos: 'Your photos', journal: 'Your journal', pause: 'Pause' }[a]]);
 
 function setScheme(s) { if (input.scheme !== s) { input.scheme = s; document.body.dataset.scheme = s; if (input.onScheme) input.onScheme(s); } }
@@ -100,6 +111,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
     const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((g) => g && g.connected);
     pad.fx = pad.fy = pad.lookX = pad.lookY = 0; pad.run = pad.breath = false;
     if (gp) {
+      input.padType = /054c|playstation|dualshock|dualsense/i.test(gp.id || '') ? 'ps' : 'xbox';   // for the button names
       const btn = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed), edge = (i) => btn(i) && !prev[i];
       const [lx, ly] = dz(gp.axes[0] || 0, gp.axes[1] || 0), [rx, ry] = dz(gp.axes[2] || 0, gp.axes[3] || 0);
       pad.fx = lx; pad.fy = -ly; pad.lookX = rx * Math.abs(rx) * 0.4 + rx * 0.6; pad.lookY = ry * Math.abs(ry) * 0.4 + ry * 0.6;
@@ -119,5 +131,6 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
     } else prev = [];
     input.fx = clamp(pad.fx + tch.fx, -1, 1); input.fy = clamp(pad.fy + tch.fy, -1, 1);
     input.lookX = pad.lookX; input.lookY = pad.lookY; input.run = pad.run || tch.run; input.breath = pad.breath || tch.breath;
+    input.start = !!(gp && gp.buttons[9] && gp.buttons[9].pressed);   // Start held (the bedtime cartoon's skip)
   };
 }

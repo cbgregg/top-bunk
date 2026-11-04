@@ -805,7 +805,14 @@ export function createNights(env) {
       const rampT = async (dur, fn) => { const n = Math.max(2, Math.round(dur * 30)); for (let i = 1; i <= n; i++) { fn(i / n); await wait(dur / n); if (!alive(t)) return false; } return true; };
       if (W.hallFrame) W.hallFrame.reset();
       // the evening: your boxes unpacked and stacked on the floor, the box that was not yours gone (Dad took it out), your door open, the hall light on
-      tidyKidBoxes(); FN.box.hide(); FN.dent.set(0); if (FN.renderer) FN.covers.warm(FN.renderer); { const d = W.doors.kid; d.a = d.target = 1; d.apply(); }
+      tidyKidBoxes(); FN.box.hide(); FN.dent.set(0); if (FN.renderer) FN.covers.warm(FN.renderer);
+      {
+        // your door: open, or (after Dad's goodnight) the crack he left it at. That crack does not last: once you have looked at it and
+        // then away, it stands open, without a sound
+        const d = W.doors.kid, crack = !!F.doorCrack; F.doorCrack = false;
+        d.a = d.target = crack ? 0.15 : 1; d.apply();
+        if (crack) { const m = new V3(d.mid.x, 1.2, d.mid.z); gaze.whenLookAt(m, () => gaze.whenLookAway(m, () => { if (alive(t) && d.a < 0.25) { d.a = d.target = 1; d.apply(); } }, 1.2), 0.85); }
+      }
       const hall = [W.nightLights[0], W.nightLights[1]].filter(Boolean);
       for (const n of hall) n.dead = false; env.nlMult(1, false);
       const chairs0 = W.chairs.map((c) => [c.holder.position.x, c.holder.position.z, c.holder.rotation.y]);

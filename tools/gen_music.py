@@ -27,6 +27,12 @@ TRACKS = {
     'morning': ('Instrumental only, no vocals. Gentle sunny morning in a farmhouse: soft acoustic guitar, light '
                 'whistling-style synth, birdsong-like textures, warm and bright, with a faint unease underneath. '
                 'Even throughout so it can loop.', 120, -20, True),
+    # the bedtime cartoon after moving day: a hot-jazz band for an early-1930s black-and-white cartoon short (an original tune)
+    'cartoon': ('Instrumental only, no vocals. An original, bouncy early-1930s hot jazz cue for a black-and-white rubber-hose cartoon: '
+                'a strummed banjo and an oom-pah tuba on every beat, a wailing clarinet lead, a muted trumpet with wah-wah, a slide trombone '
+                'smear, woodblock and cymbal hits, cheeky and fast, recorded thin and crackly like an early sound film. 180 BPM, F major. '
+                'Ends on a short comic button.',
+                80, -19, False),
 }
 
 
