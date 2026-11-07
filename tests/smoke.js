@@ -827,9 +827,10 @@ let BASE = '';
           if (how === 'kitchen') ok(out.log.every((e) => !['dent', 'door', 'bath'].includes(e.id)), `${how}: a bedroom or bathroom beat played in the kitchen`);
           if (how === 'kitchen') ok(out.log.some((e) => e.id === 'inRoom' && e.room === 'kitchen'), `${how}: the end did not come to the kitchen`);
           if (how === 'bunk') ok(out.log.some((e) => e.id === 'bedside' || e.id === 'covers'), `${how}: the end did not come to the bunk`);
-          // the ledger (RUN.nights[1].log): the dent beat written down seen or unseen, so the morning can say the right thing
+          // the ledger (RUN.nights[1].log): the dent beat written down seen or unseen whenever it played (always in the bunk; a wanderer
+          // may never give it the room), so the morning can say the right thing
           const dent = out.ledger.find((e) => e.id === 'dent');
-          if (how !== 'kitchen') ok(dent && typeof dent.seen === 'boolean', `${how}: the ledger has no dent row: ${JSON.stringify(out.ledger.map((e) => e.id))}`);
+          if (how === 'bunk' || out.log.some((e) => e.id === 'dent')) ok(dent && typeof dent.seen === 'boolean', `${how}: the ledger has no dent row: ${JSON.stringify(out.ledger.map((e) => e.id))}`);
           // the breath under the bunk: in time with yours while the weight is there, and it keeps its own rhythm when you hold
           if (how === 'bunk') {
             const b = out.ledger.find((e) => e.id === 'breathUnder');
