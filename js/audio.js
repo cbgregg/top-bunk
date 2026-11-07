@@ -15,7 +15,7 @@ const APPEAR_BOOST = 1.5;
 const WARM = ['step_wood', 'step_carpet', 'step_tile', 'step_grass', 'step_gravel', 'step_stairs', 'step_heavy', 'creak', 'creak_heavy', 'door_open', 'door_close', 'door_creak',
   'knock', 'wall_knock', 'wall_scratch', 'clock_tick', 'clock_gear', 'clock_strike', 'heartbeat', 'breath', 'whisper', 'cabinet', 'switch', 'shutter', 'winder', 'drip',
   'page_turn', 'sub_rumble', 'metal_swell', 'bowed_metal', 'radio_static', 'phone_ring', 'door_slam', 'chair_scrape',
-  'ui_tick', 'ui_tone', 'rattle', 'bone_crack', 'floor_slap', 'cloth'];   // the menu's two sounds, the catch's, and the crawl's set
+  'ui_tick', 'ui_tone', 'rattle', 'bone_crack', 'floor_slap', 'cloth', 'radio_tune'];   // the menu's two sounds, the catch's, the crawl's set, the radio's tuner
 const LONG = { car_pass: 3, thunder: 4, kettle: 1 };   // keys of long takes: only this many of them are kept in memory
 const SURFACE = { wood: 'step_wood', carpet: 'step_carpet', tile: 'step_tile', gravel: 'step_gravel', grass: 'step_grass', stairs: 'step_stairs' };
 // how loud each key sits next to the synth it replaces (every take is first evened out, see even())

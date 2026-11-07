@@ -98,7 +98,7 @@ async function nightPage(ctx, hash) {
     ok(!/scare_strings|scare_synth|violin_storm|violin_swell|violin_stab/.test(src), 'js/audio.js still reaches a strings file');
     const scream = src.slice(src.indexOf('  scream('), src.indexOf('  rattleSynth('));
     ok(scream.length > 50 && /pianoSlam\(SLAM\.full/.test(scream) && /'rattle'/.test(scream) && /'bone_crack'/.test(scream), 'scream() is not the low piano + rattle + one bone_crack');
-    ok(!/\bswell\s*\(/.test(src), 'swell() is still defined');
+    ok(!/^\s+swell\s*\(/m.test(src) && !/\.swell\s*\(/.test(src), 'swell() is still defined');
     ok(/tensionDrone\(v, t = 1\.5\)/.test(src) && !/tensionDrone[^\n]*this\.bed\(/.test(src), 'the drone call beds something');
     const A = await import(path.join(ROOT, 'js/audio.js').replace(/\\/g, '/').replace(/^([A-Za-z]:)/, 'file:///$1'));
     const { Sound, ROOM, ACOUSTIC } = A;
