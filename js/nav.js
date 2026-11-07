@@ -1,23 +1,24 @@
 // The walkable graph of the house: where the thing can stand and which doors it has to open to get there.
 // Coordinates are world metres (x, z), with a third value for the floor height where it is not 0 (the stairwell and the basement).
-// Every edge is a straight, clear line. The node just inside each hinged door stands 0.35 m further from the hinge than the leaf's arc
-// reaches, so a door can swing without passing through whoever waits there; the nodes beside furniture stand off it by a body's width.
+// Every edge is a straight, clear line. The node just inside each hinged door stands outside the leaf's swing (1.22 m from the hinge: the
+// leaf is 0.81, the thing's body 0.35, the leaf's thickness the rest), so a door it opens from inside swings clear of it and all the way;
+// the nodes beside furniture stand off it by a body's width.
 export const NODES = {
   hallW: [5.48, -0.42], hallM: [7.63, -0.42], hallE: [10.16, -0.42],
   bathIn: [5.89, 1.39], bathMid: [5.73, 1.92], bathMid2: [6.17, 2.76], bathTub: [6.0, 3.1],
   kidIn: [9.95, 1.39], kidMid: [8.96, 2.15], kidBunk: [8.26, 2.85], kidCloset: [8.14, 1.7],
-  r2In: [5.64, -1.91], r2Alc: [5.67, -2.26], r2Mid: [6.42, -2.76], r2Closet: [6.76, -2.32],
-  sIn: [10.66, -1.98], sMid: [10.01, -2.71], sClos: [10.46, -3.2],
+  r2In: [5.42, -2.3], r2Alc: [5.67, -2.26], r2Mid: [6.42, -2.5], r2Closet: [6.76, -2.32],
+  sIn: [10.6, -2.25], sMid: [10.01, -2.71], sClos: [10.46, -3.2],
   livMouth: [4.33, -0.42], livE: [3.44, -0.96], livC: [1.98, -0.9], livW: [0.41, -0.96], livMid: [-0.93, -1.02], livFar: [-1.72, -0.66], livDoor: [3.1, -3.38], livTV: [3.21, -2.37],
   archN: [2.88, -0.36], archS: [2.88, 1.03], kit2: [2.75, 1.9], kit3: [1.9, 3.45], kit4: [3.21, 2.76],
-  dinN: [-2.05, 0.75], dinS: [-2.11, 1.25], dinW: [-1.55, 2.8], backIn: [-1.72, 3.78],
+  dinN: [-2.05, 0.75], dinS: [-2.11, 1.25], dinW: [-1.55, 2.8], backIn: [-1.55, 3.45],
   // Mom and Dad's room, through the barn door: inside the door, the middle, the foot of the bed, by the dresser, the closet, the far end
   pIn: [-3.4, 1.14], pMid: [-4.63, 0.75], pFoot: [-5.19, -0.42], pDress: [-5.55, -2.45], pClos: [-4.07, -2.26], pFar: [-5.4, 2.95],
   // out the back door, down the outside stairs to the laundry, and round the west end of the house to the garage
   stoop: [-1.6, 5.37], stoopS: [-1.49, 6.67], stairTop: [-2.95, 5.32, -0.15], stairMid: [-4.52, 5.32, -1.23], stairBot: [-6.76, 5.32, -2.4],
-  lauIn: [-6.58, 3.7, -2.4], lauMid: [-5.41, 2.54, -2.4], lauWash: [-6.6, 2.43, -2.4], lauSink: [-5.36, 1.64, -2.4], lauSump: [-4.29, 1.42, -2.4],
+  lauIn: [-6.5, 3.5, -2.4], lauMid: [-5.41, 2.54, -2.4], lauWash: [-6.6, 2.43, -2.4], lauSink: [-5.36, 1.64, -2.4], lauSump: [-4.29, 1.42, -2.4],
   yardB1: [-4.5, 7.0], yardB2: [-8.2, 7.0], yardW: [-9.3, 0.5], yardSW: [-9.3, -5.2], garDoor: [-8.3, -6.4],
-  garIn: [-8.13, -8.11], garMid: [-10.6, -10.3], garPanel: [-9.7, -7.9],
+  garIn: [-8.1, -8.2], garMid: [-10.6, -10.3], garPanel: [-9.7, -7.9],
 };
 // [a, b, door that has to be open to pass]
 const EDGES = [

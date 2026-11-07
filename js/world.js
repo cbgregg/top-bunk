@@ -1241,10 +1241,11 @@ export function buildWorld(scene) {
       const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.55, 6), M.black); cord.position.y = -0.275; g.add(cord);
       const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.07, 10), M.brass); socket.position.y = -0.585; g.add(socket);
       const lampM = M.lamp.clone(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), lampM); b.position.y = -0.665; b.scale.y = 1.3; g.add(b);
-      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.4, 5), M.steel); chain.position.set(0.03, -0.8, 0); g.add(chain);
-      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), M.steel); bead.position.set(0.03, -1.0, 0); g.add(bead);
+      // the pull chain is short: a longer one hung through the eye line of anyone standing under the bulb
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.12, 5), M.steel); chain.position.set(0.03, -0.68, 0); g.add(chain);
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), M.steel); bead.position.set(0.03, -0.745, 0); g.add(bead);
       const light = new THREE.PointLight(0xffd6a0, 0, 7, 1.8); light.position.y = -0.7; g.add(light);
-      const r = { group: g, mesh: b, light, on: false, swing: 0.08, t: 0, base: 5, pos: new THREE.Vector3(-5.7, -0.85, 1.6), chain: new THREE.Vector3(-5.67, -1.16, 1.6),
+      const r = { group: g, mesh: b, light, on: false, swing: 0.08, t: 0, base: 5, pos: new THREE.Vector3(-5.7, -0.85, 1.6), chain: new THREE.Vector3(-5.67, -0.905, 1.6),
         set(on) { this.on = on; light.intensity = on ? this.base : 0; lampM.emissiveIntensity = on ? 1.4 : 0; } };
       fixups.push(() => { for (const v of [r.pos, r.chain]) { v.x = SX(v.x); v.z = SZ(v.z); } });
       return r;
@@ -1752,10 +1753,18 @@ export function buildWorld(scene) {
     };
   })();
   fieldHeight = fieldH;
-  {   // the field itself: one big plane with its vertices lifted; under the flat ground it sits a centimetre below the slabs
+  {   // the field itself: one big plane with its vertices lifted; under the flat ground it sits a centimetre below the slabs, and it has no
+      // faces over the cellar stairwell (the eye crossed it there on the way down; the slabs round the pit are the ground you see)
     const N = PHONE ? 90 : 260, geo = new THREE.PlaneGeometry(520, 520, N, N); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, -0.03 + fieldH(x, z)); uv.setXY(i, x, z); }
+    { const { x0, xEnd, z0, z1 } = STAIR, px0 = xEnd - 0.35, px1 = x0 + 0.1, pz0 = z0 - 0.1, pz1 = z1 + 0.35, idx = geo.index.array, keep = [];
+      for (let t = 0; t < idx.length; t += 3) {
+        const xs = [pos.getX(idx[t]), pos.getX(idx[t + 1]), pos.getX(idx[t + 2])], zs = [pos.getZ(idx[t]), pos.getZ(idx[t + 1]), pos.getZ(idx[t + 2])];
+        if (Math.max(...xs) > px0 && Math.min(...xs) < px1 && Math.max(...zs) > pz0 && Math.min(...zs) < pz1) continue;
+        keep.push(idx[t], idx[t + 1], idx[t + 2]);
+      }
+      geo.setIndex(keep); }
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, M.grass); m.receiveShadow = true; yard.add(m);
   }

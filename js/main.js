@@ -617,18 +617,19 @@ async function climbUp() {
     P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
   } else { P.mode = 'bunk'; bunkSince = gameTime; }
 }
-// already up on the bunk when it comes: pull the blanket over your head
+// already up on the bunk when it comes: pull the blanket over your head (from a lean over the rail, the head comes back the way it went)
 async function hideUnderCovers() {
-  F.cutscene = true; P.mode = 'cine'; const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
-  await tween(0.6, (k) => { P.cam.lerpVectors(from, BUNK_LIE, k); P.yaw = lerpAngle(y0, HIDE_YAW, k); P.pitch = lerp(p0, 0.15, k); });
+  F.cutscene = true; P.mode = 'cine'; const leaned = (F.leanK || 0) > 0.05; P.cam.copy(camera.position); F.leanK = 0;
+  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, way = leaned ? [from, LEAN_OUT, BUNK_SEAT, BUNK_LIE] : [from, BUNK_LIE];
+  await tween(leaned ? 0.9 : 0.6, (k) => { along(way, k, P.cam); P.yaw = lerpAngle(y0, HIDE_YAW, k); P.pitch = lerp(p0, 0.15, k); });
   F.cutscene = false; P.mode = 'hide'; P.pod = null; P.podYaw = HIDE_YAW; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); UI.blanket(true); sfx.whoosh(0); UI.objective(null); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
 }
 async function climbDown() {
   if (F.cutscene) return;
-  F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
-  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, way = [from, CLIMB_WP2, CLIMB_WP1, LADDER_MID];
+  F.cutscene = true; P.mode = 'cine'; const leaned = (F.leanK || 0) > 0.05; P.cam.copy(camera.position); F.leanK = 0;
+  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, way = leaned ? [from, LEAN_OUT, CLIMB_WP2, CLIMB_WP1, LADDER_MID] : [from, CLIMB_WP2, CLIMB_WP1, LADDER_MID];
   sfx.creak(0.25, 0);
-  await tween(0.4, (k) => { along(way, k, P.cam); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.1, k); });
+  await tween(leaned ? 0.55 : 0.4, (k) => { along(way, k, P.cam); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.1, k); });
   const end = new V3(LADDER_FLOOR.x, 1.32, LADDER_FLOOR.z);
   await tween(0.35, (k) => { P.cam.lerpVectors(LADDER_MID, end, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.1, 0, k); });
   sfx.footstep(0.3);
@@ -717,14 +718,16 @@ function updateCamera(dt) {
 // on the top bunk, looking right down over the room side hangs your head over the edge, and your eyes go to the bottom bunk under you
 // (F.leanK 0..1: night one listens for it)
 const LOWER_BUNK = new V3(8.42, 0.6, 3.82), leanQ = new THREE.Quaternion(), leanM = new THREE.Matrix4();
+// the head's way out over the rail (the top bunk's edge is at z 3.35, its rail up to 1.9): out and a little up first, clear of the rail, then
+// down over the side below the top mattress, so you see under it into the bottom bunk. The climbs and the covers retrace it
+const LEAN_OUT = new V3(8.34, 2.1, 3.15), LEAN_DOWN = new V3(8.34, 1.38, 3.1), LEAN_WAY = [BUNK_SEAT, LEAN_OUT, LEAN_DOWN];
 function leanOver(dt) {
-  const want = P.mode === 'bunk' && !F.cutscene && Math.abs(angDiff(HIDE_YAW, P.yaw)) < 1.25 ? THREE.MathUtils.smoothstep(-P.pitch, 0.62, 1.12) : 0;
+  if (P.mode !== 'bunk') { F.leanK = 0; return; }   // a climb or the covers start from wherever the head is and carry it back themselves
+  const want = !F.cutscene && Math.abs(angDiff(HIDE_YAW, P.yaw)) < 1.25 ? THREE.MathUtils.smoothstep(-P.pitch, 0.62, 1.12) : 0;
   F.leanK = (F.leanK || 0) + (want - (F.leanK || 0)) * Math.min(1, dt * 3.2);
   const k = F.leanK; if (k < 0.002) return;
   const e = k * k * (3 - 2 * k);
-  // the head goes out past the rail (the top bunk's edge is at z 3.35) and then hangs down over the side, below the top mattress, so you see
-  // under it into the bottom bunk
-  camera.position.z -= 0.9 * e; camera.position.y -= 0.86 * e * e; camera.position.x += 0.06 * e;
+  along(LEAN_WAY, e, tmp); camera.position.add(tmp.sub(BUNK_SEAT));
   leanM.lookAt(camera.position, LOWER_BUNK, camera.up); leanQ.setFromRotationMatrix(leanM);
   camera.quaternion.slerp(leanQ, e * 0.9);
 }
@@ -2101,4 +2104,4 @@ requestAnimationFrame(loop);
 boot();
 window.__game = { cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
   // the boundaries, for tests/sweep.js: the module, the bodies, the player's step and the camera, driven a frame at a time with the loop frozen
-  collide, PB, keys, movePlayer, updateCamera, resolvePlayer, toggleDoor, climbUp, climbDown, hideUnderCovers, toBunk, car, LIE, LADDER_MID, LADDER_FLOOR, CLIMB_WP1, CLIMB_WP2, EYE, R, stepTimers: (dt) => { gameTime += dt; runTimers(); } };
+  collide, PB, keys, movePlayer, updateCamera, resolvePlayer, toggleDoor, climbUp, climbDown, hideUnderCovers, toBunk, car, LIE, LADDER_MID, LADDER_FLOOR, CLIMB_WP1, CLIMB_WP2, LEAN_OUT, LEAN_DOWN, EYE, R, stepTimers: (dt) => { gameTime += dt; runTimers(); } };
