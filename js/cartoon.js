@@ -664,35 +664,6 @@ function iris(c, k, cx = W / 2, cy = H / 2) {
   if (k >= 1) return;
   c.save(); c.beginPath(); c.rect(-10, -10, W + 20, H + 20); c.arc(cx, cy, Math.max(0.1, k * 660), 0, TAU, true); c.fillStyle = '#080808'; c.fill('evenodd'); c.restore();
 }
-// the breath control as the player has it, drawn in the picture's own hand: an inked key cap for a keyboard, a round inked button for a
-// pad (its name as that pad calls it), a hand-lettered "HOLD BREATH" plate for a touch screen. press 0..1 pushes it in
-function keyCap(c, x, y, label, press, scheme, s = 1) {
-  c.save(); c.translate(x, y); c.scale(s, s);
-  const dy = press * 7;
-  if (scheme === 'pad') {
-    // a round button seen a little from above: its side, then its face, inked, the name in the middle
-    cel(c, ellPts(0, 10, 50, 26, 40), 4, '#3a3a3a', 1);
-    c.fillStyle = '#3a3a3a'; c.fillRect(-50, -6 + dy, 100, 16 - dy); ink(c, [[-50, -6 + dy], [-50, 10]], 3.4, false, 2); ink(c, [[50, -6 + dy], [50, 10]], 3.4, false, 3);
-    cel(c, ellPts(0, -6 + dy, 50, 26, 40), 4, WHITE, 3);
-    ink(c, ellPts(0, -6 + dy, 38, 18, 32), 2.2, true, 4);
-    letter(c, label, 0, -7 + dy, label.length > 2 ? 26 : 34, { fill: INK, line: 0, shadow: false, seed: 5 });
-  } else if (scheme === 'touch') {
-    // a painted plate with the button's name lettered on it
-    const w = 300, h = 74;
-    cel(c, [[-w / 2 + 10, -h / 2 + dy], [w / 2 - 10, -h / 2 + dy], [w / 2, -h / 2 + 10 + dy], [w / 2, h / 2 - 10 + dy], [w / 2 - 10, h / 2 + dy], [-w / 2 + 10, h / 2 + dy], [-w / 2, h / 2 - 10 + dy], [-w / 2, -h / 2 + 10 + dy]], 4, WHITE, 6);
-    ink(c, [[-w / 2 + 12, -h / 2 + 8 + dy], [w / 2 - 12, -h / 2 + 8 + dy], [w / 2 - 12, h / 2 - 8 + dy], [-w / 2 + 12, h / 2 - 8 + dy]], 1.8, true, 7);
-    letter(c, label, 0, dy, 34, { fill: INK, line: 0, shadow: false, seed: 8 });
-  } else {
-    // a typewriter-style key: the dark skirt, the white top, inked, the letters on it
-    const wide = Math.max(120, label.length * 26 + 56);
-    const skirt = [[-wide / 2 - 8, -26], [wide / 2 + 8, -26], [wide / 2 + 12, 34], [-wide / 2 - 12, 34]];
-    cel(c, skirt, 4, '#3a3a3a', 9);
-    const top = [[-wide / 2, -42 + dy], [wide / 2, -42 + dy], [wide / 2 + 4, 18 + dy], [-wide / 2 - 4, 18 + dy]].map((p) => p);
-    cel(c, [...quad(top[0], [0, -46 + dy], top[1], 10), ...quad(top[1], [wide / 2 + 6, -12 + dy], top[2], 8).slice(1), ...quad(top[2], [0, 22 + dy], top[3], 10).slice(1), ...quad(top[3], [-wide / 2 - 6, -12 + dy], top[0], 8).slice(1, -1)], 4, WHITE, 10);
-    letter(c, label, 0, -12 + dy, label.length > 5 ? 30 : 36, { fill: INK, line: 0, shadow: false, seed: label.length });
-  }
-  c.restore();
-}
 function meter(c, x, y, v, label = 'BREATH METER') {
   c.save(); c.translate(x, y);
   letter(c, label, 0, -40, 22, { seed: 23, line: 5 });
@@ -930,7 +901,23 @@ export function limbSheet(c) {
 }
 
 export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme: 'kb' }), breathDown = () => false, skipDown = () => false, subtitles = () => true, lines = {} } = {}) {
-  let cv = null, ctx = null, stage = null, sctx = null, pcv = null, pctx = null, kit = null, root = null, skipEl = null, touchEl = null;
+  let cv = null, ctx = null, stage = null, sctx = null, pcv = null, pctx = null, kit = null, root = null, skipEl = null, touchEl = null, capEl = null;
+  // the HUD margin under the film: the film is letterboxed above a black band (a tenth of the screen) that holds the skip bar and, while
+  // the picture asks for it, the breath control as the player has it (the glyph from js/input.js), so the 1930s picture never shows a
+  // 2020s button. layout is in CSS pixels, for the tests
+  let layout = { band: 0, frame: { x: 0, y: 0, w: 0, h: 0 } }, capWant = null, lastBand = -1;
+  const bandCss = () => Math.max(52, Math.min(84, Math.round(innerHeight * 0.11)));
+  // the picture asks for the cap this frame (press 0..1 pushes it in); not asked for on a frame, it hides
+  function capShow(lab, press = 0) { capWant = { lab, press }; }
+  function applyCap() {
+    if (!capEl) return;
+    const want = capWant && capWant.lab.scheme !== 'touch' ? capWant : null;   // on a touch screen its own HOLD BREATH button is the cap
+    capEl.classList.toggle('show', !!want);
+    if (!want) return;
+    const html = `<span>hold</span>${want.lab.html || `<b class="g g-kb">${String(want.lab.text).replace(/</g, '&lt;')}</b>`}`;
+    if (capEl._html !== html) { capEl._html = html; capEl.innerHTML = html; }
+    capEl.classList.toggle('press', want.press > 0.5);
+  }
   const st = { on: false, t: 0, seg: 0, segT: 0, vo: null, voT: 0, holdT: 0, holding: false, latch: false, prevDown: false, downAt: 0, tries: 0,
     passed: false, holdSaid: false, whoopsT: -9, skipK: 0, skippable: false, done: null, sources: [], music: null, projector: null, log: null, offline: false, touch: { breath: false, skip: false } };
   // the narrator's lines are vo/cartoon/c_*, Mister Buttons' own barks vo/buttons/b_*
@@ -1177,7 +1164,8 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
             hands: { l: [-80, -96, 'fist', -1], r: [80, -96, 'fist', -1] } }));
         ui.push(() => {
           const pop = ease.back(k01(t, 0.55, 0.95)), lab = getLabel();
-          if (pop > 0) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); keyCap(c, 730, 250, lab.text, press, lab.scheme, pop); glove(c, 740, 172 + press * 7, Math.PI / 2, 'point', 1.25 * pop); letter(c, 'HOLD IT!', 730, 110, 44, { seed: 31, line: 7 }); }
+          // the control itself is never in the picture: the glove points down out of the frame, where the cap sits in the margin under it
+          if (pop > 0) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); glove(c, 740, 545 + press * 10, Math.PI / 2, 'point', 1.25 * pop); letter(c, 'HOLD IT!', 730, 110, 44, { seed: 31, line: 7 }); capShow(lab, press); }
           const tapK = ease.back(k01(t, dur('c_hold') * 0.62, dur('c_hold') * 0.62 + 0.4));
           if (tapK > 0) { c.save(); c.translate(730, 360); c.scale(tapK, tapK); bigText(c, '...or TAP it once!', 0, 0, 30, { w: 6 }); c.restore(); }
         });
@@ -1226,7 +1214,7 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
               : whoops ? { y: TENT.floor + 6 - drop * 20, sy: 1 - drop * 0.25, face: 'o', eyeS: 1.15, brow: 1, look: [0, -1] } : { talk: talk(), face: talk() > 0.12 ? 'grin' : 'sly', brow: 0.2, look: [0.7, 0.1], lid: Math.max(0.5, blinkAt(T)) }));
         }
         ui.push(() => {
-          if (!st.holding && !whoops) { letter(c, 'NOW YOU TRY IT!', 720, 120, 44, { seed: 34, line: 7, arc: 8 }); keyCap(c, 720, 230, lab.text, 0.5 - 0.5 * Math.cos(t * Math.PI * 2), lab.scheme, 1 + Math.sin(t * 6) * 0.03); }
+          if (!st.holding && !whoops) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); letter(c, 'NOW YOU TRY IT!', 720, 120, 44, { seed: 34, line: 7, arc: 8 }); glove(c, 740, 545 + press * 10, Math.PI / 2, 'point', 1.2); capShow(lab, press); }
           meter(c, 720, 380, 1 - k * 0.75, 'HOLD IT...');
           if (st.holding) { const n = Math.min(HOLD_NEED, Math.floor(st.holdT) + 1), fr = st.holdT % 1, sz = 1 + (1 - ease.out(Math.min(1, fr * 3))) * 0.45; c.save(); c.translate(720, 220); c.scale(sz, sz); letter(c, `${n}!`, 0, 0, 120, { seed: 35 + n, line: 10 }); c.restore(); }
           if (whoops) { c.save(); c.translate(720, 230); c.rotate(Math.sin(t * 12) * 0.05); letter(c, 'WHOOPS!', 0, 0, 70, { seed: 40, line: 9, arc: 10 }); c.restore(); }
@@ -1356,7 +1344,7 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
     const sp = splice(kit, st.t, s.slow || s.name === 'runout' ? 2.5 : 1);
     // the picture, clean, onto the stage (held still while frames are missing at a splice)
     if (!sp.freeze || !st.drawn) {
-      sctx.save(); sctx.setTransform(1, 0, 0, 1, 0, 0);
+      sctx.save(); sctx.setTransform(1, 0, 0, 1, 0, 0); capWant = null;
       s.draw(sctx, st.segT, st.t, ui);
       for (const f of ui) f();
       sctx.restore(); st.drawn = true;
@@ -1368,9 +1356,14 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
     if (subtitles() && s.name !== 'burn') { if (saying()) subtitle(pctx, text(st.vo)); else if (barking()) subtitle(pctx, text(st.bark)); }
     if (s.name === 'burn' && st.segT > 2.2) { pctx.fillStyle = '#000'; pctx.fillRect(0, 0, W, H); }
     if (!ctx) return;
-    const cw = cv.width, ch = cv.height, sc = Math.min(cw / W, ch / H), dw = W * sc, dh = H * sc;
+    // the film fitted above the HUD band, centred
+    const cw = cv.width, ch = cv.height, px = cw / Math.max(1, innerWidth), band = Math.round(bandCss() * px);
+    const sc = Math.min(cw / W, (ch - band) / H), dw = W * sc, dh = H * sc, fx = (cw - dw) / 2, fy = Math.max(0, (ch - band - dh) / 2);
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cw, ch);
-    ctx.imageSmoothingEnabled = true; ctx.drawImage(pcv, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(pcv, fx, fy, dw, dh);
+    layout = { band: band / px, frame: { x: fx / px, y: fy / px, w: dw / px, h: dh / px } };
+    if (root && layout.band !== lastBand) { lastBand = layout.band; root.style.setProperty('--band', `${layout.band}px`); }
+    applyCap();
     if (skipEl) { skipEl.style.opacity = st.skippable ? 1 : 0; skipEl.querySelector('i').style.width = `${Math.min(1, st.skipK) * 100}%`; }
     if (touchEl) { touchEl.style.display = getLabel().scheme === 'touch' ? '' : 'none'; touchEl.querySelector('.cskip').style.visibility = st.skippable ? '' : 'hidden'; }
   }
@@ -1388,10 +1381,18 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
     stage = document.createElement('canvas'); stage.width = W; stage.height = H; sctx = stage.getContext('2d'); pcv = document.createElement('canvas'); pcv.width = W; pcv.height = H; pctx = pcv.getContext('2d'); kit = filmKit();
     if (!document.body) return;
     root = document.createElement('div'); root.id = 'cartoon';
-    root.innerHTML = '<canvas></canvas><div class="skip">Hold <b></b> to skip<span><i></i></span></div>'
+    root.innerHTML = '<canvas></canvas><div class="skip">Hold <b></b> to skip<span><i></i></span></div><div class="cap"></div>'
       + '<div class="ctouch"><button type="button" class="cbreath">HOLD<br>BREATH</button><button type="button" class="cskip">SKIP</button></div>';
     document.body.appendChild(root);
-    cv = root.querySelector('canvas'); ctx = cv.getContext('2d'); skipEl = root.querySelector('.skip'); touchEl = root.querySelector('.ctouch');
+    cv = root.querySelector('canvas'); ctx = cv.getContext('2d'); skipEl = root.querySelector('.skip'); touchEl = root.querySelector('.ctouch'); capEl = root.querySelector('.cap');
+    if (!document.getElementById('cartoon-cap-css')) {   // the cap's look, kept with the code that fills it
+      const st = document.createElement('style'); st.id = 'cartoon-cap-css';
+      st.textContent = `#cartoon .cap { position: absolute; left: 50%; bottom: 0; height: var(--band, 60px); transform: translateX(-50%); display: none; align-items: center; gap: 12px; color: #d8d8d8; font: 15px 'Courier Prime', monospace; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+#cartoon .cap.show { display: flex; }
+#cartoon .cap .g { font-size: 17px; letter-spacing: 0.08em; margin: 0; transition: transform 0.1s, opacity 0.1s; }
+#cartoon .cap.press .g { transform: translateY(2px); opacity: 0.7; }`;
+      document.head.appendChild(st);
+    }
     const hold = (sel, key) => {
       const b = root.querySelector(sel), on = (e) => { e.preventDefault(); st.touch[key] = true; }, off = (e) => { e.preventDefault(); st.touch[key] = false; };
       b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
@@ -1418,6 +1419,7 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
     get active() { return st.on; },
     get opaque() { return st.on; },
     get state() { return { seg: SEG[st.seg] && SEG[st.seg].name, t: st.t, holdT: st.holdT, holding: st.holding, tries: st.tries, passed: st.passed, skippable: st.skippable }; },
+    get layout() { return layout; },   // the film's frame and the HUD band under it, in CSS pixels
     segments: SEG.map((s) => s.name),
     // play it: resolves 'done' or 'skipped'. firstTime: the skip is offered only once the "now you try it" is passed
     play({ firstTime = true, skipLabel = 'Esc' } = {}) {

@@ -98,24 +98,35 @@ button:hover { background: rgba(233,226,208,0.08); }
 .note.gfx select { background: #0d0d0d; color: #cfc8b8; border: 1px solid #4a4538; font: inherit; padding: 0.15em 0.4em; margin-left: 0.6em; cursor: pointer; }
 
 /* ---------- touch controls (shown on touch devices) ---------- */
-#touch { position: fixed; inset: 0; z-index: 32; display: none; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* the right-hand cluster, anchored at the corner: USE with RUN beside it, above it one fixed slot that HOLD BREATH and COVER UP share
+   (so the layout never changes under the thumb), above that LIGHT with CAM beside it; II at the top. --k scales the buttons (Options:
+   touch button size); .left mirrors the halves and the cluster for a left-handed player */
+#touch { --k: 1; position: fixed; inset: 0; z-index: 32; display: none; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 #touch.on { display: block; }
+#touch.large { --k: 1.2; }
 #touch * { touch-action: none; }
 #t-look { position: absolute; top: 0; right: 0; bottom: 0; width: 52%; pointer-events: auto; }
 #t-move { position: absolute; top: 0; left: 0; bottom: 0; width: 48%; pointer-events: auto; }
+#touch.left #t-look { right: auto; left: 0; }
+#touch.left #t-move { left: auto; right: 0; }
 #t-base, #t-knob { display: none; position: fixed; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 #t-base { width: 128px; height: 128px; border: 2px solid rgba(233,226,208,0.35); background: rgba(233,226,208,0.06); }
 #t-knob { width: 56px; height: 56px; background: rgba(233,226,208,0.35); border: 2px solid rgba(233,226,208,0.6); }
-#touch button { position: absolute; pointer-events: auto; border-radius: 50%; font-size: 14px; letter-spacing: 1px; line-height: 1.15; padding: 0; color: #e9e2d0; background: rgba(10,10,10,0.45); border: 2px solid rgba(233,226,208,0.45); -webkit-tap-highlight-color: transparent; }
-#t-act { right: max(24px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 92px; height: 92px; font-size: 18px; }
+#touch button { position: absolute; pointer-events: auto; border-radius: 50%; font-size: calc(14px * var(--k)); letter-spacing: 1px; line-height: 1.15; padding: 0; color: #e9e2d0; background: rgba(10,10,10,0.45); border: 2px solid rgba(233,226,208,0.45); -webkit-tap-highlight-color: transparent; }
+#t-act { right: max(24px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: calc(92px * var(--k)); height: calc(92px * var(--k)); font-size: calc(18px * var(--k)); }
 #t-act.ready { background: rgba(160,30,30,0.55); border-color: rgba(255,200,190,0.9); box-shadow: 0 0 22px rgba(200,40,40,0.55); }
-#t-run { right: max(132px, calc(env(safe-area-inset-right) + 108px)); bottom: max(34px, env(safe-area-inset-bottom)); width: 72px; height: 72px; }
-#t-breath { display: none; right: max(24px, env(safe-area-inset-right)); bottom: 134px; width: 92px; height: 92px; font-size: 13px; }
-#t-breath.show { display: block; }
-#t-cover { display: none; right: max(24px, env(safe-area-inset-right)); bottom: 134px; width: 92px; height: 92px; font-size: 13px; }
-#t-cover.show { display: block; }
+#t-act .shutter { display: none; width: 58%; height: 58%; }
+#t-act.cam span { display: none; }
+#t-act.cam .shutter { display: block; margin: auto; }
+#t-run { right: max(calc(132px * var(--k)), calc(env(safe-area-inset-right) + 108px * var(--k))); bottom: max(34px, env(safe-area-inset-bottom)); width: calc(72px * var(--k)); height: calc(72px * var(--k)); }
+#t-breath, #t-cover { visibility: hidden; right: max(24px, env(safe-area-inset-right)); bottom: calc(134px * var(--k)); width: calc(92px * var(--k)); height: calc(92px * var(--k)); font-size: calc(13px * var(--k)); }
+#t-breath.show, #t-cover.show { visibility: visible; }
 #touch button.down { background: rgba(233,226,208,0.35); }
-#t-light { right: max(24px, env(safe-area-inset-right)); bottom: 240px; width: 64px; height: 64px; font-size: 11px; }
+#t-light { right: max(24px, env(safe-area-inset-right)); bottom: calc(240px * var(--k)); width: calc(64px * var(--k)); height: calc(64px * var(--k)); font-size: calc(11px * var(--k)); }
+#t-cam { right: max(calc(102px * var(--k)), calc(env(safe-area-inset-right) + 78px * var(--k))); bottom: calc(240px * var(--k)); width: calc(64px * var(--k)); height: calc(64px * var(--k)); font-size: calc(11px * var(--k)); }
+#touch.left #t-act, #touch.left #t-breath, #touch.left #t-cover, #touch.left #t-light { right: auto; left: max(24px, env(safe-area-inset-left)); }
+#touch.left #t-run { right: auto; left: max(calc(132px * var(--k)), calc(env(safe-area-inset-left) + 108px * var(--k))); }
+#touch.left #t-cam { right: auto; left: max(calc(102px * var(--k)), calc(env(safe-area-inset-left) + 78px * var(--k))); }
 #t-pause { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 44px; height: 44px; font-size: 16px; }
 body[data-scheme="touch"] #crosshair { opacity: 0.35 !important; }
 
