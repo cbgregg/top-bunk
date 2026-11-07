@@ -13,6 +13,7 @@ import { makePerson } from './people.js';
 import * as events from './events.js';
 import * as log from './log.js';
 import { hooks } from './hooks.js';
+import { active } from './collide.js';
 
 const DAWN = 360;   // minutes after midnight
 
@@ -115,7 +116,7 @@ export function createNights(env) {
     }
     return true;
   });
-  const solidAt = (x, z) => W.colliders.some((c) => c.on !== false && !c.dressing && x > c.minX - 0.25 && x < c.maxX + 0.25 && z > c.minZ - 0.25 && z < c.maxZ + 0.25 && (c.minY === undefined || (P.pos.y + 1 >= c.minY && P.pos.y + 1 <= c.maxY)));
+  const solidAt = (x, z) => W.colliders.some((c) => active(c) && !c.dressing && x > c.minX - 0.25 && x < c.maxX + 0.25 && z > c.minZ - 0.25 && z < c.maxZ + 0.25 && (c.minY === undefined || (P.pos.y + 1 >= c.minY && P.pos.y + 1 <= c.maxY)));
   // the nearest point of the nearest wall at the player's height: where a creak or a knock in the wall belongs
   const nearestWall = () => {
     const c = W.colliders.filter((q) => q.wall && (q.minY === undefined || (P.pos.y + 1 >= q.minY && P.pos.y + 1 <= q.maxY)))
@@ -1246,7 +1247,7 @@ export function createNights(env) {
         let d = 0.5;
         for (; d < 9; d += 0.12) {
           const x = x0 + ux * d, z = z0 + uz * d;
-          if (W.colliders.some((c) => c.on !== false && x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ && (c.minY === undefined || (P.pos.y + 1 >= c.minY && P.pos.y + 1 <= c.maxY)))) break;
+          if (W.colliders.some((c) => active(c) && x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ && (c.minY === undefined || (P.pos.y + 1 >= c.minY && P.pos.y + 1 <= c.maxY)))) break;
         }
         if (d < 3.4) return null;
         const far = d - 0.6, near = Math.max(1.5, far * 0.42);

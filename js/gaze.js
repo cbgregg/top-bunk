@@ -18,6 +18,7 @@
 //   homeLight()                  the house's light is in sight (the forest's rule): true until setHomeLight(fn) hands over the real test
 //   inBunkFor()                  seconds the player has lain in the bunk without getting up (law 8's bunk fallback reads it)
 import * as THREE from 'three';
+import { active } from './collide.js';
 
 export function createGaze({ camera, P, los, roomAt, colliders, F = null, W = null }) {
   const hist = [], watchers = [], glance = new Map(), _p = new THREE.Vector3(), _f = new THREE.Vector3();
@@ -54,8 +55,10 @@ export function createGaze({ camera, P, los, roomAt, colliders, F = null, W = nu
     }
     return false;
   }
-  const free = (x, z, r = 0.4) => !colliders.some((c) => c.on !== false && !c.wall && x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r)
-    && !colliders.some((c) => c.on !== false && c.wall && x > c.minX - 0.25 && x < c.maxX + 0.25 && z > c.minZ - 0.25 && z < c.maxZ + 0.25);
+  // a box counts as the boundaries count it (collide.active: switched on, and its night or `when` condition holding; the vigil's chair
+  // stands in the hall mouth only while the vigil runs)
+  const free = (x, z, r = 0.4) => !colliders.some((c) => active(c) && !c.wall && x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r)
+    && !colliders.some((c) => active(c) && c.wall && x > c.minX - 0.25 && x < c.maxX + 0.25 && z > c.minZ - 0.25 && z < c.maxZ + 0.25);
   // a spot behind the player: candidates fan out round the direction opposite the facing, nearest to straight behind first
   function behind(min = 1.6, max = 3.6, { strict = true, sameRoom = true, y = P.pos.y } = {}) {
     const f = fwd(), back = Math.atan2(-f.x, -f.z), room = roomAt(P.pos.x, P.pos.z, P.pos.y), out = [];
