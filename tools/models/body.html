@@ -36,11 +36,23 @@ function bake(tgt, src, clip, name) {
     return { t, s, A, restS: wq(s), restT: wq(t), restLocal: t.quaternion.clone() };
   });
   const n = Math.max(2, Math.round(clip.duration * FPS)), times = [], vals = rest.map(() => []);
-  const action = mixer.clipAction(clip); action.play();
+  // the hips' path and a probe of the pose (where the head and the front point, which hand is up), measured on the source rig in its own metres
+  const pelvis = S.pelvis, pelvis0 = wp(pelvis), pelvisQ0 = wq(pelvis), floorS = src.userData.floor, pelvisS = pelvis0.y - floorS, hips = [], probe = { ups: [] };
+  const up = () => wp(S.Head).sub(wp(pelvis)).normalize().toArray(), front = () => new THREE.Vector3(0, 0, 1).applyQuaternion(wq(pelvis).multiply(pelvisQ0.clone().invert())).toArray();
+  // the Rocketbox skeleton's own ground: the knees, the ankles and the toe joints, each with the flesh under it (the T-pose stands its soles
+  // on y = 0, in centimetres), and its pelvis height; the path is carried over by the pelvis heights' ratio and then lifted wherever one of
+  // those joints would be under the floor, since this rig's legs are longer for its pelvis height than the library's and a kneel or a
+  // crouch that is right on the library's rig puts a shin through the floor on this one
+  const GROUND = ['L', 'R'].flatMap((s) => [[T[`Bip01_${s}_Calf`], 0.06], [T[`Bip01_${s}_Foot`], 0.055], [T[`Bip01_${s}_Toe0`], Math.min(0.03, wp(T[`Bip01_${s}_Toe0`]).y / 100)]]);
+  const pelvisT = wp(T.Bip01_Pelvis).y / 100, kT = pelvisT / pelvisS, lifts = [];   // (kT: library metres to Rocketbox metres)
+  const action = mixer.clipAction(clip); action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();   // (played once: the last frame is the clip's own end, not a wrap to its start)
   const q = new THREE.Quaternion(), qp = new THREE.Quaternion(), dW = new THREE.Quaternion();
   for (let i = 0; i <= n; i++) {
     const tt = (i / n) * clip.duration; times.push(tt);
     mixer.setTime(tt); src.updateMatrixWorld(true);
+    hips.push(wp(pelvis).sub(pelvis0).toArray());
+    if (i % Math.max(1, Math.round(n / 4)) === 0 || i === n) probe.ups.push({ t: +tt.toFixed(2), up: up(), front: front(), pelvisY: +(wp(pelvis).y - floorS).toFixed(2), headY: +(wp(S.Head).y - floorS).toFixed(2) });
+    if (i === 0) { const hl = wp(S.hand_l).y - wp(pelvis).y, hr = wp(S.hand_r).y - wp(pelvis).y; Object.assign(probe, { handL0: hl, handR0: hr, raised: hl - hr > 0.1 ? 'L' : hr - hl > 0.1 ? 'R' : 'neither' }); }
     rest.forEach((r, k) => {
       dW.copy(wq(r.s)).multiply(r.restS.clone().invert());
       q.copy(dW).multiply(r.A).multiply(r.restT);
@@ -50,10 +62,24 @@ function bake(tgt, src, clip, name) {
       if (prev && prev[0] * a[0] + prev[1] * a[1] + prev[2] * a[2] + prev[3] * a[3] < 0) for (let j = 0; j < 4; j++) a[j] = -a[j];   // one hemisphere, so blends never go the long way round
       vals[k].push(...a);
     });
+    // this frame's pose on the Rocketbox skeleton (its pelvis still at rest): how far the lowest joint's flesh would be under the floor
+    // once the hips take their path, and the lift that keeps it on the floor (not while the body lies on its back or front: a knee or a
+    // heel is then not what rests on the ground)
+    tgt.updateMatrixWorld(true);
+    const clear = Math.min(...GROUND.map(([b, r]) => wp(b).y / 100 + hips[i][1] * kT - r)), lying = Math.abs(front()[1]) > 0.6;
+    lifts.push(!lying && clear < -0.003 ? -clear : 0);
   }
   action.stop(); mixer.uncacheRoot(src);
   rest.forEach((r) => r.t.quaternion.copy(r.restLocal)); tgt.updateMatrixWorld(true);
-  return { name, duration: clip.duration, fps: FPS, bones: rest.map((r) => r.t.name.replace(/^Bip01_/, '')), frames: n + 1, vals };
+  for (let i = 0; i <= n; i++) hips[i][1] += lifts[i] / kT;
+  // the hips go into the file only when they leave the standing stance by more than 3 cm (sitting down, lying, kneeling, a crouch):
+  // in millimetres from the rest pose, with the rest pose's pelvis height `pelvis` to scale them by
+  const idle = window.idleHips || hips[0], travel = Math.max(...hips.map((h) => Math.hypot(h[0] - idle[0], h[1] - idle[1], h[2] - idle[2])));
+  if (name === 'stand') window.idleHips = hips[0];
+  Object.assign(probe, { hips0: hips[0], hips1: hips[n], drop: -Math.min(...hips.map((h) => h[1])), travel, lift: Math.max(...lifts), liftAt: +times[lifts.indexOf(Math.max(...lifts))].toFixed(2) });
+  // (stance: where the hips rest in the library's standing idle, so a reader of the path can tell a clip's standing ends)
+  return { name, duration: clip.duration, fps: FPS, bones: rest.map((r) => r.t.name.replace(/^Bip01_/, '')), frames: n + 1, vals, probe,
+    hips: travel > 0.03 ? hips.map((h) => h.map((x) => Math.round(x * 1000))) : null, pelvis: pelvisS, stance: idle.map((x) => Math.round(x * 1000)) };
 }
 (async () => {
   const tgt = (await load('/assets/models/dad.glb')).scene;
@@ -65,6 +91,7 @@ function bake(tgt, src, clip, name) {
       const S = byName(g.scene), T = byName(tgt); g.scene.updateMatrixWorld(true); tgt.updateMatrixWorld(true);
       const fs = wp(S.ball_l).sub(wp(S.foot_l)).setY(0).normalize(), ft = wp(T.Bip01_L_Toe0).sub(wp(T.Bip01_L_Foot)).setY(0).normalize();
       info[file] = { facing: fs.dot(ft) }; if (fs.dot(ft) < 0) { g.scene.rotation.y += Math.PI; g.scene.updateMatrixWorld(true); }
+      const bb = new THREE.Box3().setFromObject(g.scene); g.scene.userData.height = bb.max.y - bb.min.y; g.scene.userData.floor = bb.min.y; info[file].height = g.scene.userData.height;   // (the rig's own height and floor: its hip path is scaled by its pelvis height)
     }
     const clip = srcs[file].animations.find((a) => a.name === sc); if (!clip) throw new Error('no clip ' + sc);
     out.push(bake(tgt, srcs[file].scene, clip, name));
