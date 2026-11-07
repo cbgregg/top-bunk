@@ -152,7 +152,7 @@
   "made": "2026-11-07"
  },
  "dad/f_c": {
-  "sha1": "5fb12387117a9374a6192c7b496d49085838735a",
+  "sha1": "af2b7b483788c458acd1f65a7cc0bbc6c376fa89",
   "model": "eleven_v4",
   "voice": "1t1EeRixsJrKbiF1zwM6",
   "speed": 0.9,
@@ -560,7 +560,7 @@
   "made": "2026-11-07"
  },
  "dad/n_bed": {
-  "sha1": "0ab3f953076d375e3ab97662c3bed510157055b7",
+  "sha1": "aee78808ad3d513fa078cd5d0c3c3462d1f32230",
   "model": "eleven_v4",
   "voice": "1t1EeRixsJrKbiF1zwM6",
   "speed": 0.9,

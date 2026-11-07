@@ -1081,7 +1081,7 @@
  },
  "dad/n_bed": {
   "voice": "dad",
-  "say": "[flat, without turning] Go to bed.",
+  "say": "[flat, tired] Go to bed.",
   "html": "<b>Dad:</b> Go to bed."
  },
  "dad/n_funny": {
@@ -1251,7 +1251,7 @@
  },
  "dad/f_c": {
   "voice": "dad",
-  "say": "[flat, not looking away] Bud. Is the hall light on.",
+  "say": "[quiet] Bud. Is the hall light on.",
   "html": "<b>Dad:</b> Bud. Is the hall light on."
  },
  "you/f_b": {

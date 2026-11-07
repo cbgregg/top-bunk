@@ -3,6 +3,7 @@
 
     ELEVENLABS_API_KEY=... python3 tools/gen_voice.py [--only vo/mom] [--force]
     ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --wave 1        # the ids of one wave of tests/voice_ids.json
+    ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --only vo/mom/n5_g,vo/dad/f_c --force     # a few takes again
     python3 tools/gen_voice.py --room [--only vo/mom]     # no new speech: the existing files through the room filter again
 
 Writes assets/audio/<id>.mp3 (24 kHz, 48 kbit/s mono MP3, padding trimmed, long pauses shortened, put in a small room,
@@ -54,7 +55,7 @@ SCENES = [
     ['dad/barn_d', 'dad/barn_e', 'dad/barn_f', 'dad/barn_g', 'dad/barn_h', 'you/barn_b', 'dad/barn_i'],
     # the nights: Dad woken (three), Mom woken (five), the couch (seven), the bottom bunk (eight), the barn (nine)
     ['mom/n3_a', 'dad/n3_a', 'dad/n3_b', 'dad/n3_c', 'you/n3_a', 'dad/n3_d', 'dad/n3_e', 'dad/n3_f'],
-    ['mom/n5_a', 'mom/n5_b', 'mom/n5_c', 'mom/n5_d', 'mom/n5_e'], ['mom/n5_g', 'mom/n5_h'],
+    ['mom/n5_a', 'mom/n5_b', 'mom/n5_c', 'mom/n5_d', 'mom/n5_e'],   # her two search calls are read alone: with each other as context she says "Bud" twice
     ['dad/lure_a', 'you/n7_a', 'dad/n7_b', 'dad/n7_c', 'dad/n7_d'],
     ['mom/n8_a', 'mom/n8_b', 'mom/n8_c', 'mom/n8_d'],
     ['you/n9_a', 'dad/n9_a', 'dad/n9_b', 'dad/n9_c', 'dad/n9_d', 'dad/n9_e'],
@@ -65,7 +66,7 @@ SCENES = [
     ['mom/v_a', 'dad/v_a', 'mom/v_b'], ['mom/m_wet', 'you/m_wet', 'mom/m_needles', 'dad/m_back', 'you/m_back'],
     ['mom/m_phone', 'dad/m_phone'], ['mom/m_up', 'dad/m_asleep'], ['dad/m_horn', 'mom/m_horn'],
     # the endings: believed, taken
-    ['dad/f_b', 'dad/f_c', 'you/f_b', 'dad/f_d', 'mom/f_b', 'you/f_c', 'mom/f_c', 'dad/f_e'],
+    ['dad/f_d', 'mom/f_b', 'you/f_c', 'mom/f_c', 'dad/f_e'],   # dad/f_c is read alone: given the line before or the kid's "Yes." after, Dad reads that too
     ['mom/f_d', 'dad/f_g', 'mom/f_e', 'mom/f_f'],
     # the breakfast radio, read as one bulletin
     ['news/r1', 'news/r2', 'news/r3'],
@@ -199,8 +200,8 @@ def make(id_):
         os.replace(tmp, path)
     if id_ in BEND:
         bend(path, BEND[id_])
-    if double and DOUBLE['semitones']:
-        bend(path, 'rubberband=pitch=%.5f:formant=preserved:pitchq=quality' % (2 ** (DOUBLE['semitones'] / 12)))
+    if double and DOUBLE['semitones']:   # pitched down after the room, then matched to the others again (the shift takes a few LU off)
+        bend(path, 'rubberband=pitch=%.5f:formant=preserved:pitchq=quality,loudnorm=I=-16:TP=-1.5:LRA=11' % (2 ** (DOUBLE['semitones'] / 12)))
     # what this take was made from, for tools/voice_lint.js (a line whose text changed since is re-recorded)
     return id_, {'sha1': hashlib.sha1(line.encode()).hexdigest(), 'model': EL_MODEL, 'voice': voice[0], 'speed': voice[1],
                  'semitones': DOUBLE['semitones'] if double else 0, 'made': datetime.date.today().isoformat()}
@@ -237,7 +238,8 @@ def write_manifest():
 
 
 def main():
-    only = sys.argv[sys.argv.index('--only') + 1] if '--only' in sys.argv else ''
+    # --only takes one id prefix or a comma-separated list of them (vo/mom, vo/dad/n3_, vo/mom/n5_g,vo/dad/f_c ...)
+    only = tuple(sys.argv[sys.argv.index('--only') + 1].split(',')) if '--only' in sys.argv else ()
     if '--room' in sys.argv:
         # no new speech: run the existing files through the room again (after a change to ROOM)
         files = [f for f in (os.path.join(d, n) for d, _, ns in os.walk(OUT) for n in ns if n.endswith('.mp3'))
