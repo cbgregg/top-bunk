@@ -838,8 +838,10 @@ export class Sound {
     if (!this.pick('kettle', { ...o, gain: 0.7 * gain, wet: 0.15, jitter: 0.02, ramp: 2 })) this.noiseHit({ dur: rise + hold + 2, type: 'lowpass', f: 900, f2: 1400, q: 0.6, gain: 0.25 * gain, attack: 3, wet: 0.15 });
     const out = this.bus(0.22 * gain, 0, 0.25, rise + hold + 3, 'sfx', at ? { at, ref: 1.2, roll: 1 } : null);
     const env = ctx.createGain(); env.gain.setValueAtTime(0.0001, t0); env.gain.exponentialRampToValueAtTime(1, t0 + rise); env.gain.setValueAtTime(1, end); env.gain.exponentialRampToValueAtTime(0.0001, end + 0.6);
-    const flutter = ctx.createOscillator(), fg = ctx.createGain(); flutter.frequency.value = 5.5 + Math.random(); fg.gain.value = 0.12; flutter.connect(fg).connect(env.gain); flutter.start(t0); flutter.stop(end + 1);
-    env.connect(out);
+    // the lid's flutter multiplies what the envelope lets through (on the envelope itself it would leak the whistle before it has risen)
+    const trem = ctx.createGain(), flutter = ctx.createOscillator(), fg = ctx.createGain(); trem.gain.value = 1; flutter.frequency.value = 5.5 + Math.random(); fg.gain.value = 0.12;
+    flutter.connect(fg).connect(trem.gain); flutter.start(t0); flutter.stop(end + 1);
+    env.connect(trem).connect(out);
     for (const [mul, g] of [[1, 1], [2.02, 0.28], [3.01, 0.07]]) {   // the note, its octave a shade sharp, a trace of the twelfth
       const osc = ctx.createOscillator(), og = ctx.createGain(); osc.type = 'sine'; og.gain.value = g;
       osc.frequency.setValueAtTime(f0 * mul * 0.93, t0); osc.frequency.exponentialRampToValueAtTime(f0 * mul, t0 + rise); osc.frequency.linearRampToValueAtTime(f0 * mul * 1.012, end);
