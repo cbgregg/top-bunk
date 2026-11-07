@@ -319,7 +319,9 @@ async function browserHalf() {
   const DAY = [
     ['until', ["g.F.stage === 'day' && g.F.phase === 'day'", 10]],
     ['step', 45],                                                // the chores: Dad's first box off the truck and unpacked, Mom at the kitchen box
-    ['do', 'g.F.boxes = 3'],                                     // your three boxes in: Dad finishes the one he has, Mom is wanted
+    ['do', 'g.F.boxes = 2'],                                     // two of your boxes in, and you out of your room: the fourth box is put there
+    ['step', 2],
+    ['do', 'g.F.boxes = 3'],                                     // the third: Dad finishes the one he has, Mom is wanted, and "there are four"
     ['step', 3],
     ['do', 'g.F.talkedMom = true'],
     ['until', ['g.F.giftTaken === false', 200]],                 // Dad home, the talk, the camera held out
@@ -333,12 +335,12 @@ async function browserHalf() {
   const MORNING = [
     ['until', ["g.F.stage === 'b1' && g.F.breakfastWait", 20]],
     ['step', 6],
-    ['do', "g.P.mode = 'walk'; g.P.pos.set(2.75, 0, 2.08); g.P.yaw = Math.PI / 2; g.P.pitch = 0; g.sitInChair()"],
+    ['do', "g.P.mode = 'walk'; g.P.pos.set(2.75, 0, 2.08); g.P.yaw = Math.PI / 2; g.P.pitch = 0; g.cam(); g.sitInChair()"],   // (the eye put where you stand: the frozen loop leaves it where the title had it)
     ['until', ["g.P.mode === 'seat' && g.seat && !g.seat.tween", 5]],
     ['step', 9],
     ['do', 'g.standUp()'],                                       // up in the middle of it: they wait, Mom asks you to sit
     ['step', 6],
-    ['do', 'g.sitInChair()'],
+    ['do', 'g.cam(); g.sitInChair()'],
     ['until', ["g.F.stage !== 'b1'", 120]],
   ];
   const runs = {};
@@ -373,7 +375,7 @@ async function browserHalf() {
       }
     }
     const last = b.trace[b.trace.length - 1], marks = b.trace.filter((s) => s.mark).length;
-    ok(name === 'day' ? last.flags[6] === true && last.camera : last.stage === 'n2', `the ${name} did not reach its end: ${JSON.stringify(last).slice(0, 300)}`);
+    ok(name === 'day' ? last.flags[6] === true && last.camera && b.trace.some((s) => s.box4) : last.stage === 'n2', `the ${name} did not reach its end: ${JSON.stringify(last).slice(0, 300)}`);
     return `${n} samples over ${last.t.toFixed(1)} game seconds, ${marks} steps of the plan`;
   });
 }
