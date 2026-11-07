@@ -51,8 +51,8 @@
  },
  "dad/leftovers": {
   "voice": "dad",
-  "say": "People before us left in a hurry. Back room's still full of their stuff.",
-  "html": "<b>Dad:</b> People before us left in a hurry. Back room's still full of their stuff."
+  "say": "People before us left in a hurry. Front room's still full of their stuff.",
+  "html": "<b>Dad:</b> People before us left in a hurry. Front room's still full of their stuff."
  },
  "mom/teeth": {
   "voice": "mom",
@@ -103,8 +103,8 @@
  },
  "dad/m2_a": {
   "voice": "dad",
-  "say": "[low, angry] That's enough. I am not doing this every morning. You want attention, you ask for it. You don't make up monsters.",
-  "html": "<b>Dad:</b> That's enough. I am not doing this every morning. You want attention, you ask for it. You don't make up monsters."
+  "say": "[low, angry] That's enough. I'm not doing this every morning.",
+  "html": "<b>Dad:</b> That's enough. I'm not doing this every morning."
  },
  "mom/m2_b": {
   "voice": "mom",
@@ -138,8 +138,8 @@
  },
  "mom/mimic_b": {
   "voice": "mom",
-  "say": "[soft, patient] Honey, I need you in the kitchen. Right now. Please.",
-  "html": "<b>Mom:</b> Honey, I need you in the kitchen. Right now. Please."
+  "say": "[soft, patient] I need you in the kitchen, honey. Right now.",
+  "html": "<b>Mom:</b> I need you in the kitchen, honey. Right now."
  },
  "mom/mimic_c": {
   "voice": "mom",
@@ -173,8 +173,8 @@
  },
  "mom/m3_a": {
   "voice": "mom",
-  "say": "Sweetheart... three nights, three different things. I'm not mad. I just need you to hear how that sounds.",
-  "html": "<b>Mom:</b> Sweetheart. Three nights, three different things. I'm not mad. I just need you to hear how that sounds."
+  "say": "[tired] Three nights, bud. Three different things.",
+  "html": "<b>Mom:</b> Three nights, bud. Three different things."
  },
  "dad/m3_a": {
   "voice": "dad",
@@ -223,18 +223,18 @@
  },
  "mom/m6_a": {
   "voice": "mom",
-  "say": "I'm calling the landlord today. I don't care what it costs. Something's wrong with this house, and I'm done pretending it isn't.",
-  "html": "<b>Mom:</b> I'm calling the landlord today. I don't care what it costs. Something's wrong with this house, and I'm done pretending it isn't."
+  "say": "He called back.",
+  "html": "<b>Mom:</b> He called back."
  },
  "dad/m6_a": {
   "voice": "dad",
-  "say": "[bitter] And say what? That the ghost is raising the rent? We signed a year lease. We put every dime into this move.",
-  "html": "<b>Dad:</b> And say what? That the ghost is raising the rent? We signed a year lease. We put every dime into this move."
+  "say": "[flat] And.",
+  "html": "<b>Dad:</b> And."
  },
  "mom/m6_b": {
   "voice": "mom",
-  "say": "Then we find the money somewhere else. We always do.",
-  "html": "<b>Mom:</b> Then we find the money somewhere else. We always do."
+  "say": "He said we can go. He'll send the deposit.",
+  "html": "<b>Mom:</b> He said we can go. He'll send the deposit."
  },
  "dad/m7_a": {
   "voice": "dad",
@@ -258,18 +258,18 @@
  },
  "mom/m8_a": {
   "voice": "mom",
-  "say": "I'm sleeping in your room tonight. Don't argue with me, mister.",
-  "html": "<b>Mom:</b> I'm sleeping in your room tonight. Don't argue with me, mister."
+  "say": "I checked on him.",
+  "html": "<b>Mom:</b> I checked on him."
  },
  "dad/m8_a": {
   "voice": "dad",
-  "say": "[ashamed] I put a chair against our door last night. Like that would do anything.",
-  "html": "<b>Dad:</b> I put a chair against our door last night. Like that would do anything."
+  "say": "[flat] You were up.",
+  "html": "<b>Dad:</b> You were up."
  },
  "mom/m8_b": {
   "voice": "mom",
-  "say": "Two more nights. That's it. Then we're gone, lease or no lease.",
-  "html": "<b>Mom:</b> Two more nights. That's it. Then we're gone, lease or no lease."
+  "say": "[quiet] ...I didn't see anything.",
+  "html": "<b>Mom:</b> ...I didn't see anything."
  },
  "mom/m9_a": {
   "voice": "mom",
@@ -280,11 +280,6 @@
   "voice": "dad",
   "say": "[quiet] I called my brother. He'll put us up. I should have listened to you on day one, buddy.",
   "html": "<b>Dad:</b> I called my brother. He'll put us up. I should have listened to you on day one, buddy."
- },
- "you/m9_a": {
-  "voice": null,
-  "say": "Just one more night.",
-  "html": "<b>You:</b> Just one more night."
  },
  "mom/m9_b": {
   "voice": "mom",
@@ -351,16 +346,6 @@
   "say": "MOM! DAD! HELP!",
   "html": "<b>You:</b> MOM! DAD! HELP!"
  },
- "dad/f_a": {
-  "voice": "dad",
-  "say": "[panic, shouting] What the -- JESUS CHRIST.",
-  "html": "<b>Dad:</b> What the -- Jesus Christ."
- },
- "mom/f_a": {
-  "voice": "mom",
-  "say": "[screaming, raw terror] I SEE IT. OH MY GOD, I SEE IT.",
-  "html": "<b>Mom:</b> I SEE IT. OH MY GOD, I SEE IT."
- },
  "mom/car_a": {
   "voice": "mom",
   "say": "[bright, a little too cheerful] Seatbelt, sweetie. We're almost there.",
@@ -413,8 +398,8 @@
  },
  "gramps/v_b": {
   "voice": "gramps",
-  "say": "[low, wet, not quite his voice] Look at me, Bud. Look at me. Don't you know who I am?",
-  "html": "<b>Grandpa:</b> Look at me, Bud. Look at me. Don't you know who I am?"
+  "say": "[low, wet, not quite his voice] Look at me, bud. Don't you know me.",
+  "html": "<b>Grandpa:</b> Look at me, bud. Don't you know me."
  },
  "dad/talk_a": {
   "voice": "dad",
@@ -458,8 +443,8 @@
  },
  "mom/ph_low_b": {
   "voice": "mom",
-  "say": "Where did you even get film for that thing? Not at the table.",
-  "html": "<b>Mom:</b> Where did you even get film for that thing? Not at the table."
+  "say": "Not at the table.",
+  "html": "<b>Mom:</b> Not at the table."
  },
  "dad/ph_low_a": {
   "voice": "dad",
@@ -468,8 +453,8 @@
  },
  "dad/ph_low_b": {
   "voice": "dad",
-  "say": "You were up taking pictures at three in the morning? Well, there's your problem.",
-  "html": "<b>Dad:</b> You were up taking pictures at three in the morning? Well, there's your problem."
+  "say": "[flat] Three in the morning you're taking pictures. ...Okay.",
+  "html": "<b>Dad:</b> Three in the morning you're taking pictures. ...Okay."
  },
  "mom/ph_mid_a": {
   "voice": "mom",
@@ -606,8 +591,8 @@
  },
  "dad/box4": {
   "voice": "dad",
-  "say": "[flat, quiet] ...That's not one of ours. I'll put it out by the road.",
-  "html": "<b>Dad:</b> ...That's not one of ours. I'll put it out by the road."
+  "say": "[flat] Which one.",
+  "html": "<b>Dad:</b> Which one."
  },
  "mom/n1_call_a": {
   "voice": "mom",
@@ -651,8 +636,8 @@
  },
  "cartoon/c_hold": {
   "voice": "announcer",
-  "say": "Then hold your breath! Press that button and keep it down. Or give it one little tap, and you'll keep right on holding!",
-  "html": "Then hold your breath! Press that button and keep it down. Or give it one little tap, and you'll keep right on holding!"
+  "say": "Then hold your breath! And don't you let it out till he's good and gone!",
+  "html": "Then hold your breath! And don't you let it out till he's good and gone!"
  },
  "cartoon/c_quiet": {
   "voice": "announcer",
@@ -661,8 +646,8 @@
  },
  "cartoon/c_meter": {
   "voice": "announcer",
-  "say": "Keep an eye on your breath meter! When she runs low, Mister Buttons gets mighty blue in the face!",
-  "html": "Keep an eye on your breath meter! When she runs low, Mister Buttons gets mighty blue in the face!"
+  "say": "And when your chest gets tight, kids, that means he's close!",
+  "html": "And when your chest gets tight, kids, that means he's close!"
  },
  "cartoon/c_try": {
   "voice": "announcer",
@@ -733,5 +718,785 @@
   "voice": "buttons",
   "say": "[screaming in terror] AAAAAAAAAHHHHHHH!",
   "html": "<i>Mister Buttons:</i> AAAAAAAAAHHH!"
+ },
+ "dad/boxes_a": {
+  "voice": "dad",
+  "say": "[flat] I'll get them.",
+  "html": "<b>Dad:</b> I'll get them."
+ },
+ "mom/gift_c": {
+  "voice": "mom",
+  "say": "It's on your dresser.",
+  "html": "<b>Mom:</b> It's on your dresser."
+ },
+ "you/box4_b": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> It's not ours."
+ },
+ "dad/box4_b": {
+  "voice": "dad",
+  "say": "[flat] ...Leave it. I'll put it out with the trash.",
+  "html": "<b>Dad:</b> ...Leave it. I'll put it out with the trash."
+ },
+ "mom/box4_a": {
+  "voice": "mom",
+  "say": "[quiet] Mark.",
+  "html": "<b>Mom:</b> Mark."
+ },
+ "dad/box4_c": {
+  "voice": "dad",
+  "say": "[flat] It's a box.",
+  "html": "<b>Dad:</b> It's a box."
+ },
+ "dad/torch_a": {
+  "voice": "dad",
+  "say": "That was your grandpa's. Don't drop it. ...It's heavier than it looks.",
+  "html": "<b>Dad:</b> That was your grandpa's. Don't drop it. ...It's heavier than it looks."
+ },
+ "mom/fence_a": {
+  "voice": "mom",
+  "say": "[calling] Bud. This side of the fence.",
+  "html": "<b>Mom:</b> <i>(from the window)</i> Bud. This side of the fence."
+ },
+ "you/fence_a": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Why."
+ },
+ "mom/fence_b": {
+  "voice": "mom",
+  "say": "There's a ditch back there you can't see the bottom of. ...And I can't see you.",
+  "html": "<b>Mom:</b> There's a ditch back there you can't see the bottom of. ...And I can't see you."
+ },
+ "dad/barn_a": {
+  "voice": "dad",
+  "say": "Landlord said the barn's not ours.",
+  "html": "<b>Dad:</b> Landlord said the barn's not ours."
+ },
+ "you/barn_a": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> What's in it."
+ },
+ "dad/barn_b": {
+  "voice": "dad",
+  "say": "Their stuff.",
+  "html": "<b>Dad:</b> Their stuff."
+ },
+ "dad/barn_c": {
+  "voice": "dad",
+  "say": "...So it's not ours.",
+  "html": "<b>Dad:</b> ...So it's not ours."
+ },
+ "dad/barn_d": {
+  "voice": "dad",
+  "say": "Huh.",
+  "html": "<b>Dad:</b> Huh."
+ },
+ "dad/barn_e": {
+  "voice": "dad",
+  "say": "[quiet] They had a little one.",
+  "html": "<b>Dad:</b> They had a little one."
+ },
+ "dad/barn_f": {
+  "voice": "dad",
+  "say": "[quiet] ...Leave that.",
+  "html": "<b>Dad:</b> ...Leave that."
+ },
+ "dad/barn_g": {
+  "voice": "dad",
+  "say": "Get the sawhorses.",
+  "html": "<b>Dad:</b> Get the sawhorses."
+ },
+ "dad/barn_h": {
+  "voice": "dad",
+  "say": "We don't come down here. Okay?",
+  "html": "<b>Dad:</b> We don't come down here. Okay?"
+ },
+ "you/barn_b": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Okay."
+ },
+ "dad/barn_i": {
+  "voice": "dad",
+  "say": "Okay.",
+  "html": "<b>Dad:</b> Okay."
+ },
+ "dad/barn_j": {
+  "voice": "dad",
+  "say": "[flat] Don't go in there again.",
+  "html": "<b>Dad:</b> Don't go in there again."
+ },
+ "dad/gate_a": {
+  "voice": "dad",
+  "say": "That's not ours. Leave it.",
+  "html": "<b>Dad:</b> That's not ours. Leave it."
+ },
+ "dad/gate_b": {
+  "voice": "dad",
+  "say": "[flat] Stays shut.",
+  "html": "<b>Dad:</b> Stays shut."
+ },
+ "dad/road_a": {
+  "voice": "dad",
+  "say": "[calling] Hey. Not the road.",
+  "html": "<b>Dad:</b> <i>(from the truck)</i> Hey. Not the road."
+ },
+ "mom/road_a": {
+  "voice": "mom",
+  "say": "[calling] Bud. Where I can see you.",
+  "html": "<b>Mom:</b> <i>(from the kitchen window)</i> Bud. Where I can see you."
+ },
+ "dad/road_b": {
+  "voice": "dad",
+  "say": "[flat] I'm not gonna say it twice.",
+  "html": "<b>Dad:</b> I'm not gonna say it twice."
+ },
+ "dad/road_c": {
+  "voice": "dad",
+  "say": "[flat] Inside.",
+  "html": "<b>Dad:</b> Inside."
+ },
+ "mom/sheet_a": {
+  "voice": "mom",
+  "say": "[calling] Leave that. It isn't ours.",
+  "html": "<b>Mom:</b> <i>(from the hall)</i> Leave that. It isn't ours."
+ },
+ "mom/m_gramps": {
+  "voice": "mom",
+  "say": "[quiet] He'd have hated this house.",
+  "html": "<b>Mom:</b> He'd have hated this house."
+ },
+ "dad/night_a": {
+  "voice": "dad",
+  "say": "You good?",
+  "html": "<b>Dad:</b> You good?"
+ },
+ "you/night_a": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Yeah."
+ },
+ "dad/night_b": {
+  "voice": "dad",
+  "say": "Your mother wants the hall light on. So it's on.",
+  "html": "<b>Dad:</b> Your mother wants the hall light on. So it's on."
+ },
+ "dad/night_c": {
+  "voice": "dad",
+  "say": "[quiet] Night, bud.",
+  "html": "<b>Dad:</b> Night, bud."
+ },
+ "dad/night_d": {
+  "voice": "dad",
+  "say": "[quiet] ...It's a good room.",
+  "html": "<b>Dad:</b> <i>(through the gap)</i> ...It's a good room."
+ },
+ "mom/table_a": {
+  "voice": "mom",
+  "say": "[quiet] ...I didn't do that.",
+  "html": "<b>Mom:</b> ...I didn't do that."
+ },
+ "dad/bird_a": {
+  "voice": "dad",
+  "say": "Hit the glass. They do that.",
+  "html": "<b>Dad:</b> Hit the glass. They do that."
+ },
+ "dad/talk_d": {
+  "voice": "dad",
+  "say": "Go help your mother.",
+  "html": "<b>Dad:</b> Go help your mother."
+ },
+ "mom/bed_call": {
+  "voice": "mom",
+  "say": "[calling] Bud. In. Now.",
+  "html": "<b>Mom:</b> Bud. In. Now."
+ },
+ "mom/bed7_a": {
+  "voice": "mom",
+  "say": "I'm on the bottom bunk tonight.",
+  "html": "<b>Mom:</b> I'm on the bottom bunk tonight."
+ },
+ "mom/door_a": {
+  "voice": "mom",
+  "say": "[whispering, worried] Mark. Somebody's at the door.",
+  "html": "<b>Mom:</b> <i>(through the wall)</i> Mark. Somebody's at the door."
+ },
+ "dad/door_a": {
+  "voice": "dad",
+  "say": "[half asleep] Nobody's at the door.",
+  "html": "<b>Dad:</b> <i>(through the wall)</i> Nobody's at the door."
+ },
+ "dad/m_fence": {
+  "voice": "dad",
+  "say": "[flat] You don't go past the fence. I'm not asking.",
+  "html": "<b>Dad:</b> You don't go past the fence. I'm not asking."
+ },
+ "mom/n5_g": {
+  "voice": "mom",
+  "say": "[flat, worried] Bud? Where are you.",
+  "html": "<b>Mom:</b> Bud? Where are you."
+ },
+ "mom/n5_h": {
+  "voice": "mom",
+  "say": "[flat, worried] Bud. Answer me.",
+  "html": "<b>Mom:</b> Bud. Answer me."
+ },
+ "dad/n3_b": {
+  "voice": "dad",
+  "say": "[low] Bud.",
+  "html": "<b>Dad:</b> Bud."
+ },
+ "dad/n3_c": {
+  "voice": "dad",
+  "say": "[low] What is this.",
+  "html": "<b>Dad:</b> What is this."
+ },
+ "you/n3_a": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> I didn't\u2014"
+ },
+ "dad/n3_d": {
+  "voice": "dad",
+  "say": "[low] Every chair. ...Put them back.",
+  "html": "<b>Dad:</b> Every chair. ...Put them back."
+ },
+ "dad/n3_e": {
+  "voice": "dad",
+  "say": "[low] Go to bed. Don't wake your mother.",
+  "html": "<b>Dad:</b> Go to bed. Don't wake your mother."
+ },
+ "dad/n3_f": {
+  "voice": "dad",
+  "say": "[quiet, to himself] ...Why that one.",
+  "html": "<b>Dad:</b> ...Why that one."
+ },
+ "mom/n5_a": {
+  "voice": "mom",
+  "say": "[sleepy] Bud?",
+  "html": "<b>Mom:</b> <i>(through their door)</i> Bud?"
+ },
+ "mom/n5_b": {
+  "voice": "mom",
+  "say": "[quiet] Why are you standing there.",
+  "html": "<b>Mom:</b> Why are you standing there."
+ },
+ "mom/n5_c": {
+  "voice": "mom",
+  "say": "[quiet] ...Come here. ...Slowly.",
+  "html": "<b>Mom:</b> ...Come here. ...Slowly."
+ },
+ "mom/n5_d": {
+  "voice": "mom",
+  "say": "[quiet, after a long look] Who turned the hall light off.",
+  "html": "<b>Mom:</b> Who turned the hall light off."
+ },
+ "mom/n5_e": {
+  "voice": "mom",
+  "say": "[quiet] Get in our bed. Don't tell your father.",
+  "html": "<b>Mom:</b> Get in our bed. Don't tell your father."
+ },
+ "mom/n5_f": {
+  "voice": "mom",
+  "say": "[flat] Bud.",
+  "html": "<b>Mom:</b> <i>(from your room)</i> Bud."
+ },
+ "dad/n7_b": {
+  "voice": "dad",
+  "say": "[tired, not turning round] I've got it. I'm up. Go to bed.",
+  "html": "<b>Dad:</b> I've got it. I'm up. Go to bed."
+ },
+ "dad/n7_c": {
+  "voice": "dad",
+  "say": "[quiet] ...Bulb.",
+  "html": "<b>Dad:</b> ...Bulb."
+ },
+ "dad/n7_d": {
+  "voice": "dad",
+  "say": "[tired] Go to bed.",
+  "html": "<b>Dad:</b> Go to bed."
+ },
+ "dad/n7_e": {
+  "voice": "dad",
+  "say": "[calling] You okay, bud?",
+  "html": "<b>Dad:</b> <i>(from the living room)</i> You okay, bud?"
+ },
+ "mom/n8_a": {
+  "voice": "mom",
+  "say": "[barely a whisper] Bud. Don't move.",
+  "html": "<b>Mom:</b> Bud. Don't move."
+ },
+ "mom/n8_b": {
+  "voice": "mom",
+  "say": "[barely a whisper] Don't look down.",
+  "html": "<b>Mom:</b> Don't look down."
+ },
+ "mom/n8_c": {
+  "voice": "mom",
+  "say": "[whispering, shaking] It's okay. It's gone.",
+  "html": "<b>Mom:</b> It's okay. It's gone."
+ },
+ "mom/n8_d": {
+  "voice": "mom",
+  "say": "[whispering] Close your eyes. I'm here. Close them.",
+  "html": "<b>Mom:</b> Close your eyes. I'm here. Close them."
+ },
+ "you/n9_a": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Dad."
+ },
+ "dad/n9_a": {
+  "voice": "dad",
+  "say": "[quiet, not turning] Somebody's out here, bud.",
+  "html": "<b>Dad:</b> Somebody's out here, bud."
+ },
+ "dad/n9_b": {
+  "voice": "dad",
+  "say": "[quiet] In the barn. Somebody's measuring something.",
+  "html": "<b>Dad:</b> In the barn. Somebody's measuring something."
+ },
+ "dad/n9_c": {
+  "voice": "dad",
+  "say": "[quiet] ...Go in. Lock it behind you.",
+  "html": "<b>Dad:</b> ...Go in. Lock it behind you."
+ },
+ "dad/n9_d": {
+  "voice": "dad",
+  "say": "[urgent, sharp] Get inside. Get inside.",
+  "html": "<b>Dad:</b> Get inside. Get inside."
+ },
+ "dad/n9_e": {
+  "voice": "dad",
+  "say": "[quiet] I don't know what that was. We're leaving. Say nothing to your mother.",
+  "html": "<b>Dad:</b> <i>(at your door)</i> I don't know what that was. We're leaving. Say nothing to your mother."
+ },
+ "dad/n9_f": {
+  "voice": "dad",
+  "say": "[calling] Bud. Stay on the road.",
+  "html": "<b>Dad:</b> <i>(from the track)</i> Bud. Stay on the road."
+ },
+ "dad/n_bed": {
+  "voice": "dad",
+  "say": "[flat, without turning] Go to bed.",
+  "html": "<b>Dad:</b> Go to bed."
+ },
+ "dad/n_funny": {
+  "voice": "dad",
+  "say": "[low] You think this is funny.",
+  "html": "<b>Dad:</b> You think this is funny."
+ },
+ "dad/n_who": {
+  "voice": "dad",
+  "say": "[low] Who is this.",
+  "html": "<b>Dad:</b> Who is this."
+ },
+ "dad/n_tap": {
+  "voice": "dad",
+  "say": "[tired] Who left the water running.",
+  "html": "<b>Dad:</b> Who left the water running."
+ },
+ "mom/under_a": {
+  "voice": "mom",
+  "say": "[sleepy, gentle] Bud? You awake?",
+  "html": "<b>Mom:</b> <i>(from the bottom bunk)</i> Bud? You awake?"
+ },
+ "dad/sleep_a": {
+  "voice": "dad",
+  "say": "[asleep, mumbling] ...Ben. Get down from there.",
+  "html": "<b>Dad:</b> <i>(asleep)</i> ...Ben. Get down from there."
+ },
+ "mom/m1_c": {
+  "voice": "mom",
+  "say": "[low] Did you take the picture out of my wallet.",
+  "html": "<b>Mom:</b> Did you take the picture out of my wallet."
+ },
+ "dad/m1_b": {
+  "voice": "dad",
+  "say": "[flat] What picture.",
+  "html": "<b>Dad:</b> What picture."
+ },
+ "dad/m1_c": {
+  "voice": "dad",
+  "say": "Eat, bud.",
+  "html": "<b>Dad:</b> Eat, bud."
+ },
+ "you/m2_b": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> It's not a dream. It's a monster."
+ },
+ "mom/m2_c": {
+  "voice": "mom",
+  "say": "[quiet] Who slept in the bottom bunk.",
+  "html": "<b>Mom:</b> Who slept in the bottom bunk."
+ },
+ "dad/m3_b": {
+  "voice": "dad",
+  "say": "[flat] He was in the kitchen at three. Every chair pulled out.",
+  "html": "<b>Dad:</b> He was in the kitchen at three. Every chair pulled out."
+ },
+ "mom/m3_b": {
+  "voice": "mom",
+  "say": "He said he didn't\u2014",
+  "html": "<b>Mom:</b> He said he didn't\u2014"
+ },
+ "dad/m3_c": {
+  "voice": "dad",
+  "say": "[flat] I know what he said.",
+  "html": "<b>Dad:</b> I know what he said."
+ },
+ "mom/m3_c": {
+  "voice": "mom",
+  "say": "[quiet] ...There are scratches inside his closet door. Down low.",
+  "html": "<b>Mom:</b> ...There are scratches inside his closet door. Down low."
+ },
+ "dad/m3_d": {
+  "voice": "dad",
+  "say": "[flat] Then he did that too.",
+  "html": "<b>Dad:</b> Then he did that too."
+ },
+ "dad/m6_b": {
+  "voice": "dad",
+  "say": "...He didn't ask why?",
+  "html": "<b>Dad:</b> ...He didn't ask why?"
+ },
+ "mom/m6_c": {
+  "voice": "mom",
+  "say": "He didn't ask anything.",
+  "html": "<b>Mom:</b> He didn't ask anything."
+ },
+ "dad/m6_c": {
+  "voice": "dad",
+  "say": "[flat] We can't move twice in a month. Every dime's in this.",
+  "html": "<b>Dad:</b> We can't move twice in a month. Every dime's in this."
+ },
+ "mom/m6_d": {
+  "voice": "mom",
+  "say": "[quiet] Then you tell him.",
+  "html": "<b>Mom:</b> Then you tell him."
+ },
+ "dad/m8_b": {
+  "voice": "dad",
+  "say": "[flat] At four. With the light off.",
+  "html": "<b>Dad:</b> At four. With the light off."
+ },
+ "dad/m8_c": {
+  "voice": "dad",
+  "say": "[flat] I didn't say you did.",
+  "html": "<b>Dad:</b> I didn't say you did."
+ },
+ "mom/m8_c": {
+  "voice": "mom",
+  "say": "Eat, bud.",
+  "html": "<b>Mom:</b> Eat, bud."
+ },
+ "dad/m9_b": {
+  "voice": "dad",
+  "say": "[flat] Your uncle's coming at eight. One more night. We're all in one room.",
+  "html": "<b>Dad:</b> Your uncle's coming at eight. One more night. We're all in one room."
+ },
+ "mom/v_a": {
+  "voice": "mom",
+  "say": "[quiet] You were talking to somebody in the hall. You called him Grandpa.",
+  "html": "<b>Mom:</b> You were talking to somebody in the hall. You called him Grandpa."
+ },
+ "dad/v_a": {
+  "voice": "dad",
+  "say": "[flat] He's tired.",
+  "html": "<b>Dad:</b> He's tired."
+ },
+ "mom/v_b": {
+  "voice": "mom",
+  "say": "[quiet] He said the light was better.",
+  "html": "<b>Mom:</b> He said the light was better."
+ },
+ "mom/m_wet": {
+  "voice": "mom",
+  "say": "Your shoes were soaked.",
+  "html": "<b>Mom:</b> Your shoes were soaked."
+ },
+ "you/m_wet": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> I didn't go out."
+ },
+ "mom/m_needles": {
+  "voice": "mom",
+  "say": "There's needles in your bed.",
+  "html": "<b>Mom:</b> There's needles in your bed."
+ },
+ "dad/m_back": {
+  "voice": "dad",
+  "say": "[flat] Back door was open at four. You do that?",
+  "html": "<b>Dad:</b> Back door was open at four. You do that?"
+ },
+ "you/m_back": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> No."
+ },
+ "mom/m_road": {
+  "voice": "mom",
+  "say": "You were on the road yesterday.",
+  "html": "<b>Mom:</b> You were on the road yesterday."
+ },
+ "dad/f_b": {
+  "voice": "dad",
+  "say": "[flat, steady] I see it. ...I see you.",
+  "html": "<b>Dad:</b> I see it. ...I see you."
+ },
+ "dad/f_c": {
+  "voice": "dad",
+  "say": "[flat, not looking away] Bud. Is the hall light on.",
+  "html": "<b>Dad:</b> Bud. Is the hall light on."
+ },
+ "you/f_b": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Yes."
+ },
+ "dad/f_d": {
+  "voice": "dad",
+  "say": "[flat] Then it stays there. Keep looking at it. Both of us.",
+  "html": "<b>Dad:</b> Then it stays there. Keep looking at it. Both of us."
+ },
+ "mom/f_b": {
+  "voice": "mom",
+  "say": "[quiet] What time is it.",
+  "html": "<b>Mom:</b> <i>(under you)</i> What time is it."
+ },
+ "you/f_c": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Five forty."
+ },
+ "mom/f_c": {
+  "voice": "mom",
+  "say": "[quiet] Okay. Okay.",
+  "html": "<b>Mom:</b> Okay. Okay."
+ },
+ "dad/f_e": {
+  "voice": "dad",
+  "say": "[flat] Shoes. Nothing else.",
+  "html": "<b>Dad:</b> Shoes. Nothing else."
+ },
+ "dad/f_h": {
+  "voice": "dad",
+  "say": "[low, sharp] Bud. Up. Now.",
+  "html": "<b>Dad:</b> Bud. Up. Now."
+ },
+ "you/f_mom": {
+  "voice": null,
+  "say": "",
+  "html": "<b>You:</b> Mom?"
+ },
+ "mom/m_door": {
+  "voice": "mom",
+  "say": "The back bedroom door was open this morning. I keep that shut.",
+  "html": "<b>Mom:</b> The back bedroom door was open this morning. I keep that shut."
+ },
+ "mom/m_bear": {
+  "voice": "mom",
+  "say": "[quiet] Your bear was on our bed. Between us.",
+  "html": "<b>Mom:</b> Your bear was on our bed. Between us."
+ },
+ "dad/m_pictures": {
+  "voice": "dad",
+  "say": "[flat] Who turned the pictures round.",
+  "html": "<b>Dad:</b> Who turned the pictures round."
+ },
+ "mom/m_drawing": {
+  "voice": "mom",
+  "say": "Did you draw on that picture in the hall.",
+  "html": "<b>Mom:</b> Did you draw on that picture in the hall."
+ },
+ "mom/m_stand": {
+  "voice": "mom",
+  "say": "Did you stand outside our door last night.",
+  "html": "<b>Mom:</b> Did you stand outside our door last night."
+ },
+ "dad/m_chair2": {
+  "voice": "dad",
+  "say": "[flat] Your chair was out in the middle of the floor.",
+  "html": "<b>Dad:</b> Your chair was out in the middle of the floor."
+ },
+ "mom/m_ourdoor": {
+  "voice": "mom",
+  "say": "Our door was open at four. Did you open our door.",
+  "html": "<b>Mom:</b> Our door was open at four. Did you open our door."
+ },
+ "mom/m_boxes": {
+  "voice": "mom",
+  "say": "You stacked your boxes in the night?",
+  "html": "<b>Mom:</b> You stacked your boxes in the night?"
+ },
+ "dad/m_chair": {
+  "voice": "dad",
+  "say": "[flat] There was a chair in the hall. Outside his room. Facing it.",
+  "html": "<b>Dad:</b> There was a chair in the hall. Outside his room. Facing it."
+ },
+ "mom/m_bunk": {
+  "voice": "mom",
+  "say": "[quiet] The bottom bunk was slept in.",
+  "html": "<b>Mom:</b> The bottom bunk was slept in."
+ },
+ "dad/m_halllight": {
+  "voice": "dad",
+  "say": "[flat] You had the hall light on all night.",
+  "html": "<b>Dad:</b> You had the hall light on all night."
+ },
+ "mom/m_inbed": {
+  "voice": "mom",
+  "say": "You were in bed when I checked. Then the kitchen light was on.",
+  "html": "<b>Mom:</b> You were in bed when I checked. Then the kitchen light was on."
+ },
+ "dad/m_porch": {
+  "voice": "dad",
+  "say": "[flat] Porch light was on this morning. I didn't leave it on.",
+  "html": "<b>Dad:</b> Porch light was on this morning. I didn't leave it on."
+ },
+ "mom/m_called": {
+  "voice": "mom",
+  "say": "You called me in the night. I came in. You were asleep.",
+  "html": "<b>Mom:</b> You called me in the night. I came in. You were asleep."
+ },
+ "mom/m_phone": {
+  "voice": "mom",
+  "say": "Who were you on the phone to at three.",
+  "html": "<b>Mom:</b> Who were you on the phone to at three."
+ },
+ "dad/m_phone": {
+  "voice": "dad",
+  "say": "[flat] Nobody. The phone's not even plugged in.",
+  "html": "<b>Dad:</b> Nobody. The phone's not even plugged in."
+ },
+ "mom/m_up": {
+  "voice": "mom",
+  "say": "I was up with you half the night.",
+  "html": "<b>Mom:</b> I was up with you half the night."
+ },
+ "dad/m_asleep": {
+  "voice": "dad",
+  "say": "[flat] You were asleep.",
+  "html": "<b>Dad:</b> You were asleep."
+ },
+ "mom/m_glasses": {
+  "voice": "mom",
+  "say": "[quiet] The glasses were all in a row on the edge. Right on the edge.",
+  "html": "<b>Mom:</b> The glasses were all in a row on the edge. Right on the edge."
+ },
+ "dad/m_closet": {
+  "voice": "dad",
+  "say": "[flat] Who wrote on the closet.",
+  "html": "<b>Dad:</b> Who wrote on the closet."
+ },
+ "mom/m_paper": {
+  "voice": "mom",
+  "say": "[quiet] Where did this come from.",
+  "html": "<b>Mom:</b> Where did this come from."
+ },
+ "mom/m_doors": {
+  "voice": "mom",
+  "say": "Every door in this house was shut this morning. Every one.",
+  "html": "<b>Mom:</b> Every door in this house was shut this morning. Every one."
+ },
+ "dad/m_backwide": {
+  "voice": "dad",
+  "say": "[flat] Back door was wide open at three. You were standing right there.",
+  "html": "<b>Dad:</b> Back door was wide open at three. You were standing right there."
+ },
+ "dad/m_tv": {
+  "voice": "dad",
+  "say": "[flat] TV was on. Volume all the way up.",
+  "html": "<b>Dad:</b> TV was on. Volume all the way up."
+ },
+ "mom/m_radio": {
+  "voice": "mom",
+  "say": "Who left the radio on.",
+  "html": "<b>Mom:</b> Who left the radio on."
+ },
+ "dad/m_bedframe": {
+  "voice": "dad",
+  "say": "[flat] That bed frame. You jumping on it?",
+  "html": "<b>Dad:</b> That bed frame. You jumping on it?"
+ },
+ "dad/m_horn": {
+  "voice": "dad",
+  "say": "[flat] Somebody was out front at three. Leaned on the horn.",
+  "html": "<b>Dad:</b> Somebody was out front at three. Leaned on the horn."
+ },
+ "mom/m_horn": {
+  "voice": "mom",
+  "say": "I didn't hear it.",
+  "html": "<b>Mom:</b> I didn't hear it."
+ },
+ "mom/m_fell": {
+  "voice": "mom",
+  "say": "Something fell in the hall at two. Did you hear it.",
+  "html": "<b>Mom:</b> Something fell in the hall at two. Did you hear it."
+ },
+ "dad/m_water": {
+  "voice": "dad",
+  "say": "[flat] Water was running at three. Back door open. You in the kitchen.",
+  "html": "<b>Dad:</b> Water was running at three. Back door open. You in the kitchen."
+ },
+ "mom/m_frame": {
+  "voice": "mom",
+  "say": "The picture in the hall fell down. Glass everywhere.",
+  "html": "<b>Mom:</b> The picture in the hall fell down. Glass everywhere."
+ },
+ "mom/m_closet3": {
+  "voice": "mom",
+  "say": "[quiet] He was in the closet at three.",
+  "html": "<b>Mom:</b> He was in the closet at three."
+ },
+ "mom/m_hallchairs": {
+  "voice": "mom",
+  "say": "[quiet] There were two chairs outside his door this morning.",
+  "html": "<b>Mom:</b> There were two chairs outside his door this morning."
+ },
+ "mom/f_d": {
+  "voice": "mom",
+  "say": "[quiet, frightened] Mark, don't\u2014",
+  "html": "<b>Mom:</b> Mark, don't\u2014"
+ },
+ "dad/f_g": {
+  "voice": "dad",
+  "say": "[calling, firm] It's a man. It's just a\u2014",
+  "html": "<b>Dad:</b> <i>(from the hall)</i> It's a man. It's just a\u2014"
+ },
+ "mom/f_e": {
+  "voice": "mom",
+  "say": "[flat, after a long time] Get in the car. Your dad's coming.",
+  "html": "<b>Mom:</b> Get in the car. Your dad's coming."
+ },
+ "mom/f_f": {
+  "voice": "mom",
+  "say": "[flat] ...We'll go to your brother's.",
+  "html": "<b>Mom:</b> <i>(to the empty seat)</i> ...We'll go to your brother's."
+ },
+ "news/r1": {
+  "voice": "news",
+  "say": "...clear and cold through Thursday, with a chance of snow by the weekend. In farm prices, corn is down a quarter at the elevator, beans unchanged...",
+  "html": "<i>(the radio)</i> ...clear and cold through Thursday, with a chance of snow by the weekend..."
+ },
+ "news/r2": {
+  "voice": "news",
+  "say": "...the animal was found a quarter mile in off Larch Road, and the county asks residents to keep dogs on a lead. Snow by the weekend. In farm prices...",
+  "html": "<i>(the radio)</i> ...the animal was found a quarter mile in off Larch Road..."
+ },
+ "news/r3": {
+  "voice": "news",
+  "say": "...and the county says it will not be grading Larch Road before the thaw. Residents out that way are asked to be patient. Now the markets...",
+  "html": "<i>(the radio)</i> ...the county says it will not be grading Larch Road before the thaw..."
+ },
+ "news/n9": {
+  "voice": "news",
+  "say": "...eleven years this week since the Hollis boy, and the county has closed the file. The family could not be reached. The house on Larch Road is let again. Clear overnight, frost by morning.",
+  "html": "<i>(the radio)</i> ...eleven years this week since the Hollis boy, and the county has closed the file..."
  }
 }

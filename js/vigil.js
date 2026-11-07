@@ -46,7 +46,7 @@ const DREAM = [
   '<i>Your bunk is on the ceiling now. It has always been on the ceiling.</i>',
   "<i>Dad says don't look behind you. Something is smiling from every door.</i>",
   '<i>Mom is singing in the kitchen. The song is going backwards.</i>',
-  '<i>You are not falling. The floor is coming up to meet you, very politely.</i>',
+  '<i>You are not falling. The floor is coming up.</i>',
   '<i>Grandpa is at the end of the hall. He has your eyes now. He is smiling with all of them.</i>',
   '<i>Wake up. Wake up. Wake up.</i>',
 ];

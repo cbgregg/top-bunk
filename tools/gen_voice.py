@@ -2,20 +2,25 @@
 """Generate TOP BUNK's voice lines (Mom and Dad, the late news, Grandpa and the bedtime cartoon's announcer and Mister Buttons' barks) with ElevenLabs.
 
     ELEVENLABS_API_KEY=... python3 tools/gen_voice.py [--only vo/mom] [--force]
+    ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --wave 1        # the ids of one wave of tests/voice_ids.json
     python3 tools/gen_voice.py --room [--only vo/mom]     # no new speech: the existing files through the room filter again
 
 Writes assets/audio/<id>.mp3 (24 kHz, 48 kbit/s mono MP3, padding trimmed, long pauses shortened, put in a small room,
 loudness matched) and assets/audio/manifest.json, which lists every file that exists and is what the game loads. Lines that
-already have a file are skipped unless --force. The key is read from the environment only: never put it in this file.
+already have a file are skipped unless --force or the line's text has changed since its take (assets/audio/vo/takes.json
+remembers the text each recording was made from; tools/voice_lint.js reads it). The key is read from the environment only:
+never put it in this file.
 
 Acting tags in front of a line ([whispering], [panicked]...) set the delivery and are never spoken; use them sparingly, the
 voices are set to a steady delivery and the words carry the rest. Lines in SCENES are read with their neighbours as context.
+The doubles (the thing wearing a parent's or Grandpa's voice, DOUBLE below) are read slower and pitched down after the room.
 """
-import json, os, re, subprocess, sys, time, urllib.error, urllib.request
+import datetime, hashlib, json, os, re, subprocess, sys, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 OUT = os.path.join(ROOT, 'assets', 'audio')
+TAKES = os.path.join(OUT, 'vo', 'takes.json')
 EL_MODEL = os.environ.get('EL_MODEL', 'eleven_v4')
 
 # (voice id, speed). ElevenLabs library voices: Andrea (kind, calm) for Mom, Jerry B (off-the-cuff, unpolished) for Dad
@@ -36,10 +41,34 @@ SCENES = [
     ['dad/welcome', 'dad/line_1', 'dad/line_2', 'dad/line_3', 'mom/boxes_first', 'mom/boxes_again', 'dad/mom_looking',
      'mom/helper', 'you/box4', 'dad/box4', 'mom/gift_a', 'you/gift', 'dad/gift', 'mom/gift_b', 'mom/landlord', 'dad/cheap', 'dad/leftovers', 'mom/teeth'],
     ['mom/n1_call_a', 'mom/n1_call_b'], ['mom/n1_door_a', 'mom/n1_door_b'],
-    ['you/m1_a', 'mom/m1_a', 'you/m1_b', 'dad/m1_a', 'mom/m1_b'],
-    ['you/m2_a', 'mom/m2_a', 'dad/m2_a', 'mom/m2_b'], ['you/m3_a', 'mom/m3_a', 'dad/m3_a'], ['mom/m4_a', 'dad/m4_a', 'you/m4_a', 'mom/m4_b'],
-    ['dad/m5_a', 'mom/m5_a', 'dad/m5_b', 'mom/m5_b'], ['mom/m6_a', 'dad/m6_a', 'mom/m6_b'], ['dad/m7_a', 'you/m7_a', 'mom/m7_a', 'dad/m7_b'],
-    ['mom/m8_a', 'dad/m8_a', 'mom/m8_b'], ['mom/m9_a', 'dad/m9_a', 'you/m9_a', 'mom/m9_b'],
+    ['you/m1_a', 'mom/m1_a', 'you/m1_b', 'dad/m1_a', 'mom/m1_b'], ['mom/m1_c', 'dad/m1_b', 'dad/m1_c'],
+    ['you/m2_a', 'mom/m2_a', 'you/m2_b', 'dad/m2_a', 'mom/m2_b'], ['you/m3_a', 'mom/m3_a', 'dad/m3_a'], ['mom/m4_a', 'dad/m4_a', 'you/m4_a', 'mom/m4_b'],
+    ['dad/m5_a', 'mom/m5_a', 'dad/m5_b', 'mom/m5_b'], ['dad/m7_a', 'you/m7_a', 'mom/m7_a', 'dad/m7_b'],
+    ['mom/m9_a', 'dad/m9_a', 'dad/m9_b', 'mom/m9_b'],
+    # moving day: the fourth box, the flashlight, the fence, the barn rule, bedtime
+    ['you/box4', 'dad/box4', 'you/box4_b', 'dad/box4_b', 'mom/box4_a', 'dad/box4_c'],
+    ['mom/fence_a', 'you/fence_a', 'mom/fence_b'], ['dad/barn_a', 'you/barn_a', 'dad/barn_b', 'dad/barn_c'],
+    ['dad/night_a', 'you/night_a', 'dad/night_b', 'dad/night_c', 'dad/night_d'],
+    ['dad/road_a', 'dad/road_b', 'dad/road_c'], ['dad/gate_a', 'dad/gate_b'], ['mom/door_a', 'dad/door_a'],
+    # the barn with Dad, day four
+    ['dad/barn_d', 'dad/barn_e', 'dad/barn_f', 'dad/barn_g', 'dad/barn_h', 'you/barn_b', 'dad/barn_i'],
+    # the nights: Dad woken (three), Mom woken (five), the couch (seven), the bottom bunk (eight), the barn (nine)
+    ['mom/n3_a', 'dad/n3_a', 'dad/n3_b', 'dad/n3_c', 'you/n3_a', 'dad/n3_d', 'dad/n3_e', 'dad/n3_f'],
+    ['mom/n5_a', 'mom/n5_b', 'mom/n5_c', 'mom/n5_d', 'mom/n5_e'], ['mom/n5_g', 'mom/n5_h'],
+    ['dad/lure_a', 'you/n7_a', 'dad/n7_b', 'dad/n7_c', 'dad/n7_d'],
+    ['mom/n8_a', 'mom/n8_b', 'mom/n8_c', 'mom/n8_d'],
+    ['you/n9_a', 'dad/n9_a', 'dad/n9_b', 'dad/n9_c', 'dad/n9_d', 'dad/n9_e'],
+    # the mornings that are a conversation: three, six (the landlord), eight, the vigil's, the forest's
+    ['dad/m3_b', 'mom/m3_b', 'dad/m3_c', 'mom/m3_c', 'dad/m3_d'],
+    ['mom/m6_a', 'dad/m6_a', 'mom/m6_b', 'dad/m6_b', 'mom/m6_c', 'dad/m6_c', 'mom/m6_d'],
+    ['dad/m8_a', 'mom/m8_a', 'dad/m8_b', 'mom/m8_b', 'dad/m8_c', 'mom/m8_c'],
+    ['mom/v_a', 'dad/v_a', 'mom/v_b'], ['mom/m_wet', 'you/m_wet', 'mom/m_needles', 'dad/m_back', 'you/m_back'],
+    ['mom/m_phone', 'dad/m_phone'], ['mom/m_up', 'dad/m_asleep'], ['dad/m_horn', 'mom/m_horn'],
+    # the endings: believed, taken
+    ['dad/f_b', 'dad/f_c', 'you/f_b', 'dad/f_d', 'mom/f_b', 'you/f_c', 'mom/f_c', 'dad/f_e'],
+    ['mom/f_d', 'dad/f_g', 'mom/f_e', 'mom/f_f'],
+    # the breakfast radio, read as one bulletin
+    ['news/r1', 'news/r2', 'news/r3'],
     # the photos on the breakfast table: brushed off, then uneasy, then scared
     ['mom/ph_low_a', 'dad/ph_low_a', 'mom/ph_low_b', 'dad/ph_low_b'], ['mom/ph_mid_a', 'dad/ph_mid_a', 'mom/ph_mid_b', 'dad/ph_mid_b'],
     ['mom/ph_high_a', 'dad/ph_high_a', 'mom/ph_high_b', 'dad/ph_high_b'],
@@ -52,6 +81,12 @@ SCENES = [
 ]
 # Grandpa: a slower, older voice. Set GRAMPS_VOICE to an ElevenLabs voice id (defaults to Chris, slowed down).
 GRAMPS = (os.environ.get('GRAMPS_VOICE', DAD[0]), 0.85)
+# The doubles: the thing speaking with Mom's voice from the bottom bunk, Mom's call to the kitchen, Grandpa in the vigil chair. The
+# tell is that they speak too slowly: read at DOUBLE['rate'] instead of the voice's own speed, then pitched DOUBLE['semitones'] down
+# after the room (ffmpeg's rubberband, formant kept, so it is the same voice a little lower and not a pitch-shift effect). The
+# fallback if the pitch shift reads as an effect is rate 0.9 and no shift: DOUBLE_FALLBACK=1.
+DOUBLE_IDS = {'vo/mom/mimic_b', 'vo/mom/under_a', 'vo/gramps/v_b'}
+DOUBLE = {'rate': 0.9, 'semitones': 0} if os.environ.get('DOUBLE_FALLBACK') else {'rate': 0.85, 'semitones': -2}
 
 # The lines live in assets/audio/lines.json, which the game reads too (subtitles and voice stay in sync): {id: {voice, say, html}}.
 # id -> (voice, line). Lines without a voice (what the kid says, shown as subtitles only) are skipped.
@@ -138,8 +173,17 @@ def finish(path, trim=True, fx=None):
         os.remove(tmp)
 
 
+def bend(path, af):
+    tmp = path + '.bend.mp3'
+    subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', path, '-af', af, '-ar', '24000', '-ac', '1', '-b:a', '48k', tmp], check=True)
+    os.replace(tmp, path)
+
+
 def make(id_):
     voice, line = LINES[id_]
+    double = id_ in DOUBLE_IDS
+    if double:
+        voice = (voice[0], DOUBLE['rate'])
     path = os.path.join(OUT, id_ + '.mp3')
     os.makedirs(os.path.dirname(path), exist_ok=True)
     prev, nxt = context(id_[3:])
@@ -154,10 +198,33 @@ def make(id_):
         subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', path, '-filter_complex', TEAR[id_], '-ar', '24000', '-ac', '1', '-b:a', '48k', tmp], check=True)
         os.replace(tmp, path)
     if id_ in BEND:
-        tmp = path + '.bend.mp3'
-        subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', path, '-af', BEND[id_], '-ar', '24000', '-ac', '1', '-b:a', '48k', tmp], check=True)
-        os.replace(tmp, path)
-    return id_
+        bend(path, BEND[id_])
+    if double and DOUBLE['semitones']:
+        bend(path, 'rubberband=pitch=%.5f:formant=preserved:pitchq=quality' % (2 ** (DOUBLE['semitones'] / 12)))
+    # what this take was made from, for tools/voice_lint.js (a line whose text changed since is re-recorded)
+    return id_, {'sha1': hashlib.sha1(line.encode()).hexdigest(), 'model': EL_MODEL, 'voice': voice[0], 'speed': voice[1],
+                 'semitones': DOUBLE['semitones'] if double else 0, 'made': datetime.date.today().isoformat()}
+
+
+def read_takes():
+    try:
+        return json.load(open(TAKES))
+    except (OSError, ValueError):
+        return {}
+
+
+def stale(id_):
+    # a line whose text changed since its take, or one recorded before takes were kept, is made again
+    t = read_takes().get(id_[3:])
+    return not t or t.get('sha1') != hashlib.sha1(LINES[id_][1].encode()).hexdigest()
+
+
+def wave_ids(n):
+    spec = json.load(open(os.path.join(ROOT, 'tests', 'voice_ids.json')))
+    ids = [w['ids'] for w in spec['waves'] if w['wave'] == n]
+    if not ids:
+        sys.exit(f'no wave {n} in tests/voice_ids.json')
+    return ['vo/' + i for i in ids[0]]
 
 
 def write_manifest():
@@ -182,11 +249,23 @@ def main():
     if not os.environ.get('ELEVENLABS_API_KEY'):
         sys.exit('set ELEVENLABS_API_KEY')
     force = '--force' in sys.argv
-    jobs = [id_ for id_ in LINES if (not only or id_.startswith(only))
-            and (force or not os.path.exists(os.path.join(OUT, id_ + '.mp3')))]
+    wave = int(sys.argv[sys.argv.index('--wave') + 1]) if '--wave' in sys.argv else 0
+    pool_ids = wave_ids(wave) if wave else list(LINES)
+    missing = [i for i in pool_ids if i not in LINES]
+    if missing:
+        sys.exit('not in lines.json with a voice: ' + ', '.join(missing))
+    # a wave's ids are made when the file is missing or its text changed since the take (so a replaced line is re-recorded)
+    jobs = [id_ for id_ in pool_ids if (not only or id_.startswith(only))
+            and (force or not os.path.exists(os.path.join(OUT, id_ + '.mp3')) or (wave and stale(id_)))]
+    takes = read_takes()
     with ThreadPoolExecutor(4) as pool:
-        for n, id_ in enumerate(pool.map(make, jobs), 1):
+        for n, (id_, take) in enumerate(pool.map(make, jobs), 1):
+            takes[id_[3:]] = take
             print(f'[{n}/{len(jobs)}] {id_}', flush=True)
+    if jobs:
+        with open(TAKES, 'w') as f:
+            json.dump(dict(sorted(takes.items())), f, indent=1)
+            f.write('\n')
     print(f'{len(jobs)} made, {write_manifest()} in the manifest')
 
 
