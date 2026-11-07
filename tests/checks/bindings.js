@@ -7,7 +7,7 @@ module.exports = {
   name: 'bindings',
   timeout: 600e3,
   async run(browser, H) {
-    const { alone, nightPage, stand, tap, until, ok, sleep, clean } = H;
+    const { alone, nightPage, stand, tap, until, ok, sleep, clean, playFor } = H;
     const notes = [];
     await alone(browser, async (c) => {
       const { page, w } = await nightPage(c, '#night2', { pad: true });
@@ -66,7 +66,8 @@ module.exports = {
       const p1 = await G(() => [window.__game.P.pos.x, window.__game.P.pos.z]);
       const dpadMoved = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
       ok(dpadMoved < 0.02, `the d-pad moved the player ${dpadMoved.toFixed(3)} m`);
-      await G(() => { window.__pad.axes[1] = -1; }); await sleep(700); await G(() => { window.__pad.axes[1] = 0; }); await sleep(200);
+      // held for game seconds, not wall seconds: the walk and the turn are per frame, and a busy machine draws fewer frames a second
+      await G(() => { window.__pad.axes[1] = -1; }); await playFor(page, 0.7); await G(() => { window.__pad.axes[1] = 0; }); await sleep(200);
       const p2 = await G(() => [window.__game.P.pos.x, window.__game.P.pos.z]);
       const stickMoved = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
       ok(stickMoved > 0.3, `the left stick moved the player only ${stickMoved.toFixed(2)} m`);
@@ -74,7 +75,7 @@ module.exports = {
       // ---- the look acceleration: the same stick push turns the view further with it on
       const turn = async (accel) => {
         await G((a) => { const g = window.__game; g.settings.set('padLookAccel', a); g.P.yaw = 0; g.P.pitch = 0; g.P.vel.set(0, 0, 0); }, accel);
-        await G(() => { window.__pad.axes[2] = 0.9; }); await sleep(1000); await G(() => { window.__pad.axes[2] = 0; }); await sleep(120);
+        await G(() => { window.__pad.axes[2] = 0.9; }); await playFor(page, 1.0); await G(() => { window.__pad.axes[2] = 0; }); await sleep(120);
         return Math.abs(await G(() => window.__game.P.yaw));
       };
       const t0 = await turn(0), t1 = await turn(1);
