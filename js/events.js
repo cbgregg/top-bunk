@@ -205,7 +205,8 @@ function reveal(a, how) {
   if (def.tier === 'presence' || def.tier === 'loud') gaze.markBusy();
   payoffs[def.id] = (payoffs[def.id] || 0) + 1;
   try { def.payoff(D, a.h, how); } catch (e) { console.warn('event payoff failed', def.id, e); }
-  log.push({ id: def.id, tier: def.tier, seen: true, how, p: a.at ? { x: Math.round(a.at.x * 100) / 100, z: Math.round(a.at.z * 100) / 100 } : undefined, noise: def.noise || 0, witness: after.witness || 0, blamed: after.blamed || 0, journal: after.journal, morning: after.morning, ...extra(a) });
+  // the row is written now and brought up to date when the beat ends (a beat's own extras, logExtra, can still be counting)
+  a.row = log.push({ id: def.id, tier: def.tier, seen: true, how, p: a.at ? { x: Math.round(a.at.x * 100) / 100, z: Math.round(a.at.z * 100) / 100 } : undefined, noise: def.noise || 0, witness: after.witness || 0, blamed: after.blamed || 0, journal: after.journal, morning: after.morning, ...extra(a) });
   if (after.proof && D && D.fired) { try { D.fired(def.id); } catch (e) { /* no proof tonight */ } }
   if (def.noise && G.hooks && G.hooks.parents && typeof G.hooks.parents.noise === 'function') { try { G.hooks.parents.noise(def.noise, a.at); } catch (e) { /* the parents are not written yet */ } }
   if (G.RUN && G.RUN.story) { if (after.witness) G.RUN.story.witness = (G.RUN.story.witness || 0) + after.witness; if (after.blamed) G.RUN.story.blamed = (G.RUN.story.blamed || 0) + after.blamed; }
@@ -223,6 +224,7 @@ function release(a) {
 function finishActive(a, how, { undo = true } = {}) {
   if (a.done) return; a.done = true;
   if (!a.revealedAt) log.push({ id: a.def.id, tier: a.def.tier, seen: false, how: how || 'unseen', ...extra(a) });
+  else if (a.row) Object.assign(a.row, extra(a));
   if (undo && !(a.def.after && a.def.after.keep)) undoOnce(a);
   release(a); NIGHT.lastEnd = T; gaze.markEnd();
   if (a.def.end) { try { a.def.end(D, a.h, !!a.revealedAt); } catch (e) { console.warn('event end failed', a.def.id, e); } }

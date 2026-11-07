@@ -3,13 +3,16 @@
 // The night engine's own tests (js/events.js, js/gaze.js, js/log.js and the beats on the table), headless in Chromium:
 //   lint      every registered event has every field, its reveal is never a clock, a loud one declares its noise, its morning id is a
 //             real line, and events.get / events.defs answer for it
-//   headless  for each event: arm refused with its anchor on screen; armed out of view with no payoff; the payoff only after its reveal,
-//             every sound in it placed; undo() puts the house back (doors, chairs, the bear, the lights, the drawing, the thing, the TV,
-//             the quilt); a catch mid-beat leaves no mesh in the house that was not there before
-//   pace      six minutes of night three at __clockMul 1 with a scripted walk (hall -> bath -> bunk, facing each door): a presence-tier
-//             arm, a reveal, never two loud reveals back to back, no reveal of a beat armed while the house was not settled; the same
-//             six minutes still in the bunk: an arm from the bunk's own chain and no payoff the player did not make
-//   crumple   the crawl catches by contact only: out of its sight for two seconds it gives up; in front of it, it has you
+//   headless  for each event (night four for the beats of nights two to nine, night one for its own): arm refused with its anchor on
+//             screen; armed out of view with no payoff; the payoff only after its reveal (the player's own turn where they stand, a step
+//             in for a beat that wants you nearer, by hand failing both), every sound in it placed; undo() puts the house back (doors,
+//             chairs, the bear, the lights, the drawing, the thing, the TV, the quilt); a catch mid-beat leaves no mesh in the house that
+//             was not there before. A beat that declines to arm from every spot is reported, not failed: its own arm said no
+//   pace      six minutes of night three (seed F3PC-0005) at __clockMul 1 with a scripted walk (hall -> bath -> bunk, facing each door):
+//             a presence-tier arm, a reveal, never two loud reveals back to back, no reveal of a beat armed while the house was not
+//             settled; the same six minutes still in the bunk: an arm from the bunk's own chain and no payoff the player did not make
+//   crumple   the crawl catches by contact only (crawlCatch: the slam, the fade, the crawled nightmare): out of its sight it never
+//             catches and gives up after two seconds; in front of it, it has you
 //   node tests/events.js [--port N] [--only lint,headless,pace,crumple]
 const http = require('http');
 const fs = require('fs');

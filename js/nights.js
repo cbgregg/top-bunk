@@ -860,7 +860,7 @@ export function createNights(env) {
       reveal: { by: 'look', at: 'bunk', when: (D, h) => h.ready && ((F.leanK || 0) > 0.75 || (P.mode === 'walk' && gaze.inView({ x: BED.x, z: BED.z, y: 0 }))) },
       payoff: (D, h) => { h.seen = true; N1.dentSeen = true; env.FN.dent.relax(7); F.fear = Math.max(F.fear, 0.85); later(2.4, () => sfx.creak(0.1, D.pan(BED.x, BED.z, 0.6))); h.done = true; },
       while: () => room() === 'bed',
-      max: () => 5 + 30 * K(),
+      max: () => Math.max(20, 5 + 30 * K()),   // never shorter than the breath below needs to match four of yours and be held through
       undo: (h) => { h.alive = false; F.script = false; N1.dentOn = false; if (!h.seen) { if (h.ready) env.FN.dent.relax(14); else env.FN.dent.set(0); } },
       end: () => { N1.dentOn = false; n1.done(); },
       after: { keep: false, log: true, journal: 'dent' },

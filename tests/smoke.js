@@ -809,7 +809,7 @@ let BASE = '';
             if (how === 'wander' && !(await page.evaluate(() => window.__game.F.script))) { const p = tour[i++ % tour.length]; await stand(page, ...p); }
             if (how === 'kitchen') await stand(page, ...kitchen);
             // in the bunk, when the breath below starts: the covers up (a short hold), four of its breaths in time with yours, then hold yours
-            if (how === 'bunk' && !breathed && st.log.includes('breathUnder')) { breathed = true; await hold(page, 'Space', 450); await sleep(5600); await hold(page, 'Space', 3500); }
+            if (how === 'bunk' && !breathed && st.log.includes('breathUnder')) { breathed = true; await hold(page, 'Space', 450); await sleep(9000); await hold(page, 'Space', 3500); }
             await sleep(how === 'wander' ? 9000 : 3000);
           }
           const out = await page.evaluate(() => ({ log: window.__n1log, rooms: window.__n1rooms, ledger: ((window.__game.RUN.nights || {})[1] || {}).log || [], fx: window.__game.F.flashFx === null }));
@@ -828,7 +828,7 @@ let BASE = '';
           // the breath under the bunk: in time with yours while the weight is there, and it keeps its own rhythm when you hold
           if (how === 'bunk') {
             const b = out.ledger.find((e) => e.id === 'breathUnder');
-            ok(b && b.seen && b.held && b.cycles >= 4, `${how}: the breath under the bunk: ${JSON.stringify(b || out.ledger.map((e) => e.id))}`);
+            ok(b && b.seen && b.held && b.matched >= 4 && b.cycles > b.matched, `${how}: the breath under the bunk: ${JSON.stringify(b || out.ledger.map((e) => e.id))}`);
           }
           console.log(`  [${how}] ` + out.log.map((e) => `${e.id}@${e.room}${e.gap !== undefined ? ` +${e.gap}s` : ''}${e.cycles !== undefined ? ` cycles ${e.cycles}/${e.matched} held ${e.held}` : ''}`).join(' | '));
           return out.log.map((e) => e.id).join('>');
