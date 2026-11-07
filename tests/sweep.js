@@ -89,8 +89,9 @@ function sweepLib() {
     // the player, standing: on the floor at (x, z), facing (tx, tz)
     const stand = (x, z, tx, tz) => { P.pos.set(x, W.groundAt(x, z, P.pos.y), z); P.vel.set(0, 0, 0); P.mode = 'walk'; P.pod = null; g.F.cutscene = false; g.F.dead = false; P.pitch = 0; if (tx !== undefined) P.yaw = Math.atan2(-(tx - x), -(tz - z)); };
     const clearKeys = () => { for (const k in g.keys) g.keys[k] = false; };
-    // one frame of the player's movement, the doors and the camera (what update() does for them, with the loop frozen)
-    const frame = (dt = DT) => { if (P.mode === 'walk') g.movePlayer(dt); W.tick(dt); E.update(dt); g.updateCamera(dt); };
+    // one frame of the player's movement, the doors and the camera (what update() does for them, with the loop frozen). The keys
+    // reach movePlayer through input.poll (the move and sprint actions), which loop() runs before update(), so the frame polls first
+    const frame = (dt = DT) => { g.input.poll(); if (P.mode === 'walk') g.movePlayer(dt); W.tick(dt); E.update(dt); g.updateCamera(dt); };
     // the eye against the triangles and the boundaries; the body against the boundaries
     function checks(step, scene, n, { near = C.NEAR, body = true, tris = houseTris() } = {}) {
       const t = tris.nearest(camera.position.x, camera.position.y, camera.position.z, near);
