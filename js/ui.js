@@ -6,8 +6,12 @@ let subTimer = 0, cardTimer = 0, hintTimer = 0, flashTimer = 0;
 const calm = (v) => { if (typeof document !== 'undefined' && document.body) document.body.classList.toggle('reduce-flashing', !!v); };
 calm(settings.get('reduceFlashing')); settings.on('reduceFlashing', calm);
 
+// the game's flags (bindFlags, at boot): the objective on screen is also a flag the night engine reads, so nothing load-bearing is in the DOM
+let FLAGS = null;
+export function bindFlags(f) { FLAGS = f; }
 export function objective(t) {
   const el = $('objective');
+  if (FLAGS) FLAGS.objective = t || null;
   if (!t) { el.classList.remove('show'); return; }
   el.innerHTML = t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
 }

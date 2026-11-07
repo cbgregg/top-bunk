@@ -187,7 +187,9 @@ const waitFor = (check) => new Promise((res) => waiters.push({ check, res }));
 const wait = (s) => { const t = gameTime + s; return waitFor(() => gameTime >= t); };
 const later = (s, fn) => wait(s).then(fn);
 function tween(dur, fn, e = ease.inOut) { return new Promise((res) => { fn(0); tweens.push({ t0: gameTime, dur, fn, e, res }); }); }
-function killAll() { waiters = []; tweens = []; }
+// drops every pending wait and tween, after the night's cleanup list has put the house back (every armed beat's undo, a held TV, a double
+// on its feet): getting caught and the pause menu's Restart both come through here, so nothing relies on an await resuming
+function killAll() { events.cleanup(); waiters = []; tweens = []; }
 function runTimers() {
   const ws = waiters; waiters = [];
   for (const w of ws) { if (w.check()) w.res(); else waiters.push(w); }
@@ -765,11 +767,12 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
 }
 
 function resetNight() {
-  vigil.stop(); WF.stop(); FN.reset(E);
+  events.cleanup(); vigil.stop(); WF.stop(); FN.reset(E);
   F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false;
   F.splashed = false; F.morningReady = false; P.breath = 1; P.stamina = 1; P.exhausted = false; shake = 0;
   carEnd(); F.live = false; F.script = false; F.blackout = false; F.clockGlitch = 0; F.fear = 0; P.pod = null; P.podYaw = HIDE_YAW; UI.pod(null); UI.clock(null); F.flashOn = false; flash.intensity = 0;
   W.tvFx.set(false); W.phone.setRinging(false); W.mirrorFx.hide(); W.curtainSee(false); W.nightLights.forEach((n) => { n.dead = false; }); if (nights) nights.hunter.reset();
+  F.photoHold = false; F.objective = null;
   UI.blanket(false); UI.breath(1, false); UI.hint(null); UI.objective(null);
   E.visible = false; E.reach = 0; E.lean = 0; E.smileScale = 1; E.tilt = 0; E.mode = 'idle';
   W.bathSpot.intensity = 0; sfx.violins(0, 0.3);
@@ -1753,7 +1756,7 @@ function endScreen(id) {
 // file and is reached through js/hooks.js (hooks.parents, hooks.doors, hooks.forest, hooks.day, hooks.days), and the blocks that were
 // written here are the named functions below, each owned by the part of the game it serves. The camera is resolved after everything
 // that moves has moved, so a push from a body never leaves the eye in a wall; the hands follow it from loop().
-let birdT = 1, ambT = 14;
+let birdT = 1;
 function update(dt) {
   gameTime += dt;
   runTimers();
@@ -1850,16 +1853,9 @@ function flickerTick(dt) {
     nlMult(flicker('nl', Math.random() < 0.15 ? 0 : 0.25, 0.25), false);
   }
 }
-// the house's idle noises on a night, while nothing else is happening
-function ambienceTick(dt) {
-  if (F.phase === 'night' && !F.live && !F.chase && !F.echo && !F.dead && P.mode !== 'hide') {
-    ambT -= dt;
-    if (ambT <= 0) {   // the house does more every night
-      ambT = (12 + Math.random() * 14) / (0.6 + 0.4 * F.night); const r = Math.random(), pan = (Math.random() - 0.5) * 1.6;
-      if (r < 0.4) sfx.creak(0.18, pan); else if (r < 0.6) sfx.knock(pan * 0.6, 0.12); else if (F.night >= 2 && r < 0.8) sfx.ceilingThump(); else if (F.night >= 2) sfx.slamFar(pan); else sfx.creak(0.2, pan);
-    }
-  }
-}
+// the house's idle noises on a night come from the night engine's whisper tier now, each placed where it happens (js/events.js): nothing
+// here is panned to a random stereo position any more
+function ambienceTick(dt) {}
 // family idle: the parents duck under the truck roof, look at you when you are near and turn to face you
 function familyIdleTick(dt) {
   if (mom.group.visible) {
