@@ -36,11 +36,16 @@ function bake(tgt, src, clip, name) {
     return { t, s, A, restS: wq(s), restT: wq(t), restLocal: t.quaternion.clone() };
   });
   const n = Math.max(2, Math.round(clip.duration * FPS)), times = [], vals = rest.map(() => []);
-  const action = mixer.clipAction(clip); action.play();
+  // the hips' path and a probe of the pose (where the body points, which hand is up), measured on the source rig in its own metres
+  const pelvis = S.pelvis, pelvis0 = wp(pelvis), pelvisQ0 = wq(pelvis), hips = [], probe = {}, up = (v) => wp(S.Head).sub(wp(pelvis)).normalize().toArray(), front = () => new THREE.Vector3(0, 0, 1).applyQuaternion(wq(pelvis).multiply(pelvisQ0.clone().invert())).toArray();
+  const action = mixer.clipAction(clip); action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();   // (played once: the last frame is the clip's own end, not a wrap to its start)
   const q = new THREE.Quaternion(), qp = new THREE.Quaternion(), dW = new THREE.Quaternion();
   for (let i = 0; i <= n; i++) {
     const tt = (i / n) * clip.duration; times.push(tt);
     mixer.setTime(tt); src.updateMatrixWorld(true);
+    hips.push(wp(pelvis).sub(pelvis0).toArray());
+    if (i === 0) { const hl = wp(S.hand_l).y - wp(pelvis).y, hr = wp(S.hand_r).y - wp(pelvis).y; Object.assign(probe, { up0: up(), front0: front(), handL0: hl, handR0: hr, raised: hl - hr > 0.1 ? 'L' : hr - hl > 0.1 ? 'R' : 'neither' }); }
+    if (i === n) Object.assign(probe, { up1: up(), front1: front() });
     rest.forEach((r, k) => {
       dW.copy(wq(r.s)).multiply(r.restS.clone().invert());
       q.copy(dW).multiply(r.A).multiply(r.restT);
@@ -53,7 +58,11 @@ function bake(tgt, src, clip, name) {
   }
   action.stop(); mixer.uncacheRoot(src);
   rest.forEach((r) => r.t.quaternion.copy(r.restLocal)); tgt.updateMatrixWorld(true);
-  return { name, duration: clip.duration, fps: FPS, bones: rest.map((r) => r.t.name.replace(/^Bip01_/, '')), frames: n + 1, vals };
+  const travel = Math.max(...hips.map((h) => Math.hypot(...h)));
+  Object.assign(probe, { hips0: hips[0], hips1: hips[n], drop: -Math.min(...hips.map((h) => h[1])) });
+  // the hips go into the file only when they move (sitting down, lying, kneeling): in millimetres, for a body `height` tall
+  return { name, duration: clip.duration, fps: FPS, bones: rest.map((r) => r.t.name.replace(/^Bip01_/, '')), frames: n + 1, vals, probe,
+    hips: travel > 0.02 ? hips.map((h) => h.map((x) => Math.round(x * 1000))) : null, height: src.userData.height };
 }
 (async () => {
   const tgt = (await load('/assets/models/dad.glb')).scene;
@@ -65,6 +74,7 @@ function bake(tgt, src, clip, name) {
       const S = byName(g.scene), T = byName(tgt); g.scene.updateMatrixWorld(true); tgt.updateMatrixWorld(true);
       const fs = wp(S.ball_l).sub(wp(S.foot_l)).setY(0).normalize(), ft = wp(T.Bip01_L_Toe0).sub(wp(T.Bip01_L_Foot)).setY(0).normalize();
       info[file] = { facing: fs.dot(ft) }; if (fs.dot(ft) < 0) { g.scene.rotation.y += Math.PI; g.scene.updateMatrixWorld(true); }
+      const bb = new THREE.Box3().setFromObject(g.scene); g.scene.userData.height = bb.max.y - bb.min.y; info[file].height = g.scene.userData.height;   // (the rig's own height, for scaling its hip path)
     }
     const clip = srcs[file].animations.find((a) => a.name === sc); if (!clip) throw new Error('no clip ' + sc);
     out.push(bake(tgt, srcs[file].scene, clip, name));

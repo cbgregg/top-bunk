@@ -370,6 +370,23 @@ const SCENES = {
   },
 };
 
+// ---------- scenes kept in their own files: tests/contacts/<file>.js ----------
+// Each file exports an object of scene functions with the signature above (async (page) => frames, the page carrying window.__game
+// and window.__contacts); they are merged into SCENES under their own names, in file order, so --only takes them like any other.
+// A name two files (or a file and this one) both use is an error, so no two scenes ever fight over one name.
+const SCENE_FILE = {};
+{
+  const dir = path.join(__dirname, 'contacts');
+  for (const f of (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((n) => /\.js$/.test(n)).sort()) {
+    const mod = require(path.join(dir, f));
+    for (const [name, run] of Object.entries(mod)) {
+      if (typeof run !== 'function') continue;
+      if (SCENES[name]) { console.error(`tests/contacts/${f}: a scene named ${name} already exists in ${SCENE_FILE[name] ? 'tests/contacts/' + SCENE_FILE[name] : 'tests/contacts.js'}`); process.exit(2); }
+      SCENES[name] = run; SCENE_FILE[name] = f;
+    }
+  }
+}
+
 (async () => {
   const { chromium } = require('playwright');
   const server = http.createServer(async (req, res) => {

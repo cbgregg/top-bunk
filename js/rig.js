@@ -44,17 +44,27 @@ export const loadBody = () => (bodyP ||= fetch('assets/models/body.bin').then((r
     const times = Float32Array.from({ length: c.frames }, (_, i) => (i / (c.frames - 1)) * c.duration), tracks = [];
     for (const b of c.bones) { const v = new Float32Array(c.frames * 4); for (let i = 0; i < v.length; i++) v[i] = data[o++] / 32767; normQ(v); tracks.push(new THREE.QuaternionKeyframeTrack('Bip01_' + b + '.quaternion', times, v)); }
     // standing clips keep only the body above the hips' children: the legs are the steady idle stance's (people.js), so a clip's own
-    // stride never moves a foot into the stove or the bed; the seated ones are put where sit() puts them anyway
-    const legs = /(Thigh|Calf|Foot|Toe0)\.quaternion$/;
-    const clip = new THREE.AnimationClip(c.name, c.duration, /^sit_/.test(c.name) ? tracks : tracks.filter((t) => !legs.test(t.name))); clips.push(clip);
-    if (/talk|stand|fold|sit_idle/.test(c.name)) seamless(clip);   // (the loops' ends meet)
+    // stride never moves a foot into the stove or the bed; the seated ones are put where sit() puts them anyway. Sitting down and
+    // getting up (Sitting_*), lying to standing (LayToIdle) and kneeling at a repair (Fixing_Kneeling) keep their legs: the legs are
+    // the movement, and the hips' path comes with them (below). Eating (Consume) is its arms alone, laid over the seated clip.
+    const legs = /(Thigh|Calf|Foot|Toe0)\.quaternion$/, arms = /(Clavicle|UpperArm|Forearm|Hand)\.quaternion$/;
+    const keepLegs = /^(sit_|Sitting_|LayToIdle|Fixing_Kneeling)/.test(c.name), armsOnly = /^Consume$/.test(c.name);
+    const clip = new THREE.AnimationClip(c.name, c.duration, keepLegs ? tracks : tracks.filter((t) => (armsOnly ? arms.test(t.name) : !legs.test(t.name)))); clips.push(clip);
+    // where the hips travel, for the clips that keep their legs: userData.hips is [x, y, z] every 1/fps s from t = 0, in millimetres
+    // from the standing rest for a body `height` metres tall, +z forward. The bake keeps rotations only, so whoever plays such a
+    // clip moves the group by this path (scaled by their height / `height`, turned by their yaw) or the knees fold in the air.
+    // (The file carries a path for a few standing clips too, which lean or crouch; with the idle's legs under them it is not used.)
+    if (c.hips && keepLegs) clip.userData = { hips: c.hips, height: c.height, fps: c.fps };
+    if (/talk|stand|fold|sit_idle|_Loop$/.test(c.name)) seamless(clip);   // (the loops' ends meet)
     if (/^sit_/.test(c.name)) {
-      clip.userData = { additive: true };   // seated: only the movement, laid on an upright body (the clips slouch far back in their chair)
+      clip.userData = { ...clip.userData, additive: true };   // seated: only the movement, laid on an upright body (the clips slouch far back in their chair)
       // ...and the arms on their own, played as they are: a seated person's hands talking over a table (people.js keeps them above it)
       const arms = new THREE.AnimationClip(c.name + '_arms', c.duration, tracks.filter((t) => /(Clavicle|UpperArm|Forearm|Hand)\.quaternion$/.test(t.name)));
       clips.push(arms, mirror(arms, c.name + '_arms_m'));
     }
-    if (/talk|sit_idle|stand|fold/.test(c.name)) clips.push(mirror(clip, c.name + '_m'));
+    // left for right: the talking loops (so a line never repeats the last one's movements) and the one-handed clips. The library holds
+    // the torch in the left hand and the phone in the right, so Dad's torch, in his right, is Idle_Torch_Loop_m
+    if (/talk|sit_idle|stand|fold|^(Consume|Yes|Idle_|Interact|PickUp_Table)/.test(c.name)) { const m = mirror(clip, c.name + '_m'); if (c.hips) m.userData.hips = c.hips.map(([x, y, z]) => [-x, y, z]); clips.push(m); }
   }
   return clips;
 }));
