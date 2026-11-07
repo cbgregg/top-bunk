@@ -28,8 +28,11 @@ doubles below, before anything else. What the numbers say:
 
 - **Flat, not sitcom.** Over the 159 takes the pitch wanders by a median 2.6 semitones (Dad) and 2.8 (Mom), never more than 4.8;
   the takes that were already in the game and read as the model for the register (`dad/m1_a`, `mom/m1_a`, `mom/landlord`) sit at
-  2.6 to 3.9. Pace is a median 3.1 words a second for both parents (the existing takes: 2.9 to 4.2). Loudness is matched at
-  -16 LUFS across the set (the parents' takes land between -19 and -16; the voice tool matches them before the room).
+  2.6 to 3.9. Pace is a median 3.1 words a second for both parents (the existing takes: 2.9 to 4.2). Loudness: the one-pass
+  match in the voice tool undershoots on a short quiet take (a whispered "Don't look down." came out at -26 LUFS with its
+  consonants already at the peak ceiling), so the tool now measures every take after the room and lifts it by the difference
+  with a limiter holding the peaks at -1.5 dBTP (`--level` does the same to existing files); the 159 takes sit between -15.6
+  and -17.5 LUFS, with Dad's one-word "Huh." at -19.
 - **Every line says its words.** The transcript matched the line on 143 of 159 takes at the first pass. The rest were either the
   transcriber (a number read as a clock time, a one-word take it could not place: `Bud.`, `Huh.`, `Bulb.`; those were checked on the
   waveform, one burst each, and `Huh.` is an exhale, which is what the line is) or the voice model, which on a short line sometimes

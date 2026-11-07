@@ -5,6 +5,7 @@
     ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --wave 1        # the ids of one wave of tests/voice_ids.json
     ELEVENLABS_API_KEY=... python3 tools/gen_voice.py --only vo/mom/n5_g,vo/dad/f_c --force     # a few takes again
     python3 tools/gen_voice.py --room [--only vo/mom]     # no new speech: the existing files through the room filter again
+    python3 tools/gen_voice.py --level [--wave 1 | --only vo/mom]   # no new speech: the files measured and matched to -16 LUFS
 
 Writes assets/audio/<id>.mp3 (24 kHz, 48 kbit/s mono MP3, padding trimmed, long pauses shortened, put in a small room,
 loudness matched) and assets/audio/manifest.json, which lists every file that exists and is what the game loads. Lines that
@@ -180,6 +181,22 @@ def bend(path, af):
     os.replace(tmp, path)
 
 
+def level(path, target=-16.0):
+    # the one-pass loudnorm in finish() undershoots on a short, quiet take (a two-second whisper lands at -23 or -26 with its
+    # consonants already at the peak ceiling); measure the take, lift it by the difference and let a limiter hold the peaks at
+    # -1.5 dBTP, so every line sits at about the same level before the mix (a very peaky take still ends a LU or two under)
+    r = subprocess.run(['ffmpeg', '-loglevel', 'info', '-i', path, '-af', 'loudnorm=I=%g:TP=-1.5:LRA=11:print_format=json' % target, '-f', 'null', '-'],
+                       capture_output=True, text=True)
+    m = re.search(r'\{[^{}]*"input_i"[^{}]*\}', r.stderr)
+    if not m:
+        return False
+    gain = target - float(json.loads(m.group(0))['input_i'])
+    if abs(gain) < 1.0:
+        return False
+    bend(path, 'volume=%.2fdB,alimiter=limit=0.8413:attack=3:release=60:level=false' % gain)
+    return True
+
+
 def make(id_):
     voice, line = LINES[id_]
     double = id_ in DOUBLE_IDS
@@ -200,8 +217,9 @@ def make(id_):
         os.replace(tmp, path)
     if id_ in BEND:
         bend(path, BEND[id_])
-    if double and DOUBLE['semitones']:   # pitched down after the room, then matched to the others again (the shift takes a few LU off)
-        bend(path, 'rubberband=pitch=%.5f:formant=preserved:pitchq=quality,loudnorm=I=-16:TP=-1.5:LRA=11' % (2 ** (DOUBLE['semitones'] / 12)))
+    if double and DOUBLE['semitones']:   # pitched down after the room
+        bend(path, 'rubberband=pitch=%.5f:formant=preserved:pitchq=quality' % (2 ** (DOUBLE['semitones'] / 12)))
+    level(path)
     # what this take was made from, for tools/voice_lint.js (a line whose text changed since is re-recorded)
     return id_, {'sha1': hashlib.sha1(line.encode()).hexdigest(), 'model': EL_MODEL, 'voice': voice[0], 'speed': voice[1],
                  'semitones': DOUBLE['semitones'] if double else 0, 'made': datetime.date.today().isoformat()}
@@ -248,14 +266,20 @@ def main():
             finish(f, trim=False, fx=FILM if ('/cartoon/' in f.replace(os.sep, '/') or '/buttons/' in f.replace(os.sep, '/')) else None)
         print(f'{len(files)} files through the room')
         return
-    if not os.environ.get('ELEVENLABS_API_KEY'):
-        sys.exit('set ELEVENLABS_API_KEY')
     force = '--force' in sys.argv
     wave = int(sys.argv[sys.argv.index('--wave') + 1]) if '--wave' in sys.argv else 0
     pool_ids = wave_ids(wave) if wave else list(LINES)
     missing = [i for i in pool_ids if i not in LINES]
     if missing:
         sys.exit('not in lines.json with a voice: ' + ', '.join(missing))
+    if '--level' in sys.argv:
+        # no new speech: the selected files' loudness measured and matched again
+        files = [id_ for id_ in pool_ids if (not only or id_.startswith(only)) and os.path.exists(os.path.join(OUT, id_ + '.mp3'))]
+        lifted = [id_ for id_ in files if level(os.path.join(OUT, id_ + '.mp3'))]
+        print(f'{len(files)} measured, {len(lifted)} matched to -16 LUFS')
+        return
+    if not os.environ.get('ELEVENLABS_API_KEY'):
+        sys.exit('set ELEVENLABS_API_KEY')
     # a wave's ids are made when the file is missing or its text changed since the take (so a replaced line is re-recorded)
     jobs = [id_ for id_ in pool_ids if (not only or id_.startswith(only))
             and (force or not os.path.exists(os.path.join(OUT, id_ + '.mp3')) or (wave and stale(id_)))]
