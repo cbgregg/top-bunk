@@ -574,10 +574,15 @@ let BASE = '';
       ok(t.items[0] === 'Continue · Night 1' && /night 1 of 10.*SMKE-0001/.test(t.info), `title before: ${JSON.stringify(t)}`);
       await page.click('#title-menu [data-entry="continue"]');
       await until(page, () => window.__game.F.stage === 'n1' && window.__game.F.live, null, 240e3);
+      // the hall picture down in the night, and a row in the night's ledger: dawn puts the frame back and keeps the ledger
+      await page.evaluate(async () => { const g = window.__game, log = await import('/js/log.js'); g.W.hallFrame.fall(); log.push({ id: 'dent', seen: false, how: 'drop' }); });
       await until(page, () => window.__game.RUN.night === 2, null, 240e3);
-      const d = await page.evaluate(() => ({ ach: Object.keys(JSON.parse(localStorage.getItem('topbunk.achievements') || '{}')), run: JSON.parse(localStorage.getItem('topbunk.run')), night: window.__game.RUN.night }));
+      const d = await page.evaluate(() => ({ ach: Object.keys(JSON.parse(localStorage.getItem('topbunk.achievements') || '{}')), run: JSON.parse(localStorage.getItem('topbunk.run')), night: window.__game.RUN.night, frame: window.__game.W.hallFrame.fallen, log: ((window.__game.RUN.nights || {})[1] || {}).log || [] }));
       ok(d.run.night === 2 && d.run.seed === 'SMKE-0001', `saved run after dawn: ${JSON.stringify(d.run)}`);
       ok(d.ach.includes('NIGHT_1') && d.ach.includes('FIRST_TRY'), `achievements after dawn: ${JSON.stringify(d.ach)}`);
+      ok(d.frame === false, 'the hall frame was not put back at dawn');
+      ok(d.log.some((e) => e.id === 'dent' && e.seen === false) && d.log.some((e) => e.id === 'frame'), `night one's ledger after dawn: ${JSON.stringify(d.log.map((e) => e.id))}`);
+      ok(d.run.nights && d.run.nights[1] && d.run.nights[1].log.some((e) => e.id === 'dent'), 'the ledger is not in the saved run');
       t = await load();
       ok(t.items[0] === 'Continue · Night 2' && /night 2 of 10.*SMKE-0001/.test(t.info), `title after the reload: ${JSON.stringify(t)}`);
       await page.click('#title-menu [data-entry="continue"]');
@@ -802,7 +807,7 @@ let BASE = '';
           const kitchen = [3.0, 0.4, 3.6, 0.4];   // by the hall wall, the table behind you
           const tour = [[8.6, 1.4, 8.6, 3.6], [6.6, -0.9, 9.6, -0.9], [4.2, 1.6, 4.2, 3.4], [6.0, -0.9, 3.0, -0.9], [0.5, -2.4, -2.5, -2.4], [3.0, 0.4, 3.6, 0.4], [-2.4, 1.6, -2.4, 3.4], [7.2, -0.9, 9.6, -0.9]];
           if (how !== 'bunk') { await climbDown(page); if (how === 'kitchen') await stand(page, ...kitchen); }
-          let stop = 0, objShown = false, i = 0;
+          let stop = 0, objShown = false, i = 0, breathed = false;
           const t0 = Date.now();
           while (Date.now() - t0 < 600e3) {
             const st = await page.evaluate(() => ({ log: window.__n1log.map((e) => e.id), dead: window.__game.F.dead, obj: document.getElementById('objective').classList.contains('show') && document.getElementById('objective').textContent.trim() }));
@@ -811,9 +816,16 @@ let BASE = '';
             if (st.log.includes('mom')) { stop = 1; break; }
             if (how === 'wander' && !(await page.evaluate(() => window.__game.F.script))) { const p = tour[i++ % tour.length]; await stand(page, ...p); }
             if (how === 'kitchen') await stand(page, ...kitchen);
+            // in the bunk, when the breath below starts: the covers up (a short hold), four of its breaths in time with yours, then hold yours
+            // (the key is held until the covers are up, and a moment more so the release does not latch the breath held)
+            if (how === 'bunk' && !breathed && st.log.includes('breathUnder')) {
+              breathed = true;
+              await page.keyboard.down('Space'); await until(page, () => window.__game.P.mode === 'hide', null, 6000).catch(() => {}); await sleep(500); await page.keyboard.up('Space');
+              await sleep(9000); await hold(page, 'Space', 3500);
+            }
             await sleep(how === 'wander' ? 9000 : 3000);
           }
-          const out = await page.evaluate(() => ({ log: window.__n1log, rooms: window.__n1rooms }));
+          const out = await page.evaluate(() => ({ log: window.__n1log, rooms: window.__n1rooms, ledger: ((window.__game.RUN.nights || {})[1] || {}).log || [], fx: window.__game.F.flashFx === null }));
           clean(w); await page.close();
           ok(stop, `${how}: night one never reached Mom (beats: ${out.log.map((e) => e.id).join(', ')})`);
           ok(!objShown, `${how}: the night told the player what to do: "${objShown}"`);
@@ -823,7 +835,16 @@ let BASE = '';
           if (how === 'kitchen') ok(out.log.every((e) => !['dent', 'door', 'bath'].includes(e.id)), `${how}: a bedroom or bathroom beat played in the kitchen`);
           if (how === 'kitchen') ok(out.log.some((e) => e.id === 'inRoom' && e.room === 'kitchen'), `${how}: the end did not come to the kitchen`);
           if (how === 'bunk') ok(out.log.some((e) => e.id === 'bedside' || e.id === 'covers'), `${how}: the end did not come to the bunk`);
-          console.log(`  [${how}] ` + out.log.map((e) => `${e.id}@${e.room}${e.gap !== undefined ? ` +${e.gap}s` : ''}`).join(' | '));
+          // the ledger (RUN.nights[1].log): the dent beat written down seen or unseen whenever it played (always in the bunk; a wanderer
+          // may never give it the room), so the morning can say the right thing
+          const dent = out.ledger.find((e) => e.id === 'dent');
+          if (how === 'bunk' || out.log.some((e) => e.id === 'dent')) ok(dent && typeof dent.seen === 'boolean', `${how}: the ledger has no dent row: ${JSON.stringify(out.ledger.map((e) => e.id))}`);
+          // the breath under the bunk: in time with yours while the weight is there, and it keeps its own rhythm when you hold
+          if (how === 'bunk') {
+            const b = out.ledger.find((e) => e.id === 'breathUnder');
+            ok(b && b.seen && b.held && b.matched >= 4 && b.cycles > b.matched, `${how}: the breath under the bunk: ${JSON.stringify(b || out.ledger.map((e) => e.id))}`);
+          }
+          console.log(`  [${how}] ` + out.log.map((e) => `${e.id}@${e.room}${e.gap !== undefined ? ` +${e.gap}s` : ''}${e.cycles !== undefined ? ` cycles ${e.cycles}/${e.matched} held ${e.held}` : ''}`).join(' | '));
           return out.log.map((e) => e.id).join('>');
         });
         runs.push(`${how}: ${r}`);

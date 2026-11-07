@@ -1,13 +1,17 @@
-// The director: which nights are what (from the run's seed), and what happens in a night. Events are small and independent; night "types" are the
-// scripted centrepieces. Everything random comes from the seeded generator, so the same seed replays the same ten nights.
+// The director: which nights are what (from the run's seed), and the seeded plan of a night. The plan is a budget: it names the night's
+// candidate events and encounters with the earliest clock minute each may come, and the night engine (js/events.js) decides when one
+// actually happens, by what the player is doing and how settled the house is. Night "types" are the scripted centrepieces. Everything
+// random comes from the seeded generator, so the same seed replays the same ten nights.
 //
 // The context D that events run against is built in nights.js:
 //   D.r()  seeded random 0..1        D.P / D.F / D.W / D.E / D.sfx / D.UI / D.camera / D.hunter
 //   D.wait(s) / D.waitFor(fn)        D.say(id, opts) (voice + subtitle)
 //   D.pan(x, z)                      D.node(id) -> {x,z}                    D.playerRoom()  D.onBunk()
+//   D.wallPan() / D.behindPan() / D.ceilingPan()   a stereo position for the nearest wall, just behind the head, the ceiling overhead
 //   D.calm() (nothing hunting you, no scene with an objective going)        D.seesKidWindow()               D.carPass() / D.faceAtWindow()
 //   D.fired(id)                      told after each event has run (some events leave proof behind, see nights.js)
 //   D.dropped(id)                    told when an event is given up on (its ok() never passed) or failed: its proof can no longer turn up
+//   D.engineHas(id) / D.mayFire(tier, reveal) / D.firedLegacy(id, tier) / D.mayEncounter(kind) / D.notedEncounter(kind)   the engine's gates
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
 import { NODES, nearestNode, dist as navDist } from './nav.js';
 
@@ -60,7 +64,7 @@ export function makePlan(seed, n, version = PLAN_VERSION) {
   if (version >= 2) for (const f of proofTopUp(seed)[n] || []) applyFill(plan, f);
   return plan;
 }
-const eventsFor = (n) => 9 + n * 2;   // at most this many small events on night n (night one has its own count)
+const eventsFor = (n) => 9 + n * 2;   // at most this many candidate events on night n (night one has its own count); the engine's tier caps bound what fires
 function draftPlan(seed, n) {
   const r = rng(`night:${seed}:${n}`), type = nightTypes(seed)[n];
   const poltergeist = type === 'poltergeist';
@@ -193,20 +197,20 @@ export function proofSources(plan) {
 // of proof)
 const room = (D) => D.playerRoom();
 const EVENT_LIST = [
-  { id: 'creak', safe: true, w: 5, run: (D) => D.sfx.creak(0.2 + D.r() * 0.15, D.randPan()) },
-  { id: 'knock', safe: true, w: 3, run: (D) => D.sfx.knock(D.randPan() * 0.7, 0.2 + D.r() * 0.15) },
+  { id: 'creak', safe: true, w: 5, run: (D) => D.sfx.creak(0.2 + D.r() * 0.15, D.wallPan()) },
+  { id: 'knock', safe: true, w: 3, run: (D) => D.sfx.knock(D.wallPan() * 0.7, 0.2 + D.r() * 0.15) },
   { id: 'thump', safe: true, w: 3, minN: 2, run: (D) => D.sfx.ceilingThump() },
-  { id: 'whisper', safe: true, w: 3, run: (D) => { D.sfx.whisper(D.randPan(), 0.14 + D.r() * 0.1); D.F.fear = Math.max(D.F.fear, 0.3); } },
-  { id: 'slam', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.slamFar(D.randPan()); D.shake(0.15); D.F.fear = Math.max(D.F.fear, 0.4); } },
+  { id: 'whisper', safe: true, w: 3, run: (D) => { D.sfx.whisper(D.behindPan(), 0.14 + D.r() * 0.1); D.F.fear = Math.max(D.F.fear, 0.3); } },
+  { id: 'slam', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.slamFar(D.doorPan()); D.shake(0.15); D.F.fear = Math.max(D.F.fear, 0.4); } },
   { id: 'flicker', safe: true, w: 3, run: (D) => D.flicker(0.9 + D.r()) },
   { id: 'lightDies', safe: true, w: 2, minN: 2, run: (D) => D.killNightLight(35 + D.r() * 40) },
   { id: 'kidDoorShuts', safe: true, w: 2, ok: (D) => D.W.doors.kid.target === 1 && room(D) === 'bed' && D.dist(D.W.doors.kid.mid) > 1.2, run: (D) => { D.W.setDoor('kid', false); D.F.fear = Math.max(D.F.fear, 0.45); } },
   { id: 'doorDrifts', safe: true, w: 2, minN: 2, ok: (D) => D.W.doors.room2.target === 0, run: (D) => { D.W.setDoor('room2', true); } },
   { id: 'glimpse', reveal: true, w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0 && !D.onBunk() && room(D) !== 'bath', run: (D) => D.glimpse() },
-  { id: 'breathBehind', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.breath(true, 0.5); D.sfx.breath(false, 0.5); D.sfx.whisper(-0.9 + D.r() * 1.8, 0.12); D.F.fear = Math.max(D.F.fear, 0.6); } },
+  { id: 'breathBehind', safe: true, w: 2, minN: 2, run: (D) => { D.sfx.breath(true, 0.5); D.sfx.breath(false, 0.5); D.sfx.whisper(D.behindPan(), 0.12); D.F.fear = Math.max(D.F.fear, 0.6); } },
   { id: 'mirror', reveal: true, safe: true, w: 2, minN: 2, ok: (D) => room(D) === 'bath', run: (D) => D.mirror(D.F.night > 1 && D.r() < 0.5 ? 'figure' : 'writing') },
   { id: 'tvStatic', safe: true, w: 2, minN: 2, ok: (D) => room(D) !== 'living' && !D.W.tvFx.on, run: (D) => D.tvBlip() },
-  { id: 'faucet', safe: true, w: 2, run: (D) => D.sfx.faucet(4, D.randPan()) },
+  { id: 'faucet', safe: true, w: 2, run: (D) => D.sfx.faucet(4, D.tapPan()) },
   { id: 'clockGlitch', safe: true, w: 2, minN: 2, run: (D) => D.clockGlitch() },
   // the grandfather clock strikes thirteen
   { id: 'thirteen', safe: true, w: 1.5, minN: 3, once: true, ok: (D) => D.calm() && !D.W.clock.silent, run: (D) => D.chime(13) },
@@ -231,17 +235,21 @@ const EVENT_LIST = [
   { id: 'carPass', w: 2, minN: 2, once: true, alone: 6, ok: (D) => D.calm(), run: (D) => D.carPass() },
   // the huge pale face drifts past the windows (about twelve minutes): once a night, while you are in your room or can see its window
   { id: 'windowFace', reveal: true, w: 2, minN: 2, once: true, alone: 20, ok: (D) => D.calm() && D.seesKidWindow(), run: (D) => D.faceAtWindow() },
-  // the build-up to a hunt (flicker, violins, heavy steps) with no hunt after it
-  { id: 'falseAlarm', reveal: true, w: 3, minN: 2, ok: (D) => !D.hunter.busy && D.hunter.cool <= 0, run: (D) => { D.flicker(1.5); D.sfx.violins(0.3, 0.6); D.sfx.heavyStep(0.5, D.randPan()); D.later(0.85, () => { D.sfx.heavyStep(0.4, D.randPan()); D.sfx.pianoSlam(0.7); }); D.later(2.6, () => D.sfx.violins(0, 2.5)); D.F.fear = Math.max(D.F.fear, 0.8); } },
   // the wall phone rings once and stops (later it is off the hook)
   { id: 'phone', spare: true, minN: 2, ok: (D) => !D.W.phone.ringing && !D.W.phone.off, run: (D) => D.sfx.phoneRing(D.pan(-1.5, 0.9)) },
   // the power cuts out for a second or two, night lights and all, and the breaker clunks back on by itself
   { id: 'breaker', spare: true, minN: 2, ok: (D) => !D.F.blackout, run: (D) => { D.sfx.pop(); D.blackout(true); D.later(1.4 + D.r(), () => { if (D.F.blackout) { D.sfx.thump(); D.blackout(false); } }); } },
 ];
 export const EVENTS = Object.fromEntries(EVENT_LIST.map((e) => [e.id, e]));
+// the tier each of these old instant events counts as under the engine's caps, until it is ported to the event shape
+const TIER_OF = {
+  creak: 'whisper', knock: 'whisper', thump: 'whisper', whisper: 'whisper', faucet: 'whisper', flush: 'whisper', flicker: 'whisper', lurk: 'whisper', steps: 'whisper', breathBehind: 'whisper', parentsMutter: 'whisper',
+  glimpse: 'presence', nmShadow: 'presence', nmMirror: 'presence', nmHall: 'presence', nmBasement: 'presence',
+};
+export const tierOf = (id) => TIER_OF[id] || 'wrong';
 
 // -------------------------------------------------------------------------------------------------------------------------------------------
-// the director itself: fires events and encounters as the clock reaches them
+// the director itself: the plan's minute makes an entry ready; the night engine says when the house can take it
 export function createDirector(D) {
   let plan = null, running = false, lockUntil = 0, lastAt = -99, holdUntil = 0;
   const okNow = (ev) => { const def = EVENTS[ev.id]; return !def.ok || def.ok(D); };
@@ -249,28 +257,34 @@ export function createDirector(D) {
     start(p) { plan = p; running = true; lockUntil = 0; lastAt = -99; holdUntil = 0; },
     stop() { running = false; },
     get plan() { return plan; },
+    // what the budget still holds for tonight
+    pending: () => (plan ? { events: plan.events.filter((e) => !e.done).map((e) => e.id), encounters: plan.encounters.filter((e) => !e.done).map((e) => e.kind) } : null),
     update() {
       if (!running || !plan || D.F.dead) return;
       const c = D.F.clock, busy = D.F.script || D.F.cutscene || D.F.dead || D.F.pause;
       // an event that wants the house to itself, once it is due and able to run, holds everything else back until it has had its quiet
-      const lone = busy ? null : plan.events.find((ev) => !ev.done && c >= ev.t && EVENTS[ev.id].alone && okNow(ev));
-      // encounters first: they matter more
+      const lone = busy ? null : plan.events.find((ev) => !ev.done && c >= ev.t && EVENTS[ev.id].alone && okNow(ev) && !(D.engineHas && D.engineHas(ev.id)));
+      // the encounters: the plan's slots are the night's budget of them; one begins when the engine says the house is ready (law 8: the
+      // thing is the end of a chain; the quiet curve; nothing else holding it)
       for (const e of plan.encounters) {
         if (e.done || c < e.t) continue;
         if (busy || lone || c < holdUntil || D.hunter.busy || D.hunter.cool > 0 || D.now() < lockUntil) continue;
+        if (D.mayEncounter && !D.mayEncounter(e.kind)) continue;
         if (e.tries++ > 40 && c > e.t + 25) { e.done = true; continue; }
-        if (D.encounter(e.kind, plan)) { e.done = true; lockUntil = D.now() + 14; lastAt = c; }
+        if (D.encounter(e.kind, plan)) { e.done = true; lockUntil = D.now() + 14; lastAt = c; if (D.notedEncounter) D.notedEncounter(e.kind); }
       }
       for (const ev of plan.events) {
         if (ev.done || c < ev.t) continue;
+        // an id the engine knows is the engine's: its minute has come and the engine arms it when the house is ready
+        if (D.engineHas && D.engineHas(ev.id)) { ev.done = true; continue; }
         if (busy || D.hunter.state === 'hunt' || D.hunter.state === 'loom' || c < holdUntil || (lone && lone !== ev)) continue;
         const def = EVENTS[ev.id];
         if (!okNow(ev)) { if (c > ev.t + 40) { ev.done = ev.dropped = true; if (D.dropped) D.dropped(ev.id); } continue; }
         if (def.alone && c - lastAt < def.alone) continue;
-        if (!def.alone && (c - lastAt < 2.5 || (D.hunter.busy && !def.safe))) continue;
-        if (def.reveal && D.revealCool && D.revealCool()) continue;   // never two reveals within fifteen seconds
+        if (!def.alone && D.hunter.busy && !def.safe) continue;
+        if (D.mayFire && !D.mayFire(tierOf(ev.id), !!def.reveal)) continue;   // the quiet curve, the tier caps, fifteen seconds between reveals
         ev.done = true; lastAt = c; if (def.alone) holdUntil = c + def.alone;
-        try { def.run(D); if (def.reveal && D.revealed) D.revealed(); if (D.fired) D.fired(ev.id); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // no proof for an event that never happened
+        try { def.run(D); if (def.reveal && D.revealed) D.revealed(); if (D.fired) D.fired(ev.id); if (D.firedLegacy) D.firedLegacy(ev.id, tierOf(ev.id)); } catch (e) { console.warn('event failed', ev.id, e); ev.dropped = true; if (D.dropped) D.dropped(ev.id); }   // no proof for an event that never happened
       }
     },
   };
