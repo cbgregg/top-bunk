@@ -892,7 +892,9 @@ export function createNights(env) {
         h.revealed = true; F.fear = Math.max(F.fear, (F.leanK || 0) > 0.65 ? 0.85 : 0.75);
         if ((F.leanK || 0) > 0.65 && !env.holding()) { h.stopped = true; h.done = true; }   // you looked down: it stops dead
       },
-      while: () => P.mode !== 'walk',   // until you climb down (pulling the covers passes through a cut, and that is still the bunk)
+      // until you climb down (pulling the covers passes through a cut, and that is still the bunk); on night one only while the weight
+      // is still in the bottom bunk (the dent set, or not yet smoothed out)
+      while: () => P.mode !== 'walk' && ((F.night || 1) > 1 || N1.dentOn || env.FN.dent.k > 0.15),
       max: 40,
       undo: (h) => { h.alive = false; h.stopped = true; N1.breathing = false; if ((F.night || 1) > 1) env.FN.dent.set(0); },
       test: { mode: 'bunk' },

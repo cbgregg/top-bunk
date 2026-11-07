@@ -64,9 +64,12 @@ async function nightPage(browser, hash, { init = null } = {}) {
   if (init) await page.addInitScript(init);
   await page.goto(BASE + '/index.html' + hash, { waitUntil: 'load', timeout: 180e3 });
   await page.waitForFunction(() => window.__game && document.getElementById('loading').classList.contains('done'), null, { timeout: 180e3, polling: 250 });
-  await page.evaluate(() => { const g = window.__game; g.renderer.compileAsync = async () => {}; g.startGame(); });
+  // nothing is drawn in these pages: the flash of a photo (takePhoto renders a frame for the print) would otherwise push the whole
+  // never-warmed scene through the software renderer
+  await page.evaluate(() => { const g = window.__game; g.renderer.compileAsync = async () => {}; g.gfx.render = () => {}; g.startGame(); });
   const n = hash.match(/night(\d+)/)[1];
   await until(page, (n) => window.__game.F.stage === 'n' + n && window.__game.F.live, n, 240e3);
+  await page.evaluate(() => { try { window.__game.weather.lock('clear'); } catch (e) { /* no weather */ } });   // a dry night: no thunder in the sound window
   return { page, w, ctx, n: +n };
 }
 const until = (page, fn, arg, ms = 120e3) => page.waitForFunction(fn, arg, { timeout: ms, polling: 150 });
@@ -128,7 +131,7 @@ const recordOn = (page) => page.evaluate((names) => {
   for (const n of names) if (typeof sfx[n] === 'function') {
     window.__orig[n] = sfx[n];
     sfx[n] = function (...args) {
-      if (depth === 0) window.__rec.push({ n, args: args.map((a, i) => (a && typeof a === 'object' ? { at: !!a.at || (n === 'emit' && i === 1), pan: a.pan } : a)) });   // emit(key, at, o): its place is the second argument
+      if (depth === 0) window.__rec.push({ n, m: g.P.mode, args: args.map((a, i) => (a && typeof a === 'object' ? { at: !!a.at || (n === 'emit' && i === 1), pan: a.pan } : a)) });   // emit(key, at, o): its place is the second argument
       depth++; try { return window.__orig[n].apply(this, args); } finally { depth--; }
     };
   }
@@ -141,7 +144,7 @@ const recordOff = (page) => page.evaluate((names) => {
 }, SND);
 // the house's own background sounds that can land inside the window (the grandfather clock's tick, a light switch the lights module
 // clicks for its own beat): not the event's, so not its problem
-const BACKGROUND = new Set(['clock_tick', 'clock_gear', 'clock_strike', 'switch']);
+const BACKGROUND = new Set(['clock_tick', 'clock_gear', 'clock_strike', 'switch', 'thunder']);
 const PAN_AT = { footstep: 1, heavyStep: 1, creak: 1, faucet: 1 };   // where the helper takes its pan (audio.js); the rest take it first
 function soundProblems(rec, tier) {
   const bad = [], sting = ['pianoSlam', 'jolt', 'stab', 'appear'], panned = ['creak', 'knock', 'whisper', 'slamFar', 'heavyStep', 'footstep', 'lurk', 'faucet', 'flush', 'scrape', 'doorClose', 'whoosh', 'staticBurst', 'phoneRing'];
@@ -151,6 +154,7 @@ function soundProblems(rec, tier) {
   for (const c of rec) {
     const a = c.args;
     if ((c.n === 'pick' || c.n === 'emit') && BACKGROUND.has(a[0])) continue;
+    if ((c.n === 'breath' || c.n === 'whoosh') && ['hide', 'bunk', 'cine'].includes(c.m)) continue;   // the player's own breath and the covers over their head, at the ear by design
     if (c.n === 'pick' || c.n === 'emit') { if (!(a[1] && a[1].at)) bad.push(`${c.n}(${a[0]}) without at`); }
     else if (panned.includes(c.n)) { const i = PAN_AT[c.n] || 0; if (!isPos(a[i])) bad.push(`${c.n} panned to ${a[i]} instead of a place`); }
     else if (c.n === 'thump' || c.n === 'ceilingThump' || c.n === 'breath') bad.push(`${c.n}() has no place`);
@@ -331,9 +335,9 @@ async function headlessOne(page, d, night) {
 
   // ---------- pace: six minutes on night three, walking, then still ----------
   await section('pace', async () => {
-    const SIX = 360;
+    const SIX = 360, HASH = '#night3&seed=F3PC-0005';   // a fixed seed: night three is a thirst night, whose scene asks nothing of a player in the bunk
     // the walk
-    const A = await nightPage(browser, '#night3');
+    const A = await nightPage(browser, HASH);
     await climbDown(A.page);
     await ev(A.page, (events, g) => { g.nights.director.plan.encounters.forEach((e) => { e.done = true; }); });   // the hunter stays out of the measurement
     const route = [];
@@ -365,7 +369,7 @@ async function headlessOne(page, d, night) {
     ok(!loudPairs, 'two loud reveals back to back');
     ok(!unsettled.length, `reveals of beats armed while the house was not settled: ${unsettled.map((r) => r.id).join(' ')}`);
     // still in the bunk
-    const B = await nightPage(browser, '#night3');
+    const B = await nightPage(browser, HASH);
     await ev(B.page, (events, g) => { g.nights.director.plan.encounters.forEach((e) => { e.done = true; }); });
     const t1 = await B.page.evaluate(() => window.__game.gameTime);
     for (;;) { const st = await B.page.evaluate(() => ({ t: window.__game.gameTime, dead: window.__game.F.dead })); if (st.dead) throw new Error('caught while still in the bunk'); if (st.t - t1 >= SIX) break; await sleep(1000); }
@@ -377,40 +381,46 @@ async function headlessOne(page, d, night) {
     ok(!forced.length, `a payoff the player did not make: ${forced.map((r) => r.id + '/' + r.how).join(' ')}`);
     const tableReveals = still.reveals.filter((r) => r.how !== 'outside');
     return `walk: ${walk.arms.length} arms (${walk.arms.map((a) => a.id + (a.legacy ? '*' : '')).join(' ')}), ${reveals.length} reveal(s) (${reveals.map((r) => r.id + '/' + r.how).join(' ')}), caught ${caught}x; still: ${still.arms.length} arm(s) (${still.arms.map((a) => a.id + (a.legacy ? '*' : '')).join(' ')}), ${tableReveals.length} table reveal(s)${tableReveals.length ? ' (' + tableReveals.map((r) => r.id + '/' + r.how).join(' ') + ')' : ''}`;
-  }, 1500e3);
+  }, 2700e3);   // twelve game minutes take longer than twelve minutes on a slow machine
 
   // ---------- the crumple's crawl: contact only ----------
   await section('crumple', async () => {
     const { page, w, ctx } = await nightPage(browser, '#night3');
     await climbDown(page);
     await ev(page, (events, g) => { g.nights.director.stop(); events.suspend(true); });
-    // stage it: in the hall, a look east and then west puts the floor behind you in the gaze's memory
-    const setup = async () => {
-      await ev(page, (events, g) => { g.nights.stage.endStage(); g.F.script = false; g.F.cutscene = false; g.P.mode = 'walk'; g.F.fear = 0; });
+    // stage it: in the hall, a look east and then west puts the floor behind you in the gaze's memory. The crawl's catch is crawlCatch
+    // (the slam, the fade and the crawled nightmare; it sets F.nmDone), not a death
+    // The flash sets it off and half a second later it comes, at 4.8 m/s: where the player is when it comes is decided in the same call
+    // as the flash (a teleport to `pose`, the doors as given), before a frame runs
+    const setup = async (pose, doors) => {
+      await ev(page, (events, g) => { g.nights.stage.endStage(); g.F.script = false; g.F.cutscene = false; g.P.mode = 'walk'; g.F.fear = 0; g.F.nmDone = false; });
       await stand(page, 7.2, -0.42, 10.1, -0.42); await playFor(page, 1.2); await stand(page, 7.2, -0.42, 4.5, -0.42); await playFor(page, 0.3);
-      const staged = await page.evaluate(() => { const g = window.__game, S = g.nights.stage; const okk = S.SCARES.crumple.run(); if (!okk) return null; const st = S.ST.on; st.seen = g.gameTime; S.crawlAt(st); return [st.p.x, st.p.z]; });
+      const staged = await page.evaluate(([pose, doors]) => {
+        const g = window.__game, S = g.nights.stage; const okk = S.SCARES.crumple.run(); if (!okk) return null;
+        const st = S.ST.on; st.seen = g.gameTime; S.crawlAt(st);
+        for (const [name, open] of doors) g.W.setDoor(name, open, true);
+        const [x, z, tx, tz] = pose; g.P.pos.set(x, 0, z); g.P.vel.set(0, 0, 0); g.P.yaw = Math.atan2(-(tx - x), -(tz - z)); g.P.pitch = 0;
+        return [st.p.x, st.p.z];
+      }, [pose, doors]);
       ok(staged, 'the crumple would not stage behind the player');
-      await until(page, () => window.__game.E.mode === 'crawl', null, 10e3);
       return staged;
     };
-    // A: out of its sight within a second: no catch, ever (the old 3.2 s clock is gone), and it gives up after two seconds
-    await setup();
-    await stand(page, 5.6, 3.2, 5.6, 4.0);   // behind the bath wall
-    await page.evaluate(() => { window.__game.W.setDoor('bath', false, true); });
-    await playFor(page, 5.5);
-    const a = await page.evaluate(() => { const g = window.__game; return { dead: g.F.dead, staged: !!g.nights.stage.ST.on, E: g.E.visible }; });
-    ok(!a.dead, 'caught after leaving its line of sight');
-    ok(!a.staged, 'the crawl did not give up after two seconds out of sight');
+    const state = () => page.evaluate(() => { const g = window.__game; return { dead: g.F.dead, caught: !!g.F.nmDone, staged: !!g.nights.stage.ST.on, E: g.E.visible, mode: g.E.mode }; });
+    // A: out of its sight as it comes (behind the bath wall, the door shut): no catch, ever (the old 3.2 s clock is gone), and it gives up
+    // after two seconds
+    await setup([5.6, 3.2, 5.6, 4.0], [['bath', false]]);
+    await playFor(page, 6.0);
+    const a = await state();
+    ok(!a.caught && !a.dead, `caught after leaving its line of sight: ${JSON.stringify(a)}`);
+    ok(!a.staged, `the crawl did not give up after two seconds out of sight: ${JSON.stringify(a)}`);
     // B: in front of it with a line to you: contact
-    await page.evaluate(() => { window.__game.W.setDoor('bath', true, true); });
-    await setup();
-    await stand(page, 7.2, -0.42, 10.1, -0.42);
-    await until(page, () => window.__game.F.dead, null, 8e3).catch(() => {});
-    const b = await page.evaluate(() => window.__game.F.dead);
-    ok(b, 'in its sight at arm\'s length and not caught');
-    await retry(page);
+    await setup([7.2, -0.42, 10.1, -0.42], [['bath', true]]);
+    await until(page, () => window.__game.F.nmDone, null, 8e3).catch(() => {});
+    const b = await state();
+    ok(b.caught, `in its sight at arm's length and not caught: ${JSON.stringify(b)}`);
+    ok(!b.dead, 'the crawl\'s catch was a death');
     clean(w); await ctx.close();
-    return 'out of sight: no catch and it gave up in two seconds; in its reach: caught by contact';
+    return 'out of sight: no catch and it gave up in two seconds; in its reach: caught by contact (the crawled nightmare)';
   }, 400e3);
 
   await browser.close(); server.close();
