@@ -5,6 +5,7 @@ import { applyPBR } from './pbr.js';
 import { PHONE } from './gfx.js';
 import { place, scatter } from './props.js';
 import { flicker } from './settings.js';
+import * as collide from './collide.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -62,12 +63,13 @@ const within = (rooms, places, x, z, y) => {
 };
 export function roomAt(x, z, y = 0) { return within(ROOMS, PLACES, x, z, y); }
 const planRoomAt = (x, z, y = 0) => within(PLAN, { ...PLAN_PLACES, garage: PLACES.garage }, x, z, y);
-// the floor under (x, z): 0 on the yard, the stairwell and, for somebody already down there, the laundry; out in the field the ground rolls
-let fieldHeight = () => 0;   // set by buildWorld once the field exists
+// the floor under (x, z): 0 on the yard, the stairwell and, for somebody already down there, the laundry; the truck's ramp while the truck is
+// there; out in the field the ground rolls
+let fieldHeight = () => 0, rampAt = () => 0;   // set by buildWorld once the field and the truck exist
 export function groundAt(x, z, y = 0) {
   if (z > STAIR.z0 && z < STAIR.z1 && x < STAIR.x0 && x > STAIR.xEnd) return BASEMENT * Math.min(1, (STAIR.x0 - x) / STAIR.run);
   if (y < -1 && x > PLACES.laundry[0] && x < PLACES.laundry[1] && z > PLACES.laundry[2] && z < PLACES.laundry[3]) return BASEMENT;
-  return fieldHeight(x, z);
+  return fieldHeight(x, z) + rampAt(x, z);
 }
 
 // The TV model's texture (assets/props/tv.glb) carries an existing maker's badge, on the front panel and down the side. Each is painted over with
@@ -105,8 +107,14 @@ function worldUV(geo) {
 }
 export function buildWorld(scene) {
   const colliders = [];
+  // a box on the floor plan the bodies cannot enter. extra: { wall, door, minY, maxY (the top of what it stands for), id (removeSolid),
+  // night (counts only at night), when (counts while when() is true), fixed (keeps its size through the stretch) }
   const solid = (minX, maxX, minZ, maxZ, extra = {}) => { const c = { minX, maxX, minZ, maxZ, on: true, ...extra }; colliders.push(c); return c; };
+  const removeSolid = (id) => { let n = 0; for (let i = colliders.length - 1; i >= 0; i--) if (colliders[i].id === id) { colliders[i].on = false; colliders.splice(i, 1); n++; } return n; };
+  const rainDiscard = [];   // boxes { minX, maxX, minZ, maxZ, maxY } the rain does not fall inside of (weather.js reads them)
   const fixups = [], lateArches = [];   // run once the house is stretched: numbers the game keeps are mapped, the arches built in place
+  let stretched = false;
+  const fixup = (f) => { if (stretched) f(); else fixups.push(f); };   // a builder that runs after the stretch (a plugin) gets its fixups at once
   const relTo = (ox, oz) => (v) => { v.x = SX(ox) + (v.x - ox); v.z = SZ(oz) + (v.z - oz); };   // a spot on a model, which keeps its size: it moves with the model's origin
 
   const T = {
@@ -570,14 +578,20 @@ export function buildWorld(scene) {
   // floor the door stands on.
   const doors = {};
   const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+  // the leaf is a collider in every state (collide.js: a capsule from the hinge, swung to d.a); the strip on the wall line comes on only
+  // once the leaf is all but shut (a < 0.08), and never round a body standing in it (it waits for them to leave). d.max clamps how far
+  // the door can open (1 = fully; the front door's chain sets 0.04 at night)
+  const STRIP_ON = 0.08;
   function mkDoor(name, hx, hz, closed, open, col, mid, startOpen, y0 = 0, opt = {}) {
     const yr = y0 < -1 ? { minY: y0 - 0.1, maxY: y0 + 2.3 } : {};
     const c = solid(col[0], col[1], col[2], col[3], { door: name, on: !startOpen, ...yr });
-    const d = { name, a: startOpen ? 1 : 0, target: startOpen ? 1 : 0, col: c, mid: new THREE.Vector3(mid[0], y0 + 1.0, mid[1]), hx, hz };
+    const d = { name, a: startOpen ? 1 : 0, target: startOpen ? 1 : 0, max: 1, col: c, mid: new THREE.Vector3(mid[0], y0 + 1.0, mid[1]), hx, hz, y0, w: opt.w ?? 0.81, blocked: null };
+    const strip = () => { const shut = d.a < STRIP_ON; if (shut && !c.on && collide.bodies.some((b) => (!b.active || b.active()) && collide.onFloor(c, b.pos.y, b.h) && b.pos.x > c.minX - b.r && b.pos.x < c.maxX + b.r && b.pos.z > c.minZ - b.r && b.pos.z < c.maxZ + b.r)) { c.armWhenClear = true; return; } c.on = shut; c.armWhenClear = false; };
     if (opt.slide) {   // a sliding leaf: it moves `travel` along `open` from where it hangs when shut
       const g = opt.slide; g.position.set(hx, y0, hz); house.add(g); d.g = g;
-      d.apply = () => { g.position.x = d.hx + open[0] * opt.travel * d.a; g.position.z = d.hz + open[1] * opt.travel * d.a; c.on = d.a < 0.35; };
-      fixups.push(() => { d.hx = SX(hx); d.hz = SZ(hz); });
+      d.slide = { travel: opt.travel, open: [open[0], open[1]], half: opt.half ?? 0.62, off: opt.off ?? 0.05, t: opt.t ?? 0.06, height: opt.height ?? 2.1 };   // its leaf for collide.js: half its width, its centre line's offset from the hinge line, half its thickness
+      d.apply = () => { g.position.x = d.hx + open[0] * opt.travel * d.a; g.position.z = d.hz + open[1] * opt.travel * d.a; strip(); };
+      fixup(() => { d.hx = SX(hx); d.hz = SZ(hz); });
     } else {
       const rotC = Math.atan2(-closed[1], closed[0]), rotO = Math.atan2(-open[1], open[0]), alongX = closed[1] === 0, w = opt.w ?? 0.81;
       // the wall is thicker after the stretch across it (its two faces map separately, since a wall line is where the factor changes),
@@ -586,15 +600,15 @@ export function buildWorld(scene) {
       const depth = alongX ? SZ(hz + WT / 2) - SZ(hz - WT / 2) : SX(hx + WT / 2) - SX(hx - WT / 2);
       const { g, fr } = door(hx, hz, closed[0], closed[1], { y0, depth, openSide: angDiff(rotC, rotO) > 0 ? -1 : 1, ...opt });
       g.userData.noWarp = fr.userData.noWarp = true;
-      fixups.push(() => {
+      fixup(() => {
         if (alongX) { d.hx = SX(hx + w / 2 * closed[0]) - w / 2 * closed[0]; d.hz = (SZ(hz - WT / 2) + SZ(hz + WT / 2)) / 2; }
         else { d.hz = SZ(hz + w / 2 * closed[1]) - w / 2 * closed[1]; d.hx = (SX(hx - WT / 2) + SX(hx + WT / 2)) / 2; }
         g.position.set(d.hx, y0, d.hz); fr.position.set(d.hx, y0, d.hz);
       });
       Object.assign(d, { g, fr, rotC, rotO });
-      d.apply = () => { g.rotation.y = rotC + angDiff(rotC, rotO) * d.a; c.on = d.a < 0.35; };
+      d.apply = () => { g.rotation.y = rotC + angDiff(rotC, rotO) * d.a; strip(); };
     }
-    fixups.push(() => { d.mid.x = SX(d.mid.x); d.mid.z = SZ(d.mid.z); });
+    fixup(() => { d.mid.x = SX(d.mid.x); d.mid.z = SZ(d.mid.z); });
     d.apply(); doors[name] = d; return d;
   }
   // the hall doors swing into the rooms they serve (hinge at the gap's edge + the jamb); the bathroom's and yours stand open by day
@@ -607,7 +621,7 @@ export function buildWorld(scene) {
   mkDoor('garage', -8.71, -7.06, [1, 0], [0, -1], [-8.75, -7.85, -7.1, -7.02], [-8.3, -7.06], false);                              // the garage's side door, facing the house
   // the front door: hinged on your right as you come in, swings into the living room; open in the day, shut at night (frontDoor.setOpen)
   const front = mkDoor('front', 1.47, -4.5, [1, 0], [0, 1], [1.35, 2.45, -4.6, -4.4], [1.9, -4.5], true, 0, { kind: 'front', w: 0.86 });
-  const frontDoor = { setOpen(o) { front.target = front.a = o ? 1 : 0; front.apply(); } };
+  const frontDoor = { setOpen(o) { front.target = o ? 1 : 0; front.a = Math.min(front.target, front.max); front.apply(); } };
   // Mom and Dad's door, off the dining room: a whitewashed Z-brace barn leaf hung on a black rail, slid open along the dining-room
   // wall. It is the door that is locked at night (main.js). The rail and its stops stay with the wall; the leaf, its hangers and the
   // handles travel.
@@ -627,11 +641,34 @@ export function buildWorld(scene) {
     leaf.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     mkDoor('parents', x, c, [0, 0], [0, 1], [-3.34, -3.26, c - 0.55, c + 0.55], [-3.3, c], false, 0, { slide: leaf, travel: 1.3 });
   }
-  let doorHook = null, fxTick = () => {};
+  let doorHook = null, bumpHook = null, fxTick = () => {};
   const setDoor = (name, open, silent = false) => { const d = doors[name]; if (!d || d.target === (open ? 1 : 0)) return; d.target = open ? 1 : 0; if (doorHook && !silent) doorHook(name, open); };
-  const stepDoors = (dt) => { for (const k in doors) { const d = doors[k]; if (d.a === d.target) continue; d.a += Math.sign(d.target - d.a) * Math.min(Math.abs(d.target - d.a), dt * (d.name === 'parents' ? 1.0 : 1.5)); d.apply(); } };
-  // per frame: the doors swing, the bear falls, the laundry's bulb and drip run
-  const tick = (dt) => { if (teddy && teddy.step) teddy.step(dt); stepDoors(dt); fxTick(dt); };
+  // the leaves swing toward their targets (no further than d.max), each swept against the bodies first: a leaf that meets one stops against
+  // it (d.blocked, and the bump hook once per stop) and finishes once the body has moved
+  const stepDoors = (dt) => {
+    for (const k in doors) {
+      const d = doors[k], target = Math.min(d.target, d.max ?? 1);
+      if (d.a === target) { d.blocked = null; continue; }
+      const want = d.a + Math.sign(target - d.a) * Math.min(Math.abs(target - d.a), dt * (d.name === 'parents' ? 1.0 : 1.5));
+      const sw = collide.sweepLeaf(d, want - d.a);
+      if (sw.hit) { if (!d.blocked && bumpHook) bumpHook(k, sw.hit); d.blocked = sw.hit; } else d.blocked = null;
+      if (sw.a !== d.a) { d.a = sw.a; d.apply(); }
+    }
+  };
+  // things whose footprint follows them: a box picked up and set down again, the bear on a floor; each is a collider the size of the
+  // thing, on while it stands on a floor (a thing carried, hidden or up on the bunk has none)
+  const followers = [];
+  const follow = (mesh, hx, hz, { maxY = 0.5, id, onFloor } = {}) => { const c = solid(0, 0, 0, 0, { on: false, maxY, id, follow: true }); const f = { mesh, hx, hz, c, onFloor }; followers.push(f); fitFollower(f); return c; };
+  const fitFollower = (f) => {
+    const m = f.mesh, c = f.c, on = !!m.parent && m.visible && (f.onFloor ? f.onFloor(m) : m.position.y < 0.45 && (m.parent === house || m.parent === yard));
+    if (!on) { c.on = false; c.armWhenClear = false; return; }
+    const x = m.position.x, z = m.position.z;
+    if (c.on && Math.abs((c.minX + c.maxX) / 2 - x) < 0.01 && Math.abs((c.minZ + c.maxZ) / 2 - z) < 0.01) return;
+    c.minX = x - f.hx; c.maxX = x + f.hx; c.minZ = z - f.hz; c.maxZ = z + f.hz; c.minY = m.position.y - 0.4; c.maxY = m.position.y + (c.top ?? 0.5);
+    collide.armOrOn(c);
+  };
+  // per frame: the doors swing, the bear falls, the laundry's bulb and drip run, the footprints follow their things
+  const tick = (dt) => { if (teddy && teddy.step) teddy.step(dt); stepDoors(dt); fxTick(dt); for (const f of followers) fitFollower(f); };
 
   // small decor builders: figurines, wall plates, shelves, a wreath
   const rnd = TX.rng(2002);
@@ -744,6 +781,7 @@ export function buildWorld(scene) {
     teddy = place(house, 'teddy', { x: rest.pos.x, y: rest.pos.y, z: rest.pos.z, rot: rest.rot, s: 0.02, hide: [bear] });
     teddy.add(bear); teddy.rest = rest; teddy.size = { w: 0.31, h: 0.385, d: 0.245 };
     teddy.userData.noWarp = true; fixups.push(() => { relTo(6.08, 2.89)(rest.pos); teddy.position.copy(rest.pos); });   // on the bunk, which keeps its size
+    follow(teddy, 0.17, 0.14, { maxY: 0.4, id: 'teddy', onFloor: (m) => m.visible && m.position.y < 0.3 });   // on a floor it is something to trip over, not to walk through
     teddy.reset = () => { teddy.sim = null; teddy.position.copy(rest.pos); teddy.rotation.set(0, rest.rot, 0); teddy.scale.setScalar(1); teddy.visible = true; };
     // knocked or dropped: gravity, a tumble that dies away, two soft bounces, then it lies where it landed. floor is the surface it falls to
     teddy.fling = (from, vel, floor = 0.02, spin = 5) => {
@@ -1203,10 +1241,11 @@ export function buildWorld(scene) {
       const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.55, 6), M.black); cord.position.y = -0.275; g.add(cord);
       const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.07, 10), M.brass); socket.position.y = -0.585; g.add(socket);
       const lampM = M.lamp.clone(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), lampM); b.position.y = -0.665; b.scale.y = 1.3; g.add(b);
-      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.4, 5), M.steel); chain.position.set(0.03, -0.8, 0); g.add(chain);
-      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), M.steel); bead.position.set(0.03, -1.0, 0); g.add(bead);
+      // the pull chain is short: a longer one hung through the eye line of anyone standing under the bulb
+      const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.12, 5), M.steel); chain.position.set(0.03, -0.68, 0); g.add(chain);
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), M.steel); bead.position.set(0.03, -0.745, 0); g.add(bead);
       const light = new THREE.PointLight(0xffd6a0, 0, 7, 1.8); light.position.y = -0.7; g.add(light);
-      const r = { group: g, mesh: b, light, on: false, swing: 0.08, t: 0, base: 5, pos: new THREE.Vector3(-5.7, -0.85, 1.6), chain: new THREE.Vector3(-5.67, -1.16, 1.6),
+      const r = { group: g, mesh: b, light, on: false, swing: 0.08, t: 0, base: 5, pos: new THREE.Vector3(-5.7, -0.85, 1.6), chain: new THREE.Vector3(-5.67, -0.905, 1.6),
         set(on) { this.on = on; light.intensity = on ? this.base : 0; lampM.emissiveIntensity = on ? 1.4 : 0; } };
       fixups.push(() => { for (const v of [r.pos, r.chain]) { v.x = SX(v.x); v.z = SZ(v.z); } });
       return r;
@@ -1245,10 +1284,37 @@ export function buildWorld(scene) {
     const t = new THREE.CanvasTexture(cv); t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; t.anisotropy = 4; t.channel = tex.channel;
     return t;
   };
-  const prop = (name, o, { tag, old = [], box: sb, after } = {}) => place(house, name, {
-    ...o, hide: tag ? tagged[tag] || [] : [],
-    onLoad: () => { old.forEach((c) => { c.on = false; }); if (sb) { const w = sb[1] - sb[0], d = sb[3] - sb[2], cx = SX((sb[0] + sb[1]) / 2), cz = SZ((sb[2] + sb[3]) / 2); solid(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2); } if (after) after(); },
-  });
+  // a model in the house, with a footprint the bodies cannot enter: `box` (plan coordinates) draws it by hand, `box: false` leaves it out,
+  // and by default it is the model's own footprint, 5 cm in from its box, where it stands (so a chair moved by W.moveChair keeps its
+  // footprint: fitProp). A model standing on something else (a kettle on the stove, the tv on its table) or inside a hand-drawn
+  // footprint (the desk's things, the fridge in its run) gets none. Every footprint carries the model's height as maxY.
+  const footprints = new Map();   // holder -> its collider
+  const fitProp = (holder) => {
+    const c = footprints.get(holder); if (!c) return;
+    const a = holder.rotation.y, ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a)), ex = c.hx * ca + c.hz * sa, ez = c.hx * sa + c.hz * ca, x = holder.position.x, z = holder.position.z;
+    c.minX = x - ex; c.maxX = x + ex; c.minZ = z - ez; c.maxZ = z + ez;
+    if (!(c.armWhenClear || !c.on)) collide.armOrOn(c);
+  };
+  const prop = (name, o, { tag, old = [], box: sb, after } = {}) => {
+    const holder = place(house, name, {
+      ...o, hide: tag ? tagged[tag] || [] : [],
+      onLoad: (h, b) => {
+        old.forEach((c) => { c.on = false; });
+        const s = o.s ?? 1, top = (o.y ?? 0) + (b.max.y - b.min.y) * s;
+        if (sb) { const w = sb[1] - sb[0], d = sb[3] - sb[2], cx = SX((sb[0] + sb[1]) / 2), cz = SZ((sb[2] + sb[3]) / 2); solid(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, { maxY: top, prop: name }); }
+        else if (sb !== false && !o.wall && (o.y ?? 0) < 0.3) {
+          const x = holder.position.x, z = holder.position.z;
+          const covered = colliders.some((c) => c.on && !c.wall && !c.door && !c.follow && x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ);
+          if (!covered) {
+            const c = solid(0, 0, 0, 0, { on: false, maxY: top, prop: name, hx: Math.max(0.06, (b.max.x - b.min.x) / 2 * s - 0.05), hz: Math.max(0.06, (b.max.z - b.min.z) / 2 * s - 0.05) });
+            footprints.set(holder, c); fitProp(holder); collide.armOrOn(c);
+          }
+        }
+        if (after) after();
+      },
+    });
+    return holder;
+  };
   // living room
   prop('table', { x: 2.9, z: -3.2, rot: -PI / 2 }, { tag: 'tv', old: [cTv], box: [2.45, 3.25, -3.95, -2.45] });
   const tvSet = prop('tv', { x: 2.95, y: 0.55, z: -3.2, rot: -PI / 2 }, { after: () => plainTv(tvSet) });
@@ -1687,10 +1753,18 @@ export function buildWorld(scene) {
     };
   })();
   fieldHeight = fieldH;
-  {   // the field itself: one big plane with its vertices lifted; under the flat ground it sits a centimetre below the slabs
+  {   // the field itself: one big plane with its vertices lifted; under the flat ground it sits a centimetre below the slabs, and it has no
+      // faces over the cellar stairwell (the eye crossed it there on the way down; the slabs round the pit are the ground you see)
     const N = PHONE ? 90 : 260, geo = new THREE.PlaneGeometry(520, 520, N, N); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, -0.03 + fieldH(x, z)); uv.setXY(i, x, z); }
+    { const { x0, xEnd, z0, z1 } = STAIR, px0 = xEnd - 0.35, px1 = x0 + 0.1, pz0 = z0 - 0.1, pz1 = z1 + 0.35, idx = geo.index.array, keep = [];
+      for (let t = 0; t < idx.length; t += 3) {
+        const xs = [pos.getX(idx[t]), pos.getX(idx[t + 1]), pos.getX(idx[t + 2])], zs = [pos.getZ(idx[t]), pos.getZ(idx[t + 1]), pos.getZ(idx[t + 2])];
+        if (Math.max(...xs) > px0 && Math.min(...xs) < px1 && Math.max(...zs) > pz0 && Math.min(...zs) < pz1) continue;
+        keep.push(idx[t], idx[t + 1], idx[t + 2]);
+      }
+      geo.setIndex(keep); }
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, M.grass); m.receiveShadow = true; yard.add(m);
   }
@@ -1754,14 +1828,20 @@ export function buildWorld(scene) {
       for (const [x, y, z, w, h, d, mi, r] of stack) cardboardBox(x, y, z, w, h, d, mi, r, yard);
       const mat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.7, 16), std({ color: 0xc9c2a8, roughness: 1 })); mat.rotation.z = Math.PI / 2; mat.position.set(2.5, y0 + 0.3, -18.0); yard.add(mat);
     }
-    solid(TRUCK.x - 1.4, TRUCK.x + 1.4, zc - 3.3 * s, TRUCK.z + 0.1);
+    const truckCol = solid(TRUCK.x - 1.4, TRUCK.x + 1.4, zc - 3.3 * s, TRUCK.z + 0.1, { maxY: 3.5, id: 'truck' });
+    // the ramp is a floor: the family and the player walk up it to the sill (where the truck's own box stops the player); it fades out at
+    // its sides so there is no step up or down, and it is gone with the truck
+    TRUCK.rampY = (x, z) => (z < TRUCK.z ? TRUCK.bed : Math.min(TRUCK.bed, Math.max(0, (TRUCK.z + TRUCK.ramp - z) * (TRUCK.bed / TRUCK.ramp)))) * Math.min(1, Math.max(0, 1 - (Math.abs(x - TRUCK.x) - 0.5) / 0.3));
+    rampAt = (x, z) => (truckCol.on && z < TRUCK.z + TRUCK.ramp + 0.3 && z > TRUCK.z - 0.5 && Math.abs(x - TRUCK.x) < 0.8 ? TRUCK.rampY(x, z) : 0);
+    collide.headClear.add({ minX: TRUCK.x - W2, maxX: TRUCK.x + W2, minZ: TRUCK.z - 0.35, maxZ: TRUCK.z - 0.1, y0: 3.34 * s - 0.17 - TRUCK.drop - 0.11, y1: 3.6, id: 'truckRoll', when: () => truckCol.on });   // the rolled-up door at the sill
   }
-  // pickup boxes
+  // pickup boxes: something to walk round while they wait in the yard, and again once they are set down on a floor
   const pickups = [
     cardboardBox(1.3, 0, -12.3, 0.5, 0.44, 0.5, 3, 0.15, yard),
     cardboardBox(3.45, 0, -12.7, 0.5, 0.44, 0.5, 3, -0.3, yard),
     cardboardBox(3.3, 0, -11.7, 0.5, 0.44, 0.5, 3, 0.4, yard),
   ];
+  for (const b of pickups) follow(b, 0.28, 0.28, { maxY: 0.46, id: 'pickup' });
   const dropSpots = [new THREE.Vector3(5.98, 0.575, 3.0), new THREE.Vector3(6.52, 0.575, 3.0), new THREE.Vector3(6.3, 0, 1.95)];
   fixups.push(() => { relTo(6.08, 2.89)(dropSpots[0]); relTo(6.08, 2.89)(dropSpots[1]); dropSpots[2].x = SX(dropSpots[2].x); dropSpots[2].z = SZ(dropSpots[2].z); });   // two on the bunk, one on the floor   // on the bottom bunk's comforter, past the pillow; the third on the floor in front of it
 
@@ -1842,12 +1922,13 @@ export function buildWorld(scene) {
     const put = (x, z, k) => { q.setFromAxisAngle(up, r() * 6.28); mats.push(m4.clone().compose(new THREE.Vector3(x, -0.06, z), q, sc.set(k, k * (0.85 + r() * 0.3), k))); };
     for (let i = 0; i < 10; i++) put(hx + (r() - 0.5) * 0.4, -4.6 + i * 1.25, 2.3 + r() * 0.9);
     for (const x of [-1.4, -0.6, 0.1, 0.6]) put(SX(x), -5.05, 1.5 + r() * 0.4);
-    scatter(yard, 'shrub', mats); solid(hx - 0.8, hx + 0.8, -5.2, 7.2);
+    scatter(yard, 'shrub', mats); solid(hx - 0.8, hx + 0.8, -5.2, 7.2, { maxY: 1.6, id: 'shrubs' });
+    solid(SX(-1.4) - 0.45, SX(0.6) + 0.45, -5.5, -4.6, { maxY: 1.0, id: 'planter' });   // the planter under the picture window
   }
   // utility poles along the road (they also give the road something to rush past when you are in a car)
   {
     const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.18, 8, 8), M.darkWood, 28), arms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, 2.4), M.darkWood, 28), mm = new THREE.Matrix4(); let n = 0;
-    for (let x = -240; x <= 240 && n < 28; x += 40) { mm.makeTranslation(x, 4, -26.2); poles.setMatrixAt(n, mm); mm.makeTranslation(x, 7.6, -26.2); arms.setMatrixAt(n, mm); n++; }
+    for (let x = -240; x <= 240 && n < 28; x += 40) { mm.makeTranslation(x, 4, -26.2); poles.setMatrixAt(n, mm); mm.makeTranslation(x, 7.6, -26.2); arms.setMatrixAt(n, mm); n++; if (x > -70 && x < 60) solid(x - 0.22, x + 0.22, -26.42, -25.98, { maxY: 8, id: 'pole' }); }
     poles.count = arms.count = n; poles.castShadow = true; yard.add(poles, arms);
     const wire = new THREE.Mesh(new THREE.BoxGeometry(480, 0.02, 0.02), M.black); wire.position.set(0, 7.5, -26.2); yard.add(wire);
   }
@@ -1883,6 +1964,7 @@ export function buildWorld(scene) {
   const streetLight = (() => {
     const PX = 7.8, PZ = -26.3, PH = 8.0, HX = PX, HZ = -29.3, HY = 8.25;
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, PH, 10), M.darkWood); pole.position.set(PX, PH / 2, PZ); pole.castShadow = true; yard.add(pole);
+    solid(PX - 0.2, PX + 0.2, PZ - 0.2, PZ + 0.2, { maxY: PH, id: 'streetlight' });
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, Math.hypot(HZ - PZ, HY - (PH - 0.5)), 8), M.steel); arm.position.set(PX, (PH - 0.5 + HY) / 2, (PZ + HZ) / 2); arm.rotation.x = Math.atan2(HZ - PZ, HY - (PH - 0.5)); arm.castShadow = true; yard.add(arm);
     const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.9, 6), M.steel); brace.position.set(PX, PH - 1.1, PZ - 0.8); brace.rotation.x = -0.95; yard.add(brace);
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.2, 0.95), std({ color: 0x5c6066, roughness: 0.5, metalness: 0.5 })); head.position.set(HX, HY, HZ - 0.3); head.castShadow = true; yard.add(head);
@@ -1926,8 +2008,8 @@ export function buildWorld(scene) {
       },
     };
   })();
-  place(yard, 'mailbox', { x: 4.7, z: -26.9, rot: Math.PI, s: 0.33 }); solid(4.45, 4.95, -27.15, -26.65);
-  place(yard, 'trash_can', { x: 5.9, z: -26.1, rot: 0.35 }); solid(5.1, 6.7, -26.6, -25.6);
+  place(yard, 'mailbox', { x: 4.7, z: -26.9, rot: Math.PI, s: 0.33 }); solid(4.45, 4.95, -27.15, -26.65, { maxY: 1.2, id: 'mailbox' });
+  place(yard, 'trash_can', { x: 5.9, z: -26.1, rot: 0.35 }); solid(5.1, 6.7, -26.6, -25.6, { maxY: 1.1, id: 'trashCans' });
   {   // the speed limit sign a way down the road, for the +x traffic; the reflector posts along the far shoulder
     const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
     g.fillStyle = '#e9e6dc'; g.fillRect(0, 0, 128, 160); g.strokeStyle = '#1a1a1a'; g.lineWidth = 5; g.strokeRect(6, 6, 116, 148);
@@ -1935,8 +2017,9 @@ export function buildWorld(scene) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })); sign.position.set(-46, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.4, 0.06), M.steel); post.position.set(-46.04, 1.2, -26.0); yard.add(post);
+    solid(-46.12, -45.96, -26.08, -25.92, { maxY: 2.4, id: 'signPost' });
     const n = PHONE ? 0 : 13, posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), M.white, Math.max(1, n)), refl = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), Math.max(1, n)), mm = new THREE.Matrix4();
-    for (let i = 0; i < n; i++) { const x = -240 + i * 40; mm.makeTranslation(x, 0.55, RZ0 - 0.9); posts.setMatrixAt(i, mm); mm.makeTranslation(x, 0.95, RZ0 - 0.88); refl.setMatrixAt(i, mm); }
+    for (let i = 0; i < n; i++) { const x = -240 + i * 40; mm.makeTranslation(x, 0.55, RZ0 - 0.9); posts.setMatrixAt(i, mm); mm.makeTranslation(x, 0.95, RZ0 - 0.88); refl.setMatrixAt(i, mm); if (x > -70 && x < 60) solid(x - 0.08, x + 0.08, RZ0 - 0.98, RZ0 - 0.82, { maxY: 1.1, id: 'reflectorPost' }); }
     if (n) yard.add(posts, refl);
   }
   // puddles on the drive and the road, shown by weather.js once the ground is wet; dry patches in the grass where the summer burnt it
@@ -1971,7 +2054,7 @@ export function buildWorld(scene) {
   const BARN = { x: -64, z: -12 };
   {
     place(yard, 'barn', { x: BARN.x, y: -0.03, z: BARN.z, rot: Math.PI / 2, s: 0.058 });
-    solid(BARN.x - 5.4, BARN.x + 5.4, BARN.z - 7.2, BARN.z + 7.2);
+    solid(BARN.x - 5.4, BARN.x + 5.4, BARN.z - 7.2, BARN.z + 7.2, { maxY: 9, id: 'barnBlock' });   // one block for the whole barn until it is a place (W.plugin: removeSolid('barnBlock'))
     const SX = -72, SZ = -28;
     const silo = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 11, 24), M.silo); silo.position.set(SX, 5.47, SZ); silo.castShadow = true; yard.add(silo);
     const dome = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.silo); dome.position.set(SX, 10.97, SZ); yard.add(dome);
@@ -2064,7 +2147,8 @@ export function buildWorld(scene) {
     for (const [i, name] of [[0, 'fir1'], [1, 'fir2']]) { scatter(yard, name, fir[i].filter(near)); scatter(far, name + '_far', fir[i].filter((m) => !near(m)), { cast: false }); }
     scatter(yard, 'maple', maple);
     scatter(yard, 'tree_bare', bare.filter(near)); scatter(far, 'tree_bare', bare.filter((m) => !near(m)), { cast: false });
-    for (const m of [...fir[0], ...fir[1], ...maple, ...bare]) if (Math.hypot(m.elements[12] - 5, m.elements[14] + 15) < 70) solid(m.elements[12] - 0.4, m.elements[12] + 0.4, m.elements[14] - 0.4, m.elements[14] + 0.4);
+    // every trunk inside the yard's boundary is solid (the boundary itself is the last collider below)
+    for (const m of [...fir[0], ...fir[1], ...maple, ...bare]) { const x = m.elements[12], z = m.elements[14]; if (x > -70 && x < 60 && z > -60 && z < 30) solid(x - 0.4, x + 0.4, z - 0.4, z + 0.4, { maxY: 20, id: 'trunk' }); }
     // leaves under the maples, lying flat, and a mole hill or two in the lawn
     if (!PHONE) {
       const lg = new THREE.PlaneGeometry(0.11, 0.09); lg.rotateX(-Math.PI / 2);
@@ -2299,6 +2383,7 @@ export function buildWorld(scene) {
       else { c.minX = SX(c.minX); c.maxX = SX(c.maxX); c.minZ = SZ(c.minZ); c.maxZ = SZ(c.maxZ); }
     }
     for (const f of fixups) f();
+    stretched = true;
     for (const [alongX, fixed, gp] of lateArches) archFill(alongX, fixed, gp);
     for (const n of nightLights) n.light.getWorldPosition(n.pos);
   }
@@ -2343,15 +2428,66 @@ export function buildWorld(scene) {
     if (PHONE) for (const k in doors) { const d = doors[k]; if (d.g) mergeInto(d.g); if (d.fr) mergeInto(d.fr); }
   }
 
-  return {
+  // ---------- the boundaries: every built footprint gets the height of what it stands for, the overheads are listed for the tall, and the
+  // rain knows the roofs. The hand-drawn footprints above are matched by a point inside each (plan coordinates for the house's, mapped
+  // through the stretch; world coordinates for the yard's), so the furniture keeps its lines above ----------
+  function colliderPlumbing() {
+    const HOUSE_TOPS = [   // [x, z (plan), maxY, name]
+      [6.1, 3.05, 2.0, 'bunk'], [5.85, 0.1, 2.43, 'kid closet'], [5.35, 0.95, 1.2, 'kid tv stand'],
+      [4.15, 3.1, 0.6, 'tub'], [3.7, 1.9, 0.85, 'toilet'], [4.75, 0.9, 1.0, 'sink'],
+      [-2.6, -2.4, 0.95, 'couch'], [-1.1, -3.0, 0.42, 'coffee table'], [2.95, -3.2, 1.2, 'tv stand'],
+      [0.9, 3.2, 2.3, 'back counter'], [2.8, 1.3, 1.8, 'east counter'], [0.19, 1.29, 0.75, 'dining table'],
+      [-5.7, -3.62, 0.9, 'parents dresser'], [-7.8, -0.74, 0.6, 'nightstand'], [-7.8, 0.96, 1.02, 'nightstand lamp'], [-3.65, -2.55, 2.4, 'parents closet'],
+      [7.45, -4.1, 2.4, 'spare closet'], [-6.9, 0.1, 0.9, 'parents bed'], [4.95, -1.85, 2.4, 'office closet'],
+      [4.25, -4.08, 1.2, 'desk'], [5.55, -3.3, 2.0, 'bookcase'], [-4.75, -3.28, 0.85, 'parents boxes'], [-5.0, 2.8, 0.9, 'parents boxes far'],
+      [6.45, -4.17, 0.92, 'spare boxes window'], [6.15, -2.35, 1.9, 'sheeted mirror'], [6.4, -1.8, 0.86, 'spare boxes hall wall'], [7.97, -4.36, 1.1, 'rolled rug'],
+      [-1.632, 0.9, 0.73, 'phone table'], [-3.025, 3.4, 1.7, 'coat rack'],
+    ];
+    const YARD_TOPS = [[-12.0, -13.0, 1.9, 'workbench'], [-13.3, -8.0, 0.6, 'tires'], [-13.3, -9.55, 0.9, 'garage boxes'], [-27, 0, 1.75, 'west fence'], [27, 0, 1.75, 'east fence'], [0, 28, 1.75, 'back fence'], [-27, -22, 1.75, 'west fence south'], [-72, -28, 12, 'silo']];
+    const inside = (c, x, z) => x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ;
+    const topsMissed = [];
+    const assign = (x, z, maxY, name) => {
+      let n = 0;
+      for (const c of colliders) if (!c.wall && !c.door && c.maxY === undefined && inside(c, x, z)) { c.maxY = maxY; if (!c.id) c.id = name; n++; }
+      if (!n) topsMissed.push(name);
+    };
+    for (const [x, z, maxY, name] of HOUSE_TOPS) assign(SX(x), SZ(z), maxY, name);
+    for (const [x, z, maxY, name] of YARD_TOPS) assign(x, z, maxY, name);
+    // what hangs over the floor, for the tall: the door heads, the fixtures' domes, the laundry's joists, the arch, the ceilings
+    for (const k in doors) { const d = doors[k], c = d.col, y0 = (d.y0 || 0) + (d.slide ? 2.1 : 2.03); collide.headClear.add({ minX: c.minX - 0.05, maxX: c.maxX + 0.05, minZ: c.minZ - 0.05, maxZ: c.maxZ + 0.05, y0, y1: y0 + 0.67, id: 'head:' + k }); }
+    for (const k in bulbs) { const p = bulbs[k].dome.position; collide.headClear.sphere({ x: p.x, y: p.y, z: p.z, r: 0.16, id: 'fixture:' + k }); }
+    collide.headClear.add({ minX: SX(-8.1), maxX: SX(-3.3), minZ: SZ(-0.4), maxZ: SZ(3.6), y0: -0.36, y1: -0.1, id: 'laundryJoists' });
+    { const c = SX(1.7), z0 = SZ(-0.3) - 0.12, z1 = SZ(-0.3) + 0.12;   // the arch: its springing at the sides, the crown over the middle
+      collide.headClear.add({ minX: c - 0.7, maxX: c - 0.35, minZ: z0, maxZ: z1, y0: 1.85, y1: H, id: 'arch' }); collide.headClear.add({ minX: c + 0.35, maxX: c + 0.7, minZ: z0, maxZ: z1, y0: 1.85, y1: H, id: 'arch' }); collide.headClear.add({ minX: c - 0.35, maxX: c + 0.35, minZ: z0, maxZ: z1, y0: 2.45, y1: H, id: 'arch' }); }
+    collide.headClear.add({ minX: SX(-8.1), maxX: SX(8.1), minZ: -4.5, maxZ: SZ(3.6), y0: H, y1: H + 0.1, id: 'ceiling' });
+    collide.headClear.add({ minX: PLACES.garage[0], maxX: PLACES.garage[1], minZ: PLACES.garage[2], maxZ: PLACES.garage[3], y0: GH, y1: GH + 0.1, id: 'garageCeiling' });
+    rainDiscard.push({ minX: SX(-8.1) - 0.3, maxX: SX(8.1) + 0.3, minZ: -4.8, maxZ: SZ(3.6) + 0.3, maxY: 3.4, id: 'house' }, { minX: PLACES.garage[0] - 0.2, maxX: PLACES.garage[1] + 0.2, minZ: PLACES.garage[2] - 0.2, maxZ: PLACES.garage[3] + 0.2, maxY: 3.4, id: 'garage' });
+    return topsMissed;
+  }
+  const topsMissed = colliderPlumbing();
+  if (topsMissed.length) console.warn('footprints without a height:', topsMissed.join(', '));
+
+  const W = {
     colliders, onDrive, T, M, house, yard, bulbs, switches, nightLights, faceLight, carLight, fills, bathSpot, porchLight, porchBulb,
     hemi, sun, stars, moon, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
-    doors, setDoor, tick, setDoorHook: (f) => { doorHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
-    get hallFrame() { return hallFrame; }, get lowerBunk() { return lowerBunk; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; } },
+    doors, setDoor, tick, setDoorHook: (f) => { doorHook = f; }, setDoorBump: (f) => { bumpHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
+    get hallFrame() { return hallFrame; }, get lowerBunk() { return lowerBunk; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; fitProp(c.holder); } },
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.setDown(x, y, z, { facing: teddy.rotation.y, settle: false }); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
     groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry, office, spare, windows,
     streetLight, puddles, wetMats, farLights, clock, TRUCK, lawn, treesRejected,
+    // the boundaries: removeSolid(id), fitProp(holder) after a prop moves, follow(mesh, hx, hz) for a thing that keeps moving, the overheads
+    // list, the rain's roofs, and the truck's ramp as a floor
+    removeSolid, fitProp, follow, headClear: collide.headClear, rainDiscard, rampY: (x, z) => rampAt(x, z), topsMissed,
   };
+  // Build-time registration: a later builder (the barn as a place, the night fences, the day's props, an event's set) is a plugin registered
+  // from its own module's install(game) as game.W.plugin(fn); fn gets this context and adds to the world with it. Meshes it adds are not in
+  // the merged shells (separate draws; fine), and colliders it pushes are live at once. The house's own builders above take plan
+  // coordinates and are mapped by the stretch; a plugin builds after it, so inside the stretched footprint it writes finished coordinates
+  // for meshes (ctx.house, ctx.box ...) while ctx.prop's `box`, ctx.mkDoor and ctx.solid through SX/SZ still take plan ones; out in the yard
+  // (the barn, the gate) the two are the same.
+  const ctx = { solid, removeSolid, box, rbox, lbox, place, prop, std, M, T, TX, house, yard, doors, mkDoor, setDoor, colliders, rainDiscard, headClear: collide.headClear, SX, SZ, groundAt, PLAN, W };
+  W.plugin = (fn) => fn(ctx);
+  return W;
 }

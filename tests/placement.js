@@ -1,6 +1,7 @@
 // Placement audit: loads the game headless and checks every placed model against the others, the walls and the floor.
 //   node tests/placement.js [--port N] [--json out.json] [--tol 0.03]
 // Reports models that cut into each other, into a wall or the floor, that float, or whose front faces a wall; exit 1 when it finds any.
+// A model set down below the floor on purpose has its allowance in tests/sunk/<package>.json ({ modelName: metres }).
 const http = require('http'), fs = require('fs'), path = require('path');
 const { Readable } = require('stream');
 const ROOT = path.resolve(__dirname, '..');
@@ -21,6 +22,16 @@ const FRONT = {
 const IN_WALL = new Set(['outlet', 'switch', 'clock_wall']);
 // pairs that are meant to overlap in their boxes (a chair pushed under a table, a lamp on a desk, a pc on a desk)
 const TUCKED = [['chair', 'table_round'], ['office_chair', 'desk'], ['crt_pc', 'desk'], ['desk_lamp', 'desk'], ['table_lamp', 'dresser'], ['kettle', 'stove'], ['pot', 'stove'], ['tv', 'table'], ['teddy', 'bunk']];
+// models set down below the floor on purpose (the truck on its tyres, the barn on its sill): tests/sunk/*.json, each { modelName: metres its
+// lowest point may lie under the floor }, merged in file-name order so a later file overrides an earlier one (keys starting with _ are notes)
+const SUNK = {};
+{
+  const dir = path.join(__dirname, 'sunk');
+  if (fs.existsSync(dir)) for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort()) {
+    const rows = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+    for (const k in rows) if (!k.startsWith('_')) SUNK[k] = +rows[k] || 0;
+  }
+}
 
 (async () => {
   const { chromium } = require('playwright');
@@ -85,8 +96,8 @@ const TUCKED = [['chair', 'table_round'], ['office_chair', 'desk'], ['crt_pc', '
   }
   // c: floor and support
   items.forEach((a, i) => {
-    const floor = ground[i];
-    if (a.min[1] < floor - 0.02) add('high', a.room, `${a.name} (${a.x}, ${a.z})`, 'model below the floor', `bottom ${a.min[1]} vs floor ${floor}`);
+    const floor = ground[i], sunk = SUNK[a.name] || 0;
+    if (a.min[1] < floor - 0.02 - sunk) add('high', a.room, `${a.name} (${a.x}, ${a.z})`, 'model below the floor', `bottom ${a.min[1]} vs floor ${floor}${sunk ? ` (set down ${sunk} m on purpose: tests/sunk)` : ''}`);
     if (a.min[1] > floor + 0.03) {
       // something under it: another model or a built collider's footprint
       const under = items.some((b) => b !== a && Math.abs(b.max[1] - a.min[1]) < 0.04 && ov(a, b, 0) > 0 && ov(a, b, 2) > 0)
@@ -97,7 +108,8 @@ const TUCKED = [['chair', 'table_round'], ['office_chair', 'desk'], ['crt_pc', '
   // d: fronts toward the room
   for (const a of items) {
     if (!a.front) continue;
-    // the wall its back is against: within 0.35 m and running along most of the model's width (a wall end beside it does not count)
+    // the wall its back is against: within 0.35 m and running along most of the model's width (a wall end beside it does not count); in a
+    // corner the wall its front points away from is the one that counts
     let best = null;
     for (const w of walls) {
       if (a.max[1] < w[4] || a.min[1] > w[5]) continue;
@@ -106,19 +118,18 @@ const TUCKED = [['chair', 'table_round'], ['office_chair', 'desk'], ['crt_pc', '
       const alongX = (w[1] - w[0]) > (w[3] - w[2]), k = alongX ? 0 : 2;
       const contact = Math.min(a.max[k], w[k + 1]) - Math.max(a.min[k], w[k]), width = a.max[k] - a.min[k];
       if (contact < 0.5 * width) continue;
-      if (!best || contact > best.contact) {
-        const cx = (w[0] + w[1]) / 2, cz = (w[2] + w[3]) / 2;
-        best = { d, contact, away: alongX ? [0, Math.sign(a.z - cz) || 1] : [Math.sign(a.x - cx) || 1, 0], w };
-      }
+      const cx = (w[0] + w[1]) / 2, cz = (w[2] + w[3]) / 2, away = alongX ? [0, Math.sign(a.z - cz) || 1] : [Math.sign(a.x - cx) || 1, 0];
+      const dot = a.front[0] * away[0] + a.front[1] * away[1];
+      if (!best || dot > best.dot) best = { d, contact, away, w, dot };
     }
     if (!best) continue;
-    const dot = a.front[0] * best.away[0] + a.front[1] * best.away[1];
+    const dot = best.dot;
     if (dot < 0.5) add(dot < -0.5 ? 'high' : 'low', a.room, `${a.name} (${a.x}, ${a.z}) rot ${a.rot}`, dot < -0.5 ? 'front faces the wall' : 'front runs along the wall', `front (${a.front}), wall x ${best.w[0]}..${best.w[1]} z ${best.w[2]}..${best.w[3]} at ${best.d.toFixed(2)} m`);
   }
 
   const order = { high: 0, low: 1 };
   findings.sort((p, q) => order[p.sev] - order[q.sev] || p.room.localeCompare(q.room));
-  console.log(`${items.length} models, ${walls.length} wall pieces, ${furn.length} built footprints`);
+  console.log(`${items.length} models, ${walls.length} wall pieces, ${furn.length} built footprints, ${Object.keys(SUNK).length} set down on purpose (${Object.entries(SUNK).map(([k, v]) => `${k} ${v}`).join(', ') || 'none'})`);
   if (errs.length) console.log('page errors:', errs.join(' | '));
   for (const f of findings) console.log(`${f.sev.padEnd(4)} ${f.room.padEnd(8)} ${f.obj}: ${f.issue} (${f.nums})`);
   console.log(findings.length ? `${findings.length} findings` : 'clean');
