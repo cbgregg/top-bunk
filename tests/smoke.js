@@ -141,13 +141,13 @@ let BASE = '';
 (async () => {
   // ---------- 0: every module parses (node stops at the bare 'three' import, which only the browser's import map resolves) ----------
   await check(0, 'modules', () => {
-    const files = fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js')).sort(), bad = [];
+    const files = fs.readdirSync(path.join(ROOT, 'js'), { recursive: true }).map(String).filter((f) => f.endsWith('.js')).sort(), bad = [];   // js/ and its folders (js/events/)
     for (const f of files) {
       const r = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '-e', `import('./js/${f}').then(() => {}, (e) => { console.error(String(e && e.message)); process.exit(1); })`], { cwd: ROOT, encoding: 'utf8' });
       if (r.status !== 0 && !/Cannot find package 'three'/.test(r.stderr)) bad.push(`${f}: ${(r.stderr || '').trim().split('\n')[0]}`);
     }
     ok(!bad.length, bad.join(' | '));
-    return `${files.length} files in js/ import cleanly`;
+    return `${files.length} files in js/ import cleanly: ${files.join(' ')}`;
   });
 
   let chromium = null;
