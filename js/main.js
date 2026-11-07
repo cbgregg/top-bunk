@@ -8,7 +8,7 @@ import { Gfx, PHONE, contactShadow } from './gfx.js';
 import { WindowFace } from './windowface.js';
 import { Dust } from './dust.js';
 import * as UI from './ui.js';
-import { input, label as L, bindingLabel, initInput, controlsTable } from './input.js';
+import { input, label as L, bindingLabel, glyph, padStyle, initInput, controlsTable } from './input.js';
 import { createNights } from './nights.js';
 import { newSeed } from './rng.js';
 import { createCar } from './cars.js';
@@ -167,7 +167,6 @@ function toggleLight() {
   if (!(P.mode === 'walk' || P.mode === 'bunk')) return;
   F.flashOn = !F.flashOn; flash.intensity = F.flashOn ? 26 : 0; sfx.click();
 }
-addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !e.repeat) toggleLight(); });
 
 // ---------- constants ----------
 const EYE = 1.32, R = 0.28;
@@ -253,21 +252,12 @@ let shake = 0, uiMode = 'title', paused = false, started = false, pressE = false
 // the breath key pulls the covers up only once held a moment, and not right after you sit down
 let bunkSince = -9, coverHold = 0;
 const canBunkCover = () => P.mode === 'bunk' && !F.cutscene && !F.dead && gameTime - bunkSince > 0.8;
-const keys = {};
-const echoes = [];
-
 // ---------- input ----------
-addEventListener('keydown', (e) => {
-  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
-  keys[e.code] = true;
-  if (e.repeat) return;
-  if (e.code === 'KeyE') pressE = true;
-  if (e.code === 'Tab') { e.preventDefault(); openPhotos(); }
-  if (e.code === 'KeyJ') openJournal();
-  if (e.code === 'KeyC' && uiMode === 'playing' && P.mode === 'walk' && !F.cutscene && hasCamera()) hands.toggleCamera();   // the disposable camera up to the eye, or back down
-});
-addEventListener('keyup', (e) => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+// The keyboard, the mouse buttons, the controller and the touch screen all come through js/input.js and the bindings table in
+// js/settings.js: the frame reads actions by name (input.down('sprint'), input.edge(...)) and the one-shot actions (interact, camera,
+// light, journal, cancel, pause) call the functions given to initInput below. `keys` is the raw key state, which the pause clears.
+const keys = input.keys;
+const echoes = [];
 document.addEventListener('visibilitychange', () => { if (document.hidden && uiMode === 'playing') setPause(true); });
 // look sensitivity and invert-Y (options menu) scale the mouse, the right stick and the touch look pad alike
 const look = { s: settings.get('sensitivity'), y: settings.get('invertY') ? -1 : 1 };
@@ -293,7 +283,19 @@ function confirmPress() {
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat' || P.mode === 'lie');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
-initInput({ interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy, light: () => toggleLight(), cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos(), journal: () => openJournal() });
+// the disposable camera up to the eye, or back down (the camera key and Y toggle; the right mouse button can hold it up instead)
+function cameraKey(how = 'toggle') {
+  if (!(uiMode === 'playing' && P.mode === 'walk' && !F.cutscene && hasCamera())) return;
+  if (how === 'toggle' || (how === 'up') !== hands.cameraOut) hands.toggleCamera();
+}
+// the journal button (J, View, the notebook) toggles: from the journal it goes back to the game
+function toggleJournal() { if (uiMode === 'pause' && menu.state.open.includes('journal')) setPause(false); else openJournal(); }
+initInput({
+  interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy,
+  light: () => toggleLight(), camera: cameraKey, cancel: () => { if (hands.cameraOut) cameraKey('down'); },
+  cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos(), journal: toggleJournal,
+  cameraUp: () => hands.raised,   // the touch USE button shows the shutter while the camera is up
+});
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
   $('controls').innerHTML = controlsTable().map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
@@ -655,11 +657,10 @@ const onFloor = (c) => collide.active(c) && collide.onFloor(c, P.pos.y, PB.h);
 const resolvePlayer = () => collide.resolveCircle(PB);
 function movePlayer(dt) {
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
-  const f = clamp((keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + input.fy, -1, 1);
-  const s = clamp((keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + input.fx, -1, 1);
+  const f = clamp(input.fy, -1, 1), s = clamp(input.fx, -1, 1);   // forward and strafe: the move keys, the left stick and the touch stick, merged in input.poll
   let wx = fx * f + rx * s, wz = fz * f + rz * s; const wl = Math.hypot(wx, wz), mag = Math.min(1, wl);   // a gentle stick push walks slowly
   if (wl > 0) { wx /= wl; wz /= wl; }
-  const sprint = (keys.ShiftLeft || keys.ShiftRight || input.run) && wl > 0 && f > 0 && !P.carrying && !P.exhausted && P.stamina > 0.01;
+  const sprint = input.down('sprint') && wl > 0 && f > 0 && !P.carrying && !P.exhausted && P.stamina > 0.01;
   const speed = (P.carrying ? 1.6 : sprint ? 4.4 : 2.0) * (0.35 + 0.65 * mag);   // m/s: kept slow so the house takes a while to cross
   P.sprinting = sprint;
   if (sprint) P.stamina -= dt / 6; else P.stamina = Math.min(1, P.stamina + dt / 4);
@@ -696,7 +697,7 @@ function updateCamera(dt) {
   if (P.mode === 'hide') {
     const hy = P.pod ? P.podYaw : HIDE_YAW;
     P.yaw = hy + clamp(angDiff(hy, P.yaw), P.pod ? -0.9 : -0.55, P.pod ? 0.9 : 0.55); P.pitch = clamp(P.pitch, -0.35, 0.4);
-    camera.position.y += Math.sin(gameTime * (keys.Space || input.breath ? 0.6 : 2.4)) * 0.006;
+    camera.position.y += Math.sin(gameTime * (input.down('breath') ? 0.6 : 2.4)) * 0.006;
   }
   if (P.mode === 'bunk') P.pitch = clamp(P.pitch, -1.2, 0.9);
   if (P.mode === 'lie') { P.yaw = lieYaw + clamp(angDiff(lieYaw, P.yaw), -1.25, 1.25); P.pitch = clamp(P.pitch, -0.75, 0.7); }   // on your back: the head turns, the body does not
@@ -1169,8 +1170,8 @@ async function dayScript() {
 // (the cartoon, js/cartoon.js, teaches holding your breath: Mister Buttons, your own bear, in an old safety picture that ends wrong)
 const cartoon = createCartoon({
   audio: sfx, lines: LINES,
-  getLabel: () => ({ text: bindingLabel('breath'), scheme: input.scheme, pad: input.padType }),   // the breath control as set, on the device in use (live)
-  breathDown: () => !!keys.Space || input.breath, skipDown: () => !!keys.Escape || !!input.start, subtitles: () => settings.get('subtitles'),
+  getLabel: () => ({ text: bindingLabel('breath'), html: glyph('breath'), scheme: input.scheme, pad: padStyle() }),   // the breath control as set, on the device in use (live)
+  breathDown: () => input.down('breath'), skipDown: () => input.down('pause'), subtitles: () => settings.get('subtitles'),
 });
 const LIE = new V3(BUNK_LIE.x, 2.03, BUNK_LIE.z);   // on your back on the top bunk, the head on the pillow
 let lieYaw = 0;
@@ -1804,13 +1805,21 @@ function update(dt) {
   updateInteract();
 }
 
-// the right stick turns the view
+// the right stick turns the view: its own sensitivity (Options), invert X, and the look acceleration (settings.padLookAccel, 0..1):
+// a curve on the stick's magnitude past the deadzone, and a ramp over half a second once the stick is pushed near its edge, so a
+// flick stays precise and a held push turns you round
+let padRamp = 0;
 function padLookTick(dt) {
-  if (input.lookX || input.lookY) lookBy(-input.lookX * 2.7 * dt, -input.lookY * 2.0 * dt);
+  const m = input.lookMag;
+  padRamp = m > 0.8 ? Math.min(1, padRamp + dt / 0.5) : Math.max(0, padRamp - dt / 0.2);
+  if (!(input.lookX || input.lookY)) return;
+  const accel = settings.get('padLookAccel'), boost = 1 + accel * (0.7 * m * m + 0.6 * padRamp);
+  const k = settings.get('padSensitivity') / Math.max(0.3, look.s) * boost, ix = settings.get('invertX') ? -1 : 1;
+  lookBy(-input.lookX * 2.7 * dt * k * ix, -input.lookY * 2.0 * dt * k);
 }
 // from the bunk, the breath key pulls the covers over your head (only while the night is live: update() gates the call)
 function coverTick(dt) {
-  const dn = !!keys.Space || input.breath;
+  const dn = input.down('breath');
   if (P.mode === 'bunk' && !F.cutscene) {
     coverHold = dn ? coverHold + dt : 0;
     if (dn && coverHold >= 0.3 && canBunkCover()) hideUnderCovers();
@@ -1827,7 +1836,7 @@ function breathTick(dt) {
   if (P.mode !== 'hide' || F.dead) { breathLatch = false; breathPrev = false; }
   if (P.mode === 'hide' && !F.dead) {
     // hold the key to hold your breath, or tap it once to keep holding (tap again to let go)
-    const down = !!keys.Space || input.breath, now = performance.now();
+    const down = input.down('breath'), now = performance.now();
     if (down && !breathPrev) breathDownAt = now;
     if (!down && breathPrev && now - breathDownAt < 300) breathLatch = !breathLatch;
     breathPrev = down;
@@ -1841,7 +1850,7 @@ function breathTick(dt) {
         if (F.breathTeach) {
           // the first night: it hears you. everything stops, something scratches the bed frame, and the hint comes back; you live
           sfx.gasp(); sfx.scratch(0); sfx.creak(0.6, 0); shake = Math.max(shake, 0.6); F.fear = 1;
-          UI.hint(`It heard you. Hold <b>${L('breath')}</b>`, 4);
+          UI.hint(`It heard you. Hold ${glyph('breath')}`, 4);
           F.grace = 2.4; P.breath = Math.max(P.breath, 0.6);
         } else { sfx.gasp(); caught(); }
       }
@@ -1985,7 +1994,7 @@ function handsTick(dt) {
   if (started && nights && F.live) {
     if (P.mode === 'hide' && P.pod && nights.hunter.busy && nights.hunter.state === 'search') journal.learn('still');
   }
-  const holding = P.mode === 'hide' && (!!keys.Space || input.breath || breathLatch);
+  const holding = P.mode === 'hide' && (input.down('breath') || breathLatch);
   const hidden = !started || paused || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || P.mode === 'seat' || (uiMode !== 'playing' && uiMode !== 'test');
   const walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0;
   hands.update(dt, camera, { hasCamera: hasCamera(), cameraNear: !!(nights && nights.proof && nights.proof.near && F.live && nights.proof.near(P.pos)), keepCamera: !!F.photoHold, mode: P.mode, pod: P.pod, flashOn: F.flashOn && flash.intensity > 0, holding, fear: F.fear, walk, bob: P.bob, hidden: hidden && !hands.busy, world: scene, blocked: sightBlocked, outdoors: roomAt(P.pos.x, P.pos.z, P.pos.y) === 'out', night: F.phase === 'night' });
@@ -2062,7 +2071,7 @@ nights = createNights({
   clamp, lerp, lerpAngle, tween, wait, waitFor, later, ease, setFovOff: (v) => { fovOff = v; }, pan: (x, z, y = 1.2) => panFor(tmp.set(x, y, z)),
   time: () => gameTime, say, panFor, nlMult, setPhase, resetNight, caught, roomAt, sleepers, toBunk, enteredHide, carPass, faceAtWindow, lights,
   addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); },
-  holding: () => !!keys.Space || input.breath || breathLatch,
+  holding: () => input.down('breath') || breathLatch,
   addShake: (v) => { shake = Math.max(shake, v); },
   scene, photo: takePhoto, openPhotos, hands, FN, kidBoxes, faceTo: (who, x, z) => { who.group.rotation.set(0, Math.atan2(x - who.group.position.x, z - who.group.position.z), 0); },
   clockRate: 1 / 1.1, lightLabel: () => L('light'),

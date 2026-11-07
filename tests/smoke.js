@@ -21,6 +21,14 @@ const opt = (name, def) => { const i = ARGV.indexOf(name); return i >= 0 && ARGV
 const PORT = +opt('--port', process.env.SMOKE_PORT || 0);
 // the checks by name, so --only takes either 10 or gamepad
 const NAMES = { modules: 0, load: 1, fonts: 2, title: 3, day: 4, night: 5, evidence: 6, trailer: 7, phone: 8, desktop: 9, gamepad: 10, death: 11, endings: 12, dawn: 13, vigil: 14, nightmares: 15, breaker: 16, doors: 17, brightness: 18, seed: 19, breakfast: 20, lights: 21, firstnight: 22, bedtime: 23 };
+// the per-package checks: every tests/checks/<name>.js, in file order, numbered from 30 and named by its export, so --only <name> works.
+// Each exports { name, run(browser, helpers), timeout? }; helpers are the functions the checks in this file use (alone, openGame, nightPage,
+// stand, hold, tap, until, playFor, prompt, climbDown, ok, sleep, clean, Skip, roomAt, newContext, base)
+const CHECKS = (() => {
+  const dir = path.join(__dirname, 'checks'); if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => /\.js$/.test(f)).sort().map((f, i) => { const mod = require(path.join(dir, f)); return { n: 30 + i, name: mod.name || f.replace(/\.js$/, ''), mod }; });
+})();
+for (const c of CHECKS) NAMES[c.name] = c.n;
 const ONLY = opt('--only', '') ? new Set(opt('--only', '').split(',').map((t) => (t in NAMES ? NAMES[t] : Number(t)))) : null;
 if (ONLY && [...ONLY].some(Number.isNaN)) { console.error('--only takes check numbers or names: ' + Object.keys(NAMES).join(', ')); process.exit(2); }
 const want = (...ns) => !ONLY || ns.some((n) => ONLY.has(n));
@@ -152,7 +160,7 @@ let BASE = '';
 
   let chromium = null;
   try { ({ chromium } = require('playwright')); } catch (e) { /* reported below */ }
-  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+  const browserChecks = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, ...CHECKS.map((c) => c.n)];
   if (!chromium) {
     for (const n of browserChecks) await check(n, 'browser', () => { throw new Error('Playwright is not installed (npm install && npx playwright install chromium)'); });
   } else if (want(...browserChecks)) {
@@ -837,6 +845,14 @@ let BASE = '';
       // it waits at "now you try it" for as long as you don't hold your breath
       await until(page, () => window.__game.cartoon.state.seg === 'try', null, 120e3);
       await sleep(4000);
+      // the breath control is shown in the HUD margin under the film, never inside the 1930s frame, and reads the glyph of the key as bound
+      const cap = await page.evaluate(() => {
+        const g = window.__game, L = g.cartoon.layout, el = document.querySelector('#cartoon .cap'), r = el && el.getBoundingClientRect();
+        return { band: L.band, frame: L.frame, shown: !!el && getComputedStyle(el).display !== 'none' && r.height > 0, top: r && r.top, bottom: r && r.bottom, text: el && el.textContent.replace(/\s+/g, ' ').trim(), glyph: !!(el && el.querySelector('.g')), vh: innerHeight };
+      });
+      ok(cap.band >= 50 && cap.frame.h > 0 && cap.frame.y + cap.frame.h <= cap.vh - cap.band + 1, `no HUD margin under the film: ${JSON.stringify(cap)}`);
+      ok(cap.shown && cap.top >= cap.frame.y + cap.frame.h - 1 && cap.bottom <= cap.vh + 1, `the cap is not in the margin under the film: ${JSON.stringify(cap)}`);
+      ok(cap.glyph && /SPACE/.test(cap.text), `the cap does not read the breath glyph: ${JSON.stringify(cap)}`);
       let st = await page.evaluate(() => window.__game.cartoon.state);
       ok(st.seg === 'try' && !st.passed, `the cartoon went on without the breath: ${JSON.stringify(st)}`);
       ok(!st.skippable, 'the first time, skipping is offered before the lesson is passed');
@@ -855,7 +871,7 @@ let BASE = '';
       const n1 = await page.evaluate(() => { const g = window.__game; return { door: +g.W.doors.kid.a.toFixed(2), seen: g.RUN.cartoonSeen, how: g.RUN.cartoon, mode: g.P.mode }; });
       ok(n1.door > 0.12 && n1.door < 0.2 && n1.seen && n1.how === 'skipped' && n1.mode === 'bunk', `night one after the cartoon: ${JSON.stringify(n1)}`);
       clean(w); await page.close();
-      return `Dad drew the door to ${door}; the cartoon held at "now you try it" (no breath, then a 1.2 s breath: ${st.tries} tries) until a held breath passed it, then Esc skipped it without pausing; night one live in the bunk, the door at ${n1.door}`;
+      return `Dad drew the door to ${door}; the cap under the film (${Math.round(cap.band)} px band); the cartoon held at "now you try it" (no breath, then a 1.2 s breath: ${st.tries} tries) until a held breath passed it, then Esc skipped it without pausing; night one live in the bunk, the door at ${n1.door}`;
     }), 600e3);
 
     await check(21, 'lights', () => alone(browser, async (c) => {
@@ -901,6 +917,10 @@ let BASE = '';
       clean(S.w);
       return `the bedroom switch by its prompt (lever up, room lit ${lit.toFixed(2)}); blackout and dawn; every room switched twice with the frame drawn, ${cycles.res.join(' = ')} programs, ${cycles.before} lights throughout`;
     }), 420e3);
+
+    // ---------- 30 and on: the per-package checks, tests/checks/*.js ----------
+    const helpers = { alone, openGame, nightPage, stand, hold, tap, until, playFor, prompt, climbDown, ok, sleep, clean, watch, Skip, roomAt, newContext, PAD, base: () => BASE };
+    for (const c of CHECKS) await check(c.n, c.name, () => c.mod.run(browser, helpers), c.mod.timeout || 600e3);
 
     await browser.close();
     server.close();

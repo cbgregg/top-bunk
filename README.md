@@ -12,18 +12,21 @@ From night two the whole house is open, a clock runs toward dawn, and the thing 
 
 ## Controls
 
-| Action | Keyboard + mouse | Game controller | Touch |
+| Action | Keyboard + mouse | Game controller (Xbox · PlayStation) | Touch |
 |---|---|---|---|
-| Move | WASD / arrows | Left stick or d-pad | Drag on the left half (floating stick) |
-| Look | Mouse | Right stick | Drag on the right half |
-| Sprint (limited stamina) | Shift | RT / RB / L3 / B | RUN |
-| Interact (doors, switches, everything else) | E | A or X | USE (lights up when something is in reach) |
-| Flashlight | F | Y | LIGHT |
-| Pull the covers over your head (in the bunk) | Space | LT / LB / A | COVER UP |
-| Hold your breath while hiding (tap once to keep holding) | Space | LT / LB / A | HOLD BREATH |
-| Pause | Esc | Start | II |
+| Move / Look | WASD or arrows / mouse | Left stick / right stick | Drag on the left half (floating stick) / drag on the right half |
+| Sprint (limited stamina; hold) | Shift | RT · R2 (or L3) | RUN |
+| Interact, use what you hold; the shutter when the camera is up | E or left click | A · ✕ (or X · □) | USE (a shutter while the camera is up) |
+| Camera up / down | C (toggle), right click (hold or toggle, in Options) | Y · △ (or d-pad down) | CAM |
+| Flashlight | F | RB · R1 (or d-pad up) | LIGHT |
+| Hold your breath while hiding / pull the covers over your head in the bunk (hold; tap once to keep holding) | Space | LT · L2 (or LB · L1) | HOLD BREATH / COVER UP |
+| Put the camera away | C or right click again | B · ○ | — |
+| Your journal and photos (toggle; Tab opens on the photos) | J, Tab | View · Create | The notebook at the top |
+| Pause | Esc | Start · Options | II |
+| Skip the bedtime cartoon (hold) | Esc | Start · Options | SKIP |
+| Menus: choose / change / select / back / tabs / resume | Arrows or WASD / ← → / Enter or Space / Esc or Backspace / Q, E / — | D-pad or stick / ← → / A / B / LB, RB / Start | Tap / ‹ › / tap / ✕ / swipe / II |
 
-Prompts and the Controls panel follow whichever input you used last, and the menus work from the keyboard or a controller. Controllers rumble on the scares. On phones the game goes fullscreen in landscape and starts on the Medium graphics preset. Headphones recommended.
+Prompts, the Controls panel and the bedtime cartoon follow whichever input you used last and show your pad's own buttons (Xbox, PlayStation or Switch names). The menus work from the keyboard or a controller. Controllers rumble on the scares. On phones the game goes fullscreen in landscape and starts on the Medium graphics preset. Headphones recommended.
 
 Options (title and pause menus) has volume, look sensitivity, invert Y, field of view, head bob, graphics, subtitles, a reduce-flashing switch and the bedtime cartoon (on or off; hold Esc, Start or SKIP to skip it once you have passed its lesson, or straight away after the first time).
 
