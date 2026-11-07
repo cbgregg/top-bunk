@@ -6,8 +6,11 @@
 // (main.js and every file in js/ as they were at that revision, served in place of the new ones) and the new ones play moving day and the
 // first morning on the same seed, the same random numbers and the same game clock, stepped a frame at a time, and every sample of the
 // family, the player, the props, the colliders and the prompts must be the same; window.__game has the same keys in the same order.
-//   node tests/moves.js [--base <git revision>] [--port <n>] [--keep <dir>]
-// --base is the commit the move was made from (default: the one it was made from); --keep writes both traces there.
+//   node tests/moves.js [--base <git revision>] [--at <git revision>] [--port <n>] [--keep <dir>]
+// --base is the commit the move was made from (default: the one it was made from). --at checks the files as they are at a revision rather
+// than in the working tree: the proof of the move once js/day.js and js/breakfast.js have their own owners and change (run it --at the
+// commit that merged the move; without --at, a later edit to a moved function is reported as a difference, which is then what it is).
+// --keep writes both traces there.
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -18,6 +21,7 @@ const opt = (name, def = '') => { const i = ARGV.indexOf(name); return i >= 0 &&
 const BASE = opt('--base', '6bb899da136db266a96b2999957029126c795bc9');
 const PORT = +opt('--port', 0);
 const KEEP = opt('--keep', '');
+const AT = opt('--at', '');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -25,12 +29,13 @@ function test(name, fn) {
   catch (e) { failed++; console.log(`  FAIL ${name}\n       ${String((e && e.message) || e).split('\n').join('\n       ')}`); }
 }
 function ok(cond, msg) { if (!cond) throw new Error(msg); }
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
-function gitShow(rel) {
-  const r = spawnSync('git', ['show', `${BASE}:${rel}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
-  if (r.status !== 0) throw new Error(`git show ${BASE}:${rel}: ${(r.stderr || '').trim()}`);
+function gitShow(rel, rev = BASE) {
+  const r = spawnSync('git', ['show', `${rev}:${rel}`], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+  if (r.status !== 0) throw new Error(`git show ${rev}:${rel}: ${(r.stderr || '').trim()}`);
   return r.stdout;
 }
+// the new files: the working tree, or the revision --at names
+const read = (rel) => (AT ? gitShow(rel, AT) : fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 
 // ---------- the text, in top-level units ----------
 // A unit is a statement that starts at the left margin, with every indented line and closing bracket after it (a blank line inside a
@@ -173,8 +178,9 @@ function bindCall(fn) {
   let j = i; while (j < newMain.length && !/\} \}\);$|\}\);$/.test(newMain[j])) j++;
   return { at: i, end: j, text: newMain.slice(i, j + 1).join(' ') };
 }
-const BINDS = { day: bindCall('bindDay'), breakfast: bindCall('bindBreakfast') };
+const BINDS = {}; for (const [k, fn] of [['day', 'bindDay'], ['breakfast', 'bindBreakfast']]) { try { BINDS[k] = bindCall(fn); } catch (e) { BINDS[k] = null; } }   // (missing: the tests below say so)
 for (const k of Object.keys(FILES)) test(`main.js hands ${FILES[k]} exactly the names it declares, each by its own name, and a getter for each live variable it reads`, () => {
+  ok(BINDS[k], `main.js has no bind call for ${FILES[k]}`);
   const call = BINDS[k].text, getters = [...call.matchAll(/\bget ([\w$]+)\(\) \{ return \1; \}/g)].map((m) => m[1]), setters = [...call.matchAll(/\bset ([\w$]+)\(v\) \{ \1 = v; \}/g)].map((m) => m[1]);
   const plain = call.replace(/^\s*\w+\(\{/, '').replace(/\}\);$/, '').replace(/\b(get|set) [\w$]+\([^)]*\) \{[^}]*\}/g, '').split(',').map((s) => s.trim()).filter(Boolean);
   ok(plain.every((s) => /^[\w$]+$/.test(s)), `not every name is handed over as itself: ${plain.filter((s) => !/^[\w$]+$/.test(s)).join(' | ')}`);
@@ -202,7 +208,7 @@ test('main.js changed nowhere else: the moved lines gone, two import lines, the 
   const IMPORTS = [/^import \{ bind as bindDay, [\w$, ]+ \} from '\.\/day\.js';$/, /^import \{ bind as bindBreakfast, [\w$, ]+ \} from '\.\/breakfast\.js';$/];
   const boot = newMain.findIndex((l) => l === 'async function boot() {'), inst = newMain.findIndex((l, i) => i > boot && l.startsWith('  hooks.install({'));
   ok(boot >= 0 && inst > boot, 'boot() or its install line is missing');
-  for (const k of Object.keys(BINDS)) ok(BINDS[k].at > boot && BINDS[k].end < inst, `the ${k} bind call is not in boot() before the modules install`);
+  for (const k of Object.keys(BINDS)) ok(BINDS[k] && BINDS[k].at > boot && BINDS[k].end < inst, `the ${k} bind call is not in boot() before the modules install`);
   const insertable = newMain.map((l, i) => IMPORTS.some((re) => re.test(l)) || Object.values(BINDS).some((b) => i >= b.at && i <= b.end) || (i > boot && i < inst && /^ {2}\/\/ /.test(l) && i === Math.min(...Object.values(BINDS).map((b) => b.at)) - 1));
   ok(IMPORTS.every((re) => newMain.some((l) => re.test(l))), 'an import line is missing');
   // can the old lines (less the moved code) become the new ones by dropping region comments and adding only the allowed lines?
@@ -235,7 +241,7 @@ async function browserHalf() {
   const { Readable } = require('stream');
   const serve = require(path.join(ROOT, 'desktop', 'static'));
   const { chromium } = require('playwright');
-  const OLD_JS = new Map();   // js/ as it was at BASE, served in place of the new files for the old run
+  const AT_JS = { old: new Map(), new: new Map() };   // js/ as it was at BASE (the old run), and at --at when given (the new run)
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://127.0.0.1');
@@ -246,15 +252,16 @@ async function browserHalf() {
   });
   await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
-  const oldJs = (rel) => {
-    if (!OLD_JS.has(rel)) { const r = spawnSync('git', ['show', `${BASE}:${rel}`], { cwd: ROOT, maxBuffer: 1 << 26 }); OLD_JS.set(rel, r.status === 0 ? r.stdout : null); }
-    return OLD_JS.get(rel);
+  const jsAt = (which, rel) => {
+    const m = AT_JS[which], rev = which === 'old' ? BASE : AT;
+    if (!m.has(rel)) { const r = spawnSync('git', ['show', `${rev}:${rel}`], { cwd: ROOT, maxBuffer: 1 << 26 }); m.set(rel, r.status === 0 ? r.stdout : null); }
+    return m.get(rel);
   };
   // the page, with the random numbers seeded, the speech and the samples timed by the text rather than by what has loaded, nothing drawn
   async function open(which, hash) {
     const ctx = await browser.newContext({ viewport: { width: 640, height: 360 } });
-    if (which === 'old') await ctx.route(/\/js\/.*\.js(\?.*)?$/, (route) => {
-      const rel = new URL(route.request().url()).pathname.replace(/^\//, ''), body = oldJs(rel);
+    if (which === 'old' || AT) await ctx.route(/\/js\/.*\.js(\?.*)?$/, (route) => {
+      const rel = new URL(route.request().url()).pathname.replace(/^\//, ''), body = jsAt(which, rel);
       if (body === null) return route.fulfill({ status: 404, body: '' });
       return route.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body });
     });
