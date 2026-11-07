@@ -10,6 +10,8 @@ import { achievements } from './achievements.js';
 import { createGaze } from './gaze.js';
 import { createWindowScares } from './windowscares.js';
 import { makePerson } from './people.js';
+import * as events from './events.js';
+import * as log from './log.js';
 
 const DAWN = 360;   // minutes after midnight
 

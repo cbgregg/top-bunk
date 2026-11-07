@@ -25,6 +25,10 @@ import { createJournal } from './journal.js';
 import { createFirstNight } from './firstnight.js';
 import { createLights } from './lights.js';
 import { createCartoon } from './cartoon.js';
+import { hooks } from './hooks.js';
+import * as events from './events.js';
+import * as log from './log.js';
+import * as story from './story.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -765,7 +769,7 @@ function resetNight() {
   F.dead = false; F.cutscene = false; F.chase = false; F.echo = false; F.breathCheck = false; F.breathUI = false; F.flicker = false;
   F.splashed = false; F.morningReady = false; P.breath = 1; P.stamina = 1; P.exhausted = false; shake = 0;
   carEnd(); F.live = false; F.script = false; F.blackout = false; F.clockGlitch = 0; F.fear = 0; P.pod = null; P.podYaw = HIDE_YAW; UI.pod(null); UI.clock(null); F.flashOn = false; flash.intensity = 0;
-  W.tvFx.set(false); W.phone.setRinging(false); W.mirrorFx.hide(); W.curtainSee(false); W.nightLights.forEach((n) => { n.dead = false; }); if (nights) { nights.hunter.reset(); if (dad.fake) { dad.fake = false; sleepers(true); } }
+  W.tvFx.set(false); W.phone.setRinging(false); W.mirrorFx.hide(); W.curtainSee(false); W.nightLights.forEach((n) => { n.dead = false; }); if (nights) nights.hunter.reset();
   UI.blanket(false); UI.breath(1, false); UI.hint(null); UI.objective(null);
   E.visible = false; E.reach = 0; E.lean = 0; E.smileScale = 1; E.tilt = 0; E.mode = 'idle';
   W.bathSpot.intensity = 0; sfx.violins(0, 0.3);
@@ -1745,36 +1749,72 @@ function endScreen(id) {
 }
 
 // ---------- per-frame ----------
+// The frame is a list of named calls in a fixed order, and this function does not change: a module that needs the frame fills its own
+// file and is reached through js/hooks.js (hooks.parents, hooks.doors, hooks.forest, hooks.day, hooks.days), and the blocks that were
+// written here are the named functions below, each owned by the part of the game it serves. The camera is resolved after everything
+// that moves has moved, so a push from a body never leaves the eye in a wall; the hands follow it from loop().
 let birdT = 1, ambT = 14;
 function update(dt) {
   gameTime += dt;
   runTimers();
-
-  if (input.lookX || input.lookY) lookBy(-input.lookX * 2.7 * dt, -input.lookY * 2.0 * dt);
+  padLookTick(dt);
   input.setBreathVisible(F.breathUI && !F.dead);
   vigil.update(dt);
   input.setCoverVisible(P.mode === 'bunk' && !F.cutscene && !F.dead && !F.breathUI && F.live);
   if (shake > 0.25) input.rumble(shake * 0.55, shake * 0.4, 140);
   if (P.mode === 'walk' && !F.cutscene && !F.dead) movePlayer(dt);
   else { P.vel.set(0, 0, 0); P.speed = 0; P.sprinting = false; UI.stamina(1, false); }
+  hooks.parents.update(dt);
+  const live = F.live && !F.dead && nights;   // read once: the covers follow the hunter on the frame it was ticked, even one that ends the night
+  if (live) nights.tick(dt);
+  events.update(dt);
+  if (live) coverTick(dt);
+  echoTick(dt);
+  breathTick(dt);
+  UI.breath(P.breath, F.breathUI && !F.dead, P.breath < 0.3);
+  hooks.doors.tick(dt);
+  flickerTick(dt);
+  if (F.birds) { birdT -= dt; if (birdT <= 0) { sfx.chirp((Math.random() - 0.5) * 1.6); birdT = 0.5 + Math.random() * 2.4; } }   // the morning birds
+  ambienceTick(dt);
+  familyIdleTick(dt);
+  cineTick(dt); FN.tick(dt);
+  W.tick(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt); lights.update(dt);
+  hooks.forest.update(dt);
+  hooks.day.tick(dt);
+  hooks.days.tick(dt);
+  if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
+  WF.update(dt); dust.update(dt);
+  { const room = roomAt(P.pos.x, P.pos.z, P.pos.y); weather.update(dt, room !== 'out' && room !== 'stoop', F.phase === 'night' || F.phase === 'title'); }
+  traffic.update(dt, car.group.visible ? 'off' : F.phase); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, sfx);
+  sfx.listen(camera); hearRoom(dt);
+  E.update(dt, gfx.quality); applyDetail();
+  UI.crosshair(P.mode === 'walk' && !F.cutscene);
+  achievements.tick();
+  if (nights) nights.proof.hud(F.live && !F.dead && !F.script);   // not over a scripted scene: the vigil, the drive, a scare
   updateCamera(dt);
   updateInteract();
-  if (F.live && !F.dead && nights) {
-    nights.tick(dt);
-    // from the bunk, the breath key pulls the covers over your head
-    const dn = !!keys.Space || input.breath;
-    if (P.mode === 'bunk' && !F.cutscene) {
-      coverHold = dn ? coverHold + dt : 0;
-      if (dn && coverHold >= 0.3 && canBunkCover()) hideUnderCovers();
-    } else coverHold = 0;
-  }
+}
 
-  // echo footsteps behind you
+// the right stick turns the view
+function padLookTick(dt) {
+  if (input.lookX || input.lookY) lookBy(-input.lookX * 2.7 * dt, -input.lookY * 2.0 * dt);
+}
+// from the bunk, the breath key pulls the covers over your head (only while the night is live: update() gates the call)
+function coverTick(dt) {
+  const dn = !!keys.Space || input.breath;
+  if (P.mode === 'bunk' && !F.cutscene) {
+    coverHold = dn ? coverHold + dt : 0;
+    if (dn && coverHold >= 0.3 && canBunkCover()) hideUnderCovers();
+  } else coverHold = 0;
+}
+// echo footsteps behind you
+function echoTick(dt) {
   for (let i = echoes.length - 1; i >= 0; i--) {
     if (gameTime >= echoes[i]) { echoes.splice(i, 1); if (F.echo) sfx.footstep(0.2, panFor(tmp.set(P.pos.x + 6, 1, P.pos.z)), 0.6); }
   }
-
-  // breath / hiding
+}
+// breath / hiding: holding, the tap latch, the cost, the check that catches you, the breathing and the heartbeat
+function breathTick(dt) {
   if (P.mode !== 'hide' || F.dead) { breathLatch = false; breathPrev = false; }
   if (P.mode === 'hide' && !F.dead) {
     // hold the key to hold your breath, or tap it once to keep holding (tap again to let go)
@@ -1800,17 +1840,18 @@ function update(dt) {
     if (!holding) { P.breathT -= dt; if (P.breathT <= 0) { sfx.breath(P.inhale, E.visible ? 0.14 : 0.08); P.inhale = !P.inhale; P.breathT = 1.25; } }
     if (E.visible && !F.chase) { P.hb = (P.hb ?? 0) - dt; if (P.hb <= 0) { sfx.heartbeat(0.6); P.hb = 0.42; } }
   }
-  UI.breath(P.breath, F.breathUI && !F.dead, P.breath < 0.3);
-
+}
+// the night lights' slow sway and the flicker
+function flickerTick(dt) {
   if (nlBase > 0 && !F.flicker) nlMult(nlBase * (0.93 + 0.07 * Math.sin(gameTime * 0.9)));
   // light flicker
   if (F.flicker) {
     if (W.bathSpot.intensity > 0) W.bathSpot.intensity = flicker('bath', BATH_I * (0.82 + Math.sin(gameTime * 23) * 0.08 + (Math.random() < 0.03 ? -0.7 : 0)), BATH_I * 0.82);
     nlMult(flicker('nl', Math.random() < 0.15 ? 0 : 0.25, 0.25), false);
   }
-
-  // ambience
-  if (F.birds) { birdT -= dt; if (birdT <= 0) { sfx.chirp((Math.random() - 0.5) * 1.6); birdT = 0.5 + Math.random() * 2.4; } }
+}
+// the house's idle noises on a night, while nothing else is happening
+function ambienceTick(dt) {
   if (F.phase === 'night' && !F.live && !F.chase && !F.echo && !F.dead && P.mode !== 'hide') {
     ambT -= dt;
     if (ambT <= 0) {   // the house does more every night
@@ -1818,8 +1859,9 @@ function update(dt) {
       if (r < 0.4) sfx.creak(0.18, pan); else if (r < 0.6) sfx.knock(pan * 0.6, 0.12); else if (F.night >= 2 && r < 0.8) sfx.ceilingThump(); else if (F.night >= 2) sfx.slamFar(pan); else sfx.creak(0.2, pan);
     }
   }
-
-  // family idle
+}
+// family idle: the parents duck under the truck roof, look at you when you are near and turn to face you
+function familyIdleTick(dt) {
   if (mom.group.visible) {
     mom.duck = truckDuck(mom); dad.duck = truckDuck(dad);
     talkGaze();
@@ -1835,17 +1877,6 @@ function update(dt) {
       }
     }
   }
-  cineTick(dt); FN.tick(dt);
-  W.tick(dt); W.tvFx.tick(dt); W.phone.tick(gameTime); W.bedSleepers.update(dt); lights.update(dt);
-  if (car.group.visible) { car.update(dt); if (dad.inCar && dad.pose) car.wheelG.getWorldPosition(dad.pose.reach); }
-  WF.update(dt); dust.update(dt);
-  { const room = roomAt(P.pos.x, P.pos.z, P.pos.y); weather.update(dt, room !== 'out' && room !== 'stoop', F.phase === 'night' || F.phase === 'title'); }
-  traffic.update(dt, car.group.visible ? 'off' : F.phase); W.streetLight.tick(dt, camera.position, sfx); W.clock.tick(dt, camera, sfx);
-  sfx.listen(camera); hearRoom(dt);
-  E.update(dt, gfx.quality); applyDetail();
-  UI.crosshair(P.mode === 'walk' && !F.cutscene);
-  achievements.tick();
-  if (nights) nights.proof.hud(F.live && !F.dead && !F.script);   // not over a scripted scene: the vigil, the drive, a scare
 }
 
 // the conversations' look (gfx.js): on while the view follows a talk, at breakfast and in the scripted scenes, and aimed at whoever speaks
@@ -1939,13 +1970,11 @@ function loop(now) {
     }
   }
 }
-let wasFake = false;
 // the disposable camera is the kid's once Mom has given it to him (RUN.hasCamera); older saves, and any night from the second on, have it
 function hasCamera() { return RUN.hasCamera !== false || (RUN.night || 1) >= 2; }
 function handsTick(dt) {
   if (started && nights && F.live) {
     if (P.mode === 'hide' && P.pod && nights.hunter.busy && nights.hunter.state === 'search') journal.learn('still');
-    if (wasFake && !dad.fake) journal.learn('dad'); wasFake = !!dad.fake;
   }
   const holding = P.mode === 'hide' && (!!keys.Space || input.breath || breathLatch);
   const hidden = !started || paused || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || P.mode === 'seat' || (uiMode !== 'playing' && uiMode !== 'test');
@@ -1975,6 +2004,8 @@ async function compileSlices(phases, progress = () => {}) {
   progress(1);
 }
 async function boot() {
+  // 0. the modules hook in (js/hooks.js): each one's install(game) runs once, here, with the world built and before the game can start
+  hooks.install({ W, F, P, RUN, E, camera, scene, sfx, lights, nights, hunter: nights.hunter, gaze: nights.stage.gaze, events, log, UI, input, settings, mom, dad, hands, journal, menu, hooks });
   // 1. the files: done when three's manager has nothing in flight and nothing new has started for a moment (a model's textures come after it)
   // (counted in polls, not by the clock: the trailer's renderer stops the clocks)
   let idle = 0, last = -1;
