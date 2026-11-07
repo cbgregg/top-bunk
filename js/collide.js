@@ -36,7 +36,7 @@ export function init({ colliders, doors, isNight, groundAt }) {
   if (isNight) S.isNight = isNight;
   if (groundAt) S.groundAt = groundAt;
 }
-export const install = () => {};   // reached from js/hooks.js's convention; the module is set up by init() from main.js
+export function install(game) {}   // reached from js/hooks.js's convention; the module is set up by init() from main.js
 export function addBody(b) {
   const body = { kind: 'npc', r: 0.3, h: 1.7, active: () => true, ...b };
   const i = bodies.findIndex((o) => o.id === body.id); if (i >= 0) bodies.splice(i, 1);
