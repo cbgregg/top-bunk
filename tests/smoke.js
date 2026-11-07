@@ -166,7 +166,8 @@ let BASE = '';
   } else if (want(...browserChecks)) {
     const server = await startServer();
     BASE = `http://127.0.0.1:${server.address().port}`;
-    const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+    const launch = () => chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+    const browser = await launch();
     const ctx = await newContext(browser);
 
     // ---------- 1-3: the title ----------
@@ -942,10 +943,13 @@ let BASE = '';
     }), 420e3);
 
     // ---------- 30 and on: the per-package checks, tests/checks/*.js ----------
-    const helpers = { alone, openGame, nightPage, stand, hold, tap, until, playFor, prompt, climbDown, ok, sleep, clean, watch, Skip, roomAt, newContext, PAD, base: () => BASE };
-    for (const c of CHECKS) await check(c.n, c.name, () => c.mod.run(browser, helpers), c.mod.timeout || 600e3);
-
+    // The shared browser is closed first and each gets a browser of its own: after the lights check's shader pass in the software
+    // renderer the shared browser's GPU process stays busy, and a check that follows it loads its page late and, timed by the wall
+    // clock, moves the player too little (the per-package checks are the first to come after it)
     await browser.close();
+    const helpers = { alone, openGame, nightPage, stand, hold, tap, until, playFor, prompt, climbDown, ok, sleep, clean, watch, Skip, roomAt, newContext, PAD, base: () => BASE };
+    for (const c of CHECKS) await check(c.n, c.name, async () => { const b = await launch(); try { return await c.mod.run(b, helpers); } finally { await b.close().catch(() => {}); } }, c.mod.timeout || 600e3);
+
     server.close();
   }
 
