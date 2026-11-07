@@ -31,7 +31,7 @@ import { NODES } from './nav.js';
 import * as log from './log.js';
 
 const TIERS = ['whisper', 'wrong', 'presence', 'loud'];
-const DEFS = new Map(), ANCHORS = new Map(), ACTIVE = [];
+const DEFS = new Map(), ANCHORS = new Map(), ACTIVE = [], LAST = new Map();   // LAST: each id's latest arm, for the tests' undo after it has finished
 let G = null, D = null, gaze = null, T = 0;
 
 // ---- the resource table: a beat cannot arm while a resource it uses is held by anything else ----
@@ -147,7 +147,7 @@ function tryArm(def, { force = false } = {}) {
   if (typeof h !== 'object') h = { value: h };
   const a = { def, h, armedAt: T, at: anchorOf(def, h) || at, revealedAt: 0, how: null, done: false, undone: false, holdT: 0, watchT: 0, settledAtArm };
   for (const r of def.uses || []) RES.hold(r, def.id);
-  ACTIVE.push(a);
+  ACTIVE.push(a); LAST.set(def.id, a);
   NIGHT.counts[def.tier] = (NIGHT.counts[def.tier] || 0) + 1;
   NIGHT.arms.push({ id: def.id, tier: def.tier, at: T, clock: Math.round(F().clock), settled: a.settledAtArm });
   NIGHT.played.add(def.id); NIGHT.lastArm = T; NIGHT.lastLegacy = false; NIGHT.gap = drawGap(NIGHT.n);
@@ -335,7 +335,8 @@ export const test = {
     return tryArm(def, { force: !!opts.force }) ? 'armed' : 'refused';
   },
   reveal(id, how = 'test') { const a = active(id); if (!a || a.revealedAt) return false; reveal(a, how); return true; },
-  undo(id) { const a = ACTIVE.find((x) => x.def.id === id); if (!a) return false; a.done = true; undoOnce(a); release(a); return true; },
+  // put the house back after the id's latest arm, on the table or already finished (a kept change is undone this way too)
+  undo(id) { const a = ACTIVE.find((x) => x.def.id === id) || LAST.get(id); if (!a) return false; if (!a.done) { a.done = true; release(a); } undoOnce(a); return true; },
   state(id) { const a = ACTIVE.find((x) => x.def.id === id); return a ? (a.done ? 'done' : a.revealedAt ? 'revealed' : 'armed') : null; },
   active: () => ACTIVE.filter((a) => !a.done).map((a) => ({ id: a.def.id, tier: a.def.tier, armedAt: a.armedAt, revealedAt: a.revealedAt, how: a.how })),
   stats: () => ({ n: NIGHT.n, on: NIGHT.on, counts: { ...NIGHT.counts }, arms: NIGHT.arms.slice(), reveals: NIGHT.reveals.slice(), drops: NIGHT.drops.slice(), gap: NIGHT.gap, quietSince: NIGHT.quietSince, lastReveal: NIGHT.lastReveal, lastArm: NIGHT.lastArm, t: T, held: { ...RES.held }, chainSeen: chainSeen(), floor: presenceFloor() }),

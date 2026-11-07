@@ -217,7 +217,9 @@ export function createNights(env) {
     for (const c of ST.cancel) c(); ST.cancel = [];
     if (ST.it) { env.removeI(ST.it); ST.it = null; }
     const st = ST.on; ST.on = null; if (st && st.end) st.end();
-    if (st && st.kind) events.finish('stage:' + st.kind, { undo: false });   // the scare took itself down: the engine's table lets it go
+    // the scare took itself down: if its own look test had found it (st.seen; the street light's st.out) that look was its reveal, and
+    // either way the engine's table lets it go
+    if (st && st.kind) { const id = 'stage:' + st.kind; if (st.seen || st.out) events.noteReveal(id, STAGE_TIER[st.kind] || 'wrong'); events.finish(id, { undo: false }); }
     sfx.unhush();
   }
   const STAGE_TIER = { crumple: 'presence', stand: 'presence', peek: 'presence', mom: 'presence', reflect: 'presence', yard: 'presence', glass: 'presence', tap: 'whisper', curtains: 'whisper' };
@@ -280,7 +282,7 @@ export function createNights(env) {
       const m = { x: d.mid.x, z: d.mid.z, y: 0 }; if (Math.hypot(m.x - P.pos.x, m.z - P.pos.z) > 7 || gaze.onScreen(m, 1.15) || !gaze.sawRecently(m, 4)) return false;
       W.setDoor('kid', true, true);
       const st = { kind: 'door', p: m, t0: env.time() }; ST.on = st;
-      ST.cancel.push(gaze.whenLookAt(m, () => { sfx.creak(0.1, D.pan(m.x, m.z)); F.fear = Math.max(F.fear, 0.4); endStage(); }, 0.6));
+      ST.cancel.push(gaze.whenLookAt(m, () => { st.seen = env.time(); sfx.creak(0.1, D.pan(m.x, m.z)); F.fear = Math.max(F.fear, 0.4); endStage(); }, 0.6));
       return true;
     } },
     // your bear, turned round to face you
@@ -289,7 +291,7 @@ export function createNights(env) {
       const p = { x: b.position.x, z: b.position.z, y: b.position.y }; if (Math.hypot(p.x - P.pos.x, p.z - P.pos.z) > 6 || gaze.onScreen(p, 1.15) || !gaze.sawRecently(p, 4)) return false;
       b.rotation.y = Math.atan2(P.pos.x - p.x, P.pos.z - p.z);
       const st = { kind: 'bear', p, t0: env.time() }; ST.on = st;
-      ST.cancel.push(gaze.whenLookAt(p, () => { sfx.whisper(D.pan(p.x, p.z), 0.08); endStage(); }, 0.8));
+      ST.cancel.push(gaze.whenLookAt(p, () => { st.seen = env.time(); sfx.whisper(D.pan(p.x, p.z), 0.08); endStage(); }, 0.8));
       return true;
     } },
     // the faces in the photographs in the hall, gone while you were not looking; back when you look away
@@ -298,7 +300,7 @@ export function createNights(env) {
       const p = { x: 6.48, z: -1.02, y: 1.0 }; if (gaze.onScreen(p, 1.15) || !gaze.sawRecently(p, 4)) return false;
       nm.blackenPhotos(true);
       const st = { kind: 'faces', p, t0: env.time(), end: () => nm.blackenPhotos(false) }; ST.on = st;
-      ST.cancel.push(gaze.whenLookAt(p, () => { F.fear = Math.max(F.fear, 0.5); sfx.whisper(D.pan(p.x, p.z), 0.07); ST.cancel.push(gaze.whenLookAway(p, () => endStage(), 0.4)); }, 0.55));
+      ST.cancel.push(gaze.whenLookAt(p, () => { st.seen = env.time(); F.fear = Math.max(F.fear, 0.5); sfx.whisper(D.pan(p.x, p.z), 0.07); ST.cancel.push(gaze.whenLookAway(p, () => endStage(), 0.4)); }, 0.55));
       return true;
     } },
     // Mom, in the dark kitchen with her back to you; when you come close she walks into the wall and is not there
@@ -318,6 +320,9 @@ export function createNights(env) {
   // every stage scare on the engine's table: the engine decides when (the quiet curve, the tier caps, the resources), the scare stages
   // itself out of view with its own gaze test (or declines), the engine watches for the look that reveals it, and the stage takes it down
   const quietTypes = new Set(['vigil', 'car', 'finale', 'poltergeist']);   // night one is scripted end to end
+  // the ones that are heard, not seen (taps on a pane, a curtain stirring): the reveal is the sound reaching you where you stand
+  const HEARD = new Set(['tap', 'curtains']);
+  const stageSetup = { door: () => { if (W.doors.kid) W.setDoor('kid', false, true); } };   // the house as the scare needs it, for the tests
   function registerStageBridge() {
     for (const [k, s] of Object.entries(SCARES)) {
       const tier = STAGE_TIER[k] || 'wrong', id = 'stage:' + k;
@@ -327,9 +332,15 @@ export function createNights(env) {
         pre: () => !ST.on && !!F.plan && !quietTypes.has(F.plan.type) && !F.script && !F.cutscene && P.mode === 'walk' && !hunter.busy && hunter.cool <= 0,
         arm: () => {
           const door = W.doors.kid && { a: W.doors.kid.a, target: W.doors.kid.target }, bear = W.teddy && W.teddy.rotation.y;
-          const ok = s.run(); if (!ok || !ST.on) return null; const st = ST.on; st.kind ||= k; return { st, p: st.p, t0: env.time(), door, bear };
+          const ok = s.run(); if (!ok || !ST.on) return null; const st = ST.on; st.kind ||= k;
+          if (HEARD.has(k) && st.p) gaze.notePlaced(st.p, id);
+          return { st, p: st.p, t0: env.time(), door, bear };
         },
-        reveal: { by: 'look', at: (D, h) => (h && h.st ? h.st.p : null), minDot: 0.55 },
+        // the scare's own look test is the authority on whether it was found (it knows its window, its doorway, the glass); a scare without
+        // one is found by the engine's look at its spot, and a heard one by the sound reaching you
+        reveal: HEARD.has(k)
+          ? { by: 'hold', hold: 0.1, when: (D, h) => !!(h.st && h.st.p && gaze.heard(h.st.p, 7, 6)) }
+          : { by: 'look', at: (D, h) => (h && h.st ? h.st.p : null), minDot: 0.55, when: (D, h) => !!(h.st && (h.st.seen || h.st.out || (h.st.p && gaze.inView({ x: h.st.p.x, z: h.st.p.z, y: 0 }, 0.8) && gaze.facing(h.st.p) > 0.55))) },
         payoff: () => {},   // the scare's own look test made the sound: the engine only writes it down
         after: { keep: true, log: true, journal: id },
         while: (D, h) => ST.on === h.st,
@@ -339,6 +350,7 @@ export function createNights(env) {
           if (k === 'door' && h.door && W.doors.kid) { const d = W.doors.kid; d.a = h.door.a; d.target = h.door.target; d.apply(); }
           if (k === 'bear' && W.teddy && h.bear !== undefined) W.teddy.rotation.y = h.bear;
         },
+        test: stageSetup[k] ? { setup: stageSetup[k] } : undefined,
       });
     }
   }
@@ -957,11 +969,12 @@ export function createNights(env) {
       arm: () => { mark('momCall'); const h = { alive: true, bed: n1.bedP() }; sfx.pick('bed_snore', { at: h.bed, gain: 1.0, wet: 0.08, ref: 2, dur: 10 }); return h; },
       reveal: { by: 'hold', hold: 3.2, when: () => dist(n1.parD()) < 9 },
       payoff: (D, h) => {
-        (async () => {
-          await env.say('mom/n1_call_a', { muffle: true }); if (!ok(h)) return;
+        (async () => {   // her voice placed at their door, through it (voiceAt muffles what has no line of sight)
+          const dp = n1.parD();
+          await wait(voiceAt('mom/n1_call_a', dp.x, dp.z, 1.1) + 0.3); if (!ok(h)) return;
           await wait(4.5); if (!ok(h)) return;
           sfx.pick('bed_snore', { at: h.bed, gain: 1.0, wet: 0.08, ref: 2, offset: 12, dur: 3.2 });   // and it stops dead when she stops
-          await env.say('mom/n1_call_b', { muffle: true }); if (!ok(h)) return;
+          await wait(voiceAt('mom/n1_call_b', dp.x, dp.z, 1.1) + 0.3); if (!ok(h)) return;
           F.fear = Math.max(F.fear, 0.6); h.done = true;
         })();
       },

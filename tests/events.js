@@ -76,6 +76,7 @@ async function climbDown(page) {
   await page.keyboard.press('KeyE');
   await until(page, () => { const g = window.__game; return g.P.mode === 'walk' && !g.F.cutscene; }, null, 60e3);
 }
+const hold = async (page, key, ms) => { await page.keyboard.down(key); await sleep(ms); await page.keyboard.up(key); };
 const stand = (page, x, z, tx, tz) => page.evaluate(([x, z, tx, tz]) => {
   const g = window.__game; g.P.pos.set(x, 0, z); g.P.vel.set(0, 0, 0);
   if (tx !== undefined) { g.P.yaw = Math.atan2(-(tx - x), -(tz - z)); g.P.pitch = 0; }
@@ -119,10 +120,18 @@ const unmark = (defs) => defs.map((d) => { const o = { ...d }; for (const k of d
 // the sounds a payoff makes: pick/emit need `at`; the panned helpers need a pan from D.pan (a position); stings only on presence/loud
 const SND = ['pick', 'emit', 'creak', 'knock', 'whisper', 'thump', 'slamFar', 'heavyStep', 'footstep', 'lurk', 'faucet', 'flush', 'scrape', 'doorClose', 'breath', 'ceilingThump', 'pianoSlam', 'jolt', 'stab', 'appear', 'noiseHit', 'tone', 'staticBurst', 'phoneRing', 'mumble', 'play', 'speaker', 'whoosh'];
 const SENT = 0.123456;
+// only the outermost call is recorded: the library's own helpers call this.play / this.pick / this.mumble underneath, and those are the
+// same sound, not a second unplaced one
 const recordOn = (page) => page.evaluate((names) => {
-  const g = window.__game, D = g.nights.D, sfx = g.sfx; window.__rec = []; window.__orig = {};
+  const g = window.__game, D = g.nights.D, sfx = g.sfx; window.__rec = []; window.__orig = {}; let depth = 0;
   for (const k of ['pan', 'wallPan', 'behindPan', 'ceilingPan', 'doorPan', 'tapPan']) { window.__orig['D.' + k] = D[k]; D[k] = () => 0.123456; }
-  for (const n of names) if (typeof sfx[n] === 'function') { window.__orig[n] = sfx[n]; sfx[n] = function (...args) { window.__rec.push({ n, args: args.map((a) => (a && typeof a === 'object' ? { at: !!a.at, pan: a.pan } : a)) }); return window.__orig[n].apply(this, args); }; }
+  for (const n of names) if (typeof sfx[n] === 'function') {
+    window.__orig[n] = sfx[n];
+    sfx[n] = function (...args) {
+      if (depth === 0) window.__rec.push({ n, args: args.map((a, i) => (a && typeof a === 'object' ? { at: !!a.at || (n === 'emit' && i === 1), pan: a.pan } : a)) });   // emit(key, at, o): its place is the second argument
+      depth++; try { return window.__orig[n].apply(this, args); } finally { depth--; }
+    };
+  }
 }, SND);
 const recordOff = (page) => page.evaluate((names) => {
   const g = window.__game, D = g.nights.D, sfx = g.sfx, rec = window.__rec || [];
@@ -130,15 +139,22 @@ const recordOff = (page) => page.evaluate((names) => {
   for (const n of names) if (window.__orig[n]) sfx[n] = window.__orig[n];
   window.__rec = null; return rec;
 }, SND);
+// the house's own background sounds that can land inside the window (the grandfather clock's tick, a light switch the lights module
+// clicks for its own beat): not the event's, so not its problem
+const BACKGROUND = new Set(['clock_tick', 'clock_gear', 'clock_strike', 'switch']);
+const PAN_AT = { footstep: 1, heavyStep: 1, creak: 1, faucet: 1 };   // where the helper takes its pan (audio.js); the rest take it first
 function soundProblems(rec, tier) {
   const bad = [], sting = ['pianoSlam', 'jolt', 'stab', 'appear'], panned = ['creak', 'knock', 'whisper', 'slamFar', 'heavyStep', 'footstep', 'lurk', 'faucet', 'flush', 'scrape', 'doorClose', 'whoosh', 'staticBurst', 'phoneRing'];
   const isPos = (p) => Math.abs((p || 0) - SENT) < 1e-6;
+  // a placed options object anywhere in the arguments ({ at } or a pan that came from a position)
+  const placedObj = (a) => a.some((o) => o && typeof o === 'object' && (o.at || isPos(o.pan)));
   for (const c of rec) {
     const a = c.args;
+    if ((c.n === 'pick' || c.n === 'emit') && BACKGROUND.has(a[0])) continue;
     if (c.n === 'pick' || c.n === 'emit') { if (!(a[1] && a[1].at)) bad.push(`${c.n}(${a[0]}) without at`); }
-    else if (panned.includes(c.n)) { const i = c.n === 'faucet' ? 1 : 0; if (!isPos(a[i])) bad.push(`${c.n} panned to ${a[i]} instead of a place`); }
+    else if (panned.includes(c.n)) { const i = PAN_AT[c.n] || 0; if (!isPos(a[i])) bad.push(`${c.n} panned to ${a[i]} instead of a place`); }
     else if (c.n === 'thump' || c.n === 'ceilingThump' || c.n === 'breath') bad.push(`${c.n}() has no place`);
-    else if (c.n === 'noiseHit' || c.n === 'tone' || c.n === 'mumble' || c.n === 'play' || c.n === 'speaker') { if (!(a[1] && isPos(a[1].pan)) && !(a[0] && typeof a[0] === 'object' && isPos(a[0].pan))) bad.push(`${c.n} without a placed pan`); }
+    else if (c.n === 'noiseHit' || c.n === 'tone' || c.n === 'mumble' || c.n === 'play' || c.n === 'speaker') { if (!placedObj(a)) bad.push(`${c.n}(${typeof a[0] === 'string' ? a[0] : ''}) without a placed pan`); }
     else if (sting.includes(c.n) && tier !== 'presence' && tier !== 'loud') bad.push(`${c.n} on a ${tier} beat`);
   }
   return bad;
@@ -176,12 +192,15 @@ const standNear = (page, p, d, away = false) => page.evaluate(([p, d, away]) => 
   return [c.x, c.z];
 }, [p, d, away]);
 const houseMeshes = (page) => page.evaluate(() => { const s = new Set(); window.__game.W.house.traverse((o) => { if (o.isMesh) s.add(o.uuid); }); return [...s]; });
+// turn where you stand to face p
+const turnTo = (page, p) => page.evaluate(([p]) => { const g = window.__game; g.P.yaw = Math.atan2(-(p.x - g.P.pos.x), -(p.z - g.P.pos.z)); g.P.pitch = 0; }, [p]);
 
 async function headlessOne(page, d, night) {
   const r = { id: d.id, tier: d.tier, notes: [] };
   const fail = (m) => { r.fail = (r.fail ? r.fail + '; ' : '') + m; };
-  // a clean table and a free player
+  // a clean table and a free player; then the house as the beat needs it (its test.setup: the door it wants shut, the prop it wants placed)
   await ev(page, (events, g) => { events.suspend(true); for (const a of events.test.active()) events.test.undo(a.id); g.nights.stage.endStage(); g.F.script = false; g.F.cutscene = false; g.F.fear = 0; if (g.P.mode !== 'walk') g.P.mode = 'walk'; g.F.photoHold = false; if (g.nights.D.N1) g.nights.D.N1.hold = true; });
+  await ev(page, (events, g, id) => { const def = events.get(id); if (def && def.test && typeof def.test.setup === 'function') def.test.setup(g.nights.D); }, d.id);
   const pt = await ev(page, (events, g, id) => events.test.point(id), d.id);
   const watchBeat = d.reveal && d.reveal.by === 'watch';
   // 1. on screen: refused
@@ -192,12 +211,12 @@ async function headlessOne(page, d, night) {
   } else r.onScreen = 'n/a';
   // 2. out of view: armed. Spots to try: facing away from the anchor; the hall after a look east; the living room; the bedroom
   const spots = pt ? [['away', pt]] : [];
-  spots.push(['hall', [7.6, -0.42, 10.1, -0.42, 5.4, -0.42]], ['living', [0.5, -2.4, 3.5, -2.4, -2.5, -2.4]], ['bed', [9.0, 1.8, 9.0, 4.2, 9.0, -0.3]]);
+  spots.push(['hall', [7.6, -0.42, 10.1, -0.42, 5.4, -0.42]], ['hallW', [7.6, -0.42, 5.4, -0.42, 10.1, -0.42]], ['living', [0.5, -2.4, 3.5, -2.4, -2.5, -2.4]], ['bed', [9.0, 1.8, 9.0, 4.2, 9.0, -0.3]]);
   if (d.test && d.test.mode === 'bunk') spots.unshift(['bunk', null]);
   let armed = null;
   for (const [kind, s] of spots) {
     if (kind === 'away') { await standNear(page, s, 2.2, true); await playFor(page, 2.6); }
-    else if (kind === 'bunk') { await page.evaluate(() => { const g = window.__game; g.P.mode = 'bunk'; g.P.pos.set(g.BUNK_SEAT.x, 0, g.BUNK_SEAT.z); g.P.cam.copy(g.BUNK_SEAT); g.P.yaw = 0.2; }); await playFor(page, 0.5); }
+    else if (kind === 'bunk') { await page.evaluate(() => { const g = window.__game; g.P.mode = 'bunk'; g.P.pos.set(g.BUNK_SEAT.x, 0, g.BUNK_SEAT.z); g.P.cam.copy(g.BUNK_SEAT); g.P.yaw = 0.2; g.P.pitch = 0; }); await playFor(page, 2.6); }   // long enough that the bunk is out of the gaze's memory (the last test may have ended facing it)
     else { await stand(page, s[0], s[1], s[2], s[3]); await playFor(page, 1.0); await stand(page, s[0], s[1], s[4], s[5]); await playFor(page, 0.4); }
     r.snap = await snapshot(page); r.meshes = await houseMeshes(page);
     const a = await ev(page, (events, g, id) => events.test.arm(id), d.id);
@@ -206,27 +225,36 @@ async function headlessOne(page, d, night) {
   }
   if (!armed) { r.declined = true; return r; }
   r.armedFrom = armed;
-  // 3. no payoff before the reveal
+  // 3. no payoff before the reveal. A beat revealed by `hold` is found by where you are (within earshot of its sound, in its room), so
+  // one that is already revealed here was found the moment it was placed: that is its reveal, made by the player's position
   await playFor(page, 0.8);
-  const st = await ev(page, (events, g, id) => ({ state: events.test.state(id), payoffs: events.test.payoffs()[id] || 0 }), d.id);
-  if (st.state === 'revealed' || st.payoffs) fail(`paid off before any reveal (${st.state})`);
-  if (st.state !== 'armed') fail(`not armed after the arm (${st.state})`);
-  // 4. the reveal: the look where the look is the reveal, else by hand
+  const st = await ev(page, (events, g, id) => ({ state: events.test.state(id), payoffs: events.test.payoffs()[id] || 0, how: (events.test.active().find((a) => a.id === id) || {}).how }), d.id);
+  const heardAtOnce = st.state === 'revealed' && d.reveal.by === 'hold' && st.how === 'hold';
+  if ((st.state === 'revealed' || st.payoffs) && !heardAtOnce) fail(`paid off before any reveal (${st.state})`);
+  if (st.state !== 'armed' && !heardAtOnce) fail(`not armed after the arm (${st.state})`);
+  if (heardAtOnce) r.notes.push('heard where you stood');
+  // 4. the reveal: first the player's own turn toward it where they stand (how a staged thing is meant to be found), then, for a beat
+  // that wants you nearer, a step in; failing both, by hand
   const rp = await ev(page, (events, g, id) => events.test.point(id), d.id) || pt;
   await recordOn(page);
-  let how = 'look';
-  if (['look', 'watch', 'approach'].includes(d.reveal.by) && rp && armed !== 'bunk') {
-    await standNear(page, rp, d.reveal.by === 'approach' ? 1.0 : Math.min(2.0, (d.reveal.within || 3) * 0.6));
-    const t0 = Date.now();
-    while (Date.now() - t0 < (night === 1 ? 26e3 : 8e3)) { const s = await ev(page, (events, g, id) => events.test.state(id), d.id); if (s !== 'armed') break; await sleep(300); }
+  let how = 'look', s = 'armed';
+  const lookWait = night === 1 ? 26e3 : 6e3;
+  const waitOff = async (ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const st = await ev(page, (events, g, id) => events.test.state(id), d.id); if (st !== 'armed') return st; await sleep(300); } return 'armed'; };
+  if (rp && armed !== 'bunk') {
+    await turnTo(page, rp); s = await waitOff(lookWait);
+    if (s === 'armed' && (d.reveal.by === 'approach' || d.reveal.within)) { how = 'approach'; await standNear(page, rp, d.reveal.by === 'approach' ? 1.0 : Math.min(2.0, (d.reveal.within || 3) * 0.6)); s = await waitOff(lookWait / 2); }
+  } else if (armed === 'bunk') {   // in the bunk: the covers up (a short press), a few of its breaths, then hold yours
+    await hold(page, 'Space', 450); await sleep(3000); const holding = hold(page, 'Space', 3500); s = await waitOff(lookWait / 2); await holding;
+    if (s !== 'armed') how = 'hold';
   }
-  let s = await ev(page, (events, g, id) => events.test.state(id), d.id);
   if (s === 'armed') { how = 'forced'; await ev(page, (events, g, id) => events.test.reveal(id), d.id); s = await ev(page, (events, g, id) => events.test.state(id), d.id); }
-  else if (s === null) { fail('left the table before any reveal (dropped?)'); }
   await playFor(page, 1.5);
   const rec = await recordOff(page);
   const pay = await ev(page, (events, g, id) => events.test.payoffs()[id] || 0, d.id);
-  if (s === 'revealed' || s === null) { if (pay !== 1) fail(`payoff ran ${pay} times`); } else fail(`state after the reveal: ${s}`);
+  // off the table with its payoff made is a beat that was revealed and then took itself down (a scare that ends on the look); off it
+  // with no payoff is one that was dropped before any reveal
+  if (s === null && pay === 0) fail('left the table before any reveal (dropped?)');
+  else if (s === 'revealed' || s === null) { if (pay !== 1) fail(`payoff ran ${pay} times`); } else fail(`state after the reveal: ${s}`);
   r.how = how; r.sounds = rec.length;
   const sp = soundProblems(rec, d.tier); if (sp.length) fail('sounds: ' + sp.slice(0, 3).join(', '));
   // 5. undo puts the house back
@@ -280,7 +308,8 @@ async function headlessOne(page, d, night) {
   // ---------- headless, per event ----------
   await section('headless', async () => {
     const out = [], fails = [];
-    for (const [hash, nightN] of [['#night3', 3], ['#night1', 1]]) {
+    // night four for the beats of nights two to nine (every stage scare is in by then, Mom's double included), night one for its own
+    for (const [hash, nightN] of [['#night4', 4], ['#night1', 1]]) {
       const { page, w, ctx } = await nightPage(browser, hash, { init: nightN === 1 ? () => { window.__n1fast = 0.3; } : null });
       if (nightN === 1) await until(page, () => Array.isArray(window.__n1log), null, 60e3);
       await climbDown(page);
