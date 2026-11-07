@@ -1,0 +1,930 @@
+{
+ "dad/barn_a": {
+  "sha1": "bed5c93047554eb8f5b6e23f79703ba257e2fe22",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_b": {
+  "sha1": "54df28a4cd229de006e1a7bdb6d74e61c04131bf",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_c": {
+  "sha1": "b210f9aa8ff1b7bd62681f242176a29b476f52f5",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_d": {
+  "sha1": "6ed1eb5a1cc40f28339be2b5b3b96ebde89e70d7",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_e": {
+  "sha1": "63754d6fd137d3cbaa56f6cb60d3b9e40cf3f9e0",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_f": {
+  "sha1": "fe649ef4f28115a22d29048407fa152be59a19d1",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_g": {
+  "sha1": "b683b5ab09c9791838ef3a9a2b1636f2ee284959",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_h": {
+  "sha1": "2bf05a60112cbc5d11208292e7bb469717e74c37",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_i": {
+  "sha1": "4371ac3060a8e81fec1f5db96f6b4d8fb50513f9",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/barn_j": {
+  "sha1": "90ffa036e2f631a34d6d32233446b4718f36a491",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/bird_a": {
+  "sha1": "29561da850b1ec0967d903d4600d0fb69c372e77",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/box4": {
+  "sha1": "8948a178cfb026af589e1aba7426401004e9c777",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/box4_b": {
+  "sha1": "662b85bad0fea04cafb415b38f34253a2538483f",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/box4_c": {
+  "sha1": "9efd4d352b33ec69e8a3e019634edaca628f85ae",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/boxes_a": {
+  "sha1": "a85c2679c3d9916b3394a6ff8f6681263661ac23",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/door_a": {
+  "sha1": "61d016c1ad089e3cf1fdbac404c0c9eb8dbe655b",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/f_b": {
+  "sha1": "db5b5edf3a75581ac912bad56e805e2e5657913d",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/f_c": {
+  "sha1": "5fb12387117a9374a6192c7b496d49085838735a",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/f_d": {
+  "sha1": "11b9358ca712f22221349dc8e4a9a264df9c4e3b",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/f_e": {
+  "sha1": "9554bd0408c661c937f4154cd061e83dd1eaa9a9",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/f_h": {
+  "sha1": "850b11cabb3d9456826493a6de9cdb9bd7dc507e",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/gate_a": {
+  "sha1": "2a88394b1266e7d5f4db3a7feec1e5a31cb5c0c8",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/gate_b": {
+  "sha1": "f7dd013cd339bfc7a92952461c033d4f03e4609c",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/leftovers": {
+  "sha1": "f3d396bc72183a7bbb6b661d0340cd98ba4d056c",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m1_b": {
+  "sha1": "0f7d335846fe788f35bca4d40986163aac9ef320",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m1_c": {
+  "sha1": "30520f7e4e1f0de02c4bf952b84dd1706e116aaa",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m2_a": {
+  "sha1": "bd1924fb6821685a2c290f7d30b07f04834cfe28",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m3_b": {
+  "sha1": "c8f3f460a41c31035190fb064cedf01c131a8968",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m3_c": {
+  "sha1": "3fc78e38298c26d55a1266f6dc4a193d76ec421d",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m3_d": {
+  "sha1": "718ab11cf4b4f1bbcb3396bd715698bff6917180",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m6_a": {
+  "sha1": "ba42145dd95ba3215e5a5e15b91bc135e8f7cc35",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m6_b": {
+  "sha1": "5059d6ce742108f0b47d77cbbc205f224bdb646e",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m6_c": {
+  "sha1": "36a97d9b49747d34b095ee77fd5519acfbb0c5bf",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m8_a": {
+  "sha1": "d959c7896ef0f013f79cfce2d0a1182a8e0db70e",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m8_b": {
+  "sha1": "b22a9332edbcf39703e0c9558f39af4d35d2d14a",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m8_c": {
+  "sha1": "c4dc4486f877079155426d609be83cc5c3c7d401",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m9_b": {
+  "sha1": "b05e5682c45907b768ec64b02a45910e62b1ff86",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m_back": {
+  "sha1": "4148775beebe622c056a8c7a8a771021b2437ea8",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/m_fence": {
+  "sha1": "f0e134d7b72ae80b53ee61032c4de4e346eb710e",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n3_b": {
+  "sha1": "7b5ca7004740dfd58e75b1efc6598d251b9ee384",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n3_c": {
+  "sha1": "fa2b79a4480b2a0ce42316688c1befae82cea0ab",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n3_d": {
+  "sha1": "6f5c3eb92f0579f953fb302304a9c4974852bd76",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n3_e": {
+  "sha1": "b82253a3a8358d3ee369635d9dd1d763a03f9586",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n3_f": {
+  "sha1": "b73a172f7a262dcfbc74cc53b20497dce21f1475",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n7_b": {
+  "sha1": "0aab106c72bd008fc717144ccb438f302e30e2fd",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n7_c": {
+  "sha1": "94644f4ce1517c0a733687640698cc42b111ee82",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n7_d": {
+  "sha1": "21a51b96a37744732314c7bd796c559cf5216bbf",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n7_e": {
+  "sha1": "a31db120a049b24c9437bcbfa00a9e9926f6f840",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n9_a": {
+  "sha1": "8efd1c1d8a6827c9ada639c2477269b6f0a6cfb2",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n9_b": {
+  "sha1": "666adfa5639b9e0c138c0e0aea069d46ba530446",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n9_c": {
+  "sha1": "c5e02a0b73dfc4bcd52ea262c541a6a954ad86e2",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n9_d": {
+  "sha1": "66bc68da18615c95d2ab2535038771e6193b4090",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n9_e": {
+  "sha1": "85085ce3763ef15057d764cf230aad91b30dbf7e",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n9_f": {
+  "sha1": "b1cdbf24eba889c71fc356fbc56f526920684edd",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n_bed": {
+  "sha1": "0ab3f953076d375e3ab97662c3bed510157055b7",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n_funny": {
+  "sha1": "d5506d6a261dd53a7c3b3759415f8ef915257f1f",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n_tap": {
+  "sha1": "f3c0afe2952f1660c8876ff8f47f85ed53f19b07",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/n_who": {
+  "sha1": "a31d5de84e8ea6597fd46defc63e4e429fa81aef",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/night_a": {
+  "sha1": "f0ea365577f6077a92c35b0bd3f520e89a177f82",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/night_b": {
+  "sha1": "6f551a03be8a8ad102e0518527ca47736b4be0de",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/night_c": {
+  "sha1": "6c03fe5fb15e34b747f1b50ca969d1dce177b284",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/night_d": {
+  "sha1": "a3da6e8a34668deca1c6d16257c411aa0bf4c6b6",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/ph_low_b": {
+  "sha1": "734f032524c013d178d92b95a55031b3b8318746",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/road_a": {
+  "sha1": "3f10be1d69972ef990fe7262c8dae3f375202fe2",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/road_b": {
+  "sha1": "abc74cc67d6d69b503fe96d71618e70a3abbc9fa",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/road_c": {
+  "sha1": "ea31aec23228cb6610b0d423c25de17cb9140571",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/sleep_a": {
+  "sha1": "4271c3d7acc26b60366f55d1592c804da1146f05",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/talk_d": {
+  "sha1": "b72d6f4bb69ab65ac5e167dc7f9457e36afe3072",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/torch_a": {
+  "sha1": "7dc7d0dc668ebc9b8694f1fed934655177f464dd",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "dad/v_a": {
+  "sha1": "f251ba0186375c3c78b8a847b787a0709f2581b0",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.9,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "gramps/v_b": {
+  "sha1": "9a5afa7d9556175d7d28799d40a8242d5d881a63",
+  "model": "eleven_v4",
+  "voice": "1t1EeRixsJrKbiF1zwM6",
+  "speed": 0.85,
+  "semitones": -2,
+  "made": "2026-11-07"
+ },
+ "mom/bed7_a": {
+  "sha1": "7b8492ad0a9ead6c3fe60f4a89a17e9bf7b2b428",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/bed_call": {
+  "sha1": "b3f096d0204f507f4065362ffe53cd4d371677a4",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/box4_a": {
+  "sha1": "f991d9dd5f86421154d57097dbf5e8c7214c2f42",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/door_a": {
+  "sha1": "e99fd59c8d9f84503010d3a8cee91bf05ec9f204",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/f_b": {
+  "sha1": "04c105120a6cc7d13571779b70adbc7264b2ebea",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/f_c": {
+  "sha1": "c23d2350f720e8d365b0380c68e44f35eb948de6",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/fence_a": {
+  "sha1": "2ef899d4718c21ff9df3a2167b1a4f1501e01d86",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/fence_b": {
+  "sha1": "7665de71ee2103ffe4731363fef8dafe7f463464",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/gift_c": {
+  "sha1": "76860b79cebcba1d6e54f0e55a25975fd48fc094",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m1_c": {
+  "sha1": "0f9fde1b6d64af92a143d41102c4b95e86793468",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m2_c": {
+  "sha1": "099aaf040655ce28c5335d9ef87717689c293de0",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m3_a": {
+  "sha1": "2d7e40b0184096fbafbf82c4c30e3fdda4bbd817",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m3_b": {
+  "sha1": "c456705c734ee5c159757e44dae22ee757f009fb",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m3_c": {
+  "sha1": "3fdd313bb584aaccb7338e1995c8438d15eed218",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m6_a": {
+  "sha1": "884cb94ad11eede7ed7f0353212f2675c6a94988",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m6_b": {
+  "sha1": "297e43c0044b43b2243177ae1b55c067ad2f41a9",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m6_c": {
+  "sha1": "8cd3c9625d35d634cdd99acf34b337733c3820cd",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m6_d": {
+  "sha1": "bb2177700a419e7936cf3911598e2829aa7846ba",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m8_a": {
+  "sha1": "4605bb89109f6f7f683bbb5e0d3a9e42e6d1bf9a",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m8_b": {
+  "sha1": "dbca5da1535ede85cae84c04c23f017a8904d211",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m8_c": {
+  "sha1": "30520f7e4e1f0de02c4bf952b84dd1706e116aaa",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m_gramps": {
+  "sha1": "677be40987f3971af832fbf2012e30540d946e46",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m_needles": {
+  "sha1": "cac6c1a657e9238912a61f93eceefa38e0fead22",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m_road": {
+  "sha1": "8252e5a2e779e9789058490016e5b1a236729ca4",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/m_wet": {
+  "sha1": "c8927a64d40d07ea0dabf2accfe989b66654b833",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/mimic_b": {
+  "sha1": "0044e1c0c39d014442b3ab6d9e20616a2697b5b1",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.85,
+  "semitones": -2,
+  "made": "2026-11-07"
+ },
+ "mom/n5_a": {
+  "sha1": "3a17fafb8cab3b545880b2d5b7547ff3b01e6fe0",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_b": {
+  "sha1": "cf594a13186818f7d174f9da730dd0b53e330914",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_c": {
+  "sha1": "4780f65a83f87544cb1fa9b524f13a86f0e8483f",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_d": {
+  "sha1": "5e32646e6ee6ca80ca31b6e6fe9202128a6ca53d",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_e": {
+  "sha1": "9181f466358a784bfffcdc826d1caaf667076f45",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_f": {
+  "sha1": "53f338ff98041e34e1876a8db478e0996dfe421f",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_g": {
+  "sha1": "49d479b9ac58ea55a1898980064779b62679977e",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n5_h": {
+  "sha1": "d5b5e0328b94248c06e84c3edbee83b09e5eae04",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n8_a": {
+  "sha1": "e9609946d30089578eaee6c3d04b12bf0f671702",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n8_b": {
+  "sha1": "9e8362b25aac846db2c9ab84c695c3a25a8fc990",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n8_c": {
+  "sha1": "78d287aa547c9b5487cac2236ecf03bd0c8b998a",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/n8_d": {
+  "sha1": "c05688fd9550bda499c6ec5d4e3e2aee4b8e67b0",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/ph_low_b": {
+  "sha1": "f1f919b84e6f51d9c5df073df38f364e23e48837",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/road_a": {
+  "sha1": "df192124490b88607c1f56d1458cea98ce53824f",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/sheet_a": {
+  "sha1": "fc66dc9dc58f0bf0558f798a96bd8354e570260e",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/table_a": {
+  "sha1": "683402559d1e32aac985c944b49d51342e689ed0",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/under_a": {
+  "sha1": "17e4b0ad37dc5aebb98c5ef331d582eb964f5a66",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.85,
+  "semitones": -2,
+  "made": "2026-11-07"
+ },
+ "mom/v_a": {
+  "sha1": "fb97b042378ea546f5d624141851d051761514b8",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ },
+ "mom/v_b": {
+  "sha1": "398cb036809c94623679c3779589dad0db5ceb31",
+  "model": "eleven_v4",
+  "voice": "wVZ5qbJFYF3snuC65nb4",
+  "speed": 0.95,
+  "semitones": 0,
+  "made": "2026-11-07"
+ }
+}
