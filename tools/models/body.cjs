@@ -42,13 +42,16 @@ const srv = http.createServer((q, r) => {
   // what each clip does with the body, so a reader of this log knows which hand holds the torch and how far the hips travel
   for (const c of clips) {
     const p = c.probe, f3 = (v) => v.map((x) => x.toFixed(2)).join(' ');
-    console.log(`${c.name.padEnd(24)} ${c.duration.toFixed(2)}s hips first ${f3(p.hips0)} last ${f3(p.hips1)} (drop ${p.drop.toFixed(2)} m) ` +
-      `up first ${f3(p.up0)} last ${f3(p.up1)} front first ${f3(p.front0)} hands first L ${p.handL0.toFixed(2)} R ${p.handR0.toFixed(2)} (${p.raised} raised)`);
+    console.log(`${c.name.padEnd(24)} ${c.duration.toFixed(2)}s hips first ${f3(p.hips0)} last ${f3(p.hips1)} (drop ${p.drop.toFixed(2)} m, ${p.travel.toFixed(2)} from the stance${c.hips ? ', kept' : ''}; ` +
+      `lifted ${(p.lift * 100).toFixed(1)} cm at most, at ${p.liftAt} s) hands first L ${p.handL0.toFixed(2)} R ${p.handR0.toFixed(2)} (${p.raised} raised)`);
+    // the body through the clip: where the head points from the pelvis, where the front faces, and the pelvis and head heights
+    for (const u of p.ups) console.log(`    ${String(u.t).padStart(5)} s  head ${f3(u.up)}  front ${f3(u.front)}  pelvis ${u.pelvisY} m  head ${u.headY} m`);
   }
-  // the file: a JSON header (each clip's name, length, frame count and bones; and, where the hips travel more than 2 cm, their path:
-  // [x, y, z] per frame in millimetres from the standing rest, for a body `height` metres tall, +z forward), then every clip's values as
+  // the file: a JSON header (each clip's name, length, frame count and bones; and, where the hips leave the standing stance by more
+  // than 3 cm, their path: [x, y, z] per frame in millimetres from the rest pose, +z forward, for a rig whose pelvis rests `pelvis`
+  // metres over the floor, with `stance`, where the hips rest in the standing idle, in the same units), then every clip's values as
   // int16 (x 32767), clip by clip, bone by bone
-  const header = clips.map((c) => ({ name: c.name, duration: +c.duration.toFixed(4), fps: c.fps, frames: c.frames, bones: c.bones, ...(c.hips ? { height: +c.height.toFixed(3), hips: c.hips } : {}) }));
+  const header = clips.map((c) => ({ name: c.name, duration: +c.duration.toFixed(4), fps: c.fps, frames: c.frames, bones: c.bones, ...(c.hips ? { pelvis: +c.pelvis.toFixed(3), hips: c.hips, stance: c.stance } : {}) }));
   const n = clips.reduce((a, c) => a + c.vals.reduce((s, v) => s + v.length, 0), 0), data = new Int16Array(n); let o = 0;
   for (const c of clips) for (const v of c.vals) for (const x of v) data[o++] = Math.round(Math.max(-1, Math.min(1, x)) * 32767);
   const hj = Buffer.from(JSON.stringify(header)), pad = (4 - ((8 + hj.length) % 4)) % 4;

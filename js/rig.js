@@ -33,28 +33,47 @@ function seamless(clip) {
 export const loadModel = (name) => load(`assets/models/${name}.glb`);
 
 // The parents' body language (assets/models/body.bin, built by tools/models/body.cjs from Quaternius's Universal Animation Library, CC0):
-// standing, talking, sitting, sitting and talking, and arms folded. A JSON header
-// (each clip's name, length, frames and bones) and then every value as an int16. Each talking clip also comes mirrored (left for right),
-// so a line never repeats the last one's movements.
+// standing, talking, sitting, sitting and talking, arms folded, and what the days, the breakfast and the nights need (sitting down and
+// getting up, a carrying walk, eating, a nod and a shake, the phone, a call from a rail, lying to standing, a torch, a reach, a pick-up,
+// kneeling, pushing). A JSON header (each clip's name, length, frames and bones, and the hips' path where they travel) and then every
+// value as an int16. Each talking clip also comes mirrored (left for right), so a line never repeats the last one's movements.
 let bodyP = null;
-export const loadBody = () => (bodyP ||= fetch('assets/models/body.bin').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('body.bin ' + r.status)))).then((buf) => {
+export const loadBody = () => (bodyP ||= Promise.all([fetch('assets/models/body.bin').then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('body.bin ' + r.status)))), loadAnims().catch(() => [])]).then(([buf, anims]) => {
   const dv = new DataView(buf), hl = dv.getUint32(4, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, hl)));
   const data = new Int16Array(buf, 8 + hl), clips = []; let o = 0;
+  const legs = /(Thigh|Calf|Foot|Toe0)\.quaternion$/, arms = /(Clavicle|UpperArm|Forearm|Hand)\.quaternion$/;
+  // the game's standing legs: the idle clip's first frame, which people.js stands the parents on under every standing clip
+  const idle = anims.find((c) => c.name === 'idle'), idleLegs = {}; if (idle) for (const t of idle.tracks) if (legs.test(t.name)) idleLegs[t.name] = t.values.slice(0, 4);
+  const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion();
   for (const c of head) {
     const times = Float32Array.from({ length: c.frames }, (_, i) => (i / (c.frames - 1)) * c.duration), tracks = [];
     for (const b of c.bones) { const v = new Float32Array(c.frames * 4); for (let i = 0; i < v.length; i++) v[i] = data[o++] / 32767; normQ(v); tracks.push(new THREE.QuaternionKeyframeTrack('Bip01_' + b + '.quaternion', times, v)); }
     // standing clips keep only the body above the hips' children: the legs are the steady idle stance's (people.js), so a clip's own
     // stride never moves a foot into the stove or the bed; the seated ones are put where sit() puts them anyway. Sitting down and
-    // getting up (Sitting_*), lying to standing (LayToIdle) and kneeling at a repair (Fixing_Kneeling) keep their legs: the legs are
-    // the movement, and the hips' path comes with them (below). Eating (Consume) is its arms alone, laid over the seated clip.
-    const legs = /(Thigh|Calf|Foot|Toe0)\.quaternion$/, arms = /(Clavicle|UpperArm|Forearm|Hand)\.quaternion$/;
-    const keepLegs = /^(sit_|Sitting_|LayToIdle|Fixing_Kneeling)/.test(c.name), armsOnly = /^Consume$/.test(c.name);
+    // getting up (Sitting_*), lying to standing (LayToIdle), kneeling at a repair (Fixing_Kneeling), leaning on a rail (Idle_Rail_Call)
+    // and pushing (Push_Loop) keep their legs: the legs are the movement, or the lean tips the pelvis so far that the idle's legs
+    // would swing off the floor behind it, and the hips' path comes with them (below). Eating (Consume) is its arms alone, laid over
+    // the seated clip.
+    const keepLegs = /^(sit_|Sitting_|LayToIdle|Fixing_Kneeling|Idle_Rail_Call|Push_Loop)/.test(c.name), armsOnly = /^Consume$/.test(c.name);
+    // A clip that keeps its legs starts or ends (or both) in the library's own standing stance, which is wider and more staggered than
+    // the game's idle (its right foot a step back): over the last, or first, 0.35 s of such an end its legs ease into the idle's and its
+    // hips' path to nothing, so the crossfade to `stand` joins two matching poses and no foot slides
+    if (keepLegs && c.hips && c.stance && !/^sit_/.test(c.name)) {
+      const near = (h) => Math.hypot(h[0] - c.stance[0], h[1] - c.stance[1], h[2] - c.stance[2]) < 40, E = 0.35;
+      for (const end of [near(c.hips[0]) && 'start', near(c.hips[c.hips.length - 1]) && 'end']) {
+        if (!end) continue;
+        const w = (t) => { const k = Math.max(0, Math.min(1, end === 'start' ? 1 - t / E : 1 - (c.duration - t) / E)); return k * k * (3 - 2 * k); };
+        for (const tr of tracks) { const iv = idleLegs[tr.name]; if (!iv) continue; for (let i = 0; i < tr.times.length; i++) { const e = w(tr.times[i]); if (e > 0) { q0.fromArray(tr.values, i * 4); q1.fromArray(iv); q0.slerp(q1, e).toArray(tr.values, i * 4); } } }
+        c.hips = c.hips.map((h, i) => { const e = w(i / c.fps); return e > 0 ? h.map((x) => Math.round(x * (1 - e))) : h; });
+      }
+    }
     const clip = new THREE.AnimationClip(c.name, c.duration, keepLegs ? tracks : tracks.filter((t) => (armsOnly ? arms.test(t.name) : !legs.test(t.name)))); clips.push(clip);
     // where the hips travel, for the clips that keep their legs: userData.hips is [x, y, z] every 1/fps s from t = 0, in millimetres
-    // from the standing rest for a body `height` metres tall, +z forward. The bake keeps rotations only, so whoever plays such a
-    // clip moves the group by this path (scaled by their height / `height`, turned by their yaw) or the knees fold in the air.
-    // (The file carries a path for a few standing clips too, which lean or crouch; with the idle's legs under them it is not used.)
-    if (c.hips && keepLegs) clip.userData = { hips: c.hips, height: c.height, fps: c.fps };
+    // from the rest pose, +z forward, for a rig whose pelvis rests `pelvis` metres over the floor. The bake keeps rotations only, so
+    // whoever plays such a clip moves the group by this path (scaled by their pelvis height / `pelvis`, turned by their yaw) or the
+    // knees fold in the air. (The seated clips are laid over sit(), which drops the hips itself; the file carries a path for a few
+    // standing clips too, which lean or crouch, and with the idle's legs under them it is not used.)
+    if (c.hips && keepLegs && !/^sit_/.test(c.name)) clip.userData = { hips: c.hips, pelvis: c.pelvis, fps: c.fps };
     if (/talk|stand|fold|sit_idle|_Loop$/.test(c.name)) seamless(clip);   // (the loops' ends meet)
     if (/^sit_/.test(c.name)) {
       clip.userData = { ...clip.userData, additive: true };   // seated: only the movement, laid on an upright body (the clips slouch far back in their chair)
@@ -62,9 +81,10 @@ export const loadBody = () => (bodyP ||= fetch('assets/models/body.bin').then((r
       const arms = new THREE.AnimationClip(c.name + '_arms', c.duration, tracks.filter((t) => /(Clavicle|UpperArm|Forearm|Hand)\.quaternion$/.test(t.name)));
       clips.push(arms, mirror(arms, c.name + '_arms_m'));
     }
-    // left for right: the talking loops (so a line never repeats the last one's movements) and the one-handed clips. The library holds
-    // the torch in the left hand and the phone in the right, so Dad's torch, in his right, is Idle_Torch_Loop_m
-    if (/talk|sit_idle|stand|fold|^(Consume|Yes|Idle_|Interact|PickUp_Table)/.test(c.name)) { const m = mirror(clip, c.name + '_m'); if (c.hips) m.userData.hips = c.hips.map(([x, y, z]) => [-x, y, z]); clips.push(m); }
+    // left for right: the talking loops (so a line never repeats the last one's movements), the one-handed clips and the sit-up (so a
+    // parent pushes up on the side away from the other sleeper). The library holds the torch in the left hand and the phone in the
+    // right, so Dad's torch, in his right, is Idle_Torch_Loop_m; it eats with the left, so Consume_m eats with the right
+    if (/talk|sit_idle|stand|fold|^(Consume|Yes|Idle_|Interact|PickUp_Table|LayToIdle)/.test(c.name)) { const m = mirror(clip, c.name + '_m'); if (m.userData.hips) m.userData.hips = m.userData.hips.map(([x, y, z]) => [-x, y, z]); clips.push(m); }
   }
   return clips;
 }));
