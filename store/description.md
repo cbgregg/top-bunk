@@ -34,14 +34,14 @@ A single-storey farmhouse from the early 2000s, with brown carpet, a white kitch
 [h2]Nobody believes you[/h2]
 You tell them at breakfast and they explain it away. The tap was left running. The breaker tripped. You must have dropped the bear in the hall. Most nights the house leaves something behind, and if you find it, you've got something to show them. Show them enough and they start to listen.
 
-There are three endings. Which one you get depends on how many photos you've shown them by the tenth night, when it finally comes down the hall.
+There are three endings. Which one you get depends on what you showed them, what they saw for themselves and how often you got the blame, by the tenth night, when it finally comes down the hall. In one, nobody comes. In one, they see it. In one, nobody goes to bed.
 
 [h2]Features[/h2]
 [list]
 [*] A short horror story over ten nights in one house
 [*] Seeded runs: the same seed replays the same ten nights, and a new seed shuffles them
 [*] Hiding spots, a breath meter, a flashlight, stamina and doors that shut
-[*] A dozen kinds of proof to find and photograph with a disposable camera, from scratches to a handprint on the breaker box: the photos go on the breakfast table, and how many you show them decides which of three endings you get
+[*] A dozen kinds of proof to find and photograph with a disposable camera, from scratches to a handprint on the breaker box: the photos go on the breakfast table, and what you show them, what they see for themselves and who gets blamed decide which of three endings you get
 [*] Four nightmares that pull you under and leave something behind
 [*] The house gets worse each night: night lights die, the drawing in the hall changes, the clock lies
 [*] Every line is subtitled, and Mom, Dad and grandpa are voiced throughout. The kid is text only
@@ -100,10 +100,10 @@ universal macOS app about 530 MB). Steamworks has one block per OS; the lines ar
   title screen. Options → Reduce flashing softens them.
 - Implied violence against the player character (it catches you: it lunges, a scream, a white flash and a cut to black; no injury is
   shown).
-- One ending has it take the parents, on screen but abstract: it takes hold of each of them and pulls them down out of sight, with
-  cracking and chewing sounds, then a red flash. No blood, wounds or bodies are shown. Nothing else in the game shows blood or injury.
-- Mild language in the finale dialogue ("Jesus Christ"). No sexual content, no drugs, no gambling, no in-game purchases, no online
-  interaction.
+- One ending has the father go after it and a door slide shut between him and the family; he is not seen again. Nothing is shown
+  happening to him. No blood, wounds or bodies are shown anywhere in the game. Another ending implies the child is taken: a weight in
+  the bunk below, the light going out, an empty chair at breakfast.
+- No strong language. No sexual content, no drugs, no gambling, no in-game purchases, no online interaction.
 
 Mature Content survey (Steamworks → Store Page → Mature Content): tick *Frequent Violence or Gore*? No. Tick *General Mature
 Content*: yes, describe as "Horror themes, jump scares, frightening imagery, flashing lights, implied violence; no gore." Steam then
@@ -178,10 +178,11 @@ Ratings section. Germany needs one: since November 2024 Steam hides games there 
 page of Valve's content survey docs before launch (Valve won't take a USK rating that came through IARC on another store). Answer
 the survey from the content list above:
 
-- Violence: horror and fear themes; the player character is caught by a monster (implied, cut to black); in one ending the monster
-  takes the parents, pulled down out of sight with cracking and chewing sounds and a red flash, without blood, wounds or bodies.
+- Violence: horror and fear themes; the player character is caught by a creature (implied, cut to black); in one ending the father
+  goes after it and is not seen again, a door sliding shut between him and the family; in another the child is implied taken.
+  No blood, wounds or bodies.
 - Scary content: frequent and intense for the genre (jump scares, a creature with glowing eyes that hunts a child).
-- Language: mild, infrequent (one or two exclamations).
+- Language: none.
 - Sex and nudity, drugs, alcohol, gambling, user-generated content, in-game purchases, user interaction, location sharing: none.
 
 Mark at least four screenshots as suitable for all ages: 02 (your room) and 06 (breakfast) have no creature in frame, and 03 (the
