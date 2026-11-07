@@ -80,8 +80,9 @@ for (const [id, l] of Object.entries(lines)) {
 }
 
 // ---- every voiced line has a recording the manifest lists ----
+const later = new Set(WAVE ? spec.waves.filter((w) => w.wave > WAVE).flatMap((w) => w.ids) : []);   // a later wave's ids may still be unrecorded
 for (const [id, l] of Object.entries(lines)) {
-  if (!l.voice) continue;
+  if (!l.voice || later.has(id)) continue;
   if (!mp3(id)) fail(`${id}: voiced but no mp3 under vo/`);
   else if (manifest && !manifest.has('vo/' + id)) fail(`${id}: mp3 is not in manifest.json`);
 }
