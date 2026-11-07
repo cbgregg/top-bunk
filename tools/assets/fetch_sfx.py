@@ -34,7 +34,9 @@ LIB = {
   'door_open':    ('hit', [(1702, 'whole', ()), (1703, 'whole', ()), ('0224', 'split', (5,))]),
   'door_close':   ('hit', [(1704, 'onsets', (1, 1.4, 1)), (1500, 'onsets', (1, 1.4, 1), {'rate': 0.8}), (1704, 'onsets', (1, 1.4, 1), {'rate': 0.9})]),   # from the moment it meets the frame
   'door_slam':    ('hit', [('0103', 'onsets', (1, 2.2, 1)), ('0223', 'whole', ()), (1501, 'whole', ())]),
-  'door_lock':    ('hit', [('0037', 'whole', ()), (1320, 'cut', (0, 2.2))]),
+  'door_lock':    ('hit', [('0037', 'whole', ()), (1320, 'cut', (0, 2.2)), ('0191', 'onsets', (2, 1.2, 1.5)), (1540, 'whole', ()), ('0619', 'split', (3,), {'lp': 5000})]),   # a key, a bolt, the barn's, and the chain going on
+  'doorknob':     ('hit', [('0617', 'split', (5,), {'lp': 4500}), ('0224', 'onsets', (3, 0.5, 1.5), {'hp': 400})]),   # the knob turning (a dry metal grind), the latch
+  'chain':        ('hit', [('0619', 'split', (5,)), ('0359', 'whole', ()), (1133, 'cut', (0, 3))]),   # a chain picked up and let fall, the dog chain on its post, the barn's hoist
   'knock':        ('hit', [('0015', 'split', (6,)), ('0374', 'cut', (2.2, 4.8))]),
   'cabinet':      ('hit', [('0046', 'split', (4,)), ('0787', 'split', (4,))]),
   'drawer':       ('hit', [(1499, 'whole', ()), (1500, 'whole', ()), (1267, 'split', (4,))]),
@@ -44,6 +46,13 @@ LIB = {
   'washer_lid':   ('hit', [('0809', 'split', (4,))]),
   'metal_tap':    ('hit', [('0053', 'split', (6,))]),
   'chair_scrape': ('hit', [('0666', 'split', (6,)), ('0516', 'cut', (0, 3))]),
+  'chairs_fall':  ('hit', [('0516', 'split', (7,)), ('0405', 'onsets', (2, 1.2, 1.5), {'rate': 0.7, 'lp': 2500})]),   # a chair thrown over; a second clatter of what was on it
+  'bed_creak':    ('hit', [(1231, 'split', (5,), {'rate': 0.75, 'lp': 3500}), ('0518', 'split', (4,), {'rate': 0.6, 'lp': 2000})]),   # the bunk's springs and its wooden frame taking a weight
+  'crib':         ('hit', [('0865', 'onsets', (5, 1.6, 2), {'rate': 0.85, 'hp': 150, 'lp': 4000}), ('0305', 'cut', (0, 3), {'rate': 0.7, 'hp': 150, 'lp': 3000})]),   # the crib in the barn: its wicker and slats creaking
+  'tarp':         ('hit', [(1523, 'split', (4,), {'lp': 6000}), (1104, 'cut', (0, 4), {'rate': 0.65, 'lp': 3500})]),   # a tarp lifted and dropped back over the Hollis furniture
+  'shoes_cloth':  ('hit', [(1104, 'split', (4,), {'rate': 0.9}), ('0938', 'onsets', (3, 0.5, 0.5), {'rate': 0.85, 'lp': 3000})]),   # a pair of small sneakers picked up: the cloth, a rubber squeak
+  'paper_slide':  ('hit', [('0785', 'split', (6,), {'lp': 4000}), (1251, 'cut', (0, 3), {'lp': 4000})]),   # a sheet of paper sliding in under a door
+  'pencil':       ('hit', [(3233, 'onsets', (2, 1.4, 2), {'hp': 300}), (3234, 'onsets', (2, 1.4, 2), {'hp': 300}), (3235, 'onsets', (2, 1.4, 2), {'hp': 300})]),   # the same pencil as the strip's, at its own speed
   'toy_squeak':   ('hit', [('0879', 'split', (4,)), ('0364', 'whole', ())]),
   'crayon':       ('hit', [(3233, 'onsets', (2, 1.4, 2), {'rate': 0.85}), (3234, 'onsets', (2, 1.4, 2), {'rate': 0.85}), (3235, 'onsets', (2, 1.4, 2), {'rate': 0.85}), ('0541', 'cut', (2, 2))]),
   'page_turn':    ('hit', [(2210, 'whole', ()), (2212, 'whole', ()), (2213, 'whole', ()), (2214, 'whole', ()), (2216, 'whole', ()), ('0164', 'whole', ()), ('0362', 'whole', ())]),
@@ -66,6 +75,13 @@ LIB = {
   'zap':          ('hit', [(2134, 'whole', ())]),
   'radio_static': ('hit', [('0312', 'whole', ()), ('0313', 'whole', ()), ('0310', 'cut', (0, 4)), (2512, 'cut', (0, 4))]),
   'radio_tune':   ('hit', [(2617, 'whole', ()), (2618, 'cut', (0, 6))]),
+  'smoke_alarm':  ('hit', [('0925', 'onsets', (4, 0.35, 0.2))]),   # one beep of a domestic detector: the hall ceiling's low-battery chirp
+  # ---- the kitchen in the morning ----
+  'kettle':       ('hit', [('0149', 'cut', (0, 14), {'lp': 6000})]),   # the boil coming up; the whistle rising out of it is synthesized over this take (sfx.kettle), there is no CC0 kettle whistle to cut
+  'cutlery':      ('hit', [(1193, 'split', (6,)), (1191, 'split', (4,)), (1196, 'split', (4,)), (1192, 'split', (3,))]),
+  'toast_pop':    ('hit', [('0442', 'onsets', (7, 0.8, 1.0))]),
+  'glass_ring':   ('hit', [('0472', 'split', (4,)), ('0471', 'split', (4,))]),
+  'bowl':         ('hit', [(1190, 'split', (4,)), (1196, 'split', (3,), {'rate': 0.9}), ('0410', 'split', (2,))]),   # a bowl set down, a spoon in it
   # ---- the camera ----
   'shutter':      ('hit', [(2821, 'whole', ()), (2822, 'whole', ()), (3022, 'whole', ())]),
   'winder':       ('hit', [(1674, 'split', (4,))]),
@@ -88,6 +104,9 @@ LIB = {
   'wall_scratch': ('hit', [('0663', 'cut', (2, 5), {'lp': 1800, 'gain': 4}), ('0541', 'cut', (8, 4), {'lp': 1400, 'gain': 3})]),
   'crawl':        ('hit', [(1318, 'cut', (4, 5), {'rate': 1.15, 'lp': 1400}), (1254, 'cut', (2, 5), {'lp': 1200}), (1104, 'cut', (0, 4), {'rate': 1.3})]),
   'drag':         ('hit', [(1104, 'cut', (0, 5), {'rate': 0.7, 'lp': 1500}), ('0858', 'cut', (2, 4), {'rate': 0.6, 'lp': 1200})]),
+  # the crawl's own set (design §6.2, §14.3): a hand slapping the boards, and the rattle in its throat (a cat's growl slowed, a ratchet slowed)
+  'floor_slap':   ('hit', [('0597', 'split', (6,), {'rate': 0.85, 'lp': 1400}), (1152, 'onsets', (6, 0.5, 0.4), {'rate': 0.8, 'lp': 1200})]),
+  'rattle':       ('hit', [('0658', 'onsets', (4, 1.8, 2.5), {'rate': 0.7, 'hp': 60, 'lp': 2600}), ('0318', 'cut', (0, 2.5), {'rate': 0.6, 'lp': 1800}), ('0923', 'onsets', (3, 1.6, 2), {'rate': 0.5, 'lp': 1500})]),
   # ---- stingers and textures ----
   'bowed_metal':  ('hit', [(1483, 'cut', (0, 10), {'rate': 0.45}), (1482, 'cut', (0, 10), {'rate': 0.5})]),                   # a gong slowed into a long, low ring
   'metal_swell':  ('hit', [(1482, 'cut', (-9, 9), {'rate': 0.5, 'rev': True}), (1485, 'cut', (-9, 9), {'rate': 0.4, 'rev': True})]),   # the same, reversed: it rises into a hit
@@ -95,6 +114,12 @@ LIB = {
   'thunder':      ('hit', [(2718, 'whole', ()), (3113, 'whole', ()), (3114, 'whole', ()), (3115, 'whole', ()), (3116, 'whole', ()), (3179, 'whole', ()), (3180, 'whole', ()), (3181, 'whole', ()), (3184, 'whole', ())]),
   # ---- outside ----
   'car_pass':     ('hit', [(i, 'whole', ()) for i in range(2990, 2997)]),
+  'car_horn':     ('hit', [('0558', 'split', (5,), {'hp': 250}), (2721, 'whole', ())]),   # a car's horn (the pickup's, or the one that kills you on the road), and a truck's
+  'bus_horn':     ('hit', [(3594, 'whole', ()), (3593, 'split', (3,))]),                   # the school bus on the road at 7:20
+  'skid':         ('hit', [('0500', 'split', (6,))]),
+  'car_idle':     ('bed', [('0187', 'loop', (20.8, 6))]),                                     # a car stopped at the end of the drive, engine running
+  'iron_roll':    ('hit', [('0336', 'whole', (), {'rate': 0.8}), ('0616', 'cut', (2, 4), {'rate': 0.7, 'lp': 4000}), ('0683', 'cut', (0, 4), {'rate': 0.8, 'lp': 2500})]),   # the barn door on its rail (sfx.ironRoll adds the bang)
+  'needles_wind': ('bed', [('0904', 'loop', (30, 40), {'hp': 120})]),                     # the forest: wind in the trees overhead
   'dog_far':      ('hit', [(2352, 'whole', (), {'lp': 1600}), (2353, 'cut', (0, 6), {'lp': 1600}), ('0288', 'cut', (0, 4), {'lp': 1400})]),
   'owl':          ('hit', [(1763, 'whole', ()), (1764, 'whole', ()), (3459, 'whole', ()), (3460, 'whole', ())]),
   # ---- beds ----
@@ -114,6 +139,28 @@ LIB = {
   'bed_buzz':     ('bed', [(2118, 'loop', (1, 8))]),
   'bed_chimes':   ('bed', [(2687, 'loop', (20, 40))]),
   'bed_snore':    ('bed', [('0170', 'loop', (0, 40))]),
+  # the kitchen radio's AM bed: the set's own floor between the newsreader's items (interference between two stations, through the speaker chain in sfx.radio)
+  'bed_radio':    ('bed', [('0310', 'loop', (0.2, 5.6), {'hp': 300, 'lp': 3600})]),
+  # ---- the menu ----
+  'ui_tick':      ('hit', [(1738, 'whole', (), {'lp': 7000}), ('0613', 'split', (3,), {'lp': 6000})]),                                     # a trackpad's click, a pen's: the focus moving
+  'ui_tone':      ('hit', [('0470', 'cut', (65, 1.3), {'lp': 5000}), ('0470', 'cut', (73, 1.3), {'lp': 5000}), ('0470', 'cut', (85, 1.3), {'lp': 5000})]),   # three of a sanza's higher notes, plucked: confirm (lower for back)
+}
+
+# the takes that were reviewed after cutting, so the review survives a run of this tool (it is written into SOURCES.md)
+REVIEWED = {
+  'rattle': 'the throat rattle for the catch and the crawl: the cat takes slowed to a wet growl, the ratchet takes a dry clatter',
+  'floor_slap': 'a hand on the boards: skin slaps lowered and dulled so they read as a palm on wood, not a face',
+  'cloth': 'the drag of the crawl: a coat rubbed, a shower curtain (unchanged)',
+  'bone_crack': 'the crack as it unfolds: bones and peppers (unchanged)',
+  'breath': 'its breathing: nose and mouth sighs, a man breathing (unchanged)',
+  'chairs_fall': 'the loud set: a dining chair going over on carpet, a clatter after it',
+  'car_horn': 'the loud set: honks from inside a car (high-passed), a truck horn',
+  'bus_horn': 'the loud set: a bus leaning on its horn',
+  'skid': 'the loud set: tyres squealing',
+  'iron_roll': 'the loud set: a metal gate ground along, a metal door gnashing, a sliding door, all slowed',
+  'smoke_alarm': 'the loud set: one beep of a domestic detector',
+  'glass_ring': 'the loud set: a stemmed glass tapped, full and empty',
+  'bed_creak': 'the loud set: metal squeaks and a floor squeak slowed into a bed frame',
 }
 
 
@@ -220,8 +267,15 @@ def peak_norm(x, db=-1.0):
   return x * (10 ** (db / 20) / p) if p > 0 else x
 
 
+def read_sources():
+  """the titles already in SOURCES.md, so a run of a few keys keeps every other recording's row (the download cache is not committed)"""
+  p = os.path.join(OUT, 'SOURCES.md')
+  if not os.path.exists(p): return {}
+  return {m.group(1): m.group(2) for m in re.finditer(r'^\| (\d{4}) \| \[([^\]]+)\]\(', open(p).read(), re.M)}
+
+
 def write_sources(credits):
-  """assets/sfx/lib/SOURCES.md: every recording used, its page and the keys made from it"""
+  """assets/sfx/lib/SOURCES.md: every recording used, its page and the keys made from it, then the keys whose takes were reviewed"""
   used = {}
   for key, (_, recipe) in LIB.items():
     for e in recipe: used.setdefault(str(e[0]).zfill(4), []).append(key)
@@ -231,6 +285,12 @@ def write_sources(credits):
            '| # | Recording | Used for |', '|---|---|---|']
   for sid in sorted(credits):
     if sid in used: lines.append(f'| {sid} | [{credits[sid]}](https://bigsoundbank.com/x-s{sid}.html) | {", ".join(sorted(set(used[sid])))} |')
+  missing = sorted(sid for sid in used if sid not in credits)
+  if missing: lines += ['', 'Not fetched yet (no row until the tool has read the page): ' + ', '.join(missing)]
+  lines += ['', '## Reviewed takes', '', 'The keys below were reviewed after cutting: every take checked for its length, its peak and loudness, a silent or clipped stretch,',
+            'and the band its energy sits in (the crawl set of design §6.2 and the loud set of §14.2). `tools/assets/review_sfx.py` prints the same numbers for any key.', '',
+            '| Key | What the takes are |', '|---|---|']
+  for key, note in REVIEWED.items(): lines.append(f'| {key} | {note} |')
   open(os.path.join(OUT, 'SOURCES.md'), 'w').write('\n'.join(lines) + '\n')
 
 
@@ -240,7 +300,8 @@ def main():
   manifest_path = os.path.join(ROOT, 'assets', 'sfx', 'lib.json')
   manifest = json.load(open(manifest_path)) if os.path.exists(manifest_path) else {}
   cpath = os.path.join(CACHE, 'credits.json')
-  credits, refused = (json.load(open(cpath)) if os.path.exists(cpath) else {}), []
+  credits, refused = read_sources(), []
+  if os.path.exists(cpath): credits.update(json.load(open(cpath)))
   for key, (kind, recipe) in LIB.items():
     if only and key not in only: continue
     files = []
