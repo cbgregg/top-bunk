@@ -1372,7 +1372,7 @@ const MORN = {
   6: [['mom', 'm6_a'], ['dad', 'm6_a'], ['mom', 'm6_b']],
   7: [['dad', 'm7_a'], ['you', 'm7_a'], ['mom', 'm7_a'], ['dad', 'm7_b']],
   8: [['mom', 'm8_a'], ['dad', 'm8_a'], ['mom', 'm8_b']],
-  9: [['mom', 'm9_a'], ['dad', 'm9_a'], ['you', 'm9_a'], ['mom', 'm9_b']],
+  9: [['mom', 'm9_a'], ['dad', 'm9_a'], ['dad', 'm9_b'], ['mom', 'm9_b']],   // the kid's "one more night" is cut; Dad's reason to stay carries it
 };
 const TYPE_LINE = { thirst: ['mom', 't_thirst'], ring: ['dad', 't_ring'], static: ['dad', 't_static'], mimic: ['mom', 't_mimic'], blackout: ['dad', 't_blackout'], hunted: ['mom', 't_hunted'], paralysis: ['mom', 't_paralysis'], teddy: ['mom', 't_teddy'], parents: ['mom', 't_parents'], quiet: ['dad', 't_quiet'], car: ['mom', 't_car'] };
 // the kitchen in the morning: Mom stirs a pan on the stove with a wooden spoon, her other hand on the counter; Dad stands at the
@@ -1683,8 +1683,9 @@ async function finaleScene() {
   mom.group.visible = dad.group.visible = true; mom.busy = dad.busy = true; mom.lookAt = dad.lookAt = null;
   dad.group.position.set(3.7, 0, -0.6); dad.group.rotation.y = Math.PI / 2; mom.group.position.set(3.25, 0, -0.2); mom.group.rotation.y = Math.PI / 2;
   await wait(0.4);
-  await Promise.all([lookAtPerson(dad, 0.9), say('dad/f_a')]);
-  sfx.scream(); await Promise.all([lookAtPerson(mom, 0.5), say('mom/f_a')]);
+  // the two shouted lines are cut from the dialogue: they see it and say nothing, each held as long as a line was
+  await Promise.all([lookAtPerson(dad, 0.9), wait(2.4)]);
+  sfx.scream(); await Promise.all([lookAtPerson(mom, 0.5), wait(2.4)]);
   if (end === 'ENDING_BELIEVED') return finaleBelieved();
   return finaleGruesome();
 }
