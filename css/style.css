@@ -98,9 +98,9 @@ button:hover { background: rgba(233,226,208,0.08); }
 .note.gfx select { background: #0d0d0d; color: #cfc8b8; border: 1px solid #4a4538; font: inherit; padding: 0.15em 0.4em; margin-left: 0.6em; cursor: pointer; }
 
 /* ---------- touch controls (shown on touch devices) ---------- */
-/* the right-hand cluster, anchored at the corner: USE with RUN beside it, above it one fixed slot that HOLD BREATH and COVER UP share
-   (so the layout never changes under the thumb), above that LIGHT with CAM beside it; II at the top. --k scales the buttons (Options:
-   touch button size); .left mirrors the halves and the cluster for a left-handed player */
+/* the right-hand cluster, anchored at the corner in two rows so it fits a phone's height at every size: USE with RUN beside it; above
+   them one fixed slot that HOLD BREATH and COVER UP share (so the layout never changes under the thumb) with LIGHT and CAM beside it.
+   II at the top. --k scales the buttons (Options: touch button size); .left mirrors the halves and the cluster for a left-handed player */
 #touch { --k: 1; position: fixed; inset: 0; z-index: 32; display: none; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 #touch.on { display: block; }
 #touch.large { --k: 1.2; }
@@ -119,14 +119,15 @@ button:hover { background: rgba(233,226,208,0.08); }
 #t-act.cam span { display: none; }
 #t-act.cam .shutter { display: block; margin: auto; }
 #t-run { right: max(calc(132px * var(--k)), calc(env(safe-area-inset-right) + 108px * var(--k))); bottom: max(34px, env(safe-area-inset-bottom)); width: calc(72px * var(--k)); height: calc(72px * var(--k)); }
-#t-breath, #t-cover { visibility: hidden; right: max(24px, env(safe-area-inset-right)); bottom: calc(134px * var(--k)); width: calc(92px * var(--k)); height: calc(92px * var(--k)); font-size: calc(13px * var(--k)); }
+#t-breath, #t-cover { visibility: hidden; right: max(24px, env(safe-area-inset-right)); bottom: calc(42px + 92px * var(--k)); width: calc(92px * var(--k)); height: calc(92px * var(--k)); font-size: calc(13px * var(--k)); }
 #t-breath.show, #t-cover.show { visibility: visible; }
 #touch button.down { background: rgba(233,226,208,0.35); }
-#t-light { right: max(24px, env(safe-area-inset-right)); bottom: calc(240px * var(--k)); width: calc(64px * var(--k)); height: calc(64px * var(--k)); font-size: calc(11px * var(--k)); }
-#t-cam { right: max(calc(102px * var(--k)), calc(env(safe-area-inset-right) + 78px * var(--k))); bottom: calc(240px * var(--k)); width: calc(64px * var(--k)); height: calc(64px * var(--k)); font-size: calc(11px * var(--k)); }
-#touch.left #t-act, #touch.left #t-breath, #touch.left #t-cover, #touch.left #t-light { right: auto; left: max(24px, env(safe-area-inset-left)); }
+#t-light { right: max(calc(38px + 92px * var(--k)), calc(env(safe-area-inset-right) + 14px + 92px * var(--k))); bottom: calc(56px + 92px * var(--k)); width: calc(64px * var(--k)); height: calc(64px * var(--k)); font-size: calc(11px * var(--k)); }
+#t-cam { right: max(calc(50px + 156px * var(--k)), calc(env(safe-area-inset-right) + 26px + 156px * var(--k))); bottom: calc(56px + 92px * var(--k)); width: calc(64px * var(--k)); height: calc(64px * var(--k)); font-size: calc(11px * var(--k)); }
+#touch.left #t-act, #touch.left #t-breath, #touch.left #t-cover { right: auto; left: max(24px, env(safe-area-inset-left)); }
 #touch.left #t-run { right: auto; left: max(calc(132px * var(--k)), calc(env(safe-area-inset-left) + 108px * var(--k))); }
-#touch.left #t-cam { right: auto; left: max(calc(102px * var(--k)), calc(env(safe-area-inset-left) + 78px * var(--k))); }
+#touch.left #t-light { right: auto; left: max(calc(38px + 92px * var(--k)), calc(env(safe-area-inset-left) + 14px + 92px * var(--k))); }
+#touch.left #t-cam { right: auto; left: max(calc(50px + 156px * var(--k)), calc(env(safe-area-inset-left) + 26px + 156px * var(--k))); }
 #t-pause { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 44px; height: 44px; font-size: 16px; }
 body[data-scheme="touch"] #crosshair { opacity: 0.35 !important; }
 

@@ -26,7 +26,7 @@ From night two the whole house is open, a clock runs toward dawn, and the thing 
 | Skip the bedtime cartoon (hold) | Esc | Start · Options | SKIP |
 | Menus: choose / change / select / back / tabs / resume | Arrows or WASD / ← → / Enter or Space / Esc or Backspace / Q, E / — | D-pad or stick / ← → / A / B / LB, RB / Start | Tap / ‹ › / tap / ✕ / swipe / II |
 
-Every control can be rebound (Options → Controls); prompts, the Controls panel and the bedtime cartoon follow whichever input you used last and show the pad's own buttons (Xbox, PlayStation or Switch names, or your choice). The menus work from the keyboard or a controller. Controllers rumble on the scares (Vibration in Options). On phones the game goes fullscreen in landscape and starts on the Medium graphics preset. Headphones recommended.
+Prompts, the Controls panel and the bedtime cartoon follow whichever input you used last and show your pad's own buttons (Xbox, PlayStation or Switch names). The menus work from the keyboard or a controller. Controllers rumble on the scares. On phones the game goes fullscreen in landscape and starts on the Medium graphics preset. Headphones recommended.
 
 Options (title and pause menus) has volume, look sensitivity, invert Y, field of view, head bob, graphics, subtitles, a reduce-flashing switch and the bedtime cartoon (on or off; hold Esc, Start or SKIP to skip it once you have passed its lesson, or straight away after the first time).
 

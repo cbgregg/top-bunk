@@ -1165,7 +1165,7 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
         ui.push(() => {
           const pop = ease.back(k01(t, 0.55, 0.95)), lab = getLabel();
           // the control itself is never in the picture: the glove points down out of the frame, where the cap sits in the margin under it
-          if (pop > 0) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); glove(c, 740, 545 + press * 10, Math.PI / 2, 'point', 1.25 * pop); letter(c, 'HOLD IT!', 730, 110, 44, { seed: 31, line: 7 }); capShow(lab, press); }
+          if (pop > 0) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); glove(c, 838, 486 + press * 12, Math.PI / 2, 'point', 2.1 * pop); letter(c, 'HOLD IT!', 730, 110, 44, { seed: 31, line: 7 }); capShow(lab, press); }
           const tapK = ease.back(k01(t, dur('c_hold') * 0.62, dur('c_hold') * 0.62 + 0.4));
           if (tapK > 0) { c.save(); c.translate(730, 360); c.scale(tapK, tapK); bigText(c, '...or TAP it once!', 0, 0, 30, { w: 6 }); c.restore(); }
         });
@@ -1214,7 +1214,7 @@ export function createCartoon({ audio, getLabel = () => ({ text: 'SPACE', scheme
               : whoops ? { y: TENT.floor + 6 - drop * 20, sy: 1 - drop * 0.25, face: 'o', eyeS: 1.15, brow: 1, look: [0, -1] } : { talk: talk(), face: talk() > 0.12 ? 'grin' : 'sly', brow: 0.2, look: [0.7, 0.1], lid: Math.max(0.5, blinkAt(T)) }));
         }
         ui.push(() => {
-          if (!st.holding && !whoops) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); letter(c, 'NOW YOU TRY IT!', 720, 120, 44, { seed: 34, line: 7, arc: 8 }); glove(c, 740, 545 + press * 10, Math.PI / 2, 'point', 1.2); capShow(lab, press); }
+          if (!st.holding && !whoops) { const press = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); letter(c, 'NOW YOU TRY IT!', 720, 120, 44, { seed: 34, line: 7, arc: 8 }); glove(c, 838, 486 + press * 12, Math.PI / 2, 'point', 2.0); capShow(lab, press); }
           meter(c, 720, 380, 1 - k * 0.75, 'HOLD IT...');
           if (st.holding) { const n = Math.min(HOLD_NEED, Math.floor(st.holdT) + 1), fr = st.holdT % 1, sz = 1 + (1 - ease.out(Math.min(1, fr * 3))) * 0.45; c.save(); c.translate(720, 220); c.scale(sz, sz); letter(c, `${n}!`, 0, 0, 120, { seed: 35 + n, line: 10 }); c.restore(); }
           if (whoops) { c.save(); c.translate(720, 230); c.rotate(Math.sin(t * 12) * 0.05); letter(c, 'WHOOPS!', 0, 0, 70, { seed: 40, line: 9, arc: 10 }); c.restore(); }

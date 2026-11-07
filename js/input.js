@@ -34,7 +34,7 @@ const keyName = (code) => KEYNAMES[code] || (code && (code.match(/^(Key|Digit)(.
 // the on-screen buttons' own names
 const TOUCH = { move: 'the left side of the screen', look: 'the right side of the screen', sprint: 'RUN', interact: 'USE', camera: 'CAM', light: 'LIGHT', breath: 'HOLD BREATH', cancel: 'CAM', journal: 'the notebook at the top', pause: 'II',
   menuUp: 'tap', menuDown: 'tap', menuLeft: '‹', menuRight: '›', menuConfirm: 'tap', menuBack: '✕', tabPrev: 'swipe', tabNext: 'swipe', photos: 'the notebook at the top' };
-const CONTROLS = { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact / use what you hold / take the photo', camera: 'Camera up / down', light: 'Flashlight', breath: 'Hold your breath / pull the covers', cancel: 'Put the camera away', journal: 'Your journal and photos', pause: 'Pause' };
+const CONTROLS = { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact / take the photo', camera: 'Camera up / down', light: 'Flashlight', breath: 'Hold your breath / the covers', cancel: 'Put the camera away', journal: 'Your journal and photos', pause: 'Pause' };
 
 // the keyboard's move keys, by the names the move action's slots carry
 const MOVE_KEYS = { WASD: ['KeyW', 'KeyS', 'KeyA', 'KeyD'], Arrows: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'] };
@@ -102,7 +102,8 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
   });
   addEventListener('keyup', (e) => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; for (const k in mouse) mouse[k] = false; });
-  addEventListener('mousemove', () => { if (input.scheme !== 'kb' && !input.touchDevice) setScheme('kb'); });
+  // only a mouse that moved: the browser also sends a mousemove when the page changes under a still pointer (a prompt appearing)
+  addEventListener('mousemove', (e) => { if ((e.movementX || e.movementY) && input.scheme !== 'kb' && !input.touchDevice) setScheme('kb'); });
   // the mouse buttons count only while the game holds the pointer (a click that takes the pointer back is not a use)
   addEventListener('mousedown', (e) => { const c = 'Mouse' + e.button; if (!(c in mouse)) return; mouse[c] = true; if (document.pointerLockElement) mouseEdges.add(c); });
   addEventListener('mouseup', (e) => { const c = 'Mouse' + e.button; if (c in mouse) mouse[c] = false; });
@@ -162,7 +163,6 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
   // menu directions from the d-pad or the left stick: first press at once, then a repeat while held. A direction already held when the
   // menu opens (walking when you paused) waits for its release.
   const heldDir = {}, menuFire = (a) => { try { input.onMenu && input.onMenu(a); } catch (e) { console.error(e); } };
-  const padHas = (action, i) => slots(action, 'pad').includes(i);
   function menuNav(gp, on) {
     const now = performance.now(), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
     const dirs = { menuUp: padDown('menuUp') || ay < -0.55, menuDown: padDown('menuDown') || ay > 0.55, menuLeft: padDown('menuLeft') || ax < -0.55, menuRight: padDown('menuRight') || ax > 0.55 };
