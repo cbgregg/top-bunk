@@ -235,8 +235,12 @@ async function headlessOne(page, d, night) {
   // 3. no payoff before the reveal. A beat revealed by `hold` is found by where you are (within earshot of its sound, in its room), so
   // one that is already revealed here was found the moment it was placed: that is its reveal, made by the player's position
   await playFor(page, 0.8);
-  const st = await ev(page, (events, g, id) => ({ state: events.test.state(id), payoffs: events.test.payoffs()[id] || 0, how: (events.test.active().find((a) => a.id === id) || {}).how }), d.id);
-  const heardAtOnce = st.state === 'revealed' && d.reveal.by === 'hold' && st.how === 'hold';
+  const st = await page.evaluate(async (id) => {
+    const events = await import('/js/events.js'), log = await import('/js/log.js');
+    const row = log.entries().filter((e) => e.id === id && e.seen).pop();   // a kept beat found at once has already left the table: its row says how
+    return { state: events.test.state(id), payoffs: events.test.payoffs()[id] || 0, how: (events.test.active().find((a) => a.id === id) || row || {}).how };
+  }, d.id);
+  const heardAtOnce = (st.state === 'revealed' || (st.state === null && st.payoffs === 1)) && d.reveal.by === 'hold' && st.how === 'hold';
   if ((st.state === 'revealed' || st.payoffs) && !heardAtOnce) fail(`paid off before any reveal (${st.state})`);
   if (st.state !== 'armed' && !heardAtOnce) fail(`not armed after the arm (${st.state})`);
   if (heardAtOnce) r.notes.push('heard where you stood');
@@ -315,8 +319,9 @@ async function headlessOne(page, d, night) {
   // ---------- headless, per event ----------
   await section('headless', async () => {
     const out = [], fails = [];
-    // night four for the beats of nights two to nine (every stage scare is in by then, Mom's double included), night one for its own
-    for (const [hash, nightN] of [['#night4', 4], ['#night1', 1]]) {
+    // night four for the beats of nights two to nine (every stage scare is in by then, Mom's double included), night one for its own;
+    // a fixed seed whose fourth night is a hunted night: its scene is an objective and nothing else takes the bunk or the thing
+    for (const [hash, nightN] of [['#night4&seed=F3PC-0001', 4], ['#night1', 1]]) {
       const { page, w, ctx } = await nightPage(browser, hash, { init: nightN === 1 ? () => { window.__n1fast = 0.3; } : null });
       if (nightN === 1) await until(page, () => Array.isArray(window.__n1log), null, 60e3);
       await climbDown(page);

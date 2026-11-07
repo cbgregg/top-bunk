@@ -899,7 +899,8 @@ export function createNights(env) {
       while: () => P.mode !== 'walk' && ((F.night || 1) > 1 || N1.dentOn || env.FN.dent.k > 0.15),
       max: 40,
       undo: (h) => { h.alive = false; h.stopped = true; N1.breathing = false; if ((F.night || 1) > 1) env.FN.dent.set(0); },
-      test: { mode: 'bunk' },
+      test: { mode: 'bunk', setup: () => { if ((F.night || 1) <= 1) env.FN.dent.set(1); } },   // on night one it rides on the weight below
+
       end: (D, h, seen) => { N1.breathing = false; if (N1.live) { n1.done(); const row = N1.log && N1.log.find((e) => e.id === 'breathUnder'); if (row) Object.assign(row, { cycles: h.cycles, matched: h.matched, held: h.held, seen }); } },
       logExtra: (h) => ({ cycles: h.cycles, matched: h.matched, held: h.held }),
       after: { keep: false, log: true, journal: 'breathUnder' },
@@ -932,7 +933,7 @@ export function createNights(env) {
             if (!n1.seesDoor()) continue;
             sfx.pick('door_creak', { at: at(dp.x, 1.2, dp.z), gain: 0.3, wet: 0.2, rate: 0.55 });
             let away = 0;
-            while (ok(h) && kidDoor.a > 0.12 && away < 0.3) { await wait(1 / 30); if (n1.seesDoor()) { away = 0; kidDoor.a = kidDoor.target = Math.max(0.12, kidDoor.a - 0.0035); kidDoor.apply(); } else away += 1 / 30; }
+            while (ok(h) && kidDoor.a > 0.12 && away < 0.3) { await wait(1 / 30); if (!ok(h)) return; if (n1.seesDoor()) { away = 0; kidDoor.a = kidDoor.target = Math.max(0.12, kidDoor.a - 0.0035); kidDoor.apply(); } else away += 1 / 30; }
             await until(N1.tok, () => !ok(h) || !gaze.inView(dp)); if (!ok(h)) return;
             kidDoor.a = kidDoor.target = 1; kidDoor.apply(); cycles++;   // open again, without a sound
             F.fear = Math.max(F.fear, 0.7);
