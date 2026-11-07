@@ -108,7 +108,8 @@ const SUNK = {};
   // d: fronts toward the room
   for (const a of items) {
     if (!a.front) continue;
-    // the wall its back is against: within 0.35 m and running along most of the model's width (a wall end beside it does not count)
+    // the wall its back is against: within 0.35 m and running along most of the model's width (a wall end beside it does not count); in a
+    // corner the wall its front points away from is the one that counts
     let best = null;
     for (const w of walls) {
       if (a.max[1] < w[4] || a.min[1] > w[5]) continue;
@@ -117,13 +118,12 @@ const SUNK = {};
       const alongX = (w[1] - w[0]) > (w[3] - w[2]), k = alongX ? 0 : 2;
       const contact = Math.min(a.max[k], w[k + 1]) - Math.max(a.min[k], w[k]), width = a.max[k] - a.min[k];
       if (contact < 0.5 * width) continue;
-      if (!best || contact > best.contact) {
-        const cx = (w[0] + w[1]) / 2, cz = (w[2] + w[3]) / 2;
-        best = { d, contact, away: alongX ? [0, Math.sign(a.z - cz) || 1] : [Math.sign(a.x - cx) || 1, 0], w };
-      }
+      const cx = (w[0] + w[1]) / 2, cz = (w[2] + w[3]) / 2, away = alongX ? [0, Math.sign(a.z - cz) || 1] : [Math.sign(a.x - cx) || 1, 0];
+      const dot = a.front[0] * away[0] + a.front[1] * away[1];
+      if (!best || dot > best.dot) best = { d, contact, away, w, dot };
     }
     if (!best) continue;
-    const dot = a.front[0] * best.away[0] + a.front[1] * best.away[1];
+    const dot = best.dot;
     if (dot < 0.5) add(dot < -0.5 ? 'high' : 'low', a.room, `${a.name} (${a.x}, ${a.z}) rot ${a.rot}`, dot < -0.5 ? 'front faces the wall' : 'front runs along the wall', `front (${a.front}), wall x ${best.w[0]}..${best.w[1]} z ${best.w[2]}..${best.w[3]} at ${best.d.toFixed(2)} m`);
   }
 

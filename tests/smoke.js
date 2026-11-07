@@ -672,8 +672,8 @@ let BASE = '';
       await hold(page, 'KeyW', 2500);
       let d = await door('parents'), z = await page.evaluate(() => window.__game.P.pos.x);
       ok(d.target === 0 && d.a === 0 && d.on && z > -2.95, `the parents' door at night: ${JSON.stringify(d)}, x ${z}`);
-      // the back door opens, and you walk out through it onto the stoop
-      await stand(page, -1.83, 4.0, -1.83, 4.67); await sleep(400);
+      // the back door opens, and you walk out through it onto the stoop (standing beside its swing: a leaf stops against whoever is in it)
+      await stand(page, -1.15, 3.95, -1.6, 4.67); await sleep(400);
       ok((await prompt(page)) === 'E Open the door', `back door prompt "${await prompt(page)}"`);
       await page.keyboard.press('KeyE');
       await until(page, () => window.__game.W.doors.back.a === 1, null, 10e3);
