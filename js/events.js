@@ -12,6 +12,8 @@
 //     payoff(D, h, how), what the player gets for the reveal: placed sound at the anchor, a sting only for presence/loud
 //     after: { keep, proof, log, morning, journal, witness, blamed },
 //     max: seconds,      armed and unseen this long: undo() quietly, never a payoff (0: no expiry)
+//     linger: seconds,   after the payoff: a kept beat (after.keep) leaves the table at once (0) and its change stays; any other beat
+//                        lives until its handle says done (h.done), `linger` at most (thirty by default), and is undone then
 //     undo(h),           put the house back; registered on NIGHT.cleanup at the arm, so a catch, a restart and the dawn all run it
 //     while(D, h)?,      optional: false while armed and unseen means the moment has passed (undo quietly, like max)
 //     tick(D, h, dt)?,   optional: per frame while the beat is up
@@ -210,7 +212,10 @@ function reveal(a, how) {
   if (after.proof && D && D.fired) { try { D.fired(def.id); } catch (e) { /* no proof tonight */ } }
   if (def.noise && G.hooks && G.hooks.parents && typeof G.hooks.parents.noise === 'function') { try { G.hooks.parents.noise(def.noise, a.at); } catch (e) { /* the parents are not written yet */ } }
   if (G.RUN && G.RUN.story) { if (after.witness) G.RUN.story.witness = (G.RUN.story.witness || 0) + after.witness; if (after.blamed) G.RUN.story.blamed = (G.RUN.story.blamed || 0) + after.blamed; }
-  if (!after.keep && !(a.h && a.h.done)) a.endAt = T + (def.linger || 0);
+  // after the payoff: a kept change leaves the table now (its undo waits for the night's cleanup); any other beat has until its handle
+  // says done to finish what the payoff began (a door shutting while you watch, a breath keeping its rhythm), `linger` seconds at most,
+  // thirty by default, and is undone then
+  a.endAt = T + (after.keep ? (def.linger || 0) : (def.linger ?? 30));
 }
 const extra = (a) => { if (!a.def.logExtra) return {}; try { return a.def.logExtra(a.h) || {}; } catch (e) { return {}; } };
 function undoOnce(a) {

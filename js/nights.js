@@ -885,9 +885,11 @@ export function createNights(env) {
         h.cycles++; h.cue.push({ t: Math.round(events.now() * 100) / 100, breathT: Math.round(P.breathT * 100) / 100, holding });
         sfx.pick('breath', { at: BED, gain: 0.42, wet: 0.06, rate: 0.8 + (h.cycles % 2) * 0.04 });
         if (h.revealed) { if (++h.after >= 2) { h.stopped = true; h.done = true; } }
-        else if (h.cycles >= 8) { h.stopped = true; h.done = true; }   // nobody held, nobody looked: it stops on its own, unseen
+        else if (h.cycles >= 12) { h.stopped = true; h.done = true; }   // nobody held, nobody looked (a quarter of a minute of it): it stops on its own, unseen
       },
-      reveal: { by: 'hold', hold: 0.6, when: (D, h) => h.cycles >= 1 && (env.holding() || (F.leanK || 0) > 0.65) },
+      // its reveal: you hold your breath once it has followed at least one of yours (the pull of the covers, key down, is not a held
+      // breath yet), or you lean over the rail
+      reveal: { by: 'hold', hold: 0.6, when: (D, h) => (F.leanK || 0) > 0.65 || (h.matched >= 1 && env.holding()) },
       payoff: (D, h) => {
         h.revealed = true; F.fear = Math.max(F.fear, (F.leanK || 0) > 0.65 ? 0.85 : 0.75);
         if ((F.leanK || 0) > 0.65 && !env.holding()) { h.stopped = true; h.done = true; }   // you looked down: it stops dead
@@ -940,7 +942,7 @@ export function createNights(env) {
         })();
       },
       while: () => room() === 'bed',
-      max: () => 17 + 45 * K(),
+      max: () => 17 + 45 * K(), linger: 60,   // the door takes its time while you watch it, and comes round twice
       undo: (h) => { h.alive = false; F.script = false; const d = W.doors.kid; d.a = d.target = 1; d.apply(); },
       end: () => n1.done(),
       after: { keep: false, log: true, journal: 'door' },

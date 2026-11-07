@@ -809,7 +809,12 @@ let BASE = '';
             if (how === 'wander' && !(await page.evaluate(() => window.__game.F.script))) { const p = tour[i++ % tour.length]; await stand(page, ...p); }
             if (how === 'kitchen') await stand(page, ...kitchen);
             // in the bunk, when the breath below starts: the covers up (a short hold), four of its breaths in time with yours, then hold yours
-            if (how === 'bunk' && !breathed && st.log.includes('breathUnder')) { breathed = true; await hold(page, 'Space', 450); await sleep(9000); await hold(page, 'Space', 3500); }
+            // (the key is held until the covers are up, and a moment more so the release does not latch the breath held)
+            if (how === 'bunk' && !breathed && st.log.includes('breathUnder')) {
+              breathed = true;
+              await page.keyboard.down('Space'); await until(page, () => window.__game.P.mode === 'hide', null, 6000).catch(() => {}); await sleep(500); await page.keyboard.up('Space');
+              await sleep(9000); await hold(page, 'Space', 3500);
+            }
             await sleep(how === 'wander' ? 9000 : 3000);
           }
           const out = await page.evaluate(() => ({ log: window.__n1log, rooms: window.__n1rooms, ledger: ((window.__game.RUN.nights || {})[1] || {}).log || [], fx: window.__game.F.flashFx === null }));
