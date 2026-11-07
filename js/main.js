@@ -26,6 +26,7 @@ import { createFirstNight } from './firstnight.js';
 import { createLights } from './lights.js';
 import { createCartoon } from './cartoon.js';
 import { hooks } from './hooks.js';
+import * as collide from './collide.js';
 import * as events from './events.js';
 import * as log from './log.js';
 import * as story from './story.js';
@@ -84,7 +85,9 @@ LOAD.set(0.08, 'Building the house');
 await tick();
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.08, 400);   // a near plane this far out keeps depth precise at room distances (door frames and walls stop fighting)
+// the near plane at 4 cm: the 24-bit depth buffer still tells surfaces 3 mm apart (a casing from its wall) out to 45 m, past anything in the
+// house, and every clip distance is halved (collide.eyeClear keeps the eye 13 cm from everything anyway)
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.04, 400);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
@@ -412,6 +415,7 @@ for (const d of Object.values(W.doors)) {   // the interior doors
   addI({ p: d.mid, r: 1.55, label: () => (d.name === 'parents' && !d.target ? 'Try the handle' : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (d.name === 'parents' && !d.target ? lockedDoor(d) : toggleDoor(d)) });
 }
 W.setDoorHook((name, open) => { const d = W.doors[name]; const pan = panFor(tmp.set(d.mid.x, 1.2, d.mid.z)); if (open) sfx.doorOpen(pan, 0.35); else sfx.doorClose(pan, 0.5); });
+W.setDoorBump((name) => { const d = W.doors[name]; sfx.knock(panFor(tmp.set(d.mid.x, 1.0, d.mid.z)), 0.16); });   // a leaf meets somebody and stops against them
 let lockedAt = -9;
 function lockedDoor(d) {   // the handle will not turn; something on the other side is awake and does not answer
   const pan = panFor(tmp.set(d.mid.x, 1.2, d.mid.z));
@@ -421,8 +425,11 @@ function lockedDoor(d) {   // the handle will not turn; something on the other s
 }
 function toggleDoor(d) {
   if (d.target && E.visible && Math.hypot(E.root.position.x - d.mid.x, E.root.position.z - d.mid.z) < 1.2) { sfx.creak(0.2, 0); return; }
-  if (d.target && Math.hypot(P.pos.x - d.mid.x, P.pos.z - d.mid.z) < 0.55) return;   // not on top of yourself
-  W.setDoor(d.name, !d.target);
+  // the leaf is swept against the bodies: blocked at once (you, or somebody, against it) and it will not move; blocked further round and it
+  // swings and stops against whoever stands in its arc
+  const open = !d.target, sw = collide.sweepLeaf(d, (open ? 1 : -1) * 0.06);
+  if (sw.hit && sw.a === d.a) { sfx.knock(panFor(tmp.set(d.mid.x, 1.0, d.mid.z)), 0.14); return; }
+  W.setDoor(d.name, open);
 }
 addI({ p: W.bathSink, r: 1.9, label: 'Splash water on your face', when: () => F.phase === 'night' && !F.splashed, act: splash });
 
@@ -591,6 +598,10 @@ function talkDad() { talkTo(dad, F.boxes >= 3 ? 'dad/mom_looking' : dadLines[dad
 function splash() { sfx.splash(); UI.subtitle('<i>The water is ice cold.</i>', 3); F.splashed = true; }
 
 // ---------- bunk ----------
+// the eye's way over the top rail: up the ladder's face, then up and over before it goes in (a straight line from the ladder to the seat
+// passed within 5 cm of the rail). Both climbs run this polyline, one way or the other
+const CLIMB_WP1 = new V3(9.0, 1.75, 3.15), CLIMB_WP2 = new V3(8.75, 2.2, 3.4);
+const along = (pts, k, out) => { const n = pts.length - 1, s = Math.min(n - 1e-6, Math.max(0, k * n)), i = Math.floor(s); return out.lerpVectors(pts[i], pts[i + 1], s - i); };
 async function climbUp() {
   if (F.cutscene) return;
   F.cutscene = true; P.mode = 'cine';
@@ -599,8 +610,8 @@ async function climbUp() {
   sfx.creak(0.25, 0);
   await tween(0.32, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.3, k); });
   sfx.footstep(0.2, 0, 0.1);
-  const dest = hiding ? BUNK_LIE : BUNK_SEAT;
-  await tween(0.42, (k) => { P.cam.lerpVectors(LADDER_MID, dest, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
+  const dest = hiding ? BUNK_LIE : BUNK_SEAT, way = [LADDER_MID, CLIMB_WP1, CLIMB_WP2, dest];
+  await tween(0.42, (k) => { along(way, k, P.cam); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.3, hiding ? 0.15 : -0.1, k); });
   F.cutscene = false; P.pos.set(BUNK_SEAT.x, 0, BUNK_SEAT.z); P.pod = null; P.podYaw = HIDE_YAW;
   if (hiding || F.chase) {
     P.mode = 'hide'; UI.blanket(true); sfx.whoosh(0); enteredHide(); if (nights) nights.hunter.notifyPod('bunk');
@@ -615,9 +626,9 @@ async function hideUnderCovers() {
 async function climbDown() {
   if (F.cutscene) return;
   F.cutscene = true; P.mode = 'cine'; P.cam.copy(camera.position);
-  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch;
+  const from = P.cam.clone(), y0 = P.yaw, p0 = P.pitch, way = [from, CLIMB_WP2, CLIMB_WP1, LADDER_MID];
   sfx.creak(0.25, 0);
-  await tween(0.4, (k) => { P.cam.lerpVectors(from, LADDER_MID, k); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.1, k); });
+  await tween(0.4, (k) => { along(way, k, P.cam); P.yaw = lerpAngle(y0, LADDER_YAW, k); P.pitch = lerp(p0, 0.1, k); });
   const end = new V3(LADDER_FLOOR.x, 1.32, LADDER_FLOOR.z);
   await tween(0.35, (k) => { P.cam.lerpVectors(LADDER_MID, end, k); P.yaw = lerpAngle(LADDER_YAW, HIDE_YAW, k); P.pitch = lerp(0.1, 0, k); });
   sfx.footstep(0.3);
@@ -628,26 +639,19 @@ function toBunk() { bunkSince = gameTime; P.mode = 'bunk'; P.cam.copy(BUNK_SEAT)
 function enteredHide() { breathPrev = true; breathLatch = false; if (F.flashOn) { F.flashOn = false; flash.intensity = 0; } }
 
 // ---------- player ----------
-// a collider counts only on the floor you are on: the laundry is under Mom and Dad's room, and the outside stairs pass both
-const onFloor = (c) => !(P.pos.y + 0.5 < (c.minY ?? -0.3) || P.pos.y > (c.maxY ?? 3));
-function collide() {
-  for (const c of W.colliders) {
-    if (!c.on || !onFloor(c)) continue;
-    const cx = clamp(P.pos.x, c.minX, c.maxX), cz = clamp(P.pos.z, c.minZ, c.maxZ);
-    const dx = P.pos.x - cx, dz = P.pos.z - cz, d2 = dx * dx + dz * dz;
-    if (d2 >= R * R) continue;
-    if (d2 > 1e-9) { const d = Math.sqrt(d2); P.pos.x = cx + (dx / d) * R; P.pos.z = cz + (dz / d) * R; }
-    else {
-      const l = P.pos.x - c.minX, r = c.maxX - P.pos.x, b = P.pos.z - c.minZ, t = c.maxZ - P.pos.z, m = Math.min(l, r, b, t);
-      if (m === l) P.pos.x = c.minX - R; else if (m === r) P.pos.x = c.maxX + R; else if (m === b) P.pos.z = c.minZ - R; else P.pos.z = c.maxZ + R;
-    }
-  }
-  for (const p of [mom, dad]) {
-    if (!p.group.visible) continue;
-    const g = p.group.position, dx = P.pos.x - g.x, dz = P.pos.z - g.z, d = Math.hypot(dx, dz), rr = R + 0.3;
-    if (d < rr && d > 1e-6) { P.pos.x = g.x + (dx / d) * rr; P.pos.z = g.z + (dz / d) * rr; }
-  }
-}
+// the bodies (collide.js): the player's capsule on P.pos, the thing's on its root (counted while it is in the world and on a floor: the
+// catch stands it below the floor on purpose), Mom's and Dad's on their groups. A collider counts only on the floor you are on: the
+// laundry is under Mom and Dad's room, and the outside stairs pass both
+collide.init({ colliders: W.colliders, doors: W.doors, isNight: () => F.phase === 'night', groundAt: W.groundAt });
+const PB = collide.addBody({ id: 'player', kind: 'player', pos: P.pos, r: R, h: collide.PLAYER_H });
+collide.addBody({ id: 'thing', kind: 'thing', pos: E.root.position, r: 0.35, h: 2.66, active: () => E.visible && E.root.position.y >= -0.1 });
+collide.addBody({ id: 'mom', kind: 'npc', pos: mom.group.position, r: 0.32, h: 1.66, active: () => mom.group.visible });
+collide.addBody({ id: 'dad', kind: 'npc', pos: dad.group.position, r: 0.4, h: 1.84, active: () => dad.group.visible });
+// grandpa's chair and the flashlight on the floor beside it, there for the vigil (vigil.js sets F.noFlash for exactly that long)
+W.colliders.push({ minX: 4.05, maxX: 4.61, minZ: -0.4, maxZ: 0.16, on: true, maxY: 0.95, id: 'vigilChair', when: () => F.noFlash }, { minX: 4.66, maxX: 4.82, minZ: -0.43, maxZ: -0.27, on: true, maxY: 0.06, id: 'vigilTorch', when: () => F.noFlash });
+const onFloor = (c) => collide.active(c) && collide.onFloor(c, P.pos.y, PB.h);
+// out of the furniture on this floor, then the door leaves, then the other bodies (the thing included), then the walls last
+const resolvePlayer = () => collide.resolveCircle(PB);
 function movePlayer(dt) {
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
   const f = clamp((keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + input.fy, -1, 1);
@@ -662,7 +666,7 @@ function movePlayer(dt) {
   if (P.exhausted && P.stamina > 0.4) P.exhausted = false;
   const a = Math.min(1, dt * 10);
   P.vel.x += (wx * speed - P.vel.x) * a; P.vel.z += (wz * speed - P.vel.z) * a;
-  for (let i = 0; i < 3; i++) { P.pos.x += P.vel.x * dt / 3; P.pos.z += P.vel.z * dt / 3; collide(); }
+  for (let i = 0; i < 3; i++) { P.pos.x += P.vel.x * dt / 3; P.pos.z += P.vel.z * dt / 3; resolvePlayer(); }
   P.pos.y += (W.groundAt(P.pos.x, P.pos.z, P.pos.y) - P.pos.y) * Math.min(1, dt * 14);   // the outside stairs: eased, so the steps don't jolt
   P.speed = Math.hypot(P.vel.x, P.vel.z);
   const stride = sprint ? 0.95 : 0.66;
@@ -705,6 +709,8 @@ function updateCamera(dt) {
     camera.rotation.z += (Math.random() - 0.5) * shake * 0.04;
     shake = Math.max(0, shake - dt * 1.6);
   }
+  // the eye last: wherever the frame put it (a lean, a tween, a shake, a push), it is pulled back out of anything within the near plane's reach
+  collide.eyeClear(camera, { mode: P.mode });
   holdBox(dt);
 }
 
@@ -874,7 +880,7 @@ const COUNTER = [
   ...[2.65, 2.99, 3.32, 3.66].map((z) => ({ at: [4.11, COUNTER_Y, z], stand: [4.11 - COUNTER_OFF, z] })),
   ...[3.38, 3.77].map((x) => ({ at: [x, COUNTER_Y, 4.13], stand: [x, 4.13 - COUNTER_OFF] })),
 ];
-const rampY = (x, z) => (z < -14.5 ? TBED : clamp((-10.2 - z) * (TBED / 4.3), 0, TBED)) * clamp(1 - (Math.abs(x - 2.3) - 0.5) / 0.3, 0, 1);   // the ramp (4.3 m, from the sill at z -14.5 to the gravel), then the bed's floor; fades out at the ramp's sides (no step up or down)
+const rampY = (x, z) => (W.TRUCK && W.TRUCK.rampY ? W.TRUCK.rampY(x, z) : 0);   // the ramp (4.3 m, from the sill at z -14.5 to the gravel), then the bed's floor; fades out at the ramp's sides (no step up or down). The same ramp is the player's floor through W.groundAt
 const stillOn = (run) => run === chore.run;
 // the box truck's headroom (measured on the model): the rolled-up door hangs to 2.93 m just inside the sill, the roof inside is at 3.11.
 // how far a person's head has to come down at their spot, checking a stride either side since the head leads the feet when bent
@@ -2093,4 +2099,6 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 requestAnimationFrame(loop);
 boot();
-window.__game = { cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; } };
+window.__game = { cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
+  // the boundaries, for tests/sweep.js: the module, the bodies, the player's step and the camera, driven a frame at a time with the loop frozen
+  collide, PB, keys, movePlayer, updateCamera, resolvePlayer, toggleDoor, climbUp, climbDown, hideUnderCovers, toBunk, car, LIE, LADDER_MID, LADDER_FLOOR, CLIMB_WP1, CLIMB_WP2, EYE, R, stepTimers: (dt) => { gameTime += dt; runTimers(); } };
