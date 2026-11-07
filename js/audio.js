@@ -30,7 +30,8 @@ const LEVEL = { step_carpet: 1.1, step_tile: 0.72, step_grass: 0.71, step_gravel
 const OCCLUDE = [null, { f: 2600, g: 0.75, wet: 0.08 }, { f: 520, g: 0.32, wet: 0.2 }, { f: 300, g: 0.4, wet: 0.25 }];
 const VOICES = 32;   // positional voices at once; past that a sound falls back to plain stereo
 // each room's acoustics: rt the seconds a sound takes to die away, damp how much soft stuff eats the highs, er the first reflections (ms, level)
-const ACOUSTIC = {
+// (ACOUSTIC and ROOM are exported for tests/audio.js, which checks the rooms apart)
+export const ACOUSTIC = {
   small: { rt: 0.45, damp: 0.75, er: [[3, 0.5], [6, 0.35], [10, 0.25]] },   // bedrooms: beds, curtains, carpet
   bare: { rt: 0.8, damp: 0.35, er: [[4, 0.6], [8, 0.45], [13, 0.3]] },      // the room nobody unpacked
   bath: { rt: 1.0, damp: 0.12, er: [[2, 0.7], [5, 0.55], [8, 0.4]] },
@@ -45,7 +46,7 @@ const ACOUSTIC = {
   truck: { rt: 0.5, damp: 0.1, er: [[2, 0.75], [4, 0.65], [7, 0.55], [11, 0.45]] },      // the moving truck's box: steel walls a metre away, a boxy flutter
 };
 // each room: its acoustics and the beds heard in it (night: only at night, day: only by day). Neighbours leak in quietly.
-const ROOM = {
+export const ROOM = {
   bed: { ac: 'small', beds: { bed_house: 0.3, bed_wind_in: 0.22, bed_heater: 0.05 } },
   bath: { ac: 'bath', beds: { bed_vent: 0.22, bed_drip: 0.3, bed_house: 0.15 } },
   hall: { ac: 'hall', beds: { bed_house: 0.3, bed_heater: 0.14, bed_fridge: 0.04, bed_drip: 0.04 } },
@@ -547,7 +548,7 @@ export class Sound {
     if (!this.ctx) return;
     this.pianoSlam(SLAM.full * gain);
     const o = at ? { at, ref: 0.6, roll: 0.8 } : {};
-    if (!this.pick('rattle', { ...o, gain: 0.95 * gain, wet: 0.12, jitter: 0.04, rate: 0.9 })) this.rattleSynth(gain);
+    if (!this.pick('rattle', { ...o, gain: 0.95 * gain, wet: 0.12, jitter: 0.04, rate: 0.9, maxLen: 2.6 })) this.rattleSynth(gain);
     if (!this.pick('bone_crack', { ...o, gain: 0.85 * gain, wet: 0.1, delay: 0.14, maxLen: 1.6 })) this.noiseHit({ dur: 0.07, type: 'bandpass', f: 1500, q: 2.5, gain: 0.7 * gain, attack: 0.001, wet: 0.1, delay: 0.14 });
   }
   // a dry rattle in a throat, for when the recording is not loaded yet: a low pulse train, each pulse a short noise burst, slowing as it dies
@@ -771,7 +772,7 @@ export class Sound {
     this.routeRadio(at);
     this.bed('lib/bed_radio', v * 0.6, t, R.inp);       // the set's floor: its crackle and hiss, a far station bleeding through
     this.bed('lib/radio_static', stat * 0.55, t, R.inp);   // static on top when something is wrong
-    this.set(R.g.gain, on ? 1 : 0, on ? 0.3 : t);
+    this.set(R.g.gain, on ? R.occG ?? 1 : 0, on ? 0.3 : t);
     R.on = on; R.level = v; R.stat = stat;
   }
   // the radio's output: a panner at its place (made once, moved if the set moves), or straight to the bus when it has no place
@@ -827,14 +828,26 @@ export class Sound {
     if (this.pick(key, { ...o, gain: 0.9 * gain, wet: 0.3, delay, dur: hold || 0, jitter: 0.02 })) return;
     this.tone({ type: 'square', f: bus ? 330 : 420, dur: hold || 0.4, gain: 0.3 * gain, wet: 0.3, delay, ...o }); this.tone({ type: 'square', f: bus ? 415 : 520, dur: hold || 0.4, gain: 0.25 * gain, wet: 0.3, delay, ...o });
   }
-  // the kettle on the stove: the boil coming up, and the whistle rising out of it over `rise` seconds (placed at the stove).
-  // returns the seconds until the whistle is full, so a morning can land Mom's getting up on it
-  kettle({ at = null, rise = 7, gain = 1 } = {}) {
-    const o = at ? { at, ref: 1.2, roll: 1 } : {};
-    if (!this.pick('kettle', { ...o, gain: 0.7 * gain, wet: 0.15, jitter: 0.02, ramp: 2 })) this.noiseHit({ ...o, dur: rise + 4, type: 'lowpass', f: 900, f2: 1400, q: 0.6, gain: 0.25 * gain, attack: 3, wet: 0.15 });
-    if (!this.pick('kettle_whistle', { ...o, gain: 0.85 * gain, wet: 0.2, delay: 1.5, ramp: rise, jitter: 0.015, lp: 6000 })) {
-      for (const f of [2150, 2720]) this.tone({ ...o, type: 'sine', f, f2: f * 1.03, dur: rise + 3, gain: 0.08 * gain, attack: rise, wet: 0.2, delay: 1.5 });
+  // the kettle on the stove: the recorded boil coming up, and the whistle rising out of it over `rise` seconds, then holding `hold` seconds
+  // (placed at the stove). The whistle is made here (there is no CC0 kettle whistle to cut): a note with its octave, a breath of steam
+  // through the same pitch, the pitch climbing a little as the steam builds, a flutter from the lid. Returns the seconds until it is full,
+  // so a morning can land Mom's getting up on it.
+  kettle({ at = null, rise = 7, hold = 4, gain = 1 } = {}) {
+    if (!this.ctx) return 0;
+    const o = at ? { at, ref: 1.2, roll: 1 } : {}, ctx = this.ctx, t0 = this.now + 1.5, end = t0 + rise + hold, f0 = 2050 + Math.random() * 300;
+    if (!this.pick('kettle', { ...o, gain: 0.7 * gain, wet: 0.15, jitter: 0.02, ramp: 2 })) this.noiseHit({ dur: rise + hold + 2, type: 'lowpass', f: 900, f2: 1400, q: 0.6, gain: 0.25 * gain, attack: 3, wet: 0.15 });
+    const out = this.bus(0.22 * gain, 0, 0.25, rise + hold + 3, 'sfx', at ? { at, ref: 1.2, roll: 1 } : null);
+    const env = ctx.createGain(); env.gain.setValueAtTime(0.0001, t0); env.gain.exponentialRampToValueAtTime(1, t0 + rise); env.gain.setValueAtTime(1, end); env.gain.exponentialRampToValueAtTime(0.0001, end + 0.6);
+    const flutter = ctx.createOscillator(), fg = ctx.createGain(); flutter.frequency.value = 5.5 + Math.random(); fg.gain.value = 0.12; flutter.connect(fg).connect(env.gain); flutter.start(t0); flutter.stop(end + 1);
+    env.connect(out);
+    for (const [mul, g] of [[1, 1], [2.02, 0.28], [3.01, 0.07]]) {   // the note, its octave a shade sharp, a trace of the twelfth
+      const osc = ctx.createOscillator(), og = ctx.createGain(); osc.type = 'sine'; og.gain.value = g;
+      osc.frequency.setValueAtTime(f0 * mul * 0.93, t0); osc.frequency.exponentialRampToValueAtTime(f0 * mul, t0 + rise); osc.frequency.linearRampToValueAtTime(f0 * mul * 1.012, end);
+      osc.connect(og).connect(env); osc.start(t0); osc.stop(end + 1);
     }
+    const steam = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), sg = ctx.createGain();   // the breath through the spout, at the note
+    steam.buffer = this.noise; steam.loop = true; bp.type = 'bandpass'; bp.frequency.setValueAtTime(f0 * 0.93, t0); bp.frequency.exponentialRampToValueAtTime(f0, t0 + rise); bp.Q.value = 6; sg.gain.value = 0.9;
+    steam.connect(bp).connect(sg).connect(env); steam.start(t0); steam.stop(end + 1);
     return rise + 1.5;
   }
   // the barn door on its rail: the long iron roll for `dur` seconds, then the bang as it meets the stop (placed at the door)
