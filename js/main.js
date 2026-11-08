@@ -782,7 +782,10 @@ function updateCamera(dt) {
     camera.position.y += Math.sin(gameTime * (input.down('breath') ? 0.6 : 2.4)) * 0.006;
   }
   if (P.mode === 'bunk') P.pitch = clamp(P.pitch, -1.2, 0.9);
-  if (P.mode === 'lie') { P.yaw = lieYaw + clamp(angDiff(lieYaw, P.yaw), -1.25, 1.25); P.pitch = clamp(P.pitch, -0.75, 0.7); }   // on your back: the head turns, the body does not
+  if (P.mode === 'lie') {   // on your back: the head turns, the body does not (in their bed on night five, as far as parents.js's P.lieLook says)
+    const L0 = P.lieLook && Math.hypot(P.cam.x - P.lieLook.x, P.cam.z - P.lieLook.z) < 0.4 ? P.lieLook : null, y0 = L0 ? L0.yaw : lieYaw, sd = L0 ? L0.side : 1.25;
+    P.yaw = y0 + clamp(angDiff(y0, P.yaw), -sd, sd); P.pitch = clamp(P.pitch, L0 ? L0.down : -0.75, L0 ? L0.up : 0.7);
+  }
   if (P.mode === 'seat' && seat) { P.yaw = seat.yaw + clamp(angDiff(seat.yaw, P.yaw), -1.75, 1.75); P.pitch = clamp(P.pitch, -0.8, 0.55); }   // turning in a chair, not in a turret
   camera.rotation.set(P.pitch, P.mode === 'car' ? car.baseYaw() + P.yaw : P.yaw, P.roll);
   leanOver(dt);

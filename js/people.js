@@ -416,6 +416,8 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
       // world facing: the people can sit in a car that is turned
       this.group.getWorldQuaternion(RQ); RF.set(0, 0, 1).applyQuaternion(RQ); const y = Math.atan2(RF.x, RF.z), left = RL.set(Math.cos(y), 0, -Math.sin(y)), fwd = RF.set(Math.sin(y), 0, Math.cos(y));
       const hands = p.hand || 'both';
+      // carrying in both hands: the chest square, the box with its sway (on its feet: kneeling to set it down, the body is the kneel's)
+      if (p.hold && hands === 'both' && !p.L && !p.R) this.carryChest(r, p.hold, p.sit ? 0 : (1 - Math.min(1, kneel)) * (1 - Math.min(1, squat)) * Math.min(1, w));
       const facing = (q, def) => q === 'down' ? RG.set(0, -1, 0) : q === 'up' ? RG.set(0, 1, 0) : q === 'fwd' ? RG.copy(fwd) : def;
       for (const [s, sg] of [['L', 1], ['R', -1]]) {
         const own = p[s];
@@ -425,7 +427,7 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
           T = own.reach ? own.reach.clone() : own.reachLocal ? this.group.localToWorld(own.reachLocal.clone()) : null;
           palm = facing(own.palm, RG.copy(left).multiplyScalar(-sg)); close = own.grip ?? 0.75;
         } else if (p.hold) {   // both hands flat on the sides of what is carried
-          { const cl = r.bones[s + '_Clavicle'], rest = r.restLocal && r.restLocal[s + '_Clavicle']; if (cl && rest) { if (!r.saved.has(cl)) r.saved.set(cl, cl.quaternion.clone()); cl.quaternion.copy(rest); cl.updateMatrixWorld(true); } }   // the shoulders held still (no walking swing): the elbows stay out round the box
+          { const cl = r.bones[s + '_Clavicle'], rest = r.restLocal && r.restLocal[s + '_Clavicle']; if (cl && rest) { if (!r.saved.has(cl)) r.saved.set(cl, cl.quaternion.clone()); cl.quaternion.copy(rest); cl.updateMatrixWorld(true); } }   // the shoulders held still (no walking swing): the elbows stay out round the box (carryChest has done this already when both hands are on it)
           p.hold.updateWorldMatrix(true, false); p.hold.getWorldPosition(RC);
           const hw = p.holdW !== undefined ? p.holdW / 2 : p.hold.geometry.parameters.width / 2 * p.hold.getWorldScale(RS).x;
           T = RC.clone().addScaledVector(left, sg * (hw + 0.04)); T.y += p.holdY ?? -0.03; T.addScaledVector(fwd, -0.08);   // (T is the wrist: the palm then lies over the middle of the side)
@@ -442,15 +444,49 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
         if (!own && p.hold) this.onFace(r, s, p.hold, left.clone().multiplyScalar(sg), T, pole, pc, w);
       }
     },
+    // carrying in both hands: the shoulders held still (the clavicles at rest, no walking swing, so the elbows stay out round the box),
+    // the chest square to the way the body faces (the upper spine takes back the clip's twist), and a box carried against the chest
+    // going with the chest's sway from side to side. Without that the stride swings one elbow in round the box's back corner and its
+    // forearm into the box. (Spine1 and up only: the thighs hang from the Spine bone in this skeleton.) The box is moved only while it
+    // rides in this body's frame, by the sway alone: whatever the carrier's script last put it at stays its place
+    carryChest(r, box, w = 1) {
+      const B = r.bones, s1 = B.Spine1, s2 = B.Spine2, la = B.L_UpperArm, ra = B.R_UpperArm;
+      for (const s of ['L', 'R']) { const cl = B[s + '_Clavicle'], rest = r.restLocal && r.restLocal[s + '_Clavicle']; if (cl && rest) { if (!r.saved.has(cl)) r.saved.set(cl, cl.quaternion.clone()); cl.quaternion.copy(rest); cl.updateMatrixWorld(true); } }
+      if (!s1 || !la || !ra) return;
+      const g = this.group; g.updateWorldMatrix(true, false); g.getWorldQuaternion(RQ);
+      const across = () => { la.updateWorldMatrix(true, false); ra.updateWorldMatrix(true, false); g.worldToLocal(la.getWorldPosition(GA)); g.worldToLocal(ra.getWorldPosition(GB)); };
+      across();
+      const tw = Math.atan2(GA.z - GB.z, GA.x - GB.x) * w;   // (the left shoulder lies toward +x of the body's frame)
+      if (Math.abs(tw) > 1e-4) { GC.set(0, 1, 0).applyQuaternion(RQ); r.rotateWorld(s1, _qt.setFromAxisAngle(GC, tw * (s2 ? 0.5 : 1))); if (s2) r.rotateWorld(s2, _qt.setFromAxisAngle(GC, tw * 0.5)); across(); }
+      const u = box && box.parent === g ? box.userData : null; if (!u) return;
+      if (!u.sway || !box.position.equals(u.sway.at)) u.sway = { base: box.position.clone(), at: new THREE.Vector3() };
+      box.position.x = u.sway.base.x + (GA.x + GB.x) / 2 * w; box.updateMatrixWorld(true);
+      u.sway.at.copy(box.position);
+    },
     // a palm pressed on the face of a box: the fingers lie along the face, not into it, and the whole hand sits just outside it.
     // out: the face's outward normal for this hand; the box's half width along it comes from its geometry
     onFace(r, side, box, out, T, pole, palmDir, w) {
       const B = r.bones, hand = B[side + '_Hand'], tips = ['Finger12', 'Finger22', 'Finger32', 'Finger42'].map((n) => B[side + '_' + n]).filter(Boolean);   // (the thumb wraps the front edge)
+      const thumb = ['Finger0', 'Finger01', 'Finger02'].map((n) => B[side + '_' + n]).filter(Boolean);
       box.updateWorldMatrix(true, false); const mid = box.getWorldPosition(new THREE.Vector3());   // its own vector: ik() and grip() reuse the shared ones
       const hw = box.geometry && box.geometry.parameters ? box.geometry.parameters.width / 2 * box.getWorldScale(GD).x : 0.2;
       const depth = (v) => v.clone().sub(mid).dot(out) - hw;                 // above the face: positive
+      // the palm turned square onto the face by the forearm. A walk turns the forearms over and back as the arms swing, further than
+      // the wrist's own roll (grip) can take back, and the hand followed it round: the palm tipped down and the thumb and the fingers'
+      // edge went into the box
+      const fo = B[side + '_Forearm'], into = out.clone().negate(), fa = new THREE.Vector3(), pn = new THREE.Vector3();
+      const squarePalm = () => {
+        if (!fo) return;
+        fo.updateWorldMatrix(true, true); fo.getWorldPosition(RE); hand.getWorldPosition(RH); fa.copy(RH).sub(RE).normalize();
+        this.palm(side, null, pn); pn.addScaledVector(fa, -pn.dot(fa)); const want = into.clone().addScaledVector(fa, -into.dot(fa));
+        if (pn.lengthSq() < 1e-6 || want.lengthSq() < 1e-6) return;
+        pn.normalize(); want.normalize();
+        const a = Math.atan2(GF.crossVectors(pn, want).dot(fa), pn.dot(want));
+        if (Math.abs(a) > 0.01) r.rotateWorld(fo, _qu.setFromAxisAngle(fa, a * w));
+      };
       let pushed = 0;
       for (let it = 0; it < 3; it++) {
+        squarePalm();
         // lay the fingers along the face: turn the hand so its knuckle line has no part along the normal
         hand.updateWorldMatrix(true, true); hand.getWorldPosition(RH); B[side + '_Finger2'].getWorldPosition(RA);
         const along = RA.clone().sub(RH).normalize(), flatDir = along.clone().addScaledVector(out, -along.dot(out)).normalize();
@@ -461,7 +497,7 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
         for (const f of ['1', '2', '3', '4']) { const a = B[side + '_Finger' + f], b = B[side + '_Finger' + f + '1'], c = B[side + '_Finger' + f + '2']; if (a && b) r.aim(a, b, flatDir, w); if (b && c) r.aim(b, c, flatDir, w); }
         { const a = B[side + '_Finger0'], b = B[side + '_Finger01'], c = B[side + '_Finger02']; if (a && b) r.aim(a, b, thumbDir, w); if (b && c) r.aim(b, c, thumbDir, w); }
         hand.updateWorldMatrix(true, true);
-        let worst = Infinity; for (const b of [hand, ...tips]) { b.getWorldPosition(RB); worst = Math.min(worst, depth(RB)); }
+        let worst = Infinity; for (const b of [hand, ...tips, ...thumb]) { b.getWorldPosition(RB); worst = Math.min(worst, depth(RB)); }
         // the skin runs on past the last finger joint: a point beyond each tip, along its last bone
         for (const b of tips) { b.getWorldPosition(RB); b.parent.getWorldPosition(RD); worst = Math.min(worst, depth(RB.clone().addScaledVector(RB.clone().sub(RD), 0.4))); }
         if (worst >= 0.016) break;   // the joints sit about 1.5 cm inside the skin

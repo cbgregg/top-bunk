@@ -40,6 +40,10 @@ const SEE = 9;                                      // how far a parent can see 
 const ESCORT_CAP = 44;                              // forty clock-minutes, in seconds of play
 const MOM_HIDDEN = 40;                              // seconds of her search you stay hidden before she goes and sits on your bunk
 const KID_UNDER = 0.8;                              // the quilt's rise over you between them (world.js third(k): a grown body is 1)
+// night five, you between them: the bed is a double 1.04 m across, and two grown people on their backs fill it. To make room Dad is
+// turned right over onto his side with his back to you, facing the wall, lying on the quilt from the waist up (pushed down off his
+// shoulders: a quilt over a body on its side would stand up beside your face), and Mom is moved over to her edge, on her back
+const SIDE = 1.38, SIDE_SHIFT = { dad: 0.04, mom: -0.05 };   // (shift: metres toward the body's left, lying on its back)
 // the mutters, in order: the two pairs from the walls of nights two and three, then the old ones at random
 const MUTTERS = [['dad/n2_a', 'mom/n2_a'], ['mom/n3_a', 'dad/n3_a']];
 const MUTTERS_OLD = [['dad/talk_a', 'mom/talk_a'], ['mom/talk_b', 'dad/talk_b'], ['dad/talk_c', 'mom/talk_c'], ['dad/mutter_a', 'mom/mutter_a'], ['mom/mutter_b', 'dad/mutter_b']];
@@ -173,7 +177,7 @@ function hullOf(par) {
   return () => {
     const r = par.p.rig, bed = bedOf(); if (!r || !bed || !par.inBed) return null;
     let n = 0;
-    const torsoOn = par.sit < 0.25, armsOn = par.sit < 0.2;
+    const torsoOn = par.sit < 0.25 && !par.onQuilt, armsOn = par.sit < 0.2 && !par.onQuilt;   // (onQuilt: right over on a side, the trunk and arms lie on it)
     for (const [a, b, rad, arm, hips] of CAPS) {
       const A = r.bones[a], B = r.bones[b]; if (!A || !B) continue;
       if (arm && (!armsOn || par.armOut[arm] > 0.02 || par.armUp[arm] > 0.02)) continue;   // an arm out lies on the quilt, not under it
@@ -253,12 +257,15 @@ function bedTick(par, dt) {
     if (A.t > 3.2 + A.hold) { par.armOutRun = null; par.armDone = true; par.armOut[side] = 0; }
   }
   // the pose: the side's knee drawn up and the arms placed when rolled; the arm out laid on the quilt beside the hip
+  // (deep: how far past a roll-over toward lying right over on the side, night five's way of making room)
   const sideK = Math.min(1, Math.abs(par.roll) / ROLL), down = par.roll > 0 ? 'L' : 'R', up = down === 'L' ? 'R' : 'L';
+  const deep = sm(cl((Math.abs(par.roll) - ROLL) / (SIDE - ROLL), 0, 1));
   b.rest = !par.rolling && sideK < 0.01 && par.sit < 0.01 && !(par.armOut.L + par.armOut.R);
-  b.knee.L = b.knee.R = 0; b.knee[up] = 0.6 * sideK;
+  b.knee.L = b.knee.R = 0; b.knee[up] = 0.6 * sideK + 0.1 * deep; b.knee[down] = 0.25 * deep;   // (right over on a side, both knees come up a little)
   // (the head stays as it lay on the pillow while the body turns under it: the neck takes the roll, so the skull never rolls down into
-  // the pillow; on the back they face each other)
-  b.turn = (par.who === 'mom' ? 1 : -1) - par.roll / 0.55;
+  // the pillow; on the back they face each other. Right over on a side the head lies on its side with the body)
+  b.turn = ((par.who === 'mom' ? 1 : -1) - par.roll / 0.55) * (1 - deep);
+  par.onQuilt = deep > 0.5;
   b.sit = par.sit; b.awake = par.st !== 'asleep';
   for (const S of ['L', 'R']) b.arms[S] = null;
   p.group.updateMatrixWorld(true);
@@ -268,10 +275,17 @@ function bedTick(par, dt) {
   // other one); the two of them would lie arm in arm otherwise. Rolled onto the outer side, the lower arm lies in front of the stomach,
   // its elbow in front of the body (not off the edge of the bed); on the back the outer arm is the clip's
   const sgOf = (S) => (S === 'L' ? 1 : -1), feet = new V3(0, -1, 0).applyQuaternion(q);
+  // (right over on a side the arms fold in, so nothing reaches past the edge of the bed: the lower one bent up with its hand in front of
+  // the chin, its elbow down by the chest on the mattress; the upper one lying over the front of the body, its hand on the quilt over the hip)
+  const toward = (a, b2) => (deep > 0.001 ? a.lerp(b2, deep) : a);
   for (const S of ['L', 'R']) {
     if (S === inner && par.sit < 0.02) {
-      b.arms[S] = { at: p.group.localToWorld(new V3(sgOf(S) * 0.09, 0.97 * s, 0.15 * s)), w: 1, grip: 0.3, pole: new V3(0, -1, 0).addScaledVector(feet, 0.35) };
-    } else if (sideK > 0.01 && S === down) b.arms[S] = { at: p.group.localToWorld(new V3(sgOf(S) * 0.06, 1.12 * s, 0.2 * s)), w: sideK, grip: 0.3, pole: new V3(0, -0.4, 0.9).applyQuaternion(q) };
+      const at = p.group.localToWorld(toward(new V3(sgOf(S) * 0.09, 0.97 * s, 0.15 * s), new V3(sgOf(S) * 0.1, 0.84 * s, 0.12 * s)));
+      if (par.onQuilt && quilt) { const loc = quilt.toLocal(at.clone()); loc.y = Math.max(loc.y, quilt.heightAt(loc.x, loc.z) + 0.03); at.copy(quilt.group.localToWorld(loc)); }   // (on the quilt over the hip)
+      b.arms[S] = { at, w: 1, grip: 0.3,
+        pole: toward(new V3(0, -1, 0).addScaledVector(feet, 0.35).normalize(), new V3(sgOf(S) * 0.2, -0.2, 1).normalize().applyQuaternion(q)) };
+    } else if (sideK > 0.01 && S === down) b.arms[S] = { at: p.group.localToWorld(toward(new V3(sgOf(S) * 0.06, 1.12 * s, 0.2 * s), new V3(sgOf(S) * 0.02, 1.38 * s, 0.13 * s))), w: sideK, grip: 0.3,
+      pole: toward(new V3(0, -0.4, 0.9), new V3(sgOf(S) * 0.5, -0.9, 0.25)).normalize().applyQuaternion(q) };
     else if (sideK > 0.01) b.arms[S] = { at: p.group.localToWorld(new V3(sgOf(S) * 0.12, 0.95 * s, 0.17 * s)), w: sideK * 0.9, grip: 0.3, pole: new V3(0, -1, 0).addScaledVector(feet, 0.35) };
   }
   // sitting up: the hands on the lap, laid on the quilt over the thighs
@@ -303,8 +317,8 @@ function bedTick(par, dt) {
       if (par.st === 'asleep' && !lit && sideK < 0.5 && Math.hypot(c.x - h.x, c.z - h.z) < 14) sound('bed_snore', placed(h.x, h.y, h.z), { gain: 0.5, dur: 2.6, ramp: 0.6, rate: 0.97 + Math.random() * 0.06, ref: 1, roll: 1.2 });
     }
   }
-  // the quilt follows the body across the bed, and rises over any limb that comes up under it
-  const bed = bedOf(); if (bed) { bed.shift(par.who, bodyAcross(par) - REST_X[par.who]); bed.torso(par.who, par.sit); }
+  // the quilt follows the body across the bed, and rises over any limb that comes up under it (right over on a side it is down at the waist)
+  const bed = bedOf(); if (bed) { bed.shift(par.who, bodyAcross(par) - REST_X[par.who]); bed.torso(par.who, Math.max(par.sit, deep)); }
 }
 
 // ---------- the torch ----------
@@ -624,7 +638,7 @@ const SEAT = 0.69, EDGE_X = 0.54, STEP_OUT = 0.14;
 function bedside(par) {
   const bed = bedOf(), sgn = par.who === 'dad' ? -1 : 1, s = (par.p.group.userData.h || 1.75) / 1.75;
   const pel = par.pelvisBed || new V3(REST_X[par.who], 0.68, -0.25);
-  const edge = bed.group.localToWorld(new V3(sgn * EDGE_X, SEAT + 0.12 * s, pel.z));   // the pelvis, sat on the edge
+  const edge = bed.group.localToWorld(new V3(sgn * EDGE_X, SEAT + 0.09 * s, pel.z));   // the pelvis, sat on the edge (level with the hip joints, where seated() puts them: the swing ends where sitting starts)
   const out = bed.group.localToWorld(new V3(sgn * 2, 0, pel.z)).sub(bed.group.localToWorld(new V3(0, 0, pel.z))).setY(0).normalize();
   const L = legsOf(par), feet = edge.clone().setY(0).addScaledVector(out, L.dx(SEAT + 0.09 * s));   // where the feet are, sat there
   return { edge, out, yaw: Math.atan2(out.x, out.z), feet, stand: feet.clone().addScaledVector(out, STEP_OUT), s };
@@ -1053,9 +1067,9 @@ async function handoff(par) {
   const i = G.lights && G.lights.movers ? G.lights.movers.indexOf(par.p.group) : -1; if (i >= 0) G.lights.movers.splice(i, 1);
   layBack(par); par.st = 'handoff';
   kidBetween(true);
-  // you, on your back between them, your head on the pillows, looking down the bed at their door
+  // you, on your back between them, your head on the pillows, looking up along the bed toward their door
   const eye = kidInBed();
-  P0.cam.copy(eye.pos); P0.pos.set(eye.pos.x, 0, eye.pos.z); P0.vel && P0.vel.set(0, 0, 0); P0.yaw = eye.yaw; P0.pitch = eye.pitch; P0.roll = 0; P0.mode = 'lie';
+  P0.cam.copy(eye.pos); P0.pos.set(eye.pos.x, 0, eye.pos.z); P0.vel && P0.vel.set(0, 0, 0); P0.yaw = eye.yaw; P0.pitch = eye.pitch; P0.roll = 0; P0.lieLook = eye.look; P0.mode = 'lie';
   F().cutscene = false; F().sleepy = true; stats.handoff = T;
   if (par.rec) par.rec.handoff = true;
   if (UI && UI.fade) UI.fade(0, 1.6);
@@ -1065,20 +1079,23 @@ async function handoff(par) {
   await until(() => !F().sleepy, 900); if (tok !== TOK) return;
   F().clockRateNow = (F().clockRateNow || 1) * 6;
 }
-// you between them: Dad turned over toward the wall, Mom moved over toward the door, and the quilt over you as well, up to your chin
+// you between them: Dad turned over onto his side toward the wall, Mom moved over toward the door, and the quilt over you as well, up to
+// your chin
 function kidBetween(on) {
   const d = PAR.dad, m = PAR.mom, q = bedOf();
-  if (on && d && d.inBed) { d.rolling = null; d.roll = ROLL; d.shift = SHIFT; }
-  if (on && m && m.inBed) { m.rolling = null; m.shift = -0.04; }
-  if (q && q.third) q.third(on ? KID_UNDER : 0);
+  if (on && d && d.inBed) { d.rolling = null; d.roll = SIDE; d.shift = SIDE_SHIFT.dad; d.sit = 0; d.armOutRun = null; d.armOut.L = d.armOut.R = 0; d.armDone = true; }   // (his arm out stays in)
+  if (on && m && m.inBed) { m.rolling = null; m.roll = 0; m.shift = SIDE_SHIFT.mom; }
+  if (q && q.third) q.third(on ? KID_UNDER : 0, KID_EYE.x);
 }
-// where the kid's eye is, lying between them (the bed's frame: the seam of the two pillows, a head's height over them)
+// where the kid's eye is, lying between them on his back (the bed's frame): his head on the middle of the pillows, over the seam of the
+// two, halfway between Dad's back and Mom's arm, the eye a child's head's depth over them (13 cm and more from everything round it). He
+// looks up along the bed: the ceiling, their two shoulders at the sides, and past the foot of the bed their door. look: how far the head
+// turns from there (main.js reads P.lieLook while the eye is here): to either of them, up to the ceiling and a little down the quilt
+const KID_EYE = new V3(-0.04, 0.86, 0.72), KID_LOOK = { pitch: 0.42, side: 1.35, down: 0.05, up: 1.45 };
 function kidInBed() {
-  // (lying, the view turns 1.25 rad either side of the way the body faces, main.js; toward the foot of the bed that leaves it looking a
-  // little toward Dad's back)
-  const bed = bedOf(), pos = bed.group.localToWorld(new V3(0.0, 0.875, 0.74)), foot = bed.group.localToWorld(new V3(0.0, 0.875, -0.4));
-  const yawTo = Math.atan2(-(foot.x - pos.x), -(foot.z - pos.z));
-  return { pos, yaw: Math.max(yawTo, -1.2), pitch: -0.12 };
+  const bed = bedOf(), pos = bed.group.localToWorld(KID_EYE.clone()), foot = bed.group.localToWorld(new V3(KID_EYE.x, KID_EYE.y, -1));
+  const yaw = Math.atan2(-(foot.x - pos.x), -(foot.z - pos.z));
+  return { pos, yaw, pitch: KID_LOOK.pitch, look: { x: pos.x, z: pos.z, yaw, side: KID_LOOK.side, down: KID_LOOK.down, up: KID_LOOK.up } };
 }
 
 // ---------- the frame ----------
@@ -1175,6 +1192,7 @@ export function laid(on, only = null) {
   TOK++;
   for (const w of WAIT.splice(0)) w.res(false);
   LEDGER.N = 0; LEDGER.entries.length = 0; LEDGER.wasOver = false; LEDGER.lastMutter = -99; LEDGER.mutterOff = 0; LEDGER.polled = {};
+  if (P()) P().lieLook = null;   // (night five's look from their bed)
   torchHome();
   { const d = W().doors.parents; if (d) { d.max = 1; if (d.target && on) W().setDoor('parents', false, true); } }   // (a walk cut short leaves their door as it was)
   const n = night();
@@ -1236,7 +1254,7 @@ export const test = {
     bedTick(par, 0);
   },
   // night five's bed with you in it (both of them laid as they lie then), or as it was
-  kidBetween(on) { if (on) { this.bedPose('dad', { roll: ROLL }); this.bedPose('mom', {}); } kidBetween(on); },
+  kidBetween(on) { if (on) { this.bedPose('dad', {}); this.bedPose('mom', {}); } kidBetween(on); if (on) for (const w of ['dad', 'mom']) bedTick(PAR[w], 0); },
   swing(who, u) { const par = PAR[who]; if (!par.pelvis0 && par.p.rig) { par.pelvis0 = par.p.rig.bones.Pelvis.getWorldPosition(new V3()); par.pelvisBed = bedOf().toLocal(par.pelvis0.clone()); bedOf().one(who, false); } par.inBed = true; par.swing = true; par.p.sleeping = true; swingPose(par, u); },
   seated(who, h) { const par = PAR[who]; par.swing = false; par.bed.legs = null; par.bed.arms = { L: null, R: null }; seated(par, h); },
   stepOut(who, k) { stepAt(PAR[who], k); },
