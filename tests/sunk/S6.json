@@ -1,0 +1,4 @@
+{
+  "_": "the barn as a place (js/barn.js): its shell is set 0.14 m lower than world.js puts it, so its posts and walls stand on the plank floor (top 0.02) with their broken ends in the ground; its lowest point is 0.17 under the field. The barn's own props stand on that floor (the covered car's base at 0.026) and need no allowance",
+  "barn": 0.16
+}
