@@ -97,6 +97,8 @@ function mirror(clip, name) { const m = clip.clone(); m.name = name; m.userData 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 const ID = new THREE.Quaternion(), _d = new THREE.Vector3();
+const _ikS = new THREE.Vector3(), _ikE = new THREE.Vector3(), _ikW = new THREE.Vector3(), _ikT = new THREE.Vector3(), _ikU = new THREE.Vector3(), _ikP = new THREE.Vector3();
+const _ikQ = new THREE.Quaternion(), _ikG = new THREE.Vector3(), _ikM = new THREE.Vector3(), _ikD = new THREE.Vector3(), _ikA = new THREE.Vector3(), _ikB = new THREE.Vector3(), _ikC = new THREE.Vector3();
 
 export class Rig {
   constructor(gltf, clips) {
@@ -189,6 +191,83 @@ export class Rig {
     if (axis.lengthSq() < 1e-6) { axis.set(0, 1, 0).cross(_b); if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0).cross(_b); }
     this.rotateWorld(bone, new THREE.Quaternion().setFromAxisAngle(axis.normalize(), ang));
   }
+  // two bones onto a point: `end` (the wrist, the ankle) is carried onto `target` (world), the middle joint bending toward `pole` (world).
+  // The upper bone is swung so the middle joint lands where the triangle of the two lengths puts it, then the lower bone is aimed at the
+  // target (a target out of reach is met as far as the limb goes, straight at it; one too close, at the shortest the limb folds to).
+  // w eases the whole move in (0 leaves the clip's limb, 1 puts the end on the point). Lifted from night one's bedside reach.
+  // A stretched limb (the thing's arms are scaled along the upper bone) shears the lower one, so how far the end reaches changes with the
+  // bend in a way no triangle predicts: after the first solve the limb is corrected by measuring it. The elbow is bent about its own
+  // hinge until the shoulder-to-wrist distance is right (a secant on the angle), the whole limb is swung about the shoulder onto the
+  // target (a turn of the upper bone carries everything under it rigidly), and turned about that line so the elbow faces the pole.
+  ik2(upper, lower, end, target, pole, w = 1, rounds = 3) {
+    if (w <= 0.001 || !upper || !lower || !end) return;
+    end.updateWorldMatrix(true, false); end.getWorldPosition(_ikW); const goal = _ikG.copy(_ikW).lerp(target, w);
+    this.ik2once(upper, lower, end, goal, pole);
+    const reach = () => { upper.getWorldPosition(_ikS); end.getWorldPosition(_ikW); return _ikS.distanceTo(_ikW); };
+    for (let k = 0; k < rounds; k++) {
+      upper.getWorldPosition(_ikS); lower.getWorldPosition(_ikE); end.getWorldPosition(_ikW);
+      const d = _ikS.distanceTo(goal);
+      // the hinge: across the plane of the limb
+      _ikA.copy(_ikE).sub(_ikS); _ikB.copy(_ikW).sub(_ikE); _ikC.crossVectors(_ikA, _ikB);
+      if (_ikC.lengthSq() > 1e-10) {
+        _ikC.normalize();
+        let a = 0, f = reach() - d, ap = null, fp = null;
+        for (let i = 0; i < 5 && Math.abs(f) > 0.002; i++) {
+          let next = ap === null || Math.abs(f - fp) < 1e-7 ? a + 0.08 : a - f * (a - ap) / (f - fp);
+          next = THREE.MathUtils.clamp(next, a - 0.6, a + 0.6);
+          this.rotateWorld(lower, _ikQ.setFromAxisAngle(_ikC, next - a));
+          ap = a; fp = f; a = next; f = reach() - d;
+        }
+      }
+      // onto the target: the whole limb turned about the shoulder
+      upper.getWorldPosition(_ikS); end.getWorldPosition(_ikW);
+      _ikA.copy(_ikW).sub(_ikS).normalize(); _ikB.copy(goal).sub(_ikS).normalize();
+      this.rotateWorld(upper, _ikQ.setFromUnitVectors(_ikA, _ikB));
+      // the elbow toward the pole: a turn about the shoulder-target line, which leaves the wrist where it is
+      lower.getWorldPosition(_ikE); _ikU.copy(_ikB);
+      _ikA.copy(_ikE).sub(_ikS); _ikA.addScaledVector(_ikU, -_ikA.dot(_ikU));
+      _ikP.copy(pole).sub(_ikS); _ikP.addScaledVector(_ikU, -_ikP.dot(_ikU));
+      if (_ikA.lengthSq() > 1e-8 && _ikP.lengthSq() > 1e-8) {
+        _ikA.normalize(); _ikP.normalize();
+        const ang = Math.atan2(_ikM.crossVectors(_ikA, _ikP).dot(_ikU), _ikA.dot(_ikP));
+        this.rotateWorld(upper, _ikQ.setFromAxisAngle(_ikU, ang));
+      }
+      end.getWorldPosition(_ikW); if (_ikW.distanceToSquared(goal) < 1e-6) break;
+    }
+  }
+  ik2once(upper, lower, end, target, pole, bLen) {
+    upper.updateWorldMatrix(true, true);
+    upper.getWorldPosition(_ikS); lower.getWorldPosition(_ikE); end.getWorldPosition(_ikW);
+    const a = _ikS.distanceTo(_ikE), b = bLen ?? _ikE.distanceTo(_ikW);
+    _ikT.copy(target);
+    let d = _ikS.distanceTo(_ikT); if (d < 1e-5) return;
+    _ikU.copy(_ikT).sub(_ikS).divideScalar(d);
+    d = Math.max(Math.abs(a - b) + 0.002, Math.min(a + b - 0.0005, d));
+    // the bend's side: the pole with its part along the limb taken out (any side at all when the pole lies on the line)
+    _ikP.copy(pole).sub(_ikS); _ikP.addScaledVector(_ikU, -_ikP.dot(_ikU));
+    if (_ikP.lengthSq() < 1e-8) { _ikP.set(0, 1, 0).addScaledVector(_ikU, -_ikU.y); if (_ikP.lengthSq() < 1e-8) _ikP.set(1, 0, 0); }
+    _ikP.normalize();
+    const ca = THREE.MathUtils.clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1), sa = Math.sqrt(Math.max(0, 1 - ca * ca));
+    _ikM.copy(_ikS).addScaledVector(_ikU, a * ca).addScaledVector(_ikP, a * sa);
+    this.aim(upper, lower, _ikD.copy(_ikM).sub(_ikS).normalize(), 1);
+    lower.updateWorldMatrix(true, true); lower.getWorldPosition(_ikE);
+    this.aim(lower, end, _ikD.copy(_ikT).sub(_ikE).normalize(), 1);
+  }
+  // a bone turned (about its own pivot) so its local axis `axis` points along the world direction `dir`, and its local `up` as near
+  // the world `upDir` as that allows: a hand laid flat, a foot pointed back
+  orient(bone, axis, dir, up, upDir, w = 1) {
+    if (w <= 0.001 || !bone) return;
+    bone.updateWorldMatrix(true, false); bone.getWorldQuaternion(_q);
+    _ikA.copy(axis).applyQuaternion(_q);
+    const q1 = new THREE.Quaternion().setFromUnitVectors(_ikA, _ikD.copy(dir).normalize());
+    _ikB.copy(up).applyQuaternion(_q).applyQuaternion(q1);
+    // the twist about the new axis that brings `up` to the wanted side
+    _ikC.copy(upDir).addScaledVector(_ikD, -upDir.dot(_ikD)); _ikB.addScaledVector(_ikD, -_ikB.dot(_ikD));
+    let q = q1;
+    if (_ikC.lengthSq() > 1e-8 && _ikB.lengthSq() > 1e-8) { _ikC.normalize(); _ikB.normalize(); q = new THREE.Quaternion().setFromUnitVectors(_ikB, _ikC).multiply(q1); }
+    if (w < 1) q.slerp(ID, 1 - w);
+    this.rotateWorld(bone, q);
+  }
   axisWorld(x, y, z) { return _c.set(x, y, z).applyQuaternion(this.root.parent ? this.root.parent.getWorldQuaternion(_q3) : ID).clone(); }
   // rotate several bones by shares of one rotation about a model-space axis
   bend(names, shares, axis, angle) {
@@ -197,7 +276,7 @@ export class Rig {
     names.forEach((n, i) => { if (this.bones[n]) this.rotateWorld(this.bones[n], new THREE.Quaternion().setFromAxisAngle(ax, angle * shares[i])); });
   }
   // turn the neck and head toward a world point, within limits
-  lookAt(target, dt, { yaw = 1.1, pitch = 0.5, speed = 5 } = {}) {
+  lookAt(target, dt, { yaw = 1.1, pitch = 0.5, speed = 5, rate = 3.5 } = {}) {   // rate: how fast the neck may turn (rad/s; pitch at 5/7 of it)
     const on = !!target; this.lookW += ((on ? 1 : 0) - this.lookW) * Math.min(1, dt * 3);
     if (on) { if (!this.hasLook) { this.look.copy(target); this.hasLook = true; } else this.look.lerp(target, Math.min(1, dt * speed)); }
     if (this.lookW < 0.01 || !this.hasLook) return;
@@ -212,7 +291,7 @@ export class Rig {
     // and a clamp alone would snap the neck from +63 to -63 degrees in one frame (the clavicles hang from the neck in this rig, so the shoulders would snap too)
     const raw = Math.atan2(d.x, d.z), ywT = Math.abs(raw) > 2.4 ? 0 : THREE.MathUtils.clamp(raw, -yaw, yaw), ptT = THREE.MathUtils.clamp(Math.asin(THREE.MathUtils.clamp(d.y, -1, 1)), -pitch, pitch);
     if (this.yawNow === undefined) { this.yawNow = ywT; this.pitchNow = ptT; }
-    this.yawNow += THREE.MathUtils.clamp(ywT - this.yawNow, -3.5 * dt, 3.5 * dt); this.pitchNow += THREE.MathUtils.clamp(ptT - this.pitchNow, -2.5 * dt, 2.5 * dt);
+    this.yawNow += THREE.MathUtils.clamp(ywT - this.yawNow, -rate * dt, rate * dt); this.pitchNow += THREE.MathUtils.clamp(ptT - this.pitchNow, -rate * dt / 1.4, rate * dt / 1.4);
     const yw = this.yawNow, pt = this.pitchNow;
     const want = new THREE.Vector3(Math.sin(yw) * Math.cos(pt), Math.sin(pt), Math.cos(yw) * Math.cos(pt)).applyQuaternion(rootQ);
     const w = this.lookW;

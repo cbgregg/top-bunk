@@ -383,7 +383,7 @@ function eyeGeometry() {
 function eyeMaterial() {
   const m = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   m.name = 'creatureEyes'; m.color.setRGB(EYE_GLOW, EYE_GLOW, EYE_GLOW);
-  const u = m.userData.uniforms = { pupils: { value: PUPIL_AT.map((p) => new THREE.Vector2(...p)) } };
+  const u = m.userData.uniforms = { pupils: { value: PUPIL_AT.map((p) => new THREE.Vector2(...p)) }, blink: { value: 0 } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 exy, eq; attribute float eid; varying vec2 vExy, vEq; varying float vEid, vDist;')
@@ -392,7 +392,7 @@ function eyeMaterial() {
     // the pupils loom a little larger up close, in proportion to their size at 1.1 m; the white is a little darker toward its upper
     // edge, under the lip of the socket
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform vec2 pupils[2]; varying vec2 vExy, vEq; varying float vEid, vDist;`)
+      uniform vec2 pupils[2]; uniform float blink; varying vec2 vExy, vEq; varying float vEid, vDist;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       {
         float r = length( vEq ), ra = fwidth( r ) * 0.7;
@@ -402,6 +402,8 @@ function eyeMaterial() {
         float pr = length( pd ), pa = fwidth( pr ) * 1.2 + 0.015;
         float pupil = 1.0 - smoothstep( 1.0 - pa, 1.0 + pa, pr );
         float lid = 1.0 - 0.25 * smoothstep( 0.8, 0.99, r ) * smoothstep( 0.2, 0.9, vEq.y / max( r, 1e-4 ) );
+        float fall = 1.05 - 2.2 * blink;   // the lid's edge coming down over the eye
+        white *= 1.0 - smoothstep( fall - 0.04, fall + 0.04, vEq.y );
         diffuseColor.rgb = white * lid * diffuse * ( 1.0 - pupil ) + ( 1.0 - white ) * vec3( 0.0025 );
       }`);
   };
@@ -558,7 +560,8 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
 //   for a human head (about 0.16 m across) scale by about 0.4. with neck it runs on down to 0.46 m below the origin.
 //   face.eyes: both eyes (scale face.eyes.material.color to dim them); face.smile: the teeth (hide it and the mouth closes over);
 //   face.skull: the head mesh (null without one; face.addSkull() builds it, face.setSkull swaps in another built from headGeometry).
-//   face.update(dt, { target, smile }): pupils toward a world point (or stay put), smile from 1 (rest) to 1.6 (widest).
+//   face.update(dt, { target, smile, blink, eyeLag }): pupils toward a world point (or stay put), late and in jumps; smile from 1 (rest)
+//   to 1.6 (widest); blink 0..1 the lid down; eyeLag seconds one eye trails the other
 //   face.setQuality(q): 'low' gives the skin the cheaper material
 export function createFace({ skull = true, neck = false, quality = 'high' } = {}) {
   const face = new THREE.Group();
@@ -584,13 +587,31 @@ export function createFace({ skull = true, neck = false, quality = 'high' } = {}
     const low = q === 'low'; face.quality = low ? 'low' : 'high';
     if (face.skull) face.skull.material = face.skinFor(low);
   };
-  const v = new THREE.Vector3(), pupils = face.eyes.material.userData.uniforms.pupils.value;
-  face.update = (dt, { target = null, smile = 1 } = {}) => {
+  const v = new THREE.Vector3(), U = face.eyes.material.userData.uniforms, pupils = U.pupils.value;
+  // the eyes are the one live thing on it, and they are not quite right: each pupil follows where the target was 60-80 ms ago, not where
+  // it is, and in jumps (two or three a second, held between), each jump landing a little off; for a beat one eye can fall behind the
+  // other (eyeLag, seconds). blink 0..1 brings a lid down over both
+  const E = { t: 0, hist: [], sacT: 0, lag: 0.07, at: PUPIL_AT.map((p) => [p[0], p[1]]), off: [0, 0] };
+  const aimAt = (dir, i) => [PUPIL_AT[i][0] + THREE.MathUtils.clamp(dir[0], -1, 1) * PUPIL_MOVE[0], PUPIL_AT[i][1] + THREE.MathUtils.clamp(dir[1], -1, 1) * PUPIL_MOVE[1]];
+  const past = (sec) => { for (let i = E.hist.length - 1; i >= 0; i--) if (E.t - E.hist[i][0] >= sec) return E.hist[i]; return E.hist[0]; };
+  face.update = (dt, { target = null, smile = 1, blink = 0, eyeLag = 0 } = {}) => {
+    E.t += dt;
     if (target) {
       face.updateMatrixWorld(true);
       v.copy(target); face.worldToLocal(v); v.normalize();
-      PUPIL_AT.forEach((p, i) => pupils[i].set(p[0] + THREE.MathUtils.clamp(v.x, -1, 1) * PUPIL_MOVE[0], p[1] + THREE.MathUtils.clamp(v.y, -1, 1) * PUPIL_MOVE[1]));
+      E.hist.push([E.t, v.x, v.y]); while (E.hist.length > 2 && E.t - E.hist[1][0] > 0.6) E.hist.shift();
+      E.sacT -= dt;
+      const now = past(E.lag), want = aimAt([now[1], now[2]], 0), far = Math.hypot(want[0] - E.at[0][0], want[1] - E.at[0][1]) > PUPIL_MOVE[0] * 0.35;
+      if (E.sacT <= 0 || far || dt === 0) {   // a jump: to where it was looking a moment ago, a little off, then held
+        E.sacT = 0.33 + Math.random() * 0.17; E.lag = 0.06 + Math.random() * 0.02;
+        E.off = dt === 0 ? [0, 0] : [(Math.random() - 0.5) * 0.3 * PUPIL_MOVE[0], (Math.random() - 0.5) * 0.3 * PUPIL_MOVE[1]];
+        E.at[0] = [want[0] + E.off[0], want[1] + E.off[1]];
+        const late = eyeLag > 0 ? past(E.lag + eyeLag) : now, w1 = aimAt([late[1], late[2]], 1);
+        E.at[1] = [w1[0] + E.off[0], w1[1] + E.off[1]];
+      } else if (eyeLag > 0) { const late = past(E.lag + eyeLag), w1 = aimAt([late[1], late[2]], 1); E.at[1] = [w1[0] + E.off[0], w1[1] + E.off[1]]; }
+      E.at.forEach((p, i) => pupils[i].set(p[0], p[1]));
     }
+    U.blink.value = blink;
     const open = face.smile.visible, w = open ? THREE.MathUtils.clamp((smile - 1) / 0.6, 0, 1) : 0;
     face.smile.morphTargetInfluences[0] = w;
     if (face.skull) { face.skull.morphTargetInfluences[0] = w; face.skull.morphTargetInfluences[1] = open ? 0 : 1; }
