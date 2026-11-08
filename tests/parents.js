@@ -283,35 +283,35 @@ async function bed(browser) {
     await quiet(page);
     await until(page, () => window.__game.P.mode === 'bunk', null, 30e3);
     await P(page, (par) => { par.test.force = true; window.__clockMul = 1; });
-    // the quilt's rise across the bed at the chest, as a centroid on each side, against the body's own place across the bed
+    // each side of the quilt against its body: the middle of that side's rise across the bed (where world.js puts it, the rest place plus
+    // its shift) against the body's own place across the bed at the chest, and the quilt's top over the chest against the chest's top
     const sample = () => P(page, (par, g) => {
-      const b = g.W.bedSleepers, out = {};
-      for (const [who, lo, hi] of [['dad', -0.58, 0.01], ['mom', 0.01, 0.58]]) {
+      const b = g.W.bedSleepers, out = {}, REST = { mom: 0.23, dad: -0.21 };
+      for (const who of ['dad', 'mom']) {
         const p = par.test.PAR[who], r = g[who].rig, V = r.bones.Spine1.getWorldPosition(new (g.camera.position.constructor)()); b.toLocal(V);
-        let sw = 0, sx = 0, base = Infinity; const xs = []; for (let x = lo; x <= hi; x += 0.02) { const h = b.heightAt(x, V.z); xs.push([x, h]); base = Math.min(base, h); }
-        for (const [x, h] of xs) { const w2 = Math.max(0, h - base) ** 2; sw += w2; sx += w2 * x; }
-        out[who] = { body: V.x, ridge: sw > 0 ? sx / sw : V.x, roll: p.roll };
+        const C = r.bones.Spine2.getWorldPosition(new (g.camera.position.constructor)()); b.toLocal(C);
+        out[who] = { body: V.x, ridge: REST[who] + b.sides[who].dx, cover: b.heightAt(C.x, C.z) - (C.y + 0.12), roll: p.roll, sit: p.sit, inBed: p.inBed };
       }
       return out;
     });
     const t0 = await page.evaluate(() => window.__game.gameTime);
-    const rest = await sample();
-    let worst = 0, n = 0;
+    let worst = 0, bare = 0, n = 0;
     while ((await page.evaluate(() => window.__game.gameTime)) - t0 < 180) {
       await sleep(1500);
       const s = await sample(); n++;
-      for (const who of ['dad', 'mom']) { const d = Math.abs((s[who].ridge - rest[who].ridge) - (s[who].body - rest[who].body)); if (d > worst) worst = d; }
+      for (const who of ['dad', 'mom']) { const d = Math.abs(s[who].ridge - s[who].body); if (d > worst) worst = d; if (s[who].sit < 0.05 && -s[who].cover > bare) bare = -s[who].cover; }
     }
     const st = await P(page, (par) => ({ rolls: par.test.stats.rolls, arms: par.test.stats.armOuts, states: par.test.stats.states }));
     ok(st.rolls.dad >= 1 && st.rolls.mom >= 1, 'not both turned over in three minutes: ' + JSON.stringify(st.rolls));
     ok(st.arms.dad >= 1, "Dad's arm never came out in three minutes");
     ok(worst <= 0.03, `the quilt's rise lagged its body by ${(worst * 100).toFixed(1)} cm`);
+    ok(bare <= 0.01, `a chest came up through the quilt by ${(bare * 100).toFixed(1)} cm`);
     clean(w);
     await ctx.close();
-    // two renders from their door two seconds apart differ at the quilt's ridge (a page that draws, the frame stopped and stepped by hand)
+    // two renders two seconds apart differ at the quilt's ridge (a page that draws, the frame stopped and stepped by hand)
     const diff = await renderDiff(browser);
-    ok(diff.mean > 0.4, `the quilt did not move between the renders (mean difference ${diff.mean.toFixed(2)} at ${diff.X},${diff.Y})`);
-    return `rolls Dad ${st.rolls.dad}, Mom ${st.rolls.mom}; Dad's arm out ${st.arms.dad}; the quilt within ${(worst * 100).toFixed(1)} cm of its body over ${n} samples; renders 2 s apart differ by ${diff.mean.toFixed(2)} at the ridge`;
+    ok(diff.changed >= 20, `the quilt did not move between the renders (${diff.changed} pixels changed in ${JSON.stringify(diff.box)})`);
+    return `rolls Dad ${st.rolls.dad}, Mom ${st.rolls.mom}; Dad's arm out ${st.arms.dad}; each side of the quilt within ${(worst * 100).toFixed(1)} cm of its body and over its chest at ${n} samples; renders 2 s apart differ in ${diff.changed} pixels of the quilt`;
   } finally { await ctx.close().catch(() => {}); }
 }
 async function renderDiff(browser) {
@@ -319,21 +319,37 @@ async function renderDiff(browser) {
   try {
     await page.goto(BASE + '/index.html#shot', { waitUntil: 'load', timeout: 180e3 });
     await page.waitForFunction(() => window.__game && document.getElementById('loading').classList.contains('done') && window.__game.mom.rig && window.__game.dad.rig, null, { timeout: 300e3, polling: 250 });
-    return await page.evaluate(async () => {
+    await page.evaluate(async () => {
       const g = window.__game, THREE = await import('three'), par = (await import('/js/hooks.js')).hooks.parents;
       g.start(); window.__freeze = true; for (const id of ['title', 'hud', 'mobile']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
       g.gfx.setQuality('low', { save: false }); g.F.night = 2; g.setPhase('night', true); g.F.phase = 'night'; par.test.force = true; g.P.mode = 'cine';
       g.lights.set('parents', true, { silent: true }); for (let i = 0; i < 30; i++) g.lights.update(1 / 30);
       let T = 0; const step = (sec) => { for (let i = 0; i < sec * 60; i++) { T += 1 / 60; par.update(1 / 60); g.mom.update(T, 1 / 60); g.dad.update(T, 1 / 60); g.W.bedSleepers.update(1 / 60); } g.scene.updateMatrixWorld(true); };
       step(1);
-      const d = g.W.doors.parents, cam = g.camera, b = g.W.bedSleepers;
-      const sp = g.dad.rig.bones.Spine1.getWorldPosition(new THREE.Vector3()), loc = b.toLocal(sp.clone()); loc.y = b.heightAt(loc.x, loc.z); const ridge = b.group.localToWorld(loc);
-      cam.fov = 60; cam.updateProjectionMatrix(); cam.position.set(d.mid.x - 0.5, 1.45, d.mid.z); cam.lookAt(ridge); cam.updateMatrixWorld(true);
-      const px = ridge.clone().project(cam), X = Math.round((px.x + 1) / 2 * innerWidth), Y = Math.round((1 - px.y) / 2 * innerHeight);
-      const grab = () => { g.gfx.render(0.016); const c = document.querySelector('#game canvas'), cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const x = cv.getContext('2d'); x.drawImage(c, 0, 0); const sx = c.width / innerWidth, s = Math.round(40 * sx); return x.getImageData(Math.round(X * sx) - s, Math.round(Y * sx) - s, 2 * s, 2 * s).data; };
-      const a = grab(); step(2); const c2 = grab();
-      let sum = 0; for (let i = 0; i < a.length; i += 4) sum += Math.abs(a[i] - c2[i]) + Math.abs(a[i + 1] - c2[i + 1]) + Math.abs(a[i + 2] - c2[i + 2]);
-      return { mean: sum / (a.length / 4) / 3, X, Y };
+      // from the foot of the bed, low, down Dad's side: the ridge of the quilt over his chest stands against the headboard
+      const cam = g.camera, b = g.W.bedSleepers;
+      const sp = g.dad.rig.bones.Spine1.getWorldPosition(new THREE.Vector3()), loc = b.toLocal(sp.clone()); loc.y = b.heightAt(loc.x, loc.z);
+      const ridge = b.group.localToWorld(loc.clone()), eye = b.group.localToWorld(new THREE.Vector3(loc.x, loc.y + 0.06, -1.75));
+      cam.fov = 50; cam.updateProjectionMatrix(); cam.position.copy(eye); cam.lookAt(ridge); cam.updateMatrixWorld(true);
+      // the quilt's box on screen (from its vertices as they are now: the geometry's own box is the shape it was built with): the pixels
+      // inside it that changed (by 4 levels or more) between the two frames, drawn without the two of them (their breath is not the quilt's)
+      const box = new THREE.Box3().setFromObject(b.quilt, true), pts = []; for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) pts.push(new THREE.Vector3(x, y, z).project(cam));
+      const c = document.querySelector('#game canvas'), cl = (v, a, z) => Math.max(a, Math.min(z, v));
+      const X0 = cl(Math.floor((Math.min(...pts.map((q) => q.x)) + 1) / 2 * c.width), 0, c.width), X1 = cl(Math.ceil((Math.max(...pts.map((q) => q.x)) + 1) / 2 * c.width), 0, c.width);
+      const Y0 = cl(Math.floor((1 - Math.max(...pts.map((q) => q.y))) / 2 * c.height), 0, c.height), Y1 = cl(Math.ceil((1 - Math.min(...pts.map((q) => q.y))) / 2 * c.height), 0, c.height);
+      const grab = () => {
+        // (drawn twice: in the software renderer the first frame drawn after a change of shape can still show the shape before it)
+        g.mom.group.visible = g.dad.group.visible = false; g.gfx.render(0.016); g.gfx.render(0.016); g.mom.group.visible = g.dad.group.visible = true;
+        const cv = document.createElement('canvas'); cv.width = c.width; cv.height = c.height; const x = cv.getContext('2d'); x.drawImage(c, 0, 0); return x.getImageData(X0, Y0, X1 - X0, Y1 - Y0).data;
+      };
+      window.__rd = { grab, step, a: grab(), box: [X0, X1, Y0, Y1] };
+    });
+    // (the second frame in a task of its own: the canvas is read back once the first has been shown)
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+    return await page.evaluate(() => {
+      const { grab, step, a, box } = window.__rd; step(2); const c2 = grab();
+      let changed = 0; for (let i = 0; i < a.length; i += 4) if (Math.max(Math.abs(a[i] - c2[i]), Math.abs(a[i + 1] - c2[i + 1]), Math.abs(a[i + 2] - c2[i + 2])) >= 4) changed++;
+      return { changed, box };
     });
   } finally { await ctx.close(); }
 }

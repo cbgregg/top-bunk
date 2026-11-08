@@ -39,6 +39,7 @@ const R_WALK = { dad: 0.3, mom: 0.28 };             // the body's circle while w
 const SEE = 9;                                      // how far a parent can see you in the dark house
 const ESCORT_CAP = 44;                              // forty clock-minutes, in seconds of play
 const MOM_HIDDEN = 40;                              // seconds of her search you stay hidden before she goes and sits on your bunk
+const KID_UNDER = 0.8;                              // the quilt's rise over you between them (world.js third(k): a grown body is 1)
 // the mutters, in order: the two pairs from the walls of nights two and three, then the old ones at random
 const MUTTERS = [['dad/n2_a', 'mom/n2_a'], ['mom/n3_a', 'dad/n3_a']];
 const MUTTERS_OLD = [['dad/talk_a', 'mom/talk_a'], ['mom/talk_b', 'dad/talk_b'], ['dad/talk_c', 'mom/talk_c'], ['dad/mutter_a', 'mom/mutter_a'], ['mom/mutter_b', 'dad/mutter_b']];
@@ -222,6 +223,7 @@ function bedTick(par, dt) {
   const quilt = bedOf();
   if (par.swing) { if (quilt) { quilt.shift(par.who, bodyAcross(par) - REST_X[par.who]); quilt.torso(par.who, par.sit); } return; }   // getting out or in: the swing has the body
   const b = par.bed, still = (par.st === 'asleep' || par.st === 'light') && !(PAR.mom && PAR.mom.st === 'handoff');
+  b.keep = true;   // (lying, the body is kept from sinking into the mattress: people.js restOnBed)
   if (par.armOutT <= 0 && !par.armDone && Math.abs(par.roll) > 0.1 && !par.rolling) par.rollT = Math.min(par.rollT, 1.5);   // his arm is due: onto his back first
   // the roll-over: from the back onto a side (Dad toward the wall, Mom toward the door: their backs to each other) and back
   if (still && !par.rolling && par.sit < 0.01 && !(par.armOut.L + par.armOut.R)) {
@@ -349,6 +351,8 @@ function torchFollow(par, light = true) {
   const p = par.p, r = p.rig; if (!r || !r.bones.R_Finger2) return;
   const nrm = new V3(), palm = p.palm('R', new V3(), nrm), H = r.bones.R_Hand.getWorldPosition(new V3()), K = r.bones.R_Finger2.getWorldPosition(new V3());
   const dir = K.sub(H).normalize();
+  // pointed with the arm, it lies a little skew in the fist so that the beam goes where he looks (the wrist's own bend is not his aim)
+  if (par.aim && !par.handBusy) dir.lerp(par.aim, 0.8).normalize();
   torch.group.position.copy(palm).addScaledVector(nrm, 0.027).addScaledVector(dir, 0.01);
   torch.group.quaternion.copy(_q.setFromUnitVectors(_z, dir)); torch.group.updateMatrixWorld(true);
   const L = G.lights && G.lights.torch;
@@ -669,7 +673,8 @@ function swingPose(par, u) {
   const s = bs.s, lap = hip.clone().addScaledVector(th, 0.3 * s); lap.y += 0.12;
   const back = foot.clone().multiplyScalar(-Math.cos(u * Math.PI / 2)).addScaledVector(sideDir, -Math.sin(u * Math.PI / 2));   // behind the trunk: the pillows, turning to the bed's middle
   par.bed.arms = { L: { at: lap.clone().addScaledVector(new V3(-th.z, 0, th.x), 0.1), w: 1, grip: 0.3, pole: elbowsOut(p, 'L', back) }, R: { at: lap.clone().addScaledVector(new V3(-th.z, 0, th.x), -0.1), w: 1, grip: 0.3, pole: elbowsOut(p, 'R', back) } };
-  par.sit = 1 - u; par.bed.sit = par.sit; par.bed.rest = false; par.bed.awake = true;
+  // (the hips are placed here: nothing lifts the body as the shins go down over the edge, below the mattress they lay on)
+  par.sit = 1 - u; par.bed.sit = par.sit; par.bed.rest = false; par.bed.awake = true; par.bed.keep = false;
   p.pose = { sleep: par.who === 'mom' ? 1 : -1, bed: par.bed };
 }
 // sat on the edge and standing up from it (h: 0 sat, 1 stood), the feet where they are: the standing pose's own sit(), the seat rising
@@ -764,17 +769,21 @@ function aimTick(par, dt) {
   const p = par.p, g = p.group.position, yaw = p.group.rotation.y;
   par.sweepT = (par.sweepT || 0) + dt;
   let want;
-  if (par.aimAt) { const h = new V3(g.x, 1.05, g.z); want = par.aimAt.clone().sub(h).normalize(); }
+  if (par.aimAt) {   // (from the lens, when he carries the torch: the beam starts there, half a metre out in front of him)
+    const h = par.who === 'dad' && torch && torch.held && !par.handBusy ? torch.lens.getWorldPosition(new V3()) : new V3(g.x, 1.05, g.z);
+    want = par.aimAt.clone().sub(h).normalize();
+  }
   else { const sw = (par.sweep ? 0.32 : 0.08) * Math.sin(par.sweepT * 0.9); want = new V3(Math.sin(yaw + sw), -0.42, Math.cos(yaw + sw)).normalize(); }
   par.aim = par.aim ? par.aim.lerp(want, Math.min(1, dt * 5)).normalize() : want;
   // the eyes where the beam goes (or on you), the hand holding the torch out in front of the chest, a little raised to point at a face
   const look = g.clone().add(new V3(par.aim.x * 3, 1.0 + par.aim.y * 3 + 0.6, par.aim.z * 3));
   p.gaze = par.gazeOn === 'you' ? G.camera.position : look;
-  // the torch held out and pointed with the arm: the hand most of an arm's length from the shoulder along the beam, so the forearm (and
-  // the torch along the hand) points where the beam should go
+  // the torch held out and pointed with the arm: the hand nearly an arm's length from the shoulder along the beam (the elbow only a
+  // little bent), so the forearm, and the torch along the hand, point where the beam should go (torchFollow takes up the rest)
   if (par.who === 'dad' && torch && torch.held && !par.handBusy && p.rig && p.rig.bones.R_UpperArm) {
-    const sh = p.rig.bones.R_UpperArm.getWorldPosition(new V3()), s = (p.group.userData.h || 1.75) / 1.75;
-    p.pose = { ...(p.pose || {}), R: { reach: sh.addScaledVector(par.aim, 0.5 * s), palm: 'in', grip: 0.55 } };
+    const B = p.rig.bones, sh = B.R_UpperArm.getWorldPosition(new V3());
+    if (!par.armL) { const e = B.R_Forearm.getWorldPosition(new V3()); par.armL = sh.distanceTo(e) + e.distanceTo(B.R_Hand.getWorldPosition(new V3())); }
+    p.pose = { ...(p.pose || {}), R: { reach: sh.addScaledVector(par.aim, par.armL * 0.96 + 0.06), palm: 'in', grip: 0.55 } };   // (ik() stops 6 cm short)
   }
 }
 async function takeTorch(par) {
@@ -1043,8 +1052,7 @@ async function handoff(par) {
   if (G.lights && G.lights.isOn('parents')) G.lights.set('parents', false, { by: 'house', silent: true });
   const i = G.lights && G.lights.movers ? G.lights.movers.indexOf(par.p.group) : -1; if (i >= 0) G.lights.movers.splice(i, 1);
   layBack(par); par.st = 'handoff';
-  const dad = PAR.dad; if (dad && dad.inBed) { dad.rolling = null; dad.roll = ROLL; dad.shift = SHIFT; }
-  par.shift = -0.04;
+  kidBetween(true);
   // you, on your back between them, your head on the pillows, looking down the bed at their door
   const eye = kidInBed();
   P0.cam.copy(eye.pos); P0.pos.set(eye.pos.x, 0, eye.pos.z); P0.vel && P0.vel.set(0, 0, 0); P0.yaw = eye.yaw; P0.pitch = eye.pitch; P0.roll = 0; P0.mode = 'lie';
@@ -1056,6 +1064,13 @@ async function handoff(par) {
   // the night runs out there: nothing else comes for you tonight, and when you close your eyes it is soon morning
   await until(() => !F().sleepy, 900); if (tok !== TOK) return;
   F().clockRateNow = (F().clockRateNow || 1) * 6;
+}
+// you between them: Dad turned over toward the wall, Mom moved over toward the door, and the quilt over you as well, up to your chin
+function kidBetween(on) {
+  const d = PAR.dad, m = PAR.mom, q = bedOf();
+  if (on && d && d.inBed) { d.rolling = null; d.roll = ROLL; d.shift = SHIFT; }
+  if (on && m && m.inBed) { m.rolling = null; m.shift = -0.04; }
+  if (q && q.third) q.third(on ? KID_UNDER : 0);
 }
 // where the kid's eye is, lying between them (the bed's frame: the seam of the two pillows, a head's height over them)
 function kidInBed() {
@@ -1220,6 +1235,8 @@ export const test = {
     par.sit = sit; par.roll = roll; par.shift = Math.sign(roll) * SHIFT * Math.min(1, Math.abs(roll) / ROLL); par.armOut.L = par.armOut.R = 0; par.armOut[who === 'dad' ? 'L' : 'R'] = arm;
     bedTick(par, 0);
   },
+  // night five's bed with you in it (both of them laid as they lie then), or as it was
+  kidBetween(on) { if (on) { this.bedPose('dad', { roll: ROLL }); this.bedPose('mom', {}); } kidBetween(on); },
   swing(who, u) { const par = PAR[who]; if (!par.pelvis0 && par.p.rig) { par.pelvis0 = par.p.rig.bones.Pelvis.getWorldPosition(new V3()); par.pelvisBed = bedOf().toLocal(par.pelvis0.clone()); bedOf().one(who, false); } par.inBed = true; par.swing = true; par.p.sleeping = true; swingPose(par, u); },
   seated(who, h) { const par = PAR[who]; par.swing = false; par.bed.legs = null; par.bed.arms = { L: null, R: null }; seated(par, h); },
   stepOut(who, k) { stepAt(PAR[who], k); },

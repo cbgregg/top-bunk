@@ -64,6 +64,12 @@ module.exports = {
     // the arm out: its bones cross the quilt where it comes out from under it (the one contact the design allows)
     const outArm = (h) => /^L (upper arm|forearm|hand)/.test(h.part) && /^plane /.test(h.obj);   // (the quilt is an unnamed sheet: 'plane <size> at <where>')
     bedFrame("Dad's arm out on the quilt", g.dad, () => { t.bedPose('dad', { arm: 1 }); t.bedPose('mom', {}); }, { allow: outArm });
+    // night five: you between them, the quilt over you to the chin (Dad turned to the wall, Mom moved over toward the door), from both sides
+    const kid = () => { t.kidBetween(true); };
+    step(180, kid);
+    bedFrame('Night five: you between them (Dad)', g.dad, kid, { cam: [[bedAt.x - 0.2, 1.35, bedAt.z + 0.5], [bedAt.x, 0.75, bedAt.z]] });
+    bedFrame('Night five: you between them (Mom)', g.mom, kid, { cam: [[bedAt.x - 0.2, 1.35, bedAt.z + 0.5], [bedAt.x, 0.75, bedAt.z]] });
+    t.kidBetween(false); step(240, () => { t.bedPose('dad', {}); t.bedPose('mom', {}); });
     // getting out of bed: from sitting up, the legs swung out over his side, sat on the edge, half stood
     t.bedPose('dad', { sit: 1 }); step(30, () => t.bedPose('dad', { sit: 1 })); t.swing('dad', 0);
     for (const u of [0.25, 0.5, 0.75, 1]) bedFrame(`Dad getting out of bed (${u})`, g.dad, () => t.swing('dad', u), { cam: [[bedAt.x + 0.4, 1.4, bedAt.z - 2.0], [bedAt.x, 0.7, bedAt.z - 0.3]] });
