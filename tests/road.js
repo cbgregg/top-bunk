@@ -158,9 +158,9 @@ function inPage(SUNK) {
       }
       ok('bases', !bad.length && tr.cars.length === 6, { bad, models: [...new Set(seen)], cars });
     }
-    // ---- the silo ----
+    // ---- the silo ---- (the barn's outline: its block, or once js/barn.js has made it a place, W.barn.footprint)
     {
-      const s = W.silo, barn = W.colliders.find((c) => c.id === 'barnBlock'), col = W.colliders.find((c) => c.id === 'silo' || (c.minX < -74 && c.maxX > -74 && c.minZ < -14 && c.maxZ > -14 && c.id !== 'boundary'));
+      const s = W.silo, barn = W.colliders.find((c) => c.id === 'barnBlock') || (W.barn && W.barn.footprint), col = W.colliders.find((c) => c.id === 'silo' || (c.minX < -74 && c.maxX > -74 && c.minZ < -14 && c.maxZ > -14 && c.id !== 'boundary'));
       const pivot = s && s.chute, before = pivot ? [pivot.rotation.x, pivot.rotation.z] : null;
       let swingOk = false;
       if (s) {

@@ -360,14 +360,16 @@ const SCENES = {
         const L = window.__lock, g = window.__game, C = g.collide, nav = L.nav, bad = [];
         const barnBlock = g.W.colliders.some((c) => c.id === 'barnBlock');
         const intoBarn = (x, z) => barnBlock && x < -58.6 + 0.35 && x > -69.4 - 0.35 && z > -19.2 - 0.35 && z < -4.8 + 0.35;
-        const skip = (c) => c.fence;   // the pocket's night strips (the thing is not kept in by the kid's refusal)
-        const pen = (x, z, y) => { const p = C.probe(x, z, 0.35, y, 2.6, g.PB); return p.hit && skip(p.hit) ? 0 : p.pen; };
+        // the pocket's night strips (the thing is not kept in by the kid's refusal), and on an edge through a door that door's own leaf and
+        // strip (it opens it on its way, as it does the house's: the barn's sliding door is shut at night)
+        const skip = (c, own) => c.fence || (!!own && !!c.door && (c.door === own || c.door.name === own));
+        const pen = (x, z, y, own = null) => { const p = C.probe(x, z, 0.35, y, 2.6, g.PB); return p.hit && skip(p.hit, own) ? 0 : p.pen; };
         g.mom.group.visible = g.dad.group.visible = false;
         for (const [id, [x, z, y = 0]] of Object.entries(nav.OUTSIDE)) { if (intoBarn(x, z) || y > 1) continue; const p = pen(x, z, y); if (p > 0) bad.push(`node ${id}: ${C.describe(C.probe(x, z, 0.35, y, 2.6, g.PB).hit)} ${p.toFixed(2)}`); }
-        for (const [a, b] of nav.OUTSIDE_EDGE_LIST) {
+        for (const [a, b, door] of nav.OUTSIDE_EDGE_LIST) {
           const [ax, az, ay = 0] = nav.NODES[a], [bx, bz, by = 0] = nav.NODES[b], L2 = Math.hypot(bx - ax, bz - az), n = Math.ceil(L2 / 0.2);
           if (Math.abs(ay - by) > 1) continue;   // the loft's ladder
-          for (let i = 0; i <= n; i++) { const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = g.W.groundAt(x, z, ay + (by - ay) * t); if (intoBarn(x, z)) continue; const p = pen(x, z, y); if (p > 0.01) { bad.push(`edge ${a}-${b} at (${x.toFixed(2)}, ${z.toFixed(2)}): ${C.describe(C.probe(x, z, 0.35, y, 2.6, g.PB).hit)} ${p.toFixed(2)}`); break; } }
+          for (let i = 0; i <= n; i++) { const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = g.W.groundAt(x, z, ay + (by - ay) * t); if (intoBarn(x, z)) continue; const p = pen(x, z, y, door); if (p > 0.01) { bad.push(`edge ${a}-${b} at (${x.toFixed(2)}, ${z.toFixed(2)}): ${C.describe(C.probe(x, z, 0.35, y, 2.6, g.PB).hit)} ${p.toFixed(2)}`); break; } }
         }
         const was = nav.outsideJoined();
         nav.outside(false); const off = { mailbox: !!nav.path('kidBunk', 'mailbox'), barn: !!nav.path('kidBunk', 'barnDoor') };

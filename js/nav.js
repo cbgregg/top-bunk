@@ -84,13 +84,13 @@ export function edgeDoor(a, b) { const e = ADJ[a].find((x) => x.to === b); retur
 // him: the cellar stairs (1.07 m between their walls) are narrower than its arms hang. They join the graph at the stoop and the yard's
 // corners. drive2 stands beside the moving truck rather than on the drive (the truck is parked over it), and driveE, garPad and yardSW2
 // are the corners that keep each edge a straight, clear line round the truck, the garage and the trees. The barn's edge goes through its
-// door (W.doors.barn, when the barn is a place; until then nothing stops it).
+// door (W.doors.barn), and barnLoft stands on the hay loft over the west end, where the barn puts it (js/barn.js NODES).
 // These edges are joined only while the night needs them (outside(true): the player is out, the thing is out after them, or the night
 // has sent them out), so on a night spent indoors the thing never chooses to start at the mailbox and come in through the back door.
 export const OUTSIDE = {
   porch: [3.1, -5.6], frontOut: [3.1, -5.1, 0.14], drive1: [2.3, -10], driveE: [5.0, -11.0], drive2: [4.75, -20], mailbox: [4.7, -26],
   garPad: [-4.0, -8.6], yardNW: [-20, 8], yardSW2: [-16, -5.5], gate: [-27, -16],
-  track1: [-36, -15], track2: [-45, -14.1], track3: [-52, -13.2], barnDoor: [-58.0, -12], barnMid: [-64, -12], barnLoft: [-64, -6, 3.2],
+  track1: [-36, -15], track2: [-45, -14.1], track3: [-52, -13.2], barnDoor: [-58.0, -12], barnMid: [-64, -12], barnLoft: [-67.2, -12, 3.21],
   backOut: [-1.6, 5.27],
 };
 const OUTSIDE_EDGES = [

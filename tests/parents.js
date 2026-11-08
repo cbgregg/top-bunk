@@ -253,7 +253,8 @@ async function rules(browser) {
       const H = g.nights.hunter, d = g.dad.group.position, a = par.test.PAR.dad.aim, x = d.x + a.x * 3.2, z = d.z + a.z * 3.2;
       g.F.flicker = false;
       const flicks = []; const f0 = H.vanish; H.vanish = (fl = true) => { flicks.push(fl); return f0(fl); };
-      H.sight('livC', { dur: 30, stab: false, vanishOnLook: false }); g.E.root.position.set(x, 0, z); g.E.visible = true; g.E.mode = 'idle';
+      // (it is out already: the hunter refuses to bring it into being on a spot you are looking at, js/hunter.js place, but not to sight it)
+      g.E.visible = true; H.sight('livC', { dur: 30, stab: false, vanishOnLook: false }); g.E.root.position.set(x, 0, z); g.E.visible = true; g.E.mode = 'idle';
       await new Promise((r) => setTimeout(r, 400));
       H.vanish = f0;
       return { visible: g.E.visible, flicker: g.F.flicker, flicks, busy: H.busy };

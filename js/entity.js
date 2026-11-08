@@ -601,15 +601,17 @@ export class Entity {
       const feet = this._feet || (this._feet = { L: new V3(), R: new V3(), qL: new THREE.Quaternion(), qR: new THREE.Quaternion() });
       for (const sd of ['L', 'R']) { B[sd + '_Foot'].getWorldPosition(feet[sd]); B[sd + '_Foot'].getWorldQuaternion(feet['q' + sd]); }
       rr.position.y = -0.42 * dk; rr.updateMatrixWorld(true);
+      // bent over first: on this skeleton the thighs hang from the spine, so bending it after the legs were set would swing the feet back
+      // and up off the floor
+      r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 1.2 * dk);
+      r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.45 * dk);
+      r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], -0.12 * dk);
       this.root.updateMatrixWorld(true);
       for (const sd of ['L', 'R']) {
         const ft = B[sd + '_Foot'];
         r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, feet[sd], this.T((sd === 'L' ? 0.25 : -0.25), 0.9, 1.8, _a));
         r.rotateWorld(ft, _q1.copy(feet['q' + sd]).multiply(ft.getWorldQuaternion(_q2).invert()));   // and turned as the clip had it
       }
-      r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 1.2 * dk);
-      r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.45 * dk);
-      r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], -0.12 * dk);
     }
     // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0) - this.stun * 0.4);

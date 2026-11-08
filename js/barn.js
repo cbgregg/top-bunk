@@ -574,7 +574,7 @@ function bike(stat, M, solid) {
     return w;
   };
   const rearTyre = wheel(rear).children[0];
-  // the front end: fork, stem, bars, turned the way a dropped bike's bars swing
+  // the front end: the two blades down to the front axle, the stem, the bars, turned the way a dropped bike's bars swing
   const fr = new THREE.Group(); fr.position.copy(head0); b.add(fr);
   const steer = head1.clone().sub(head0).normalize(); fr.quaternion.setFromAxisAngle(steer, 0.3);
   const f = (p) => p.clone().sub(head0);

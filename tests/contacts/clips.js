@@ -14,7 +14,7 @@ module.exports = {
     g.setPhase('morning', true);
     const cm = (v) => +(v * 100).toFixed(1), sg = (v) => (v >= 0 ? '+' : '') + v, hs = (who) => (who.group.userData.h || 1.75) / 1.75;
     const bone = (who, n) => { const b = who.rig.bones[n]; b.updateWorldMatrix(true, false); return b.getWorldPosition(new V3()); };
-    const reset = (who) => { who.busy = true; who.pose = null; who.sitNow = 0; who.listening = false; who.talk(null); who.sleeping = false; who.lookAt = null; who.mood = null; who.group.rotation.order = 'XYZ'; who.group.visible = true; };
+    const reset = (who) => { who.busy = true; who.pose = null; who.sitNow = 0; who.listening = false; who.talk(null); who.eyeHold = null; who.sleeping = false; who.lookAt = null; who.mood = null; who.group.rotation.order = 'XYZ'; who.group.visible = true; };
     // each rig's pelvis height at rest, standing (what the hips' paths are scaled by)
     const PR = {}; for (const [p, n] of people) { reset(p); p.group.position.set(0, 0, 0); p.group.rotation.set(0, 0, 0); p.rig.play('idle', { fade: 0 }); step([p], 6); PR[n] = bone(p, 'Pelvis').y; }
     const K = (who, name) => PR[who === g.dad ? 'Dad' : 'Mom'] / who.rig.clips[name].userData.pelvis;   // the path's scale for this body

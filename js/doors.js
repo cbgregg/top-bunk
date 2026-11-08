@@ -287,6 +287,13 @@ function leashTick(dt) {
   if (!F.live || F.dead || F.cutscene || F.script || P.mode !== 'walk' || (F.night || 0) <= 1 || quietType(F.plan)) { S.outT = 0; return; }
   if (sanctioned(P.pos.x, P.pos.z, P.pos.y) || inForest(P.pos.x, P.pos.z)) { S.outT = 0; return; }
   S.outT += dt;
+  // a leash nobody turned round to see: the hunter lets a sighting go quietly when it was never looked at, but a kid still out where the
+  // night does not send him is hunted all the same, from the door he came out of
+  const L = S.lastLeash;
+  if (hunter && L && L.t === S.leashAt && !L.hunted) {
+    if (hunter.state !== 'sight' && hunter.state !== 'away') L.hunted = true;   // (it came after you, or the night gave it something else)
+    else if (hunter.state === 'away' && T - S.leashAt < 8 && hunter.hunt(leashSpot(L.door).id)) L.hunted = true;
+  }
   if (!hunter || hunter.state === 'hunt' || T - S.leashAt < 20 || S.outT < 0.4) return;
   if (events && events.RES && (events.RES.isHeld('E') || events.RES.isHeld('stage'))) return;   // a beat of the night has it
   const door = S.leftBy || nearestExit(P.pos), spot = leashSpot(door);
@@ -295,9 +302,12 @@ function leashTick(dt) {
 }
 export function leash(door = 'back') {
   const { hunter, E, P, F } = G, spot = leashSpot(door);
+  // it never comes into being where you are looking or just looked (the hunter refuses the spot): then it comes once you look away, and
+  // leashTick asks again next frame
+  if (hunter.refused && hunter.refused(spot.id)) return null;
   nav.outside(true);
   if (hunter.state !== 'away') hunter.vanish(false);
-  hunter.sight(spot.id, { dur: 3, lookTime: 0.6, then: 'hunt', chase: true, chaseDist: 2.4, tilt: 0.35 });
+  if (!hunter.sight(spot.id, { dur: 3, lookTime: 0.6, then: 'hunt', chase: true, chaseDist: 2.4, tilt: 0.35 })) return null;
   E.root.position.set(spot.x, spot.y, spot.z); E.faceTowards(P.pos.x, P.pos.z, 1);
   const e = E.root.position;
   S.lastLeash = { door, at: { x: spot.x, y: spot.y, z: spot.z }, e: [e.x, e.y, e.z], yaw: E.root.rotation.y, visible: E.visible, state: hunter.state, player: { x: P.pos.x, z: P.pos.z }, out: S.outT, t: T, night: F.night };

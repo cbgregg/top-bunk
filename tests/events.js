@@ -397,20 +397,24 @@ async function headlessOne(page, d, night) {
     const { page, w, ctx } = await nightPage(browser, '#night3');
     await climbDown(page);
     await ev(page, (events, g) => { g.nights.director.stop(); events.suspend(true); });
-    // stage it: in the hall, a look east and then west puts the floor behind you in the gaze's memory. The crawl's catch is crawlCatch
-    // (the slam, the fade and the crawled nightmare; it sets F.nmDone), not a death
+    // stage it: in the living room, a look down the room and then a turn toward the kitchen wall puts the floor behind you in the gaze's
+    // memory, with room there for it and for the crawl it unfolds into (it is staged only where both fit: the hall is too narrow). The
+    // crawl's catch is crawlCatch (the slam, the fade and the crawled nightmare; it sets F.nmDone), not a death
     // The flash sets it off and half a second later it comes, at 4.8 m/s: where the player is when it comes is decided in the same call
     // as the flash (a teleport to `pose`, the doors as given), before a frame runs
     const setup = async (pose, doors) => {
       await ev(page, (events, g) => { g.nights.stage.endStage(); g.F.script = false; g.F.cutscene = false; g.P.mode = 'walk'; g.F.fear = 0; g.F.nmDone = false; });
-      await stand(page, 7.2, -0.42, 10.1, -0.42); await playFor(page, 1.2); await stand(page, 7.2, -0.42, 4.5, -0.42); await playFor(page, 0.3);
-      const staged = await page.evaluate(([pose, doors]) => {
-        const g = window.__game, S = g.nights.stage; const okk = S.SCARES.crumple.run(); if (!okk) return null;
-        const st = S.ST.on; st.seen = g.gameTime; S.crawlAt(st);
-        for (const [name, open] of doors) g.W.setDoor(name, open, true);
-        const [x, z, tx, tz] = pose; g.P.pos.set(x, 0, z); g.P.vel.set(0, 0, 0); g.P.yaw = Math.atan2(-(tx - x), -(tz - z)); g.P.pitch = 0;
-        return [st.p.x, st.p.z];
-      }, [pose, doors]);
+      let staged = null;
+      for (let i = 0; i < 12 && !staged; i++) {
+        await stand(page, 1.2, -0.2, 1.2 + Math.sin(i) * 1.5, -3.0); await playFor(page, i ? 0.5 : 1.2); await stand(page, 1.2, -0.2, 1.2, 1.0); await playFor(page, 0.3);
+        staged = await page.evaluate(([pose, doors]) => {
+          const g = window.__game, S = g.nights.stage; const okk = S.SCARES.crumple.run(); if (!okk) return null;
+          const st = S.ST.on; st.seen = g.gameTime; S.crawlAt(st);
+          for (const [name, open] of doors) g.W.setDoor(name, open, true);
+          const [x, z, tx, tz] = pose; g.P.pos.set(x, 0, z); g.P.vel.set(0, 0, 0); g.P.yaw = Math.atan2(-(tx - x), -(tz - z)); g.P.pitch = 0;
+          return [st.p.x, st.p.z];
+        }, [pose, doors]);
+      }
       ok(staged, 'the crumple would not stage behind the player');
       return staged;
     };
@@ -422,8 +426,8 @@ async function headlessOne(page, d, night) {
     const a = await state();
     ok(!a.caught && !a.dead, `caught after leaving its line of sight: ${JSON.stringify(a)}`);
     ok(!a.staged, `the crawl did not give up after two seconds out of sight: ${JSON.stringify(a)}`);
-    // B: in front of it with a line to you: contact
-    await setup([7.2, -0.42, 10.1, -0.42], [['bath', true]]);
+    // B: in front of it with a line to you (where you stood, your back to it): contact
+    await setup([1.2, -0.2, 1.2, 1.0], [['bath', true]]);
     await until(page, () => window.__game.F.nmDone, null, 8e3).catch(() => {});
     const b = await state();
     ok(b.caught, `in its sight at arm's length and not caught: ${JSON.stringify(b)}`);
