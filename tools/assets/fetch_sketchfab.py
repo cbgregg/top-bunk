@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Fetch the Sketchfab props (CC BY 4.0, listed in CREDITS.md) and slim each into one small GLB in assets/props.
 
-    SKETCHFAB_API_KEY=... python3 tools/assets/fetch_sketchfab.py [--only name] [--force] [--credits]
+    SKETCHFAB_API_KEY=... python3 tools/assets/fetch_sketchfab.py [--manifest rows.json] [--only name] [--force] [--credits]
 
 The key is read from the environment only; it is never printed or written anywhere.
 Each archive is unpacked in a temp folder and handed to tools/assets/slim_models.mjs (meshopt, WebP textures, a triangle budget).
 --credits prints the attribution lines for CREDITS.md.
+--manifest reads the rows from a JSON file instead of the MODELS table below: an array of objects of the same shape as a MODELS row plus
+its name, e.g. [{"name": "car_kiri", "uid": "...", "by": "...", "title": "...", "tex": 512, "tris": 9000}] (keep, drop optional; "license"
+"by" (CC BY 4.0, the default) or "cc0"). Each part of the game keeps its own rows in tools/assets/manifests/<part>.json.
 """
 import io, json, os, shutil, subprocess, sys, tempfile, urllib.request, zipfile
 
@@ -67,6 +70,7 @@ MODELS = {
 }
 LICENSE_SLUG = 'by'
 LICENSE_NAME = 'CC BY 4.0'
+LICENSES = {'by': 'CC BY 4.0', 'cc0': 'CC0'}
 
 
 class FetchError(Exception):
@@ -78,6 +82,23 @@ def api(path, key):
     return json.loads(urllib.request.urlopen(request, timeout=60).read())
 
 
+def load_manifest(path):
+    """The rows of a manifest file, as a MODELS-shaped dict (name: row), checked for the fields the fetch needs."""
+    with open(path, encoding='utf-8') as f:
+        rows = json.load(f)
+    if not isinstance(rows, list):
+        raise SystemExit(f'{path}: a manifest is a JSON array of rows')
+    models = {}
+    for row in rows:
+        missing = [k for k in ('name', 'uid', 'by', 'title', 'tex', 'tris') if k not in row]
+        if missing:
+            raise SystemExit(f"{path}: row {row.get('name', '?')} has no {', '.join(missing)}")
+        if row.get('license', LICENSE_SLUG) not in LICENSES:
+            raise SystemExit(f"{path}: row {row['name']}: licence {row['license']} is not one the game ships ({', '.join(LICENSES)})")
+        models[row['name']] = {k: v for k, v in row.items() if k != 'name'}
+    return models
+
+
 def fetch(name, key, force):
     """Download one model and slim it; returns the slimmer's summary line, or 'kept' if the file is already there."""
     model = MODELS[name]
@@ -86,8 +107,9 @@ def fetch(name, key, force):
         return 'kept'
     info = api(f"/models/{model['uid']}", key)
     slug = (info.get('license') or {}).get('slug')
-    if slug != LICENSE_SLUG:
-        raise FetchError(f'license on Sketchfab is {slug}, not {LICENSE_SLUG}')
+    want = model.get('license', LICENSE_SLUG)
+    if slug != want:
+        raise FetchError(f'license on Sketchfab is {slug}, not {want}')
     link = api(f"/models/{model['uid']}/download", key)['gltf']['url']
     data = urllib.request.urlopen(urllib.request.Request(link, headers={'User-Agent': 'Mozilla/5.0'}), timeout=300).read()
     tmp = tempfile.mkdtemp(prefix='skf_')
@@ -121,10 +143,16 @@ def fetch(name, key, force):
 
 def credits():
     for name, m in MODELS.items():
-        print(f"  - `{name}`: [{m['title']}](https://sketchfab.com/3d-models/{m['uid']}) by [{m['by']}](https://sketchfab.com/{m['by']}), {LICENSE_NAME}")
+        print(f"  - `{name}`: [{m['title']}](https://sketchfab.com/3d-models/{m['uid']}) by [{m['by']}](https://sketchfab.com/{m['by']}), {LICENSES[m.get('license', LICENSE_SLUG)]}")
 
 
 def main():
+    global MODELS
+    if '--manifest' in sys.argv:
+        i = sys.argv.index('--manifest')
+        if i + 1 >= len(sys.argv):
+            sys.exit('--manifest needs the path of a rows file')
+        MODELS = load_manifest(sys.argv[i + 1])
     if '--credits' in sys.argv:
         return credits()
     key = os.environ.get('SKETCHFAB_API_KEY')
@@ -133,6 +161,8 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     only = sys.argv[sys.argv.index('--only') + 1] if '--only' in sys.argv else ''
     force = '--force' in sys.argv
+    if only and only not in MODELS:
+        sys.exit(f'no row named {only}')
     for name in MODELS:
         if only and name != only:
             continue

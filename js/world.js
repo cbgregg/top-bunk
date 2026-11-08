@@ -66,9 +66,17 @@ const planRoomAt = (x, z, y = 0) => within(PLAN, { ...PLAN_PLACES, garage: PLACE
 // the floor under (x, z): 0 on the yard, the stairwell and, for somebody already down there, the laundry; the truck's ramp while the truck is
 // there; out in the field the ground rolls
 let fieldHeight = () => 0, rampAt = () => 0;   // set by buildWorld once the field and the truck exist
+// the ditch along the far side of the road: two straight grass slopes 1.3 m wide down to 0.6 m under the road's level at z -36.6, the
+// whole length of the road (buildWorld lays its meshes on this same line)
+export const DITCH = { z: -36.6, half: 1.3, depth: 0.6, x: 260 };
+// the road out front, along x: the asphalt between z0 and z1 (two 3.3 m lanes, the near one for the +x traffic), gravel shoulders out to
+// the edges in `shoulder`, and the gravel apron where the drive meets it
+export const ROAD = { z0: -33.8, z1: -27.2, x: 260, shoulder: [-35.2, -26.2], lanes: { near: -29.0, far: -32.0 }, apron: (x, z) => x > -0.4 && x < 5.0 && z > -29.2 && z < -26.6 };
+export const ditchAt = (x, z) => { const d = Math.abs(z - DITCH.z); return d < DITCH.half && Math.abs(x) < DITCH.x ? -DITCH.depth * (1 - d / DITCH.half) : 0; };
 export function groundAt(x, z, y = 0) {
   if (z > STAIR.z0 && z < STAIR.z1 && x < STAIR.x0 && x > STAIR.xEnd) return BASEMENT * Math.min(1, (STAIR.x0 - x) / STAIR.run);
   if (y < -1 && x > PLACES.laundry[0] && x < PLACES.laundry[1] && z > PLACES.laundry[2] && z < PLACES.laundry[3]) return BASEMENT;
+  if (z > DITCH.z - DITCH.half && z < DITCH.z + DITCH.half && Math.abs(x) < DITCH.x) return fieldHeight(x, z) + ditchAt(x, z);
   return fieldHeight(x, z) + rampAt(x, z);
 }
 
@@ -1781,13 +1789,16 @@ export function buildWorld(scene) {
   });
   M.paintY = std({ color: 0xb59b3c, roughness: 0.75 }); M.paintW = std({ color: 0xc9c6bb, roughness: 0.75 }); M.tar = std({ color: 0x1c1c1d, roughness: 0.8 });
   const wetMats = [M.asphalt, M.gravel, M.dirt, M.rut, M.concrete, M.tar, M.paintY, M.paintW];
-  const RZ0 = -33.8, RZ1 = -27.2;   // the road's edges: two 3.3 m lanes, the near one for the +x traffic (traffic.js)
+  const RZ0 = ROAD.z0, RZ1 = ROAD.z1;   // the road's edges: two 3.3 m lanes, the near one for the +x traffic (traffic.js)
   // where the ground stays flat: the fenced yard with a margin for the house, the road and its shoulders, the barn's pad; a soft corridor for the
   // track between the yard and the barn. Everything else is the rolling field below.
-  const FLAT = [{ r: [-30, 30, -40, 31] }, { r: [-260, 260, -40, -24] }, { r: [-76, -52, -34, 0] }, { r: [-56, -27, -24, -6], w: 0.4 }];
+  // (the barn's pad reaches west under the silo behind it)
+  const FLAT = [{ r: [-30, 30, -40, 31] }, { r: [-260, 260, -40, -24] }, { r: [-80, -52, -34, 0] }, { r: [-56, -27, -24, -6], w: 0.4 }];
+  // the field's grid (below): its cells over the ditch are cut out, so the slab south of the ditch reaches back to the first row it leaves
+  const FIELD_N = PHONE ? 90 : 260, ditchLo = -260 + Math.floor((DITCH.z - DITCH.half - 0.05 + 260) / (520 / FIELD_N)) * (520 / FIELD_N);
   {   // the ground: a thin slab in pieces over the flat part, around the hole where the cellar stairs go down and the ditch across the road (thin, so its underside stays above the laundry's ceiling)
     const { x0, xEnd, z0, z1 } = STAIR, hx0 = xEnd - 0.25, hx1 = x0, hz0 = z0 + 0.02, hz1 = z1 + 0.25;
-    for (const [a, b, c, d] of [[-260, 260, -40, -38], [-30, 30, -35.2, hz0], [-30, 30, hz1, 31], [-30, hx0, hz0, hz1], [hx1, 30, hz0, hz1]]) box(a, b, -0.05, -0.02, c, d, M.grass, { cast: false, parent: yard });
+    for (const [a, b, c, d] of [[-260, 260, Math.min(-40, ditchLo), -38], [-30, 30, -35.2, hz0], [-30, 30, hz1, 31], [-30, hx0, hz0, hz1], [hx1, 30, hz0, hz1]]) box(a, b, -0.05, -0.02, c, d, M.grass, { cast: false, parent: yard });
     // the lawn inside the fence lies a centimetre over the field, in pieces round the stairwell
     for (const [a, b, c, d] of [[-27, 27, -26, hz0], [-27, 27, hz1, 28], [-27, hx0, hz0, hz1], [hx1, 27, hz0, hz1]]) box(a, b, -0.045, -0.015, c, d, M.lawn, { cast: false, parent: yard });
   }
@@ -1812,13 +1823,15 @@ export function buildWorld(scene) {
   fieldHeight = fieldH;
   {   // the field itself: one big plane with its vertices lifted; under the flat ground it sits a centimetre below the slabs, and it has no
       // faces over the cellar stairwell (the eye crossed it there on the way down; the slabs round the pit are the ground you see)
-    const N = PHONE ? 90 : 260, geo = new THREE.PlaneGeometry(520, 520, N, N); geo.rotateX(-Math.PI / 2);
+    const N = FIELD_N, geo = new THREE.PlaneGeometry(520, 520, N, N); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, -0.03 + fieldH(x, z)); uv.setXY(i, x, z); }
     { const { x0, xEnd, z0, z1 } = STAIR, px0 = xEnd - 0.35, px1 = x0 + 0.1, pz0 = z0 - 0.1, pz1 = z1 + 0.35, idx = geo.index.array, keep = [];
+      const dz0 = DITCH.z - DITCH.half - 0.05, dz1 = DITCH.z + DITCH.half + 0.05;   // the ditch's own slopes are the ground there
       for (let t = 0; t < idx.length; t += 3) {
         const xs = [pos.getX(idx[t]), pos.getX(idx[t + 1]), pos.getX(idx[t + 2])], zs = [pos.getZ(idx[t]), pos.getZ(idx[t + 1]), pos.getZ(idx[t + 2])];
         if (Math.max(...xs) > px0 && Math.min(...xs) < px1 && Math.max(...zs) > pz0 && Math.min(...zs) < pz1) continue;
+        if (Math.max(...zs) > dz0 && Math.min(...zs) < dz1 && Math.min(...xs) < DITCH.x && Math.max(...xs) > -DITCH.x) continue;
         keep.push(idx[t], idx[t + 1], idx[t + 2]);
       }
       geo.setIndex(keep); }
@@ -1842,9 +1855,16 @@ export function buildWorld(scene) {
   {   // tar patches over old potholes, and a ditch along the far side of the road (two slopes in the gap left in the ground)
     const r = TX.rng(909);
     for (let i = 0; i < 14; i++) { const x = -120 + r() * 240, z = RZ0 + 0.6 + r() * 5.4, w = 0.8 + r() * 2.2, d = 0.5 + r() * 1.2; box(x, x + w, -0.0048, -0.0042, z, z + d, M.tar, { cast: false, parent: yard }); }
-    const L = Math.hypot(1.4, 0.55), a = Math.atan2(0.55, 1.4);
-    for (const s of [-1, 1]) { const geo = new THREE.BoxGeometry(520, 0.06, L); worldUV(geo); const m = new THREE.Mesh(geo, M.grass); m.receiveShadow = true; m.position.set(0, -0.3, -36.6 + s * 0.7); m.rotation.x = -s * a; yard.add(m); }
-    box(-260, 260, -0.62, -0.56, -36.9, -36.3, M.dirt, { cast: false, parent: yard });   // the mud at the bottom
+    // the ditch: a strip across the whole road's length, its section the line groundAt walks (DITCH), 2 cm under the field's level like
+    // the slabs round it, from the slab's edge at z -38 to the shoulder's at -35.2; the mud a strip down its bottom, just over the grass
+    const ribbon = (zs, lift, mat) => {
+      const p = [], uv = [], idx = [];
+      zs.forEach((z, i) => { const y = ditchAt(0, z) - 0.02 + lift; p.push(-DITCH.x, y, z, DITCH.x, y, z); uv.push(-DITCH.x, z, DITCH.x, z); if (i) { const b = i * 2; idx.push(b - 2, b, b - 1, b - 1, b, b + 1); } });
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.userData.tag = 'ditch'; m.userData.keep = true; yard.add(m); return m;   // (kept out of the merge: it is one long strip)
+    };
+    ribbon([-38.0, DITCH.z - DITCH.half, DITCH.z - 0.6, DITCH.z, DITCH.z + 0.6, DITCH.z + DITCH.half, -35.2], 0, M.grass);
+    ribbon([DITCH.z - 0.36, DITCH.z - 0.2, DITCH.z, DITCH.z + 0.2, DITCH.z + 0.36], 0.006, M.dirt);   // the mud at the bottom
   }
   // the moving truck (assets/props/truck.glb, a cab-over box truck): backed up the drive toward the house with its roll-up door open and
   // the ramp down, so the family can walk up into the box. TRUCK.z is the rear sill, TRUCK.bed the floor height (main.js walks Dad up the ramp)
@@ -1982,12 +2002,20 @@ export function buildWorld(scene) {
     scatter(yard, 'shrub', mats); solid(hx - 0.8, hx + 0.8, -5.2, 7.2, { maxY: 1.6, id: 'shrubs' });
     solid(SX(-1.4) - 0.45, SX(0.6) + 0.45, -5.5, -4.6, { maxY: 1.0, id: 'planter' });   // the planter under the picture window
   }
-  // utility poles along the road (they also give the road something to rush past when you are in a car)
+  // utility poles along the road (they also give the road something to rush past when you are in a car). The road bends away behind a
+  // stand of firs at x ±150 (the road's ends, after the trees below); past it the poles, the wire and the reflector posts are only there for
+  // the car dream, which drives on through where the firs stand: roadEnds.dream(on) swaps the one for the other (cars.js)
+  const BEND = 148, roadEnds = { trees: new THREE.Group(), far: new THREE.Group(), bend: BEND, dream(on) { roadEnds.trees.visible = !on; roadEnds.far.visible = !!on; } };
+  roadEnds.trees.name = 'roadTreeline'; roadEnds.far.name = 'roadFar'; roadEnds.far.visible = false; yard.add(roadEnds.trees, roadEnds.far);
   {
-    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.18, 8, 8), M.darkWood, 28), arms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, 2.4), M.darkWood, 28), mm = new THREE.Matrix4(); let n = 0;
-    for (let x = -240; x <= 240 && n < 28; x += 40) { mm.makeTranslation(x, 4, -26.2); poles.setMatrixAt(n, mm); mm.makeTranslation(x, 7.6, -26.2); arms.setMatrixAt(n, mm); n++; if (x > -70 && x < 60) solid(x - 0.22, x + 0.22, -26.42, -25.98, { maxY: 8, id: 'pole' }); }
-    poles.count = arms.count = n; poles.castShadow = true; yard.add(poles, arms);
-    const wire = new THREE.Mesh(new THREE.BoxGeometry(480, 0.02, 0.02), M.black); wire.position.set(0, 7.5, -26.2); yard.add(wire);
+    const xs = []; for (let x = -240; x <= 240; x += 40) xs.push(x);
+    for (const [list, parent] of [[xs.filter((x) => Math.abs(x) < BEND), yard], [xs.filter((x) => Math.abs(x) >= BEND), roadEnds.far]]) {
+      const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.18, 8, 8), M.darkWood, list.length), arms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, 2.4), M.darkWood, list.length), mm = new THREE.Matrix4();
+      list.forEach((x, n) => { mm.makeTranslation(x, 4, -26.2); poles.setMatrixAt(n, mm); mm.makeTranslation(x, 7.6, -26.2); arms.setMatrixAt(n, mm); if (x > -96 && x < 61) solid(x - 0.22, x + 0.22, -26.42, -25.98, { maxY: 8, id: 'pole' }); });
+      poles.castShadow = true; poles.userData.tag = arms.userData.tag = 'pole'; parent.add(poles, arms);
+    }
+    const wire = (x0, x1, parent) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.02, 0.02), M.black); w.position.set((x0 + x1) / 2, 7.5, -26.2); parent.add(w); };
+    wire(-BEND - 2, BEND + 2, yard); wire(-240, -BEND - 2, roadEnds.far); wire(BEND + 2, 240, roadEnds.far);
   }
   // the property lines: a post-and-board fence along the west, back and east edges (the front is the road); 4x4 posts every 2.4 m, two rails,
   // boards with a gap between them, each a little off true. Past it the fog takes over.
@@ -2065,19 +2093,24 @@ export function buildWorld(scene) {
       },
     };
   })();
-  place(yard, 'mailbox', { x: 4.7, z: -26.9, rot: Math.PI, s: 0.33 }); solid(4.45, 4.95, -27.15, -26.65, { maxY: 1.2, id: 'mailbox' });
+  place(yard, 'mailbox', { x: 4.7, z: -26.7, rot: Math.PI, s: 0.33 }); solid(4.45, 4.95, -26.95, -26.45, { maxY: 1.2, id: 'mailbox' });   // its box 0.2 m back from the asphalt's edge
   place(yard, 'trash_can', { x: 5.9, z: -26.1, rot: 0.35 }); solid(5.1, 6.7, -26.6, -25.6, { maxY: 1.1, id: 'trashCans' });
   {   // the speed limit sign a way down the road, for the +x traffic; the reflector posts along the far shoulder
     const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
     g.fillStyle = '#e9e6dc'; g.fillRect(0, 0, 128, 160); g.strokeStyle = '#1a1a1a'; g.lineWidth = 5; g.strokeRect(6, 6, 116, 148);
     g.fillStyle = '#1a1a1a'; g.textAlign = 'center'; g.font = 'bold 22px sans-serif'; g.fillText('SPEED', 64, 38); g.fillText('LIMIT', 64, 64); g.font = 'bold 72px sans-serif'; g.fillText('35', 64, 138);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })); sign.position.set(-46, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.4, 0.06), M.steel); post.position.set(-46.04, 1.2, -26.0); yard.add(post);
-    solid(-46.12, -45.96, -26.08, -25.92, { maxY: 2.4, id: 'signPost' });
-    const n = PHONE ? 0 : 13, posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), M.white, Math.max(1, n)), refl = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), Math.max(1, n)), mm = new THREE.Matrix4();
-    for (let i = 0; i < n; i++) { const x = -240 + i * 40; mm.makeTranslation(x, 0.55, RZ0 - 0.9); posts.setMatrixAt(i, mm); mm.makeTranslation(x, 0.95, RZ0 - 0.88); refl.setMatrixAt(i, mm); if (x > -70 && x < 60) solid(x - 0.08, x + 0.08, RZ0 - 0.98, RZ0 - 0.82, { maxY: 1.1, id: 'reflectorPost' }); }
-    if (n) yard.add(posts, refl);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2 })); sign.position.set(-46.009, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.75, 0.6), M.steel); back.position.set(-46.0, 2.0, -26.0); yard.add(back);   // its back a plain plate (the face only reads from the west)
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.44, 0.06), M.steel); post.position.set(-45.966, 1.18, -26.0); yard.add(post);   // behind the plate, 4 cm into the ground
+    solid(-46.04, -45.9, -26.08, -25.92, { maxY: 2.4, id: 'signPost' });
+    const reflMat = new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), all = PHONE ? [] : Array.from({ length: 13 }, (_, i) => -240 + i * 40);
+    for (const [list, parent] of [[all.filter((x) => Math.abs(x) < BEND), yard], [all.filter((x) => Math.abs(x) >= BEND), roadEnds.far]]) {
+      if (!list.length) continue;
+      const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), M.white, list.length), refl = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), reflMat, list.length), mm = new THREE.Matrix4();
+      list.forEach((x, i) => { mm.makeTranslation(x, 0.55 - 0.04, RZ0 - 0.9); posts.setMatrixAt(i, mm); mm.makeTranslation(x, 0.95, RZ0 - 0.88); refl.setMatrixAt(i, mm); if (x > -96 && x < 61) solid(x - 0.08, x + 0.08, RZ0 - 0.98, RZ0 - 0.82, { maxY: 1.1, id: 'reflectorPost' }); });
+      posts.userData.tag = 'reflectorPost'; parent.add(posts, refl);
+    }
   }
   // puddles on the drive and the road, shown by weather.js once the ground is wet; dry patches in the grass where the summer burnt it
   const puddles = new THREE.Group(); puddles.visible = false; yard.add(puddles);
@@ -2109,13 +2142,66 @@ export function buildWorld(scene) {
   // the barn and the silo, out across the field west of the yard, its open front toward the house; the track out to it leaves the drive,
   // goes through the gate in the west fence and follows the ground
   const BARN = { x: -64, z: -12 };
+  let siloRef = null;   // W.silo
   {
     place(yard, 'barn', { x: BARN.x, y: -0.03, z: BARN.z, rot: Math.PI / 2, s: 0.058 });
     solid(BARN.x - 5.4, BARN.x + 5.4, BARN.z - 7.2, BARN.z + 7.2, { maxY: 9, id: 'barnBlock' });   // one block for the whole barn until it is a place (W.plugin: removeSolid('barnBlock'))
-    const SX = -72, SZ = -28;
-    const silo = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 11, 24), M.silo); silo.position.set(SX, 5.47, SZ); silo.castShadow = true; yard.add(silo);
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.silo); dome.position.set(SX, 10.97, SZ); yard.add(dome);
-    solid(SX - 2.3, SX + 2.3, SZ - 2.3, SZ + 2.3);
+    // the silo behind the barn's west wall: a concrete stave silo on its footing, twelve courses of staves 0.9 m tall, each course turned half
+    // a stave on the last with its foot standing 3 cm proud, six steel hoops, a conical steel roof with a vent, a caged ladder up the side
+    // toward the road, and the blower pipe hanging loose on the road side, its brackets rusted through. W.silo.chute is the pipe's pivot at
+    // the top of the wall; W.silo.swing(side, out) turns it along the wall (side, ±0.45 rad) and out from it (out, 0..0.5), never into it.
+    // One solid over the footing, the ladder's foot and the pipe; the rain stays out of it
+    const SX = -74, SZ = -14, SR = 2.3, RING = 0.9, RINGS = 12, SN = 56, SY0 = 0.2, STOP = SY0 + RING * RINGS;
+    {
+      // the staves: the concrete set lifted to weathered pale grey (its colour map is dark), each stave a face of its own; the hoops, the
+      // ladder and the pipe in dark weathered steel, the roof in the rusted galvanised metal set (M.silo)
+      M.stave = std({ color: 0xc9c4b8, roughness: 1 }); applyPBR(M.stave, 'concrete', { anti: { scale: 0.06, strength: 0.2 } }).then(() => M.stave.color.setRGB(2.0, 1.94, 1.82));
+      M.stave.flatShading = true; M.siloSteel = std({ color: 0x4f4c47, roughness: 0.62, metalness: 0.55 });
+      const metres = (geo, r, h, y0) => { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * Math.PI * 2 * r, y0 + uv.getY(i) * h); return geo; };
+      const flat = (list) => mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)));
+      const staves = [], steel = [];
+      const ring = (r, h, y, turn) => { const g = new THREE.CylinderGeometry(r, r, h, SN, 1, true); metres(g, r, h, y); g.rotateY(turn); g.translate(SX, y + h / 2, SZ); return g; };
+      for (let i = 0; i < RINGS; i++) {
+        const y = SY0 + i * RING, turn = (i % 2) * Math.PI / SN;
+        staves.push(ring(SR, RING, y, turn), ring(SR + 0.03, 0.05, y, turn));   // the course and its proud foot
+        const lip = new THREE.RingGeometry(SR, SR + 0.03, SN, 1); lip.rotateX(-Math.PI / 2); lip.rotateY(turn); lip.translate(SX, y + 0.05, SZ); staves.push(lip);   // the foot's ledge
+      }
+      { const foot = new THREE.CylinderGeometry(SR + 0.18, SR + 0.24, 0.34, SN, 1, false); metres(foot, SR + 0.2, 0.34, 0); foot.translate(SX, SY0 - 0.17, SZ); staves.push(foot); }   // the footing, its top the staves' floor
+      const sm = new THREE.Mesh(flat(staves), M.stave); sm.castShadow = sm.receiveShadow = true; yard.add(sm);
+      for (const i of [0, 1, 3, 5, 7, 9]) { const t = new THREE.TorusGeometry(SR + 0.018, 0.016, 5, 96); t.rotateX(Math.PI / 2); t.translate(SX, SY0 + i * RING + 0.47, SZ); steel.push(t); }   // the hoops, tight on the staves mid-course
+      {   // the roof: a shallow cone over a band at the eave, a vent and its cap on top
+        const r = new THREE.ConeGeometry(SR + 0.14, 1.55, 64, 1, true); metres(r, SR, 1.6, 0); r.translate(SX, STOP + 0.775, SZ); steel.push(r);
+        steel.push(new THREE.CylinderGeometry(SR + 0.14, SR + 0.14, 0.12, 64, 1, true).translate(SX, STOP, SZ), new THREE.RingGeometry(SR - 0.01, SR + 0.14, 64, 1).rotateX(Math.PI / 2).translate(SX, STOP - 0.06, SZ));   // the eave, closed underneath
+        steel.push(new THREE.CylinderGeometry(0.2, 0.24, 0.42, 16, 1, false).translate(SX, STOP + 1.6, SZ), new THREE.ConeGeometry(0.34, 0.2, 16, 1, false).translate(SX, STOP + 1.91, SZ));
+      }
+      // a part in a frame on the wall: r out from the silo's axis, along the wall, at height y; its local x along the wall and z out from it
+      const onWall = (ang) => { const ux = Math.cos(ang), uz = Math.sin(ang), yaw = -ang + Math.PI / 2; return (geo, r, along, y, turn = 0) => { geo.rotateY(yaw + turn); geo.translate(SX + ux * r - uz * along, y, SZ + uz * r + ux * along); steel.push(geo); return geo; }; };
+      {   // the ladder up the south-east side, 0.18 m off the staves on standoffs, and its cage from 2.4 m up
+        const put = onWall(Math.atan2(-0.8, 0.6)), LR = SR + 0.18;
+        for (const s of [-0.21, 0.21]) put(new THREE.BoxGeometry(0.05, STOP + 0.5 - SY0, 0.05), LR, s, (STOP + 0.5 + SY0) / 2);   // the rails, standing on the footing's edge
+        for (let y = 0.6; y < STOP + 0.3; y += 0.3) put(new THREE.CylinderGeometry(0.014, 0.014, 0.42, 6).rotateZ(Math.PI / 2), LR, 0, y);   // the rungs
+        for (let y = 1.2; y < STOP; y += 2.4) for (const s of [-0.21, 0.21]) put(new THREE.BoxGeometry(0.03, 0.03, 0.2), SR + 0.08, s, y);   // the standoffs
+        for (let y = 2.4; y < STOP + 0.4; y += 0.9) put(new THREE.TorusGeometry(0.38, 0.012, 4, 20, Math.PI).rotateX(Math.PI / 2), LR + 0.02, 0, y);   // the cage's hoops, round the outside
+        for (const a of [0.35, 1.2, 1.95, 2.8]) put(new THREE.CylinderGeometry(0.012, 0.012, STOP + 0.4 - 2.4, 5), LR + 0.02 + Math.sin(a) * 0.38, Math.cos(a) * 0.38, (STOP + 0.4 + 2.4) / 2);   // its bars
+      }
+      // the blower pipe on the south-west side: from its pivot just over the eave a gooseneck turns in over the roof and into it; the pipe
+      // hangs from the pivot to 2 m off the ground, clear of the eave and the hoops; two bracket stubs on the wall below
+      const CA = Math.atan2(-0.8, -0.6), put = onWall(CA), CR = SR + 0.34, PY = STOP + 0.35, PL = PY - 2.0;
+      put(new THREE.TorusGeometry(0.42, 0.11, 10, 12, Math.PI / 2).rotateY(-Math.PI / 2), CR - 0.42, 0, PY);   // the gooseneck: up from the pivot and in
+      put(new THREE.CylinderGeometry(0.11, 0.11, CR - 0.42 - 0.8, 12, 1, true).rotateX(Math.PI / 2), (CR - 0.42 + 0.8) / 2, 0, PY + 0.42);   // into the roof
+      for (const y of [4.0, 7.6]) put(new THREE.BoxGeometry(0.05, 0.05, 0.18), SR + 0.12, 0, y);   // the bracket stubs
+      const roof = steel.splice(6, 5), rm = new THREE.Mesh(flat(roof), M.silo); rm.castShadow = rm.receiveShadow = true; yard.add(rm);   // the roof, the eave, the vent and its cap
+      const mm = new THREE.Mesh(flat(steel), M.siloSteel); mm.castShadow = mm.receiveShadow = true; yard.add(mm);
+      const pivot = new THREE.Group(); pivot.position.set(SX + Math.cos(CA) * CR, PY, SZ + Math.sin(CA) * CR); pivot.rotation.order = 'YXZ'; pivot.rotation.y = -CA + Math.PI / 2; yard.add(pivot);
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, PL, 14, 1, true), M.siloSteel); pipe.position.y = -PL / 2; pipe.castShadow = true; pivot.add(pipe);
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 14), M.siloSteel); collar.position.y = -0.08; pivot.add(collar);
+      siloRef = { pos: new THREE.Vector3(SX, 0, SZ), r: SR, top: STOP + 2.05, chute: pivot, pipeLength: PL,
+        swing(side = 0, out = 0) { pivot.rotation.z = Math.max(-0.45, Math.min(0.45, side)); pivot.rotation.x = -Math.max(0, Math.min(0.5, out)); } };   // (about its own x a turn the other way is out)
+    }
+    solid(SX - SR - 0.2, SX + SR + 0.2, SZ - SR - 0.3, SZ + SR + 0.2);   // the footing, the ladder's foot and the pipe (its height: YARD_TOPS)
+    rainDiscard.push({ minX: SX - SR - 0.2, maxX: SX + SR + 0.2, minZ: SZ - SR - 0.2, maxZ: SZ + SR + 0.2, maxY: STOP + 1.6, id: 'silo' });
+    // the road side's other roof: the moving truck's box, open at the back, where no rain falls on the boxes still in it
+    rainDiscard.push({ minX: TRUCK.x - 1.1, maxX: TRUCK.x + 1.1, minZ: TRUCK.z - 4.3, maxZ: TRUCK.z - 0.04, maxY: 2.8, id: 'truck' });
     // the track: a strip of dirt with two ruts, draped over the field
     const line = [[-5.6, -13.2], [-9.5, -16.2], [-15, -17.6], [-21, -17.3], [-27, -16], [-36, -15], [-45, -14.1], [-52, -13.2], [-58.2, -12.4]];
     const ribbon = (w, mat, lift, off = 0) => {
@@ -2145,16 +2231,28 @@ export function buildWorld(scene) {
     }
     posts.count = n; posts.castShadow = true; yard.add(posts);
   }
-  // the fence across the road and down the east side of the next field (instanced posts + rails), on the ground where it rolls
+  // the field fences (instanced posts + rails, on the ground where it rolls, each run a solid strip): one along z -48 across the field south
+  // of the ditch, and one down x 40 from it to the north, which leaves a gap for the road and its ditch (z -39..-24); its tube gate stands
+  // swung right back along the fence north of the gap, off the shoulder
   {
-    const posts = []; for (let x = -60; x <= 60; x += 3) posts.push([x, -48]); for (let z = -48; z <= 20; z += 3) posts.push([40, z]);
-    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.3, 0.14), M.fence, posts.length);
-    const m4 = new THREE.Matrix4(); posts.forEach(([x, z], i) => { m4.makeTranslation(x, 0.65 + fieldH(x, z), z); im.setMatrixAt(i, m4); }); im.castShadow = true; yard.add(im);
+    const posts = []; for (let x = -60; x <= 60; x += 3) posts.push([x, -48]); for (let z = -48; z <= 20; z += 3) if (z < -38 || z > -25) posts.push([40, z]);
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.38, 0.14), M.fence, posts.length);
+    const m4 = new THREE.Matrix4(); posts.forEach(([x, z], i) => { m4.makeTranslation(x, 0.61 + fieldH(x, z), z); im.setMatrixAt(i, m4); }); im.castShadow = true; im.userData.tag = 'fieldFence'; yard.add(im);   // 8 cm into the ground
     const rail = (ax, az, bx, bz, y) => {   // a rail between two posts, following the ground
       const L = Math.hypot(bx - ax, bz - az), ya = fieldH(ax, az) + y, yb = fieldH(bx, bz) + y, m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, Math.hypot(L, yb - ya)), M.fence);
-      m.position.set((ax + bx) / 2, (ya + yb) / 2, (az + bz) / 2); m.rotation.y = Math.atan2(bx - ax, bz - az); m.rotation.x = -Math.atan2(yb - ya, L); yard.add(m);
+      m.position.set((ax + bx) / 2, (ya + yb) / 2, (az + bz) / 2); m.rotation.y = Math.atan2(bx - ax, bz - az); m.rotation.x = -Math.atan2(yb - ya, L); m.userData.tag = 'fieldFence'; yard.add(m);
     };
-    for (const y of [0.55, 1.1]) { for (let i = 1; i < posts.length; i++) if (posts[i][0] === 40 && posts[i - 1][0] === 40 || posts[i][1] === -48 && posts[i - 1][1] === -48) rail(posts[i - 1][0], posts[i - 1][1], posts[i][0], posts[i][1], y); }
+    for (const y of [0.55, 1.1]) for (let i = 1; i < posts.length; i++) { const [ax, az] = posts[i - 1], [bx, bz] = posts[i]; if ((ax === bx || az === bz) && Math.hypot(bx - ax, bz - az) < 3.01) rail(ax, az, bx, bz, y); }
+    // the gate: five galvanised tubes in a frame 3.6 m long, hung on the post at z -24 and swung back flat beside the fence
+    const gm = std({ color: 0xa9aeb0, roughness: 0.45, metalness: 0.8 }), gate = new THREE.Group(), GL = 3.6, gy = fieldH(40, -24);
+    gate.position.set(40.2, gy, -24); gate.userData.tag = 'cattleGate'; yard.add(gate);
+    const tube = (len, x, y, z, rx = 0, rz = 0) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, len, 8), gm); t.position.set(x, y, z); t.rotation.set(rx, 0, rz); t.castShadow = true; gate.add(t); };
+    for (const y of [0.25, 0.48, 0.71, 0.94, 1.17]) tube(GL, 0, y, GL / 2, Math.PI / 2);   // the bars, along +z
+    for (const z of [0.03, GL - 0.03]) tube(1.0, 0, 0.71, z);                                 // the stiles
+    for (const y of [0.4, 1.0]) tube(0.13, -0.065, y, 0.03, 0, Math.PI / 2);                // the hinge pins into the post
+    tube(Math.hypot(GL / 2, 0.9), 0, 0.71, GL * 0.75, Math.PI / 2 - Math.atan2(0.9, GL / 2));   // the brace
+    solid(-60.07, 60.07, -48.07, -47.93, { maxY: 1.3, id: 'fieldFence' });
+    solid(39.93, 40.07, -48, -39, { maxY: 1.3, id: 'fieldFence' }); solid(39.93, 40.26, -24, 20, { maxY: 1.3, id: 'fieldFence' });
   }
   M.leaves.map = TX.needles(); M.leaves.side = THREE.DoubleSide; M.leaves.color.set(0xd8e8d8); M.leaves.roughness = 0.95;
   // the trees. Every trunk is checked before it goes in: nothing within 1.5 m of the house, the garage, the drive, the road, the truck, the
@@ -2220,10 +2318,27 @@ export function buildWorld(scene) {
       for (const [x, z] of [[-11, 12], [16, -11], [-16, -1]]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.dirt); h.scale.y = 0.45; h.position.set(x, -0.01, z); h.castShadow = h.receiveShadow = true; yard.add(h); }
     }
   }
+  // the road's ends: across the road at x ±150, a wood's edge from the far field to the near one, so the road runs into the trees and the
+  // cars come out of them (traffic.js keeps a car hidden until it is clear of them). At that distance the day's fog would take the whole of
+  // a tree and leave it paler than the sky behind it, so these firs (the far models, their own copies of the materials, darker and duller)
+  // keep two fifths of their colour through the haze, as a far wood does: a darker band along the horizon. On the ground as it lies (the ditch included).
+  // Hidden while the car dream drives on through them (roadEnds.dream). A phone's fog ends the road first
+  if (!PHONE) {
+    const r = TX.rng(1501), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), fir = [[], []];
+    for (const s of [-1, 1]) for (let row = 0; row < 4; row++) for (let z = -70 + row * 1.3; z < 6; z += 3.2 + r() * 2.6) {
+      const x = s * (BEND + 4 + row * 4.4 + r() * 3.2), zz = z + (r() - 0.5) * 2.2, k = 0.8 + r() * r() * 0.9 + row * 0.1;
+      q.setFromAxisAngle(up, r() * 6.28); fir[r() < 0.5 ? 0 : 1].push(m4.clone().compose(new THREE.Vector3(x, fieldH(x, zz) + ditchAt(x, zz) - 0.05, zz), q, sc.set(k, k, k)));
+    }
+    const haze = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', THREE.ShaderChunk.fog_fragment.replace('mix( gl_FragColor.rgb, fogColor, fogFactor )', 'mix( gl_FragColor.rgb, fogColor, min( fogFactor, 0.6 ) )')); };
+    roadEnds.trees.addEventListener('childadded', ({ child }) => child.traverse((o) => { if (o.isMesh && !o.userData.hazed) { o.userData.hazed = true; o.material = o.material.clone(); o.material.color.multiplyScalar(0.7); o.material.envMapIntensity = 0.3; o.material.onBeforeCompile = haze; o.material.customProgramCacheKey = () => 'roadwood'; } }));
+    scatter(roadEnds.trees, 'fir1_far', fir[0], { cast: false }); scatter(roadEnds.trees, 'fir2_far', fir[1], { cast: false });
+    roadEnds.trees.userData.noAO = true;
+  }
   // ground-cover tufts and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < SX(8.1) + 1.6 + pad && z > -6.5 - pad && z < SZ(5.1) + 1.2 + pad) && !onDrive(x, z, pad) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -25.6 - pad && z > -38.5 + pad);   // not on the house, porch path, truck, garage, or the road and its ditch
+    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < SX(8.1) + 1.6 + pad && z > -6.5 - pad && z < SZ(5.1) + 1.2 + pad) && !onDrive(x, z, pad) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -22.2 && z > -41.9)   // not on the house, porch path, truck, garage, or the road, its shoulders and the ditch (a tuft spreads up to 4 m: none within that of them)
+      && !(Math.abs(x - 40) < 1.2 + pad * 0.3 && z > -49 && z < 21) && !(Math.abs(z + 48) < 1.2 + pad * 0.3 && x > -61 && x < 61);   // nor in the field fences' lines
     const grass = (name, n, rmin, rmax, k0, k1) => {
       const ms = [];
       while (ms.length < n) {
@@ -2241,6 +2356,7 @@ export function buildWorld(scene) {
       for (let i = 0; i < 2600 && ms.length < 900; i++) {
         const a = r() * 6.283, d = 34 + r() * 60, x = 2 + Math.cos(a) * d, z = -6 + Math.sin(a) * d;
         if ((z > -42 && z < -22) || (x > -78 && x < -50 && z > -36 && z < 2) || r() > 0.35 + 0.65 * Math.abs(Math.sin(x * 0.07) * Math.cos(z * 0.05))) continue;   // not on the road or the barn's pad, and in drifts
+        if ((Math.abs(x - 40) < 2.2 && z > -50 && z < 22) || (Math.abs(z + 48) < 2.2 && x > -62 && x < 62)) continue;   // nor through the field fences
         const k = 1.6 + r() * 1.3; q.setFromAxisAngle(up, r() * 6.28); ms.push(m4.clone().compose(new THREE.Vector3(x, fieldH(x, z) - 0.04, z), q, sc.set(k, k * (0.9 + r() * 0.5), k)));
       }
       for (const m of ms) { const key = Math.floor(m.elements[12] / 24) + ',' + Math.floor(m.elements[14] / 24); (cells.get(key) || cells.set(key, []).get(key)).push(m); }
@@ -2386,8 +2502,8 @@ export function buildWorld(scene) {
     self.ready = grow();
     return self;
   })();
-  // invisible yard boundary
-  solid(-70, 60, -60, -58); solid(-70, 60, 30, 32); solid(-72, -70, -60, 32); solid(60, 62, -60, 32);
+  // invisible yard boundary: the far field and the wood to the west run to x -95 and z -80 (the forest's box), the east field to x 60
+  for (const b of [[-95, 60, -82, -80], [-95, 60, 30, 32], [-97, -95, -82, 32], [60, 62, -82, 32]]) solid(...b, { id: 'boundary' });
 
   // sky dressing
   const starGeo = new THREE.BufferGeometry(); const sp = [];
@@ -2500,7 +2616,7 @@ export function buildWorld(scene) {
       [6.45, -4.17, 0.92, 'spare boxes window'], [6.15, -2.35, 1.9, 'sheeted mirror'], [6.4, -1.8, 0.86, 'spare boxes hall wall'], [7.97, -4.36, 1.1, 'rolled rug'],
       [-1.632, 0.9, 0.73, 'phone table'], [-3.025, 3.4, 1.7, 'coat rack'],
     ];
-    const YARD_TOPS = [[-12.0, -13.0, 1.9, 'workbench'], [-13.3, -8.0, 0.6, 'tires'], [-13.3, -9.55, 0.9, 'garage boxes'], [-27, 0, 1.75, 'west fence'], [27, 0, 1.75, 'east fence'], [0, 28, 1.75, 'back fence'], [-27, -22, 1.75, 'west fence south'], [-72, -28, 12, 'silo']];
+    const YARD_TOPS = [[-12.0, -13.0, 1.9, 'workbench'], [-13.3, -8.0, 0.6, 'tires'], [-13.3, -9.55, 0.9, 'garage boxes'], [-27, 0, 1.75, 'west fence'], [27, 0, 1.75, 'east fence'], [0, 28, 1.75, 'back fence'], [-27, -22, 1.75, 'west fence south'], [-74, -14, 13.1, 'silo']];
     const inside = (c, x, z) => x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ;
     const topsMissed = [];
     const assign = (x, z, maxY, name) => {
@@ -2533,7 +2649,7 @@ export function buildWorld(scene) {
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
     groundAt, PLACES, STAIR, BASEMENT, garage, breaker, laundry, office, spare, windows,
-    streetLight, puddles, wetMats, farLights, clock, TRUCK, lawn, treesRejected,
+    streetLight, puddles, wetMats, farLights, clock, TRUCK, lawn, treesRejected, silo: siloRef, roadEnds, ROAD,
     // the boundaries: removeSolid(id), fitProp(holder) after a prop moves, follow(mesh, hx, hz) for a thing that keeps moving, the overheads
     // list, the rain's roofs, and the truck's ramp as a floor
     removeSolid, fitProp, follow, headClear: collide.headClear, rainDiscard, rampY: (x, z) => rampAt(x, z), topsMissed,

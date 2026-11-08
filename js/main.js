@@ -387,6 +387,8 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 // two of the director's night events (director.js): a car goes by out front and its light slides through the windows, and something huge
 // and pale drifts past them
 function carPass() { WF.carPass(); traffic.pass(); sfx.moving('sfx/car_pass', { gain: 0.9, from: 0.9, to: -0.9 }); }
+// the road knows where you are (traffic.js): after dark a car that meets you on it is the end of you, unseen; by day it brakes and leans on its horn
+traffic.bind({ P, F, W, caught: (o) => caught(o), note: (t) => { if (/^n\d+$/.test(F.stage || '')) journal.note(F.stage, t); } });
 function faceAtWindow() {
   WF.face(); sfx.moving('sfx/face_wail', { gain: 0.8, from: 0.6, to: -0.8, dur: 13 });
 }
@@ -755,9 +757,15 @@ function playerStep(sprint) {
   sfx.footstep(vol, 0, room === 'bath' || room === 'kitchen' || room === 'dining' || room === 'laundry' ? 0.3 : 0.15, surfaceAt(P.pos.x, P.pos.z, P.pos.y, room));
   if (F.echo) echoes.push(gameTime + 0.27 + Math.random() * 0.06);
 }
-// what a foot lands on: the drive is gravel, the stoop and the stairs outside are wood, the rest of the yard grass
+// what a foot lands on: the road is asphalt, its shoulders, the apron at the end of the drive and the drive gravel, the stoop and the stairs
+// outside are wood, the rest of the yard and the field grass (the ditch too)
 function surfaceAt(x, z, y, room = roomAt(x, z, y)) {
-  if (room === 'out') return W.onDrive && W.onDrive(x, z) ? 'gravel' : (y > 0.05 ? 'stairs' : 'grass');
+  if (room === 'out') {
+    const R = W.ROAD, onRoad = R && Math.abs(x) < R.x;
+    if (onRoad && z > R.z0 && z < R.z1) return 'asphalt';
+    if ((W.onDrive && W.onDrive(x, z)) || (onRoad && ((z > R.shoulder[0] && z <= R.z0) || (z >= R.z1 && z < R.shoulder[1]))) || (R && R.apron(x, z))) return 'gravel';
+    return y > 0.05 ? 'stairs' : 'grass';
+  }
   if (room === 'stoop') return 'wood';
   if (y < -0.3 && room !== 'laundry') return 'stairs';
   return ['bath', 'kitchen', 'dining', 'laundry', 'garage'].includes(room) ? 'tile' : 'carpet';
@@ -1054,7 +1062,7 @@ async function carDream() {
   sfx.violins(0, 1); sfx.drone(0, 2); sfx.dread(0, 2); sfx.tension(0, 1);
   UI.flash('rgba(255,255,255,1)', 2.4); await wait(0.9);
   setPhase('day', true); scene.fog = new THREE.FogExp2(0xcdd9e6, 0.017); sfx.bed('music/moving_day', 0.22, 2);
-  carDriveIn({ road: true, x: -70, z: -28.8, heading: 0, speed: 11, traffic: 'cruise' });
+  carDriveIn({ road: true, x: -60, z: -28.8, heading: 0, speed: 11, traffic: 'cruise' });
   sfx.engine(1, 0.7); sfx.radio(1, 0);
   F.cutscene = false; UI.card('Saturday', 'Going to the store', 3.5);
   await wait(4.5); await say('mom/car_a'); await wait(1.4); await say('dad/car_a'); await wait(3.5);
