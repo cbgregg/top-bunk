@@ -161,7 +161,8 @@ export function createTraffic(scene, sfx) {
     // seconds until the next ordinary car is sent (a test or a scene can hold the road clear)
     get next() { return timer; }, set next(v) { timer = v; },
     // the scare: a car in the far lane right now, from one side of the house to the other in PASS_T seconds (main.js plays its sound)
-    pass() { return spawn(-1, { x: PASS_X, v: (2 * PASS_X) / PASS_T, scare: true }); },
+    // (it keeps time with the light, so the far lane is cleared in front of it, out in the dark and the fog, and it follows nobody)
+    pass() { for (const c of cars) if (c.on && c.dir < 0 && Math.abs(c.x) < PASS_X + 12) off(c); return spawn(-1, { x: PASS_X, v: (2 * PASS_X) / PASS_T, scare: true }); },
     // an ordinary car, from either end
     one(dir = Math.random() < 0.5 ? 1 : -1, o = {}) { return spawn(dir, o); },
     // a car that comes along (one already on the road heading that way and far enough short of x to stop in time, or a new one from the
@@ -193,7 +194,7 @@ export function createTraffic(scene, sfx) {
         // how fast it wants to go: its own speed, held back by the car ahead in its lane, by a stop it is making, by a kid in the road
         let want = c.state === 'back' ? -3.5 : c.v0, decel = BRAKE, wall = Infinity;   // wall: how far its nose may still go (metres along its way)
         for (const a of cars) {
-          if (a === c || !a.on || a.dir !== c.dir || a.z !== c.z) continue;
+          if (c.scare || a === c || !a.on || a.dir !== c.dir || a.z !== c.z) continue;
           const gap = (a.x - c.x) * c.dir - c.hl - a.hl;
           if (gap < -0.5 || gap > 40) continue;
           want = Math.min(want, Math.max(0, a.v) + Math.max(0, gap - 7) * 0.7); wall = Math.min(wall, gap - 2.5);

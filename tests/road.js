@@ -23,6 +23,7 @@
 //   day         by day a car within 12 m of a player on the asphalt brakes to a stop short of them with its horn, never touching; it
 //               drives on once they are off the road
 //   stop        traffic.stop(4.7) brings a car to a stop at the mailbox and it drives on after its hold
+//   scare       traffic.pass() clears the far lane in front of it and keeps time with windowface.js's light
 //   bus         traffic.busHorn() plays the bus's horn at (0, 1.5, -30) and draws nothing
 //   beam        the one headlight beam is on the nearest lit car at night and dark by day
 //   body        a car standing in the road is a box the player cannot walk into
@@ -269,6 +270,14 @@ function inPage(SUNK) {
       let held = 0; while (h && h.state === 'stopped' && held < 600) { tr.update(DT, 'day'); held++; }
       let moved = false; for (let k = 0; k < 600 && h && !moved; k++) { tr.update(DT, 'day'); if (h.car.x > 4.7 + 3) moved = true; }
       ok('stop', h && at !== null && Math.abs(at - 4.7) < 0.15 && lane === W.ROAD.lanes.near && Math.abs(held * DT - 2) < 0.1 && moved, { frames: f, at, lane, held: +(held * DT).toFixed(2), moved, model: h && h.car.model });
+    }
+    // the scare: the far lane cleared in front of it, and it keeps time with the light (40 to -40 in 4.2 s)
+    {
+      g.setPhase('night', true); clear(); stand(2.3, -12);
+      const slow = tr.one(-1, { x: 20, v: 6 }); tr.update(DT, 'night');
+      const c = tr.pass(), others = tr.cars.filter((k) => k.on && k !== c && k.dir < 0 && Math.abs(k.x) < 52).length;   // (the slow one went, or became the scare's car)
+      let f = 0; for (; f < Math.round(4.2 / DT); f++) tr.update(DT, 'night');
+      ok('scare', slow && c && c.scare && !others && Math.abs(c.x + 40) < 1.5, { others, x: c && +c.x.toFixed(2), frames: f });
     }
     // the bus: heard, never drawn
     {
