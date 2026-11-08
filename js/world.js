@@ -50,9 +50,12 @@ const PLAN_PLACES = {
   laundry: [-8.1, -3.3, -0.4, 3.75],
 };
 export const PLACES = { garage: [-14.0, -7.6, -13.6, -7.0] }; for (const k in PLAN_PLACES) PLACES[k] = rect(PLAN_PLACES[k]);
-// the outside stairs: from the stoop at x0 they drop BASEMENT over `run` metres going west, then a landing to xEnd
-const PLAN_STAIR = { x0: -3.3, run: 3.12, xEnd: -7.4, z0: 3.7, z1: 4.75 };
-export const STAIR = { x0: SX(PLAN_STAIR.x0), run: SX(PLAN_STAIR.x0) - SX(PLAN_STAIR.x0 - PLAN_STAIR.run), xEnd: SX(PLAN_STAIR.xEnd), z0: SZ(PLAN_STAIR.z0), z1: SZ(PLAN_STAIR.z1) };
+// the outside stairs: from the stoop at x0 they drop BASEMENT over `run` metres going west in `steps` treads, then a landing to xEnd
+const PLAN_STAIR = { x0: -3.3, run: 3.12, xEnd: -7.4, z0: 3.7, z1: 4.75, steps: 12 };
+export const STAIR = { x0: SX(PLAN_STAIR.x0), run: SX(PLAN_STAIR.x0) - SX(PLAN_STAIR.x0 - PLAN_STAIR.run), xEnd: SX(PLAN_STAIR.xEnd), z0: SZ(PLAN_STAIR.z0), z1: SZ(PLAN_STAIR.z1), steps: PLAN_STAIR.steps };
+// the step at the front door, drawn on the plan: its top 0.14 m up, and the lower step in front of it 0.07 m up
+const PLAN_FRONT_STEP = [[1.0, 2.8, -5.5, -4.5, 0.14], [1.3, 2.5, -6.0, -5.5, 0.07]];
+const FRONT_STEP = PLAN_FRONT_STEP.map(([x0, x1, z0, z1, top]) => ({ x0: SX(x0), x1: SX(x1), z0: SZ(z0), z1: SZ(z1), top }));
 
 const within = (rooms, places, x, z, y) => {
   const inside = (r) => x > r[0] && x < r[1] && z > r[2] && z < r[3];
@@ -63,8 +66,8 @@ const within = (rooms, places, x, z, y) => {
 };
 export function roomAt(x, z, y = 0) { return within(ROOMS, PLACES, x, z, y); }
 const planRoomAt = (x, z, y = 0) => within(PLAN, { ...PLAN_PLACES, garage: PLACES.garage }, x, z, y);
-// the floor under (x, z): 0 on the yard, the stairwell and, for somebody already down there, the laundry; the truck's ramp while the truck is
-// there; out in the field the ground rolls
+// the floor under (x, z): 0 on the yard, the top of the tread under you on the cellar stairs (then the landing), the front step's two tops
+// and, for somebody already down there, the laundry; the truck's ramp while the truck is there; out in the field the ground rolls
 let fieldHeight = () => 0, rampAt = () => 0;   // set by buildWorld once the field and the truck exist
 // the ditch along the far side of the road: two straight grass slopes 1.3 m wide down to 0.6 m under the road's level at z -36.6, the
 // whole length of the road (buildWorld lays its meshes on this same line)
@@ -74,8 +77,10 @@ export const DITCH = { z: -36.6, half: 1.3, depth: 0.6, x: 260 };
 export const ROAD = { z0: -33.8, z1: -27.2, x: 260, shoulder: [-35.2, -26.2], lanes: { near: -29.0, far: -32.0 }, apron: (x, z) => x > -0.4 && x < 5.0 && z > -29.2 && z < -26.6 };
 export const ditchAt = (x, z) => { const d = Math.abs(z - DITCH.z); return d < DITCH.half && Math.abs(x) < DITCH.x ? -DITCH.depth * (1 - d / DITCH.half) : 0; };
 export function groundAt(x, z, y = 0) {
-  if (z > STAIR.z0 && z < STAIR.z1 && x < STAIR.x0 && x > STAIR.xEnd) return BASEMENT * Math.min(1, (STAIR.x0 - x) / STAIR.run);
+  // (a riser belongs to the tread above it: standing on its edge you are on the higher one)
+  if (z > STAIR.z0 && z < STAIR.z1 && x < STAIR.x0 && x > STAIR.xEnd) return BASEMENT * Math.min(1, Math.ceil((STAIR.x0 - x) / STAIR.run * STAIR.steps - 1e-9) / STAIR.steps);
   if (y < -1 && x > PLACES.laundry[0] && x < PLACES.laundry[1] && z > PLACES.laundry[2] && z < PLACES.laundry[3]) return BASEMENT;
+  for (const s of FRONT_STEP) if (x > s.x0 && x < s.x1 && z > s.z0 && z < s.z1) return s.top;
   if (z > DITCH.z - DITCH.half && z < DITCH.z + DITCH.half && Math.abs(x) < DITCH.x) return fieldHeight(x, z) + ditchAt(x, z);
   return fieldHeight(x, z) + rampAt(x, z);
 }
@@ -1235,7 +1240,7 @@ export function buildWorld(scene) {
     box(-3.3, -1.3, -0.06, 0.0, 3.72, 5.0, M.concrete, { uv: true });
     { const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), M.lamp.clone()); b.position.set(-2.3, 2.3, 3.78); house.add(b); }
     // the stairwell: concrete steps between block walls, a curb with a pipe railing at grass level, a landing at the bottom
-    const { x0, run, xEnd, z0, z1 } = PLAN_STAIR, steps = 12, tread = run / steps, rise = -B / steps;
+    const { x0, run, xEnd, z0, z1, steps } = PLAN_STAIR, tread = run / steps, rise = -B / steps;
     for (let i = 0; i < steps; i++) box(x0 - tread * (i + 1), x0 - tread * i, B - 0.1, -rise * (i + 1), z0, z1, M.concrete, { uv: true });
     box(xEnd, x0 - run, B - 0.1, B, z0, z1, M.concrete, { uv: true });
     box(xEnd - 0.25, x0, B - 0.1, 0.3, z1, z1 + 0.25, M.block, { uv: true }); solid(xEnd - 0.25, x0, z1, z1 + 0.25, deep);
@@ -1758,7 +1763,7 @@ export function buildWorld(scene) {
   // brick-edged planter along the front wall under the picture window, with shrubs; the stoop at the front door
   box(-1.9, 0.9, 0, 0.3, -5.3, -4.7, M.brick, { uv: true }); box(-1.8, 0.8, 0.28, 0.32, -5.2, -4.8, M.dirt, { cast: false });
   for (const x of [-1.4, -0.6, 0.1, 0.6]) { const sh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), M.leaves); sh.position.set(x, 0.35, -5.0); sh.scale.y = 0.6; sh.castShadow = true; house.add(sh); }
-  box(1.0, 2.8, -0.05, 0.14, -5.5, -4.5, M.concrete, { uv: false }); box(1.3, 2.5, -0.05, 0.07, -6.0, -5.5, M.concrete, { uv: false });
+  for (const [x0, x1, z0, z1, top] of PLAN_FRONT_STEP) box(x0, x1, -0.05, top, z0, z1, M.concrete, { uv: false });   // (groundAt stands you on them)
   const porchLight = new THREE.PointLight(0xffc880, 0, 6, 2); porchLight.position.set(SX(0.9), 2.1, -4.9); scene.add(porchLight);
   const porchBulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), M.lamp.clone()); porchBulb.position.set(0.9, 2.15, -4.6); house.add(porchBulb);
 

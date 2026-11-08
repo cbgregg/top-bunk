@@ -4,37 +4,40 @@
 // leaf is 0.81, the thing's body 0.35, the leaf's thickness the rest), so a door it opens from inside swings clear of it and all the way;
 // the nodes beside furniture stand off it by a body's width.
 export const NODES = {
-  hallW: [5.48, -0.42], hallM: [7.63, -0.42], hallE: [10.16, -0.42],
+  hallW: [5.48, -0.42], hallM: [7.63, -0.42], hallK: [9.79, -0.42], hallE: [10.38, -0.42],
   bathIn: [5.89, 1.39], bathMid: [5.73, 1.92], bathMid2: [6.17, 2.76], bathTub: [6.0, 3.1],
-  kidIn: [9.95, 1.39], kidMid: [8.96, 2.15], kidBunk: [8.26, 2.85], kidCloset: [8.14, 1.7],
-  r2In: [5.42, -2.3], r2Alc: [5.67, -2.26], r2Mid: [6.42, -2.5], r2Closet: [6.76, -2.32],
+  kidIn: [9.95, 1.39], kidMid: [8.75, 2.35], kidBunk: [8.28, 2.78], kidCloset: [8.25, 1.75],
+  r2In: [5.42, -2.3], r2Alc: [5.75, -2.45], r2Mid: [5.3, -2.95], r2Closet: [6.5, -2.45],
   sIn: [10.6, -2.25], sMid: [10.01, -2.71], sClos: [10.46, -3.2],
-  livMouth: [4.33, -0.42], livE: [3.44, -0.96], livC: [1.98, -0.9], livW: [0.41, -0.96], livMid: [-0.93, -1.02], livFar: [-1.72, -0.66], livDoor: [3.1, -3.38], livTV: [3.21, -2.37],
-  archN: [2.88, -0.36], archS: [2.88, 1.03], kit2: [2.75, 1.9], kit3: [1.9, 3.45], kit4: [3.21, 2.76],
+  livMouth: [4.33, -0.42], livE: [2.9, -1.05], livC: [1.98, -0.9], livW: [0.41, -0.96], livMid: [-0.93, -1.02], livFar: [-1.72, -0.66], livDoor: [3.1, -3.38], livTV: [3.21, -2.37],
+  archN: [2.88, -0.36], archS: [2.88, 1.03], kit2: [2.75, 1.9], kit3: [1.95, 3.15], kit4: [3.21, 2.76],
   dinN: [-2.05, 0.75], dinS: [-2.11, 1.25], dinW: [-1.55, 2.8], backIn: [-1.55, 3.45],
   // Mom and Dad's room, through the barn door: inside the door, the middle, the foot of the bed, by the dresser, the closet, the far end
   pIn: [-3.4, 1.14], pMid: [-4.63, 0.75], pFoot: [-5.19, -0.42], pDress: [-5.55, -2.45], pClos: [-4.07, -2.26], pFar: [-5.4, 2.95],
   // out the back door, down the outside stairs to the laundry, and round the west end of the house to the garage
   stoop: [-1.6, 5.37], stoopS: [-1.49, 6.67], stairTop: [-2.95, 5.32, -0.15], stairMid: [-4.52, 5.32, -1.23], stairBot: [-6.76, 5.32, -2.4],
-  lauIn: [-6.5, 3.5, -2.4], lauMid: [-5.41, 2.54, -2.4], lauWash: [-6.6, 2.43, -2.4], lauSink: [-5.36, 1.64, -2.4], lauSump: [-4.29, 1.42, -2.4],
-  yardB1: [-4.5, 7.0], yardB2: [-8.2, 7.0], yardW: [-9.3, 0.5], yardSW: [-9.3, -5.2], garDoor: [-8.3, -6.4],
-  garIn: [-8.1, -8.2], garMid: [-10.6, -10.3], garPanel: [-9.7, -7.9],
+  lauIn: [-6.4, 3.2, -2.4], lauMid: [-5.85, 2.9, -2.4], lauWash: [-6.4, 1.8, -2.4], lauSink: [-5.35, 2.35, -2.4], lauSump: [-4.85, 1.75, -2.4],
+  yardB1: [-4.5, 7.0], yardB2: [-8.2, 7.0], yardW: [-9.3, 0.5], yardSW: [-9.3, -5.2], garDoor: [-8.3, -6.05],
+  garIn: [-8.7, -8.4], garMid: [-10.6, -10.3], garPanel: [-9.7, -7.9],
 };
 // [a, b, door that has to be open to pass]
 const EDGES = [
-  ['hallW', 'hallM'], ['hallM', 'hallE'],
+  ['hallW', 'hallM'], ['hallM', 'hallK'], ['hallK', 'hallE'],
   ['hallW', 'bathIn', 'bath'], ['bathIn', 'bathMid'], ['bathMid', 'bathMid2'], ['bathMid2', 'bathTub'],
-  ['hallE', 'kidIn', 'kid'], ['kidIn', 'kidMid'], ['kidMid', 'kidBunk'], ['kidMid', 'kidCloset'],
-  ['hallW', 'r2In', 'room2'], ['r2In', 'r2Alc'], ['r2Alc', 'r2Mid'], ['r2Alc', 'r2Closet'], ['r2Mid', 'r2Closet'],
+  ['hallK', 'kidIn', 'kid'], ['kidIn', 'kidMid'], ['kidMid', 'kidBunk'], ['kidMid', 'kidCloset'],
+  ['hallW', 'r2In', 'room2'], ['r2In', 'r2Alc'], ['r2Alc', 'r2Mid'], ['r2Alc', 'r2Closet'],
   ['hallE', 'sIn', 'spare'], ['sIn', 'sMid'], ['sMid', 'sClos'],
   ['hallW', 'livMouth'], ['livMouth', 'livE'], ['livE', 'livC'], ['livC', 'livW'], ['livW', 'livMid'], ['livMid', 'livFar'], ['livE', 'livDoor'], ['livE', 'livTV'], ['livDoor', 'livTV'],
   ['livE', 'archN'], ['archN', 'archS'], ['archS', 'kit2'], ['archS', 'kit4'], ['kit2', 'kit3'], ['kit3', 'kit4'],
   ['livFar', 'dinN'], ['dinN', 'dinS'], ['dinS', 'pIn', 'parents'], ['pIn', 'pMid'], ['pMid', 'pFoot'], ['pFoot', 'pDress'], ['pFoot', 'pClos'], ['pDress', 'pClos'], ['pMid', 'pFar'],
   ['dinS', 'dinW'], ['dinW', 'backIn'], ['backIn', 'stoop', 'back'],
-  ['stoop', 'stairTop'], ['stairTop', 'stairMid'], ['stairMid', 'stairBot'], ['stairBot', 'lauIn', 'basement'], ['lauIn', 'lauMid'], ['lauMid', 'lauWash'], ['lauMid', 'lauSink'], ['lauSink', 'lauSump'],
+  ['stoop', 'stairTop'], ['stairTop', 'stairMid'], ['stairMid', 'stairBot'], ['stairBot', 'lauIn', 'basement'], ['lauIn', 'lauMid'], ['lauIn', 'lauWash'], ['lauMid', 'lauWash'], ['lauMid', 'lauSink'], ['lauSink', 'lauSump'],
   ['stoop', 'stoopS'], ['stoopS', 'yardB1'], ['yardB1', 'yardB2'], ['yardB2', 'yardW'], ['yardW', 'yardSW'], ['yardSW', 'garDoor'],
   ['garDoor', 'garIn', 'garage'], ['garIn', 'garMid'], ['garIn', 'garPanel'], ['garMid', 'garPanel'],
 ];
+// the laundry's own nodes: under its joists (2.04 m) it goes on all fours (design 6.3), from just inside its door to the far corner
+export const LOW = new Set(['lauIn', 'lauMid', 'lauWash', 'lauSink', 'lauSump']);
+export const crawlEdge = (a, b) => LOW.has(a) && LOW.has(b);
 export const ADJ = {};
 for (const k in NODES) ADJ[k] = [];
 for (const [a, b, door] of EDGES) {
@@ -88,7 +91,7 @@ export function edgeDoor(a, b) { const e = ADJ[a].find((x) => x.to === b); retur
 // These edges are joined only while the night needs them (outside(true): the player is out, the thing is out after them, or the night
 // has sent them out), so on a night spent indoors the thing never chooses to start at the mailbox and come in through the back door.
 export const OUTSIDE = {
-  porch: [3.1, -5.6], frontOut: [3.1, -5.1, 0.14], drive1: [2.3, -10], driveE: [5.0, -11.0], drive2: [4.75, -20], mailbox: [4.7, -26],
+  porch: [3.1, -5.6], frontOut: [3.1, -5.1, 0.14], drive1: [2.3, -10], driveE: [5.0, -11.0], drive2: [4.75, -20], mailbox: [4.3, -25.4],
   garPad: [-4.0, -8.6], yardNW: [-20, 8], yardSW2: [-16, -5.5], gate: [-27, -16],
   track1: [-36, -15], track2: [-45, -14.1], track3: [-52, -13.2], barnDoor: [-58.0, -12], barnMid: [-64, -12], barnLoft: [-67.2, -12, 3.21],
   backOut: [-1.6, 5.27],

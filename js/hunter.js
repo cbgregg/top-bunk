@@ -17,7 +17,7 @@
 //   flashStun, loomSurvived, loomOpened.
 import * as THREE from 'three';
 import { SLAM } from './audio.js';
-import { NODES, path as navPath, nearestNode, dist as navDist, edgeDoor, pathLength } from './nav.js';
+import { NODES, path as navPath, nearestNode, dist as navDist, edgeDoor, pathLength, LOW, crawlEdge } from './nav.js';
 import { active as colliderOn, onFloor as colliderOnFloor, leafOf, segNear } from './collide.js';
 import { rng } from './rng.js';
 import * as log from './log.js';
@@ -192,13 +192,17 @@ export function createHunter(ctx) {
     }
     return r.arrived;
   }
-  // through a doorway on all fours from level 5
+  // on all fours: the laundry's own edges at any level (2.04 m under its joists: design 6.3; it comes through its door bent double and
+  // goes down at the first node inside), and from level 5 every doorway
   function lowHere() {
-    // (the laundry, 2.04 m under its joists, it goes through bent double: the duck brings its crown to 1.9 m)
+    const a = S.pi > 0 ? S.path[S.pi - 1] : S.node, b = S.path[S.pi];
+    if (b ? crawlEdge(a, b) : LOW.has(a)) return true;
     if (S.level < 5) return false;
     for (const k in W.doors) { const d = W.doors[k]; if (Math.abs((d.y0 || 0) - ep().y) < 1 && Math.hypot(d.mid.x - ep().x, d.mid.z - ep().z) < (E.mode === 'crawl' ? 1.5 : 1.1)) return true; }
     return false;
   }
+  // in the laundry, under its joists (its node one of the laundry's own, on that floor)
+  const lowSpot = () => ep().y < -1 && LOW.has(S.node);
   // the crawl's heading: toward a point 0.9 m further along its path (so the head and the hands keep to the path at a corner), or at you
   function crawlFace(dt, target = null) {
     let tx, tz;
@@ -408,6 +412,9 @@ export function createHunter(ctx) {
 
   // ---- per frame ----
   function update(dt) {
+    tick(dt); lowGuard();
+  }
+  function tick(dt) {
     if (S.cool > 0) S.cool -= dt;
     if (S.state === 'away') { S.steps.x = P.pos.x; S.steps.z = P.pos.z; return; }
     const g = gap(), podId = hidden();
@@ -473,7 +480,13 @@ export function createHunter(ctx) {
         if (!seen && (arrived || Math.hypot(S.lastSeen.x - ep().x, S.lastSeen.z - ep().z) < 0.5)) {
           // the last stretch off the graph: to the very spot, then still
           const dx = S.lastSeen.x - ep().x, dz = S.lastSeen.z - ep().z, d = Math.hypot(dx, dz);
-          if (d > 0.15 && !blockedAt(ep().x + dx / d * 0.2, ep().z + dz / d * 0.2, 0.3)) { const st = Math.min(d, huntSpeed() * dt); ep().x += dx / d * st; ep().z += dz / d * st; E.faceTowards(S.lastSeen.x, S.lastSeen.z, Math.min(1, dt * 8)); E.mode = 'run'; settle(); }
+          if (d > 0.15 && !blockedAt(ep().x + dx / d * 0.2, ep().z + dz / d * 0.2, 0.3)) {
+            if (lowSpot()) {   // (under the laundry's joists, on all fours: by its lunges)
+              if (E.mode !== 'crawl') { E.mode = 'crawl'; E.snap = 1; E.lungeOut = 0; }
+              E.crawlSpeed = huntSpeed(); const st = Math.min(d, E.lungeOut); E.lungeOut = 0;
+              ep().x += dx / d * st; ep().z += dz / d * st; crawlFace(dt, S.lastSeen); settle();
+            } else { const st = Math.min(d, huntSpeed() * dt); ep().x += dx / d * st; ep().z += dz / d * st; E.faceTowards(S.lastSeen.x, S.lastSeen.z, Math.min(1, dt * 8)); E.mode = 'run'; settle(); }
+          }
           else startSearch(true, { listen: true });
         } else if (S.lostT > 12) startSearch(true, { listen: false });
         break;
@@ -586,6 +599,11 @@ export function createHunter(ctx) {
         break;
       }
     }
+  }
+  // under the laundry's joists it is never on its feet: standing still there (listening, at a shut door, held by the light) it stays down
+  function lowGuard() {
+    if (!E.visible || S.state === 'away' || E.mode !== 'idle' || !lowSpot() || E.catchPose) return;
+    E.mode = 'crawl'; E.snap = 1; E.crawlSpeed = 0; E.lungeOut = 0;
   }
   function endSearch() {   // gave up: walks off
     setState('leave'); S.leaveT = 0; sfx.bed('music/chase', 0, 2); if (sfx.tensionDrone) sfx.tensionDrone(0, 2); sfx.drone(0.085, 3);
