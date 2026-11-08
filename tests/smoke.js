@@ -671,48 +671,79 @@ let BASE = '';
       return `the breaker brings the lights back (hunter ${a.hunter})`;
     }), 300e3);
 
-    // ---------- 17: the back door, the basement door and the parents' door ----------
-    await check(17, 'doors', () => alone(browser, async (c) => {
-      const { page, w } = await nightPage(c, '#night3&type=hunted');
-      await page.evaluate(() => { window.__game.nights.director.stop(); });
-      await climbDown(page);
-      const door = (n) => page.evaluate((n) => { const d = window.__game.W.doors[n]; return { target: d.target, a: d.a, on: d.col.on }; }, n);
-      // Mom and Dad's barn door off the dining room is locked at night: the handle does not turn, and you cannot walk through it
-      await stand(page, -2.05, 1.14, -2.72, 1.14); await sleep(400);
-      ok((await prompt(page)) === 'E Try the handle', `parents' door prompt "${await prompt(page)}"`);
-      await page.keyboard.press('KeyE'); await sleep(500);
-      const sub = await page.evaluate(() => document.getElementById('subtitle').textContent);
-      ok(/locked/i.test(sub), `the locked handle says so: "${sub}"`);
-      await hold(page, 'KeyW', 2500);
-      let d = await door('parents'), z = await page.evaluate(() => window.__game.P.pos.x);
-      ok(d.target === 0 && d.a === 0 && d.on && z > -2.95, `the parents' door at night: ${JSON.stringify(d)}, x ${z}`);
-      // the back door opens, and you walk out through it onto the stoop. Within reach of the handle you stand in its swing, so the leaf
-      // stops against you, and it finishes once you step back out of the way
-      await stand(page, -1.83, 4.0, -1.83, 4.67); await sleep(400);
-      ok((await prompt(page)) === 'E Open the door', `back door prompt "${await prompt(page)}"`);
-      await page.keyboard.press('KeyE'); await sleep(600);
-      await stand(page, -1.6, 3.3, -1.6, 4.67);
-      await until(page, () => window.__game.W.doors.back.a === 1, null, 10e3);
-      d = await door('back'); ok(d.target === 1 && !d.on, `back door: ${JSON.stringify(d)}`);
-      await hold(page, 'KeyW', 1800);
-      z = await page.evaluate(() => window.__game.P.pos.z);
-      ok(z > 5.2, `walking through the open back door reached only z ${z.toFixed(2)}`);
-      // from the stoop west down the outside stairs to the foot, then the basement door
-      await stand(page, -1.83, 5.3, -3.8, 5.3);
-      await hold(page, 'KeyW', 3600);
-      const f = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y }));
-      ok(f.y < -2.2 && f.x < -6.0, `the outside stairs: ${JSON.stringify(f)}`);
-      await page.evaluate(() => { window.__game.P.yaw = 0; window.__game.P.pitch = 0; }); await sleep(500);
-      ok((await prompt(page)) === 'E Open the door', `basement door prompt "${await prompt(page)}"`);
-      await page.keyboard.press('KeyE');
-      await until(page, () => window.__game.W.doors.basement.a === 1, null, 10e3);
-      await hold(page, 'KeyW', 1800);
-      const p = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y, z: window.__game.P.pos.z }));
-      const room = await roomAt(page, p.x, p.z, p.y);
-      ok(room === 'laundry' && p.z < 4.3, `through the basement door: ${JSON.stringify(p)} in ${room}`);
-      clean(w);
-      return `parents' door stays shut; back door to z ${z.toFixed(1)}, stairs down to y ${f.y.toFixed(1)}, into the ${room}`;
-    }), 300e3);
+    // ---------- 17: the doors at night: the parents' door, the back door locked on a hunted night, open in the blackout ----------
+    // The doors out of the house follow js/doors.js: on a hunted night the back door is tried, not opened; in the blackout it opens and the
+    // walk to the stoop, down the outside stairs and through the cellar door into the laundry still works. doors.js reaches the frame and
+    // the world only through js/hooks.js and W.plugin, never by editing update() or build()
+    await check(17, 'doors', async () => {
+      const src = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+      const doorsSrc = src('js/doors.js'), mainSrc = src('js/main.js'), worldSrc = src('js/world.js');
+      const upd = (mainSrc.match(/\nfunction update\(dt\) \{[\s\S]*?\n\}\n/) || [''])[0];
+      ok(/W\.plugin\(/.test(doorsSrc) && /export function tick\(/.test(doorsSrc) && /export function install\(/.test(doorsSrc), 'js/doors.js: no install(game) with W.plugin, or no tick');
+      ok(!/function update\(|function build\(|buildWorld/.test(doorsSrc), 'js/doors.js defines or calls update()/build()');
+      ok(upd && (upd.match(/doors/g) || []).length === 1 && /hooks\.doors\.tick\(dt\);/.test(upd), `main.js update() names the doors other than through hooks.doors.tick: ${(upd.match(/.*doors.*/g) || []).join(' | ')}`);
+      ok(!/pocketFence|doors\.js/.test(worldSrc), 'world.js knows about the night doors (they belong to js/doors.js)');
+      const hunted = await alone(browser, async (c) => {
+        const { page, w } = await nightPage(c, '#night3&type=hunted');
+        await page.evaluate(() => { window.__game.nights.director.stop(); });
+        await climbDown(page);
+        const door = (n) => page.evaluate((n) => { const d = window.__game.W.doors[n]; return { target: d.target, a: d.a, on: d.col.on }; }, n);
+        // Mom and Dad's barn door off the dining room is locked at night: the handle does not turn, and you cannot walk through it
+        await stand(page, -2.05, 1.14, -2.72, 1.14); await sleep(400);
+        ok((await prompt(page)) === 'E Try the handle', `parents' door prompt "${await prompt(page)}"`);
+        await page.keyboard.press('KeyE'); await sleep(500);
+        const sub = await page.evaluate(() => document.getElementById('subtitle').textContent);
+        ok(/locked/i.test(sub), `the locked handle says so: "${sub}"`);
+        await hold(page, 'KeyW', 2500);
+        let d = await door('parents'); const x = await page.evaluate(() => window.__game.P.pos.x);
+        ok(d.target === 0 && d.a === 0 && d.on && x > -2.95, `the parents' door at night: ${JSON.stringify(d)}, x ${x}`);
+        // the back door on a hunted night: tried, locked, and you cannot walk through it
+        await stand(page, -1.83, 4.0, -1.83, 4.67); await sleep(400);
+        ok((await prompt(page)) === 'E Try the door', `back door prompt on a hunted night "${await prompt(page)}"`);
+        await page.keyboard.press('KeyE'); await sleep(500);
+        const sub2 = await page.evaluate(() => document.getElementById('subtitle').textContent);
+        ok(/locked/i.test(sub2), `the back door says it is locked: "${sub2}"`);
+        await hold(page, 'KeyW', 1500);
+        d = await door('back'); const z = await page.evaluate(() => window.__game.P.pos.z);
+        ok(d.target === 0 && d.a === 0 && d.on && z < 4.5, `the back door on a hunted night: ${JSON.stringify(d)}, z ${z.toFixed(2)}`);
+        clean(w);
+        return `parents' door stays shut; back door locked (z ${z.toFixed(2)})`;
+      });
+      // the blackout: the back door opens, and you walk out through it onto the stoop. Within reach of the handle you stand in its swing,
+      // so the leaf stops against you, and it finishes once you step back out of the way
+      const blackout = await alone(browser, async (c) => {
+        const { page, w } = await nightPage(c, '#night3&type=blackout', { clock: 6 });
+        await climbDown(page);
+        await until(page, () => window.__game.F.blackout, null, 150e3);
+        await page.evaluate(() => { const g = window.__game; g.nights.director.stop(); g.nights.hunter.dismiss(); });
+        const door = (n) => page.evaluate((n) => { const d = window.__game.W.doors[n]; return { target: d.target, a: d.a, on: d.col.on }; }, n);
+        await stand(page, -1.83, 4.0, -1.83, 4.67); await sleep(400);
+        ok((await prompt(page)) === 'E Open the door', `back door prompt in the blackout "${await prompt(page)}"`);
+        await page.keyboard.press('KeyE'); await sleep(600);
+        await stand(page, -1.6, 3.3, -1.6, 4.67);
+        await until(page, () => window.__game.W.doors.back.a === 1, null, 10e3);
+        const d = await door('back'); ok(d.target === 1 && !d.on, `back door: ${JSON.stringify(d)}`);
+        await hold(page, 'KeyW', 1800);
+        const z = await page.evaluate(() => window.__game.P.pos.z);
+        ok(z > 5.2, `walking through the open back door reached only z ${z.toFixed(2)}`);
+        // from the stoop west down the outside stairs to the foot, then the basement door
+        await stand(page, -1.83, 5.3, -3.8, 5.3);
+        await hold(page, 'KeyW', 3600);
+        const f = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y }));
+        ok(f.y < -2.2 && f.x < -6.0, `the outside stairs: ${JSON.stringify(f)}`);
+        await page.evaluate(() => { window.__game.P.yaw = 0; window.__game.P.pitch = 0; }); await sleep(500);
+        ok((await prompt(page)) === 'E Open the door', `basement door prompt "${await prompt(page)}"`);
+        await page.keyboard.press('KeyE');
+        await until(page, () => window.__game.W.doors.basement.a === 1, null, 10e3);
+        await hold(page, 'KeyW', 1800);
+        const p = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y, z: window.__game.P.pos.z }));
+        const room = await roomAt(page, p.x, p.z, p.y);
+        ok(room === 'laundry' && p.z < 4.3, `through the basement door: ${JSON.stringify(p)} in ${room}`);
+        clean(w);
+        return `in the blackout the back door to z ${z.toFixed(1)}, stairs down to y ${f.y.toFixed(1)}, into the ${room}`;
+      });
+      return `${hunted}; ${blackout}; doors.js only through hooks and W.plugin`;
+    }, 420e3);
 
     // ---------- 18: brightness changes the exposure ----------
     await check(18, 'brightness', () => alone(browser, async (c) => {
