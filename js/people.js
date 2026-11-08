@@ -69,7 +69,7 @@ export const UNCANNY = { neck: 2.4, neckSpeed: 1.6, eyesHold: 6 };
 // sitting up in bed: how far the trunk curls up from the hips (the body lies flat by a group rotation, sleepers() in main.js)
 const SIT_UP = 1.5;
 // the parts that rest on the mattress, and the flesh round each bone (a body in bed is kept from sinking further than it lay at rest)
-const BED_REST = [['Head', 0.12], ['Pelvis', 0.11], ['Spine', 0.11], ['Spine1', 0.11], ['Spine2', 0.11], ['L_UpperArm', 0.05], ['R_UpperArm', 0.05], ['L_Forearm', 0.04], ['R_Forearm', 0.04], ['L_Hand', 0.03], ['R_Hand', 0.03],
+const BED_REST = [['Head', 0.15], ['Pelvis', 0.11], ['Spine', 0.11], ['Spine1', 0.11], ['Spine2', 0.11], ['L_UpperArm', 0.05], ['R_UpperArm', 0.05], ['L_Forearm', 0.04], ['R_Forearm', 0.04], ['L_Hand', 0.03], ['R_Hand', 0.03],
   ['L_Thigh', 0.075], ['R_Thigh', 0.075], ['L_Calf', 0.05], ['R_Calf', 0.05], ['L_Foot', 0.07], ['R_Foot', 0.07]];   // (the heel sits well under the ankle)
 const _qBed = new THREE.Quaternion(), _qRoll = new THREE.Quaternion(), _eBed = new THREE.Euler(), _yAx = new THREE.Vector3(0, 1, 0);
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look. uncanny: true for a double (by default, any body after

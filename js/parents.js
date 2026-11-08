@@ -95,14 +95,15 @@ function sees(par) {
 
 // ---------- voices ----------
 // a line in a parent's voice, from where their head is: through the walls when there are walls between, with its words on screen
-function say(par, id, { muffle = null, to = 'you', gain = 1.25 } = {}) {
+// (eyes: where the eyes rest after the line, when not on you)
+function say(par, id, { muffle = null, to = 'you', gain = 1.25, eyes = null } = {}) {
   const sfx = G.sfx, head = par.p.head.getWorldPosition(new V3()), c = G.camera.position, d = Math.hypot(c.x - head.x, c.z - head.z);
   const seen = los(c.x, c.z, head.x, head.z), mf = muffle ?? !seen;
   let dur = 0;
   try { dur = sfx.play ? sfx.play('vo/' + id, { gain: gain / (1 + d * 0.1), pan: { at: placed(head.x, head.y, head.z) }, wet: mf ? 0.35 : 0.2, muffle: mf }) : 0; } catch (e) { dur = 0; }
   const l = LINES[id], text = l ? l.html.replace(/<[^>]+>/g, '') : id;
   if (!dur) dur = Math.max(1.4, 0.8 + text.length / 15);
-  if (!mf && par.p.talk) { let env = null; try { env = sfx.envelope ? sfx.envelope('vo/' + id) : null; } catch (e) { env = null; } par.p.talk(env, { to, question: /\?\s*$/.test(text) }); }
+  if (!mf && par.p.talk) { let env = null; try { env = sfx.envelope ? sfx.envelope('vo/' + id) : null; } catch (e) { env = null; } par.p.talk(env, { to, question: /\?\s*$/.test(text), eyesOn: eyes }); }
   if (l && G.UI && G.UI.subtitle) G.UI.subtitle(l.html, Math.max(2.4, dur + 0.6), 'speech');
   stats.said.push(id);
   return dur;
@@ -162,20 +163,20 @@ function bedState(par) {
   return { roll: par.roll, shift: par.shift + OUTWARD[par.who], sit: par.sit, toFoot: par.who === 'dad' ? 0.16 : 0.1 };
 }
 // the limbs under the quilt as capsules in the bed's frame, for the quilt to rise over (world.js bedSleepers.hull)
-const CAPS = [['Pelvis', 'Spine1', 0.13], ['Spine1', 'Spine2', 0.12], ['Spine2', 'Neck', 0.11], ['L_UpperArm', 'R_UpperArm', 0.06],
+const CAPS = [['Pelvis', 'Pelvis', 0.13, null, 'hips'], ['Pelvis', 'Spine1', 0.13], ['Spine1', 'Spine2', 0.12], ['Spine2', 'Neck', 0.11], ['L_UpperArm', 'R_UpperArm', 0.06],
   ['L_Thigh', 'L_Calf', 0.075], ['L_Calf', 'L_Foot', 0.052], ['L_Foot', 'L_Toe0', 0.04], ['R_Thigh', 'R_Calf', 0.075], ['R_Calf', 'R_Foot', 0.052], ['R_Foot', 'R_Toe0', 0.04],
   ['L_UpperArm', 'L_Forearm', 0.052, 'L'], ['L_Forearm', 'L_Hand', 0.042, 'L'], ['L_Hand', 'L_Finger2', 0.032, 'L'], ['R_UpperArm', 'R_Forearm', 0.052, 'R'], ['R_Forearm', 'R_Hand', 0.042, 'R'], ['R_Hand', 'R_Finger2', 0.032, 'R']];
 const _a = new V3(), _b = new V3();
 function hullOf(par) {
-  const out = new Float32Array(CAPS.length * 7);
+  const out = new Float32Array(CAPS.length * 7);   // (a hips entry is a ball at the pelvis: sitting up, the trunk rising off it takes no quilt with it)
   return () => {
     const r = par.p.rig, bed = bedOf(); if (!r || !bed || !par.inBed) return null;
     let n = 0;
-    const torsoOn = par.sit < 0.35, armsOn = par.sit < 0.6;
-    for (const [a, b, rad, arm] of CAPS) {
+    const torsoOn = par.sit < 0.25, armsOn = par.sit < 0.2;
+    for (const [a, b, rad, arm, hips] of CAPS) {
       const A = r.bones[a], B = r.bones[b]; if (!A || !B) continue;
       if (arm && (!armsOn || par.armOut[arm] > 0.02 || par.armUp[arm] > 0.02)) continue;   // an arm out lies on the quilt, not under it
-      if (!arm && !/Thigh|Calf|Foot|Pelvis/.test(a) && !torsoOn) continue;               // sitting up, the quilt falls from the chest into the lap
+      if (!arm && !hips && !/Thigh|Calf|Foot/.test(a) && !torsoOn) continue;               // sitting up, the quilt falls from the chest into the lap (the hips stay under it)
       A.getWorldPosition(_a); B.getWorldPosition(_b); bed.toLocal(_a); bed.toLocal(_b);
       out[n++] = _a.x; out[n++] = _a.y; out[n++] = _a.z; out[n++] = _b.x; out[n++] = _b.y; out[n++] = _b.z; out[n++] = rad;
     }
@@ -238,12 +239,10 @@ function bedTick(par, dt) {
     if (R.t >= ROLL_T) par.rolling = null;
   }
   // Dad's arm out onto the quilt, once a night, while he lies on his back; Mom's from under it once the house has split them
-  if (still && par.armOutT < Infinity && !par.armDone && !par.rolling && Math.abs(par.roll) < 0.05) {
-    par.armOutT -= dt;
-    if (par.armOutT <= 0 && !par.armOutRun) {
-      par.armOutRun = { t: 0, hold: 25 + Math.random() * 20 }; stats.armOuts[par.who]++;
-      const at = p.head.getWorldPosition(new V3()); sound('cloth', placed(at.x, 0.75, at.z), { gain: 0.25 });
-    }
+  if (still && par.armOutT < Infinity && !par.armDone) par.armOutT -= dt;
+  if (still && par.armOutT <= 0 && !par.armDone && !par.armOutRun && !par.rolling && Math.abs(par.roll) < 0.05) {
+    par.armOutRun = { t: 0, hold: 25 + Math.random() * 20 }; stats.armOuts[par.who]++;
+    const at = p.head.getWorldPosition(new V3()); sound('cloth', placed(at.x, 0.75, at.z), { gain: 0.25 });
   }
   const side = par.who === 'dad' ? 'L' : 'R';   // the outer arm: Dad's left is the wall side, Mom's right the door side
   if (par.armOutRun) {
@@ -255,26 +254,23 @@ function bedTick(par, dt) {
   const sideK = Math.min(1, Math.abs(par.roll) / ROLL), down = par.roll > 0 ? 'L' : 'R', up = down === 'L' ? 'R' : 'L';
   b.rest = !par.rolling && sideK < 0.01 && par.sit < 0.01 && !(par.armOut.L + par.armOut.R);
   b.knee.L = b.knee.R = 0; b.knee[up] = 0.6 * sideK;
-  b.turn = (par.who === 'mom' ? 1 : -1) * Math.max(0, 1 - 2 * sideK);   // (rolled, the head lies straight on the pillow)
+  // (the head stays as it lay on the pillow while the body turns under it: the neck takes the roll, so the skull never rolls down into
+  // the pillow; on the back they face each other)
+  b.turn = (par.who === 'mom' ? 1 : -1) - par.roll / 0.55;
   b.sit = par.sit; b.awake = par.st !== 'asleep';
   for (const S of ['L', 'R']) b.arms[S] = null;
   p.group.updateMatrixWorld(true);
   const s = (p.group.userData.h || 1.75) / 1.75, inner = par.who === 'dad' ? 'R' : 'L', q = p.group.getWorldQuaternion(new THREE.Quaternion());
-  // where each hand goes in the group's frame, and which way its elbow: on the back the hand on the side toward the other one rests on the
-  // stomach, its elbow in at the side and down toward the mattress (the two of them would lie arm in arm otherwise); on a side the lower
-  // arm lies in front of the stomach, its elbow in front of the body (not off the edge of the bed), the upper hand on the hip, its elbow
-  // down along the flank (not out behind into the other one). The arm toward the other one always has a place; the outer arm is the
-  // clip's on the back
-  const sgOf = (S) => (S === 'L' ? 1 : -1);
-  const belly = (S) => ({ at: new V3(sgOf(S) * 0.09, 0.97 * s, 0.15 * s), pole: new V3(sgOf(S) * 0.25, -0.3, -0.9) });
-  const front = (S) => ({ at: new V3(sgOf(S) * 0.06, 1.12 * s, 0.2 * s), pole: new V3(0, -0.4, 0.9) });
-  const hip = (S) => ({ at: new V3(sgOf(S) * 0.16, 0.95 * s, 0.12 * s), pole: new V3(sgOf(S) * 0.15, -0.9, 0.2) });
+  // where each hand goes in the group's frame, and which way its elbow. The hand on the side toward the other one rests on the stomach,
+  // its elbow down toward the mattress (whichever way the body has turned: they turn away from each other, so that is never toward the
+  // other one); the two of them would lie arm in arm otherwise. Rolled onto the outer side, the lower arm lies in front of the stomach,
+  // its elbow in front of the body (not off the edge of the bed); on the back the outer arm is the clip's
+  const sgOf = (S) => (S === 'L' ? 1 : -1), feet = new V3(0, -1, 0).applyQuaternion(q);
   for (const S of ['L', 'R']) {
-    const rolled = S === down ? front(S) : hip(S);
     if (S === inner && par.sit < 0.02) {
-      const k = sm(cl((sideK - 0.5) / 0.5, 0, 1)), a = belly(S), at = a.at.lerp(rolled.at, k), pole = a.pole.lerp(rolled.pole, k);   // (on the stomach until the roll is half done)
-      b.arms[S] = { at: p.group.localToWorld(at), w: 1, grip: 0.3, pole: pole.applyQuaternion(q) };
-    } else if (sideK > 0.01) b.arms[S] = { at: p.group.localToWorld(rolled.at), w: S === down ? sideK : sideK * 0.9, grip: 0.3, pole: rolled.pole.applyQuaternion(q) };
+      b.arms[S] = { at: p.group.localToWorld(new V3(sgOf(S) * 0.09, 0.97 * s, 0.15 * s)), w: 1, grip: 0.3, pole: new V3(0, -1, 0).addScaledVector(feet, 0.35) };
+    } else if (sideK > 0.01 && S === down) b.arms[S] = { at: p.group.localToWorld(new V3(sgOf(S) * 0.06, 1.12 * s, 0.2 * s)), w: sideK, grip: 0.3, pole: new V3(0, -0.4, 0.9).applyQuaternion(q) };
+    else if (sideK > 0.01) b.arms[S] = { at: p.group.localToWorld(new V3(sgOf(S) * 0.12, 0.95 * s, 0.17 * s)), w: sideK * 0.9, grip: 0.3, pole: new V3(0, -1, 0).addScaledVector(feet, 0.35) };
   }
   // sitting up: the hands on the lap, laid on the quilt over the thighs
   if (par.sit > 0.02 && p.rig && p.rig.bones.L_Thigh && quilt) {
@@ -820,9 +816,9 @@ async function upDad(par, why) {
   stats.firstGoal = { x: src.at.x, z: src.at.z };
   par.rec = wokeRow(par, src.at);
   if (G.lights && G.lights.set && !G.lights.isOn('parents')) G.lights.set('parents', true, { by: 'house' });
-  if (!(await getOut(par))) return;
+  if (!(await getOut(par))) return bail(par, tok);
   par.st = 'walking';
-  if (!(await takeTorch(par))) return;
+  if (!(await takeTorch(par))) return bail(par, tok);
   if (G.lights && G.lights.movers && !G.lights.movers.includes(p.group)) G.lights.movers.push(p.group);
   // out of the room
   if (!(await goTo(par, new V3(DOOR.x + 0.7, 0, DOOR.z)))) return endWalk(par);
@@ -932,6 +928,8 @@ async function endWalk(par) {
   if (tok !== TOK) return;
   finishUp(par, !ok);
 }
+// a walk that could not go on (no way found): back in bed as it stands, the house free again (unless the night itself moved on)
+function bail(par, tok) { if (tok === TOK) finishUp(par, true); }
 // the walk over: back in bed (laid there if the way back failed), the house free again
 function finishUp(par, place = false) {
   const p = par.p, i = G.lights && G.lights.movers ? G.lights.movers.indexOf(p.group) : -1; if (i >= 0) G.lights.movers.splice(i, 1);
@@ -946,7 +944,7 @@ async function upMom(par) {
   const tok = TOK, p = par.p; par.st = 'up'; stats.up = { who: 'mom', at: T, n: night() };
   par.woke++; par.mult = HARDER; holdRes(); endE();
   par.rec = wokeRow(par, loudest() ? loudest().at : null);
-  if (!(await getOut(par))) return;
+  if (!(await getOut(par))) return bail(par, tok);
   par.st = 'walking'; stats.firstGoal = { x: kidLook().out.x, z: kidLook().out.z, door: 'kid' };
   if (G.lights && G.lights.movers && !G.lights.movers.includes(p.group)) G.lights.movers.push(p.group);
   if (!(await goTo(par, new V3(DOOR.x + 0.7, 0, DOOR.z)))) return endWalk(par);
@@ -1012,11 +1010,12 @@ async function momOnBunk(par) {
   say(par, 'mom/n5_f');
   // she waits; when you come out she looks past you, and says the same as if she had found you
   await until(() => !inPod() && P().mode === 'walk', 600); if (tok !== TOK) return;
-  par.gazeOn = null; const pp = playerPos(); par.p.gaze = new V3(pp.x + (pp.x - p.group.position.x) * 2, 1.4, pp.z + (pp.z - p.group.position.z) * 2);   // past you
-  par.blind = true;
+  par.gazeOn = null; const pp = playerPos(), past = new V3(pp.x + (pp.x - p.group.position.x) * 2, 1.4, pp.z + (pp.z - p.group.position.z) * 2);   // past you
+  par.aimAt = past; par.blind = true;
   await wait(1.2); if (tok !== TOK) return;
   const g1 = bunkSeat().stand; await tween(0.9, (k) => { sitOnBunk(par, 1 - k, g1); }); p.pose = null;
-  await wait(say(par, 'mom/n5_b') + 0.4); if (tok !== TOK) return;
+  await wait(say(par, 'mom/n5_b', { eyes: past }) + 0.4); if (tok !== TOK) return;
+  par.aimAt = null;
   if (night() === 5) await handoff(par); else await endWalk(par);
 }
 async function momOutside(par) {
@@ -1155,6 +1154,7 @@ export function laid(on, only = null) {
   for (const w of WAIT.splice(0)) w.res(false);
   LEDGER.N = 0; LEDGER.entries.length = 0; LEDGER.wasOver = false; LEDGER.lastMutter = -99; LEDGER.mutterOff = 0; LEDGER.polled = {};
   torchHome();
+  { const d = W().doors.parents; if (d) { d.max = 1; if (d.target && on) W().setDoor('parents', false, true); } }   // (a walk cut short leaves their door as it was)
   const n = night();
   for (const par of Object.values(PAR)) {
     par.st = on ? 'asleep' : 'day'; par.mult = 1; par.woke = 0; par.walk = null; par.rec = null; par.walkRow = null; par.noticed = null; par.blind = false; par.gazeOn = null; par.aimAt = null;

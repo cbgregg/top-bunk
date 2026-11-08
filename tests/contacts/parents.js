@@ -98,7 +98,7 @@ module.exports = {
     t.force = true; g.F.night = 2; g.setPhase('night', true); g.F.phase = 'night';
     g.mom.group.visible = g.dad.group.visible = true;
     const bedAt = g.W.bedSleepers.group.getWorldPosition(new V3());
-    let T = 0, all = [], checks = 0, worstOther = 0;
+    let T = 0, all = [], checks = 0, worstOther = 0; const bad = [];
     const armOut = () => t.PAR.dad.armOut.L > 0.02 || t.PAR.mom.armOut.R > 0.02;
     const outArm = (h) => /^(L|R) (upper arm|forearm|hand)/.test(h.part) && /^plane /.test(h.obj) && armOut();
     for (let f = 0; f < 180 * 60; f++) {
@@ -108,7 +108,12 @@ module.exports = {
       for (const who of [g.dad, g.mom]) {
         let hits = check(who.group, { floorCheck: false }).filter((h) => !outArm(h));
         hits = hits.concat(others(who, who === g.dad ? g.mom : g.dad, armOut() ? [/^(L|R) (upper arm|forearm|hand)/] : []));
-        if (hits.length) all = C.merge(all, hits.map((h) => ({ ...h, part: (who === g.dad ? 'Dad ' : 'Mom ') + h.part })));
+        if (hits.length) {
+          all = C.merge(all, hits.map((h) => ({ ...h, part: (who === g.dad ? 'Dad ' : 'Mom ') + h.part })));
+          // the first few moments that fail, each drawn as a frame of its own, with what the two of them were doing
+          const P2 = t.PAR, st = `t ${T.toFixed(1)} s: Dad roll ${P2.dad.roll.toFixed(2)} sit ${P2.dad.sit.toFixed(2)} arm ${P2.dad.armOut.L.toFixed(2)}, Mom roll ${P2.mom.roll.toFixed(2)}`;
+          if (bad.length < 4 && !bad.some((b) => Math.abs(b.T - T) < 3)) { bad.push({ T }); out.push(C.rec({ label: `Asleep at ${st}`, hits, cam: [[bedAt.x + 0.3, 1.5, bedAt.z - 1.7], [bedAt.x, 0.75, bedAt.z]] })); }
+        }
       }
     }
     const s = t.stats;

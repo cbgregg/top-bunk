@@ -1080,7 +1080,7 @@ export function buildWorld(scene) {
         const across = { mom: (x) => { const d = (x - XM) / 0.34; return 1.10 * Math.exp(-d * d * d * d * 2); }, dad: (x) => { const d = (x - XD) / 0.45, d2 = d * d; return 1.22 * Math.exp(-d2 * d2 * d2 * 2); },
           third: (x) => { const d = (x - XT) / 0.26; return 0.9 * Math.exp(-d * d * d * d * 2); } };
         // sitting up, the quilt falls from the chest into the lap: the rise over the first part of the bed goes as k does
-        const torsoFall = (z, k) => (k <= 0 ? 1 : 1 - k * (1 - sm((alongOf(z) - 0.3) / 0.28)));
+        const torsoFall = (z, k) => (k <= 0 ? 1 : 1 - Math.min(1, 2 * k) * (1 - sm((alongOf(z) - 0.3) / 0.28)));   // (all of it by halfway up)
         const folds = (x, z) => { const edge = sm((x - X0) / 0.08) * sm((X1 - x) / 0.08) * sm((z - Z0) / 0.08) * sm((Z1 - z) / 0.08); return edge * (0.02 * Math.sin(x * 9 + 0.7) * Math.sin(z * 5.3 + 1.1) + 0.011 * Math.sin(x * 21 + z * 8)); };   // the folds stay off the edges
         const sheet = (x0, x1, z0, z1, nx, nz, mat, lift) => {
           const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, nx, nz); geo.rotateX(-Math.PI / 2); geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
