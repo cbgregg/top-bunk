@@ -46,9 +46,10 @@ export function inForest(x, z) {
 }
 const inside = (r, x, z) => x > r[0] && x < r[1] && z > r[2] && z < r[3];
 const OUTDOOR = new Set(['out', 'stoop', 'garage']);
-// the side of each door its rule is for (the house side); the far side always opens. out: the outward normal (x, z); y: its floor
+// each door's far side, the one it always opens from (free: the direction of that side from the door's middle, x and z): the stoop, the
+// laundry, the inside of the garage; the front door is on its chain from both sides. y: the floor the door stands on
 const SIDE = {
-  front: { out: [0, -1] }, back: { out: [0, 1] }, basement: { out: [0, 1], y: -2.4 }, garage: { out: [0, 1] },
+  front: { free: null }, back: { free: [0, 1] }, basement: { free: [0, -1], y: -2.4 }, garage: { free: [0, -1] },
 };
 // where the thing stands for the leash, by the door you came out of (nav.js: 0.6 m out from each door's middle)
 const LEASH = { front: 'frontOut', back: 'backOut', basement: 'cellarOut' };
@@ -102,7 +103,7 @@ export function lockFor(name, pos) {
   const r = rule(name); if (r === 'open') return null;
   if (r === 'chain') return 'chain';
   const d = G.W.doors[name], s = SIDE[name];
-  if (d && pos && s && ((pos.x - d.mid.x) * s.out[0] + (pos.z - d.mid.z) * s.out[1]) > 0) return null;
+  if (d && pos && s && s.free && ((pos.x - d.mid.x) * s.free[0] + (pos.z - d.mid.z) * s.free[1]) > 0) return null;
   return r;
 }
 
@@ -240,7 +241,7 @@ export function refuse(how = 'fence') {
   if (sfx.breath) sfx.breath(true, 0.2);
   S.dim = { t: 0 };
   G.log.push({ id: 'refused', seen: true, how });
-  S.log.push({ t: T, what: 'refuse', how });
+  S.log.push({ t: T, what: 'refuse', how, fear: F.fear });
 }
 // the flashlight sags to half for eight seconds and comes back over two (the beam in the hand: the spot light on the camera)
 let torch = null;

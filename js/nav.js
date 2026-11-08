@@ -93,7 +93,7 @@ export const OUTSIDE = {
 };
 const OUTSIDE_EDGES = [
   ['frontOut', 'porch'], ['porch', 'drive1'], ['drive1', 'driveE'], ['driveE', 'drive2'], ['drive2', 'mailbox'],
-  ['drive1', 'garPad'], ['garPad', 'garDoor'], ['garPad', 'yardSW'],
+  ['drive1', 'garPad'], ['garPad', 'yardSW'],
   ['yardB2', 'yardNW'], ['yardNW', 'yardSW2'], ['yardSW', 'yardSW2'], ['yardSW2', 'gate', 'gate'],
   ['gate', 'track1'], ['track1', 'track2'], ['track2', 'track3'], ['track3', 'barnDoor'], ['barnDoor', 'barnMid', 'barn'], ['barnMid', 'barnLoft'],
   ['backOut', 'stoop'], ['cellarOut', 'stairBot'],
