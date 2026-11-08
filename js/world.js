@@ -2043,9 +2043,10 @@ export function buildWorld(scene) {
     g.fillStyle = '#e9e6dc'; g.fillRect(0, 0, 128, 160); g.strokeStyle = '#1a1a1a'; g.lineWidth = 5; g.strokeRect(6, 6, 116, 148);
     g.fillStyle = '#1a1a1a'; g.textAlign = 'center'; g.font = 'bold 22px sans-serif'; g.fillText('SPEED', 64, 38); g.fillText('LIMIT', 64, 64); g.font = 'bold 72px sans-serif'; g.fillText('35', 64, 138);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })); sign.position.set(-46, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.4, 0.06), M.steel); post.position.set(-46.04, 1.2, -26.0); yard.add(post);
-    solid(-46.12, -45.96, -26.08, -25.92, { maxY: 2.4, id: 'signPost' });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, metalness: 0.2 })); sign.position.set(-46.009, 2.0, -26.0); sign.rotation.y = -Math.PI / 2; yard.add(sign);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.75, 0.6), M.steel); back.position.set(-46.0, 2.0, -26.0); yard.add(back);   // its back a plain plate (the face only reads from the west)
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.44, 0.06), M.steel); post.position.set(-45.966, 1.18, -26.0); yard.add(post);   // behind the plate, 4 cm into the ground
+    solid(-46.04, -45.9, -26.08, -25.92, { maxY: 2.4, id: 'signPost' });
     const reflMat = new THREE.MeshStandardMaterial({ color: 0xff2a1e, emissive: 0x8a0c08, emissiveIntensity: 0.6, roughness: 0.3 }), all = PHONE ? [] : Array.from({ length: 13 }, (_, i) => -240 + i * 40);
     for (const [list, parent] of [[all.filter((x) => Math.abs(x) < BEND), yard], [all.filter((x) => Math.abs(x) >= BEND), roadEnds.far]]) {
       if (!list.length) continue;
@@ -2120,7 +2121,7 @@ export function buildWorld(scene) {
       const onWall = (ang) => { const ux = Math.cos(ang), uz = Math.sin(ang), yaw = -ang + Math.PI / 2; return (geo, r, along, y, turn = 0) => { geo.rotateY(yaw + turn); geo.translate(SX + ux * r - uz * along, y, SZ + uz * r + ux * along); steel.push(geo); return geo; }; };
       {   // the ladder up the south-east side, 0.18 m off the staves on standoffs, and its cage from 2.4 m up
         const put = onWall(Math.atan2(-0.8, 0.6)), LR = SR + 0.18;
-        for (const s of [-0.21, 0.21]) put(new THREE.BoxGeometry(0.05, STOP + 0.2, 0.05), LR, s, (STOP + 0.2) / 2 + 0.3);   // the rails
+        for (const s of [-0.21, 0.21]) put(new THREE.BoxGeometry(0.05, STOP + 0.5 - SY0, 0.05), LR, s, (STOP + 0.5 + SY0) / 2);   // the rails, standing on the footing's edge
         for (let y = 0.6; y < STOP + 0.3; y += 0.3) put(new THREE.CylinderGeometry(0.014, 0.014, 0.42, 6).rotateZ(Math.PI / 2), LR, 0, y);   // the rungs
         for (let y = 1.2; y < STOP; y += 2.4) for (const s of [-0.21, 0.21]) put(new THREE.BoxGeometry(0.03, 0.03, 0.2), SR + 0.08, s, y);   // the standoffs
         for (let y = 2.4; y < STOP + 0.4; y += 0.9) put(new THREE.TorusGeometry(0.38, 0.012, 4, 20, Math.PI).rotateX(Math.PI / 2), LR + 0.02, 0, y);   // the cage's hoops, round the outside
@@ -2267,8 +2268,8 @@ export function buildWorld(scene) {
   // Hidden while the car dream drives on through them (roadEnds.dream). A phone's fog ends the road first
   if (!PHONE) {
     const r = TX.rng(1501), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion(), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), fir = [[], []];
-    for (const s of [-1, 1]) for (let row = 0; row < 4; row++) for (let z = -70 + row * 1.3; z < 6; z += 3.6 + r() * 1.4) {
-      const x = s * (BEND + 4 + row * 4.4 + r() * 1.8), zz = z + (r() - 0.5) * 1.2, k = 1.0 + r() * 0.4 + row * 0.08;
+    for (const s of [-1, 1]) for (let row = 0; row < 4; row++) for (let z = -70 + row * 1.3; z < 6; z += 3.2 + r() * 2.6) {
+      const x = s * (BEND + 4 + row * 4.4 + r() * 3.2), zz = z + (r() - 0.5) * 2.2, k = 0.8 + r() * r() * 0.9 + row * 0.1;
       q.setFromAxisAngle(up, r() * 6.28); fir[r() < 0.5 ? 0 : 1].push(m4.clone().compose(new THREE.Vector3(x, fieldH(x, zz) + ditchAt(x, zz) - 0.05, zz), q, sc.set(k, k, k)));
     }
     const haze = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', THREE.ShaderChunk.fog_fragment.replace('mix( gl_FragColor.rgb, fogColor, fogFactor )', 'mix( gl_FragColor.rgb, fogColor, min( fogFactor, 0.6 ) )')); };
