@@ -1068,8 +1068,9 @@ export function buildWorld(scene) {
       // slept in. one('dad', false) empties his side. Each side follows its sleeper: shift(name, dx) moves its rise across the bed with
       // the body (a roll-over), torso(name, k) lets the quilt fall from the chest to the lap as they sit up, and hull(name, fn) hands it
       // the body's limbs as capsules in the bed's own frame ([ax, ay, az, bx, by, bz, r] each, y up from the floor), so wherever a limb
-      // rises above the resting shape the quilt rises over it (it lifts at once and settles back slowly, like cloth). third(k) puts a
-      // third body under it, between the two. heightAt(x, z) is the quilt's top at a point of the bed's frame (an arm laid on it).
+      // rises above the resting shape the quilt rises over it (it lifts at once and settles back slowly, like cloth). third(k, x) puts a
+      // third body under it, between the two, its middle at x across the bed. heightAt(x, z) is the quilt's top at a point of the bed's
+      // frame (an arm laid on it).
       bedSleepers = (() => {
         const cl = (v, a, b) => Math.max(a, Math.min(b, v)), sm = (t) => { t = cl(t, 0, 1); return t * t * (3 - 2 * t); };
         const g = new THREE.Group(); bed.add(g);
@@ -1077,7 +1078,8 @@ export function buildWorld(scene) {
         // the sheet is a little wider than the mattress (0.53 each side) so that it hangs down over the rolled edges: past EDGE it drapes to
         // DRAPE, never over a limb, and from the side nobody is seen lying under it
         const EDGE = 0.5, DRAPE = 0.62, FOOT = -0.98, FOOT_DRAPE = 0.69;   // (and over the foot, to just over its rolled edge)
-        const XM = 0.23, XD = -0.21, XT = 0.01;   // across the bed: where Mom's, Dad's and a third body's rises are centred at rest
+        const XM = 0.23, XD = -0.21, XT0 = 0.01;   // across the bed: where Mom's, Dad's and a third body's rises are centred at rest
+        let XT = XT0;                              // (the third one lies where it is put: third(k, x))
         const CHIN = 0.18, TUCK = 0.755;          // a child between them: how far up the pillows its share of the quilt comes, and how low it tucks there
         // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
         // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
@@ -1121,7 +1123,7 @@ export function buildWorld(scene) {
           shift(name, dx) { fx.sides[name].dx = dx; },
           torso(name, k) { fx.sides[name].torso = cl(k, 0, 1); },
           hull(name, fn) { fx.sides[name].hull = fn || null; },
-          third(k) { fx.k3Want = cl(k, 0, 1); },
+          third(k, x = XT0) { fx.k3Want = cl(k, 0, 1); if (k > 0) XT = x; },
           // the quilt's top at (x, z) in the bed's frame, as last drawn
           heightAt(x, z) {
             const i = Math.round(cl((x - X0) / (X1 - X0), 0, 1) * NX) + Math.round(cl((z - Z0) / (Z1 - Z0), 0, 1) * NZ) * (NX + 1);   // (the sheet's rows run from the foot, Z0, after its turn onto the bed)
@@ -1154,7 +1156,7 @@ export function buildWorld(scene) {
                 // the third one is a child, lower in the bed than its parents' heads: the middle of the pillow end is drawn up onto the pillows
                 // to its chin and tucked down there, so from its eyes the quilt is over it to the chin (and the pillows, not the sheet, under the fold)
                 let zz = z;
-                if (k3) { const d = (x - XT) / 0.14, wt = k3 * Math.exp(-d * d * d * d); if (wt > 1e-3) { zz = z + CHIN * wt * sm((z - (Z1 - 0.35)) / 0.35); y += (TUCK - y) * wt * sm((z - (Z1 - 0.1)) / 0.1); } }
+                if (k3) { const d = (x - XT) / 0.1, wt = k3 * Math.exp(-d * d * d * d); if (wt > 1e-3) { zz = z + CHIN * wt * sm((z - (Z1 - 0.35)) / 0.35); y += (TUCK - y) * wt * sm((z - (Z1 - 0.1)) / 0.1); } }   // (a child's width: never out under the arms either side)
                 // a limb above the resting shape lifts the cloth over it
                 for (const sd of [M0, D0]) if (sd.caps) { const top = hullTop(sd.caps, x, zz); if (top > y) y = top; }
                 // cloth: up at once (nothing may come through it), down slowly
