@@ -13,8 +13,10 @@ module.exports = {
     const notes = [];
     await alone(browser, async (c) => {
       const { page, w } = await nightPage(c, '#night2&type=hunted', { pad: true });
-      // nothing drawn, not even a shot's print (it would push the whole never-warmed scene through the software renderer)
-      await page.evaluate(async () => { const g = window.__game, ev = await import('/js/events.js'); g.nights.director.stop(); g.nights.hunter.dismiss(); ev.suspend(true); g.gfx.render = () => {}; g.P.mode = 'walk'; g.F.cutscene = false; g.F.script = false; g.F.noFlash = false; g.F.fear = 0; });
+      // nothing drawn, not even a shot's print (it would push the whole never-warmed scene through the software renderer); on its feet in
+      // the hall, not where the bunk seats it (walked from there, the bunk's box puts it out through the wall into the yard, where the
+      // thing comes for a kid out of the house at night)
+      await page.evaluate(async () => { const g = window.__game, ev = await import('/js/events.js'); g.nights.director.stop(); g.nights.hunter.dismiss(); ev.suspend(true); g.gfx.render = () => {}; g.P.mode = 'walk'; g.P.pos.set(7.63, 0, -0.42); g.P.vel.set(0, 0, 0); g.F.cutscene = false; g.F.script = false; g.F.noFlash = false; g.F.fear = 0; });
       const G = (fn, arg) => page.evaluate(fn, arg);
       const press = (i, on) => G(([i, on]) => { window.__pad.buttons[i].pressed = on; }, [i, on]);
       const hold = async (i, ms) => { await press(i, true); await sleep(ms); await press(i, false); await sleep(150); };
@@ -98,7 +100,7 @@ module.exports = {
       const cov = await G(() => ({ mode: window.__game.P.mode, breath: window.__game.P.breath, down: window.__game.input.down('breath') }));
       await press(5, false);
       ok(cov.mode === 'hide' && cov.down && cov.breath < 1, `RB on the bunk: ${JSON.stringify(cov)}`);
-      await G(() => { const g = window.__game; g.toBunk(); g.UI.blanket(false); g.P.mode = 'walk'; });
+      await G(() => { const g = window.__game; g.toBunk(); g.UI.blanket(false); g.P.mode = 'walk'; g.P.pos.set(5.2, 0, -0.15); g.P.vel.set(0, 0, 0); });   // (off the bunk onto the hall floor, as above)
 
       // ---- the d-pad no longer moves you; the left stick does
       await stand(page, 5.2, -0.15, 1.0, -0.15);

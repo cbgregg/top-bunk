@@ -315,6 +315,10 @@ module.exports = {
         stand(10.16, -0.42, 12, -0.42); await run(2.5);
         H.place('hallM', { force: true }); H.hunt('hallM'); H.S.replan = 99; H.S.path = []; Ent.root.position.set(7.4, 0, -0.42);
         const hd = Ent.headWorld(new (window.__game.camera.position.constructor)()); face(hd.x, hd.z, hd.y);
+        // the torch held up: this check's frame does not run the hands, so for this part their aim is what F.flashAimed says (the hunter
+        // reads hands.aimed with the flashlight out; the bindings check proves LT sets it)
+        const hands = window.__game.hands, aimedWas = hands && Object.getOwnPropertyDescriptor(hands, 'aimed');
+        if (aimedWas) Object.defineProperty(hands, 'aimed', { configurable: true, enumerable: true, get: () => !!F.flashAimed && hands.active !== 'camera' });
         F.flashOn = true; F.flashAimed = true;
         let flinchT = 0; for (let i = 0; i < 90; i++) { await run(1 / 60); const h2 = Ent.headWorld(hd); face(h2.x, h2.z, h2.y); if (Ent.flinch > 0.01) flinchT += 1 / 60; }
         const f1 = rows('flinch').length;
@@ -322,10 +326,10 @@ module.exports = {
         const f2 = rows('flinch').length;
         // the flash: a photo (the hands' flash mark when they have one, else the photo this file hears)
         F.flashAimed = false; F.flashOn = false;
-        const hands = window.__game.hands; const fire = () => { if (hands && hands.flashAt !== undefined) hands.flashAt = window.__game.gameTime + Math.random(); else N.stage.photoTaken(); };
+        const fire = () => { if (hands && hands.flashAt !== undefined) hands.flashAt = window.__game.gameTime + Math.random(); else N.stage.photoTaken(); };
         await run(0.1); fire(); let stunT = 0; for (let i = 0; i < 150; i++) { await run(1 / 60); if (Ent.stun > 0.01) stunT += 1 / 60; const h2 = Ent.headWorld(hd); face(h2.x, h2.z, h2.y); }
         const s1 = rows('flashStun').length; fire(); await run(0.5); const s2 = rows('flashStun').length;
-        H.dismiss();
+        H.dismiss(); if (aimedWas) Object.defineProperty(hands, 'aimed', aimedWas);
         return { flinchT: +flinchT.toFixed(2), f1, f2, stunT: +stunT.toFixed(2), s1, s2, hd: [hd.x, hd.y, hd.z].map((v) => +v.toFixed(2)) };
       });
       ok(light.f1 === 1 && light.f2 === 1 && light.flinchT > 0.5 && light.flinchT <= 0.85, `the flinch: ${JSON.stringify(light)}`);
