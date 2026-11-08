@@ -261,7 +261,8 @@ async function rules(browser) {
     ok(!v.visible, 'the thing stayed in his beam');
     ok(!v.flicker && v.flicks.length >= 1 && v.flicks.every((f) => f === false), 'it did not go by hunter.vanish(false): ' + JSON.stringify(v));
     await follow(page, (par) => par.test.stats.up && par.state('dad') === 'asleep', 200e3);
-    await P(page, (par) => { par.test.stats.up = null; par.test.PAR.dad.stirCool = 0; par.test.set(0.9); });
+    // (Mom kept out of it: from night five she is the first up past 0.9, and here it is Dad's thresholds that are measured)
+    await P(page, (par) => { par.test.PAR.mom.mult = 2; par.test.stats.up = null; par.test.PAR.dad.stirCool = 0; par.test.set(0.9); });
     await sleep(9000);
     const low = await P(page, (par) => ({ up: par.test.stats.up, st: par.state('dad'), N: par.ledger() }));
     ok(!low.up, 'at 0.9 he got up again after a wake (his thresholds are not x1.3): ' + JSON.stringify(low));

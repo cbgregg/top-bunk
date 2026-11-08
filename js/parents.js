@@ -42,7 +42,7 @@ const MOM_HIDDEN = 40;                              // seconds of her search you
 // the mutters, in order: the two pairs from the walls of nights two and three, then the old ones at random
 const MUTTERS = [['dad/n2_a', 'mom/n2_a'], ['mom/n3_a', 'dad/n3_a']];
 const MUTTERS_OLD = [['dad/talk_a', 'mom/talk_a'], ['mom/talk_b', 'dad/talk_b'], ['dad/talk_c', 'mom/talk_c'], ['dad/mutter_a', 'mom/mutter_a'], ['mom/mutter_b', 'dad/mutter_b']];
-// Mom's own search calls (the thing's lure through her door on night one is mom/n1_call_*: she never says those)
+// Mom's own search calls (never the two lines the thing calls through her door on night one, in her voice: that voice is its lure)
 const MOM_CALLS = ['mom/n5_g', 'mom/n5_h'];
 // the night types where the parents are part of the night's own scene (or nothing should wake them)
 const QUIET_TYPES = new Set(['poltergeist', 'vigil', 'car', 'finale', 'parents']);
