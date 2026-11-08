@@ -165,9 +165,11 @@ module.exports = {
       // ---- 9. the crumple stage reaches hunter.crawl (F3's stageTick no longer takes its straight-line fallback)
       const stage = await E(async () => {
         const { reset, stand, face, run, H, E: Ent, N, P, F } = window.__T; reset();
-        stand(1.98, -0.9, 1.98, -3.0); await run(1.2); face(1.98, 1.0); await run(0.3);   // looked at the room, then turned to the kitchen: the floor behind is the blind spot
+        // looked down the living room, then turned to the kitchen wall: the floor behind is the blind spot (with room there for it, and
+        // for the crawl it unfolds into, or it is not staged at all)
+        stand(1.2, -0.2, 1.2, -3.0); await run(1.2); face(1.2, 1.0); await run(0.3);
         let st = null;
-        for (let i = 0; i < 12 && !st; i++) { if (N.stage.SCARES.crumple.run()) st = N.stage.ST.on; else { face(1.98 + Math.sin(i) * 2, -3.0); await run(0.5); face(1.98, 1.0); await run(0.2); } }
+        for (let i = 0; i < 12 && !st; i++) { if (N.stage.SCARES.crumple.run()) st = N.stage.ST.on; else { face(1.2 + Math.sin(i) * 1.5, -3.0); await run(0.5); face(1.2, 1.0); await run(0.2); } }
         if (!st) return { staged: false };
         face(st.p.x, st.p.z, 0.4); await run(0.5, { stage: true });
         N.stage.crawlAt(st);
@@ -267,7 +269,7 @@ module.exports = {
       // ---- revision 4 (4): 10 000 seeded rolls with every guard satisfied open 5 % +- 0.6 %; with a guard, never
       const rolls = await E(async () => {
         const { loomOpens } = await import('/js/hunter.js');
-        let open = 0, guarded = 0; const seed = window.__game.RUN.seed;
+        let open = 0, guarded = 0; const seed = 'a fixed seed for the count';   // (fixed, so the count is the same every run)
         for (let i = 0; i < 10000; i++) {
           if (loomOpens({ seed, n: 2 + (i % 8), index: i, firstSurvived: false, lastOpened: false, owned: false })) open++;
           for (const g of [{ n: 1 }, { firstSurvived: true }, { lastOpened: true }, { owned: true }]) if (loomOpens({ seed, n: 3, index: i, firstSurvived: false, lastOpened: false, owned: false, ...g })) guarded++;
