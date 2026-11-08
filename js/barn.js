@@ -132,7 +132,7 @@ function materials(ctx) {
   const M = {
     floor: wood(0x6f5d4a, 'pine', 0x7a6650, 0.9), floor2: wood(0x655546, 'pine', 0x6c5a49, 0.9), floor3: wood(0x5a4b3d, 'darkwood', 0x9a8670, 1.2),
     beam: wood(0x5c4c3c, 'darkwood', 0xa09078, 1.0), board: wood(0x7a6c5c, 'darkwood', 0xb8a890, 1.1), weathered: ctx.M.fence,
-    leaf: wood(0x9c9484, 'pine', 0xa69c8a, 0.8), loft: wood(0x6a5846, 'pine', 0x806a52, 1.0), pine: wood(0xb7a284, 'pine', 0xc4ae8e, 0.9),
+    loft: wood(0x6a5846, 'pine', 0x806a52, 1.0), pine: wood(0xbcae98, 'pine', 0xc2b49c, 0.9),
     under: std({ color: 0x2a2219, roughness: 1 }),
     iron: std({ color: 0x2b2826, roughness: 0.55, metalness: 0.6 }), rust: std({ color: 0x5a3a26, roughness: 0.75, metalness: 0.35 }),
     paint: std({ color: 0xd2cbb8, roughness: 0.62 }), paintChip: std({ color: 0xb9ad94, roughness: 0.7 }),
@@ -141,6 +141,8 @@ function materials(ctx) {
     cord: std({ color: 0x141414, roughness: 0.6 }), brick: ctx.M.brick || std({ color: 0xa0553f, roughness: 0.95 }),
     bulb: std({ color: 0xfff1d0, emissive: 0xffb860, emissiveIntensity: 0, roughness: 0.3 }), cap: std({ color: 0x1c1c1c, roughness: 0.6 }),
   };
+  // the sliding leaf: boards gone grey in the weather like the walls round it (the siding set's boards, stood on end)
+  M.leaf = std({ color: 0x8e887c, roughness: 0.9 }); M.leaf.userData.worldUV = true; applyPBR(M.leaf, 'siding', { tint: 0x8a8478, rotate: Math.PI / 2, tile: 1.0 });
   M.paint.userData.worldUV = true; applyPBR(M.paint, 'pine', { keepMap: true, tile: 0.6, normal: 0.6 });   // white paint over pine: the grain shows through
   M.paintChip.userData.worldUV = true; applyPBR(M.paintChip, 'pine', { keepMap: true, tile: 0.6 });
   // the dust sheets: an old canvas drop cloth, and a bedsheet gone the colour of the barn (the linen set gives the weave, not its colour)
@@ -192,10 +194,11 @@ function drape({ x0, x1, z0, z1, solids, mat, seed = 1, res = 0.04, sag = 0.003,
     if (i > 0) { s += h[q - 1]; n++; } if (i < NX) { s += h[q + 1]; n++; } if (j > 0) { s += h[q - NX - 1]; n++; } if (j < NZ) { s += h[q + NX + 1]; n++; }
     h[q] = Math.max(h0[q], s / n - sag);
   }
-  const waves = Array.from({ length: 5 }, () => ({ a: r() * Math.PI, f: 9 + r() * 14, p: r() * 6.28, amp: 0.006 + r() * 0.01 }));
+  const waves = Array.from({ length: 5 }, () => ({ a: r() * Math.PI, f: 9 + r() * 14, p: r() * 6.28, amp: 0.003 + r() * 0.005 }));
   const pos = [], uv = [], idx = [];
   for (let j = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++) {
-    const x = x0 + (x1 - x0) * i / NX, z = z0 + (z1 - z0) * j / NZ, q = at(i, j), free = Math.min(1, Math.max(0, (h[q] - h0[q]) / 0.05));
+    const x = x0 + (x1 - x0) * i / NX, z = z0 + (z1 - z0) * j / NZ, q = at(i, j), edge = Math.min(i, j, NX - i, NZ - j) * res;
+    const free = Math.min(1, Math.max(0, (h[q] - h0[q]) / 0.05)) * Math.min(1, edge / 0.08);   // folds in the middle, a clean roll over the edge
     let y = h[q]; for (const w of waves) y += free * w.amp * Math.sin((x * Math.cos(w.a) + z * Math.sin(w.a)) * w.f + w.p);
     pos.push(x, Math.max(h0[q], y), z); uv.push(x, z);
     if (i < NX && j < NZ) { const a = at(i, j), b = a + 1, c = a + NX + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
@@ -304,7 +307,7 @@ function build(ctx) {
   ctx.rainDiscard.push({ ...RAIN_BOX });
 
   const gate = gateLeaf(ctx, M);
-  W.barn = { inside, FLOOR, box: { ...IN }, nodes: NODES, door: S.door, gate, lamp, post: S.post, crib, sawhorses: horses, sack, shell };
+  W.barn = { inside, FLOOR, box: { ...IN }, footprint: { minX: OUT.x0, maxX: OUT.x1, minZ: OUT.z0, maxZ: OUT.z1 }, nodes: NODES, door: S.door, gate, lamp, post: S.post, crib, sawhorses: horses, sack, shell };
   return W.barn;
 }
 
@@ -490,19 +493,19 @@ function measuringPost(stat, M, solid) {
     g.clearRect(0, 0, CW, CH);
     for (const L of lines) {
       const y = yOf(L.h), x0 = 6 + r() * 6, x1 = CW - 8 - r() * 8, tilt = (r() - 0.5) * 3;
-      g.strokeStyle = L.wet ? 'rgba(10,10,14,0.97)' : `rgba(34,33,36,${L.age ? 0.85 : 0.75})`; g.lineWidth = L.wet ? 4.5 : 3.4;
+      g.strokeStyle = L.wet ? 'rgba(8,8,12,1)' : `rgba(24,23,26,${L.age ? 0.92 : 0.85})`; g.lineWidth = L.wet ? 5 : 4;
       g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y + tilt); g.stroke();
       if (L.wet) { g.strokeStyle = 'rgba(30,30,36,0.35)'; g.lineWidth = 9; g.beginPath(); g.moveTo(x0 + 10, y + 1); g.lineTo(x1 - 14, y + tilt + 1); g.stroke(); }
       if (L.age) {   // the number under the line, careful and a little too even
-        g.save(); g.translate(CW * 0.5, y + 34); g.rotate((r() - 0.5) * 0.12); g.fillStyle = 'rgba(30,29,33,0.9)';
-        g.font = '34px "Gloria Hallelujah", "Comic Sans MS", cursive'; g.textAlign = 'center'; g.fillText(String(L.age), 0, 0); g.restore();
+        g.save(); g.translate(CW * 0.5, y + 34); g.rotate((r() - 0.5) * 0.12); g.fillStyle = 'rgba(22,21,25,0.95)';
+        g.font = '38px "Gloria Hallelujah", "Comic Sans MS", cursive'; g.textAlign = 'center'; g.fillText(String(L.age), 0, 0); g.restore();
       }
     }
     t.needsUpdate = true;
   }
   for (const [age, m] of AGES) lines.push({ h: m, age });
   for (const m of NAMELESS) lines.push({ h: m });
-  paint(); whenFonts(['34px "Gloria Hallelujah"'], paint);
+  paint(); whenFonts(['38px "Gloria Hallelujah"'], paint);
   S.post = {
     lines, mesh: plane,
     // a new line: at h metres above the floor (the next one up by default), drawn in wet pencil
@@ -570,24 +573,33 @@ function bike(stat, M, solid) {
     for (let k = 0; k < 20; k++) { const a = k / 20 * Math.PI * 2, s = k % 2 ? 1 : -1; rod(w, v(0, 0, s * 0.035), v(Math.cos(a) * (R - 0.048), Math.sin(a) * (R - 0.048), s * 0.006), 0.0018, M.chrome, { seg: 4, cast: false }); }
     return w;
   };
-  wheel(rear);
+  const rearTyre = wheel(rear).children[0];
   // the front end: fork, stem, bars, turned the way a dropped bike's bars swing
   const fr = new THREE.Group(); fr.position.copy(head0); b.add(fr);
-  const steer = head1.clone().sub(head0).normalize(); fr.quaternion.setFromAxisAngle(steer, 0.9);
+  const steer = head1.clone().sub(head0).normalize(); fr.quaternion.setFromAxisAngle(steer, 0.3);
   const f = (p) => p.clone().sub(head0);
   for (const s of [-1, 1]) rod(fr, f(v(0.6, 0.43, s * 0.04)), f(v(0.68, R, s * 0.045)), 0.009, M.chrome, { seg: 6 });
   const fw = wheel(front); fr.add(fw); fw.position.copy(f(front));
   rod(fr, f(head1), f(v(0.565, 0.66, 0)), 0.012, M.chrome); rod(fr, f(v(0.56, 0.66, -0.25)), f(v(0.56, 0.66, 0.25)), 0.011, M.chrome);
-  for (const s of [-1, 1]) { rod(fr, f(v(0.56, 0.66, s * 0.25)), f(v(0.49, 0.72, s * 0.26)), 0.011, M.chrome); rod(fr, f(v(0.49, 0.72, s * 0.26)), f(v(0.42, 0.75, s * 0.26)), 0.016, M.rubber); }
+  let grip = null, pedal = null;
+  for (const s of [-1, 1]) { rod(fr, f(v(0.56, 0.66, s * 0.25)), f(v(0.49, 0.72, s * 0.26)), 0.011, M.chrome); const gm = rod(fr, f(v(0.49, 0.72, s * 0.26)), f(v(0.42, 0.75, s * 0.26)), 0.016, M.rubber); if (s < 0) grip = gm; }
   // seat, cranks, pedals, the chain guard
   rod(b, seat, v(0.115, 0.62, 0), 0.011, M.chrome);
   const saddle = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.05, 0.12, 2, 0.02), M.vinyl); saddle.position.set(0.08, 0.645, 0); saddle.rotation.z = 0.06; saddle.castShadow = true; b.add(saddle);
-  for (const s of [-1, 1]) { const p = v(0.25 + 0.12 * s, 0.17 - 0.05 * s, s * 0.07); rod(b, v(0.25, 0.17, s * 0.06), p, 0.008, M.chrome); box(b, p.x - 0.045, p.x + 0.045, p.y - 0.012, p.y + 0.012, p.z + s * 0.01, p.z + s * 0.07, M.rubber); }
+  for (const s of [-1, 1]) { const p = v(0.25 + 0.12 * s, 0.17 - 0.05 * s, s * 0.07); rod(b, v(0.25, 0.17, s * 0.06), p, 0.008, M.chrome); const pm = box(b, p.x - 0.045, p.x + 0.045, p.y - 0.012, p.y + 0.012, p.z + s * 0.01, p.z + s * 0.07, M.rubber); if (s < 0) pedal = pm; }
   const guard = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.006), M.bikeRed); guard.position.set(0.13, 0.2, 0.055); guard.rotation.z = -0.05; b.add(guard);
-  // lay it down on its left side, a little propped on its pedal and the end of its bars, then onto the floor
-  b.rotation.set(-Math.PI / 2 + 0.12, 0, 0, 'XYZ');
-  const g = new THREE.Group(); g.add(b); g.rotation.y = 0.35; stat.add(g); g.updateMatrixWorld(true);
-  const bb3 = new THREE.Box3().setFromObject(g); g.position.set(-64.65 - (bb3.min.x + bb3.max.x) / 2, FLOOR - bb3.min.y, -10.55 - (bb3.min.z + bb3.max.z) / 2); g.updateMatrixWorld(true);
+  // lay it down on its left side: it rests where a dropped bike rests, on the end of its bars, its pedal and the side of its back tyre. The
+  // tilt that brings those three level (and nothing lower than them) is found by trying, then it is set down on the floor
+  b.rotation.set(-Math.PI / 2, 0, 0);
+  const tilt = new THREE.Group(); tilt.add(b);
+  const g = new THREE.Group(); g.add(tilt); g.rotation.y = 0.35; stat.add(g);
+  const lowY = (o) => new THREE.Box3().setFromObject(o, true).min.y, rests = [grip, pedal, rearTyre];
+  const score = (rx, rz) => { tilt.rotation.set(rx, 0, rz); g.updateMatrixWorld(true); const ys = rests.map(lowY), lo = Math.min(...ys); return Math.max(...ys) - lo + 3 * Math.max(0, lo - lowY(g)); };
+  let best = { s: Infinity, rx: 0, rz: 0 };
+  for (let rx = -0.4; rx <= 0.4; rx += 0.04) for (let rz = -0.4; rz <= 0.4; rz += 0.04) { const sc = score(rx, rz); if (sc < best.s) best = { s: sc, rx, rz }; }
+  for (let rx = best.rx - 0.04; rx <= best.rx + 0.04; rx += 0.005) for (let rz = best.rz - 0.04; rz <= best.rz + 0.04; rz += 0.005) { const sc = score(rx, rz); if (sc < best.s) best = { s: sc, rx, rz }; }
+  tilt.rotation.set(best.rx, 0, best.rz); g.updateMatrixWorld(true); S.bikeRest = best;
+  const bb3 = new THREE.Box3().setFromObject(g, true); g.position.set(-64.65 - (bb3.min.x + bb3.max.x) / 2, FLOOR - bb3.min.y, -10.55 - (bb3.min.z + bb3.max.z) / 2); g.updateMatrixWorld(true);
   const bx = new THREE.Box3().setFromObject(g); S.bikeBox = bx;
   solid(bx.min.x, bx.max.x, bx.min.z, bx.max.z, bx.max.y, 'barnBike');
 }
