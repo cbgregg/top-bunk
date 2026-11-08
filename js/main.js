@@ -385,7 +385,7 @@ function setPhase(p, silent = false) {
   const wx = p === 'night' ? weatherFor(RUN.seed, F.night) : morn && weatherFor(RUN.seed, F.night) !== 'clear' ? 'wet' : 'clear';
   weather.set(wx); if (silent || p !== 'night') weather.jump();
   W.bathSpot.intensity = 0;
-  W.frontDoor.setOpen(day);
+  hooks.doors.phase(p); W.frontDoor.setOpen(day);   // the doors out (js/doors.js): at night the front door on its chain, the others shut
   // the drawing changes in the night: on night one someone draws a new figure into it (F.drawn), from night two it is the one where he pushes
   W.drawingMat.map = !(p === 'night' || morn) ? W.T.drawing0 : (F.night || 0) <= 1 ? (F.drawn ? (W.T.drawing2 || (W.T.drawing2 = FN.drawing())) : W.T.drawing0) : W.T.drawing1; W.drawingMat.needsUpdate = true;
   setExposure(EXPOSURE[day ? 'day' : night ? 'night' : 'morning']);
@@ -416,14 +416,18 @@ for (const sw of W.switches) {
   addI({ p: sw.at, r: 1.35, label: () => (lights.isOn(sw.room) ? 'Turn off the light' : 'Turn on the light'), when: () => F.phase !== 'title' && !F.cutscene && !F.script, act: () => lights.toggle(sw.room, { by: 'player', sw }) });
 }
 addI({ p: new V3(9.09, 1.3, 3.1), r: 1.6, label: 'Climb into the top bunk', when: () => F.phase === 'day' || F.phase === 'night', act: climbUp });
-for (const d of Object.values(W.doors)) {   // the interior doors
-  // Mom and Dad's barn door is kept locked, day and night; only the story slides it open (and once it is open you may shut it again)
-  addI({ p: d.mid, r: 1.55, label: () => (d.name === 'parents' && !d.target ? 'Try the handle' : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (d.name === 'parents' && !d.target ? lockedDoor(d) : toggleDoor(d)) });
+for (const d of Object.values(W.doors)) {   // the doors
+  // Mom and Dad's barn door is kept locked, day and night; only the story slides it open (and once it is open you may shut it again). The
+  // four that lead out of the house (front, back, basement, garage) follow the night's rules (js/doors.js): locked, the front door on its
+  // chain, or open while the night sends you out; a shut one that will not open is tried, not opened
+  const held = () => !d.target && (d.name === 'parents' || !!hooks.doors.lockFor(d.name, P.pos));
+  addI({ p: d.mid, r: 1.55, label: () => (held() ? (d.name === 'parents' ? 'Try the handle' : 'Try the door') : d.target ? 'Close the door' : 'Open the door'), when: () => F.phase !== 'title' && !(F.phase === 'night' && F.night === 0), act: () => (held() ? lockedDoor(d) : toggleDoor(d)) });
 }
 W.setDoorHook((name, open) => { const d = W.doors[name]; const pan = panFor(tmp.set(d.mid.x, 1.2, d.mid.z)); if (open) sfx.doorOpen(pan, 0.35); else sfx.doorClose(pan, 0.5); });
 W.setDoorBump((name) => { const d = W.doors[name]; sfx.knock(panFor(tmp.set(d.mid.x, 1.0, d.mid.z)), 0.16); });   // a leaf meets somebody and stops against them
 let lockedAt = -9;
 function lockedDoor(d) {   // the handle will not turn; something on the other side is awake and does not answer
+  if (d.name !== 'parents' && hooks.doors.tryDoor(d)) return;   // a door out of the house: its deadbolt, or the front door's chain (js/doors.js)
   const pan = panFor(tmp.set(d.mid.x, 1.2, d.mid.z));
   sfx.knock(pan, 0.12); for (let i = 0; i < 3; i++) sfx.noiseHit({ dur: 0.05, type: 'bandpass', f: 2400 + i * 300, gain: 0.12, pan, wet: 0.08, delay: 0.05 + i * 0.07 });   // the latch rattles in the keeper
   if (gameTime - lockedAt > 6) UI.subtitle("<i>It's locked.</i>", 1.8);
