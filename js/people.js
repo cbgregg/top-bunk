@@ -69,8 +69,8 @@ export const UNCANNY = { neck: 2.4, neckSpeed: 1.6, eyesHold: 6 };
 // sitting up in bed: how far the trunk curls up from the hips (the body lies flat by a group rotation, sleepers() in main.js)
 const SIT_UP = 1.5;
 // the parts that rest on the mattress, and the flesh round each bone (a body in bed is kept from sinking further than it lay at rest)
-const BED_REST = [['Pelvis', 0.11], ['Spine', 0.11], ['Spine1', 0.11], ['Spine2', 0.11], ['L_UpperArm', 0.05], ['R_UpperArm', 0.05], ['L_Forearm', 0.04], ['R_Forearm', 0.04], ['L_Hand', 0.03], ['R_Hand', 0.03],
-  ['L_Thigh', 0.075], ['R_Thigh', 0.075], ['L_Calf', 0.05], ['R_Calf', 0.05]];
+const BED_REST = [['Head', 0.12], ['Pelvis', 0.11], ['Spine', 0.11], ['Spine1', 0.11], ['Spine2', 0.11], ['L_UpperArm', 0.05], ['R_UpperArm', 0.05], ['L_Forearm', 0.04], ['R_Forearm', 0.04], ['L_Hand', 0.03], ['R_Hand', 0.03],
+  ['L_Thigh', 0.075], ['R_Thigh', 0.075], ['L_Calf', 0.05], ['R_Calf', 0.05], ['L_Foot', 0.07], ['R_Foot', 0.07]];   // (the heel sits well under the ankle)
 const _qBed = new THREE.Quaternion(), _qRoll = new THREE.Quaternion(), _eBed = new THREE.Euler(), _yAx = new THREE.Vector3(0, 1, 0);
 // model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look. uncanny: true for a double (by default, any body after
 // the first of its model)
@@ -374,6 +374,11 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
         r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * (b.turn ?? p.sleep) * (1 - 0.7 * sit));
         if (!b.legs) r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], (p.feet ?? 1.0) * (1 - 0.5 * sit));   // toes pointed along the bed, so they stay under the quilt (the breath is the life layer's)
         r.bend(['Spine1', 'Spine2', 'Neck'], [0.35, 0.4, 0.25], [1, 0, 0], 0.12 * flat);   // the shoulders and head propped on the pillow, not sunk through it into the mattress
+        // lying down the legs come together and the arms in against the sides (the standing clip's stance is 42 cm wide: two of them
+        // side by side in a double bed would lie with their inner hands and feet in each other)
+        if (!b.legs) { r.bend(['L_Thigh'], [1], [0, 0, 1], -0.09); r.bend(['R_Thigh'], [1], [0, 0, 1], 0.09); }
+        r.bend(['L_UpperArm'], [1], [0, 0, 1], -0.07); r.bend(['R_UpperArm'], [1], [0, 0, 1], 0.07);
+        r.bend(['L_Clavicle'], [1], [0, 1, 0], -0.25 * flat); r.bend(['R_Clavicle'], [1], [0, 1, 0], 0.25 * flat);   // the shoulders rolled forward, relaxed
         // sitting up: the trunk curls up from the hips with the legs left lying along the bed (the thighs hang from the spine bone in this
         // skeleton, so they are given its share back), the head tipped forward off the pillow's angle so the eyes look ahead
         if (sit > 1e-3) {

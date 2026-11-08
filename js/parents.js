@@ -33,7 +33,7 @@ import { NODES } from './nav.js';
 const V3 = THREE.Vector3;
 const OWNER = 'parents';
 const TH = { mutter: 0.35, stir: 0.6, dad: 0.8, mom: 0.9 }, DECAY = 0.02, HARDER = 1.3;
-const ROLL = 0.55, SHIFT = 0.06, ROLL_T = 2.2;     // a roll-over: how far onto a side, how far across the bed, how long it takes
+const ROLL = 0.42, SHIFT = 0.03, ROLL_T = 2.2;     // a roll-over: how far onto a side, how far across the bed toward that side, how long it takes
 const SPEED = { dad: 1.0, mom: 0.9 };               // a night walk, slower than the day's
 const R_WALK = { dad: 0.3, mom: 0.28 };             // the body's circle while walking (the shoulders turn through a doorway)
 const SEE = 9;                                      // how far a parent can see you in the dark house
@@ -156,8 +156,10 @@ function pollNoise(dt) {
 // ---------- in bed ----------
 function bedOf() { return W().bedSleepers; }
 // a body's resting state in bed: on its back, rolled, the arm out, sitting up
+// (each lies 2.5 cm further out than the bed's spot, toward their own edge: Dad's left, Mom's right)
+const OUTWARD = { dad: 0.03, mom: -0.03 };
 function bedState(par) {
-  return { roll: par.roll, shift: par.shift, sit: par.sit, toFoot: par.who === 'dad' ? 0.16 : 0.1 };
+  return { roll: par.roll, shift: par.shift + OUTWARD[par.who], sit: par.sit, toFoot: par.who === 'dad' ? 0.16 : 0.1 };
 }
 // the limbs under the quilt as capsules in the bed's frame, for the quilt to rise over (world.js bedSleepers.hull)
 const CAPS = [['Pelvis', 'Spine1', 0.13], ['Spine1', 'Spine2', 0.12], ['Spine2', 'Neck', 0.11], ['L_UpperArm', 'R_UpperArm', 0.06],
@@ -179,6 +181,13 @@ function hullOf(par) {
     }
     return n === out.length ? out : out.subarray(0, n);
   };
+}
+// sitting up: the elbows out to the side, back toward the pillows and a little up (never down into the bed)
+// (back: the way behind the trunk, flat: toward the pillows sitting up in bed, toward the bed's middle sat on its edge)
+function elbowsOut(p, S, back) {
+  const q = p.group.getWorldQuaternion(new THREE.Quaternion()), side = new V3(S === 'L' ? 1 : -1, 0, 0).applyQuaternion(q);
+  side.y = 0; if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+  return side.normalize().multiplyScalar(0.9).addScaledVector(back, 0.35).add(new V3(0, 0.25, 0));
 }
 // the rest x of each rise across the bed (world.js) and the body's own x there now
 const REST_X = { mom: 0.23, dad: -0.21 };
@@ -246,22 +255,33 @@ function bedTick(par, dt) {
   const sideK = Math.min(1, Math.abs(par.roll) / ROLL), down = par.roll > 0 ? 'L' : 'R', up = down === 'L' ? 'R' : 'L';
   b.rest = !par.rolling && sideK < 0.01 && par.sit < 0.01 && !(par.armOut.L + par.armOut.R);
   b.knee.L = b.knee.R = 0; b.knee[up] = 0.6 * sideK;
-  b.turn = par.who === 'mom' ? 1 - 1.4 * sideK : -1 + 1.4 * sideK;
+  b.turn = (par.who === 'mom' ? 1 : -1) * Math.max(0, 1 - 2 * sideK);   // (rolled, the head lies straight on the pillow)
   b.sit = par.sit; b.awake = par.st !== 'asleep';
   for (const S of ['L', 'R']) b.arms[S] = null;
-  if (sideK > 0.01) {
-    // on a side: the lower arm in front of the chest, the upper hand on the hip
-    p.group.updateMatrixWorld(true);
-    const s = (p.group.userData.h || 1.75) / 1.75;
-    b.arms[down] = { at: p.group.localToWorld(new V3(down === 'L' ? 0.06 : -0.06, 1.26 * s, 0.2 * s)), w: sideK, grip: 0.35 };
-    b.arms[up] = { at: p.group.localToWorld(new V3(up === 'L' ? 0.16 : -0.16, 0.95 * s, 0.12 * s)), w: sideK * 0.9, grip: 0.3 };
+  p.group.updateMatrixWorld(true);
+  const s = (p.group.userData.h || 1.75) / 1.75, inner = par.who === 'dad' ? 'R' : 'L', q = p.group.getWorldQuaternion(new THREE.Quaternion());
+  // where each hand goes in the group's frame, and which way its elbow: on the back the hand on the side toward the other one rests on the
+  // stomach, its elbow in at the side and down toward the mattress (the two of them would lie arm in arm otherwise); on a side the lower
+  // arm lies in front of the stomach, its elbow in front of the body (not off the edge of the bed), the upper hand on the hip, its elbow
+  // down along the flank (not out behind into the other one). The arm toward the other one always has a place; the outer arm is the
+  // clip's on the back
+  const sgOf = (S) => (S === 'L' ? 1 : -1);
+  const belly = (S) => ({ at: new V3(sgOf(S) * 0.09, 0.97 * s, 0.15 * s), pole: new V3(sgOf(S) * 0.25, -0.3, -0.9) });
+  const front = (S) => ({ at: new V3(sgOf(S) * 0.06, 1.12 * s, 0.2 * s), pole: new V3(0, -0.4, 0.9) });
+  const hip = (S) => ({ at: new V3(sgOf(S) * 0.16, 0.95 * s, 0.12 * s), pole: new V3(sgOf(S) * 0.15, -0.9, 0.2) });
+  for (const S of ['L', 'R']) {
+    const rolled = S === down ? front(S) : hip(S);
+    if (S === inner && par.sit < 0.02) {
+      const k = sm(cl((sideK - 0.5) / 0.5, 0, 1)), a = belly(S), at = a.at.lerp(rolled.at, k), pole = a.pole.lerp(rolled.pole, k);   // (on the stomach until the roll is half done)
+      b.arms[S] = { at: p.group.localToWorld(at), w: 1, grip: 0.3, pole: pole.applyQuaternion(q) };
+    } else if (sideK > 0.01) b.arms[S] = { at: p.group.localToWorld(rolled.at), w: S === down ? sideK : sideK * 0.9, grip: 0.3, pole: rolled.pole.applyQuaternion(q) };
   }
-  // sitting up: the hands on the lap, on the quilt over the thighs
-  if (par.sit > 0.02 && p.rig && p.rig.bones.L_Thigh) {
-    for (const [S, sg] of [['L', 1], ['R', -1]]) {
+  // sitting up: the hands on the lap, laid on the quilt over the thighs
+  if (par.sit > 0.02 && p.rig && p.rig.bones.L_Thigh && quilt) {
+    for (const S of ['L', 'R']) {
       const th = p.rig.bones[S + '_Thigh'], ca = p.rig.bones[S + '_Calf']; th.getWorldPosition(_a); ca.getWorldPosition(_b);
-      const at = _a.clone().lerp(_b, 0.45); at.y += 0.13; void sg;
-      b.arms[S] = { at, w: Math.min(1, par.sit * 1.5), grip: 0.25, palm: new V3(0, -1, 0) };
+      const at = _a.clone().lerp(_b, 0.4), loc = quilt.toLocal(at.clone()); loc.y = Math.max(loc.y + 0.12, quilt.heightAt(loc.x, loc.z) + 0.07);
+      b.arms[S] = { at: quilt.group.localToWorld(loc), w: Math.min(1, par.sit * 1.5), grip: 0.25, palm: new V3(0, -1, 0), pole: elbowsOut(p, S, new V3(-Math.sin(spot.yaw ?? Math.PI / 2), 0, -Math.cos(spot.yaw ?? Math.PI / 2))) };
     }
   }
   if (par.armOut[side] > 0.001) {
@@ -324,14 +344,15 @@ function torchOn(on) {
   const L = G.lights && G.lights.torch; if (L) { L.intensity = on ? 18 : 0; if (!on) { L.position.set(0, -50, 0); L.target.position.set(0, -60, 0); L.target.updateMatrixWorld(); } }
   if (torch.lens) sound('switch', torch.lens.getWorldPosition(new V3()), { gain: 0.3, maxLen: 0.4 });
 }
-// the torch in Dad's right hand, pointed `dir` (world, unit): the mesh at his palm along the beam, the light from its lens
+// the torch in Dad's right hand: along the hand (wrist to knuckles), in the curl of the fingers a palm's flesh and its own radius out from
+// the palm, and the light from its lens the way it points (the arm points it: aimTick)
 const _q = new THREE.Quaternion(), _z = new V3(0, 0, 1);
+function torchAxis() { return _z.clone().applyQuaternion(torch.group.quaternion); }
 function torchFollow(par, light = true) {
   if (!torch || !torch.held) return;
-  const p = par.p; if (!p.rig) return;
-  const nrm = new V3(), palm = p.palm('R', new V3(), nrm);
-  const dir = par.aim.clone().normalize();
-  // in the curl of the fingers: the body's axis a palm's flesh and the torch's own radius out from the palm
+  const p = par.p, r = p.rig; if (!r || !r.bones.R_Finger2) return;
+  const nrm = new V3(), palm = p.palm('R', new V3(), nrm), H = r.bones.R_Hand.getWorldPosition(new V3()), K = r.bones.R_Finger2.getWorldPosition(new V3());
+  const dir = K.sub(H).normalize();
   torch.group.position.copy(palm).addScaledVector(nrm, 0.027).addScaledVector(dir, 0.01);
   torch.group.quaternion.copy(_q.setFromUnitVectors(_z, dir)); torch.group.updateMatrixWorld(true);
   const L = G.lights && G.lights.torch;
@@ -349,7 +370,7 @@ function torchHome() {
 // the beam: a segment from the lens five metres along it
 function beamNear(x, z) {
   if (!torch || !torch.on || !torch.held) return Infinity;
-  const a = torch.lens.getWorldPosition(new V3()), dir = PAR.dad.aim.clone().normalize(), b = a.clone().addScaledVector(dir, 5);
+  const a = torch.lens.getWorldPosition(new V3()), dir = torchAxis(), b = a.clone().addScaledVector(dir, 5);
   const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz, t = l2 < 1e-6 ? 0 : cl(((x - a.x) * dx + (z - a.z) * dz) / l2, 0, 1);
   return Math.hypot(a.x + dx * t - x, a.z + dz * t - z);
 }
@@ -590,14 +611,21 @@ async function shutSlide(par, d) {
 
 // ---------- getting up and back into bed ----------
 const _e = new THREE.Euler();
-// where each of them stands beside the bed (their own side), and sits on its edge
+// sitting on the edge of the bed: on the rolled edge of the quilt (its top is 0.675), the hips over the mattress's own edge
+const SEAT = 0.69, EDGE_X = 0.54, STEP_OUT = 0.14;
+// where each of them sits on their own side of the bed and where they stand up from it (Dad's side is the bed's -x, the wall side; Mom's +x)
 function bedside(par) {
-  const bed = bedOf(), sgn = par.who === 'dad' ? -1 : 1;   // Dad's side is the bed's -x (the wall side), Mom's +x
+  const bed = bedOf(), sgn = par.who === 'dad' ? -1 : 1, s = (par.p.group.userData.h || 1.75) / 1.75;
   const pel = par.pelvisBed || new V3(REST_X[par.who], 0.68, -0.25);
-  const edge = bed.group.localToWorld(new V3(sgn * 0.42, 0.66, pel.z));
-  const stand = bed.group.localToWorld(new V3(sgn * 1.02, 0, pel.z));
+  const edge = bed.group.localToWorld(new V3(sgn * EDGE_X, SEAT + 0.12 * s, pel.z));   // the pelvis, sat on the edge
   const out = bed.group.localToWorld(new V3(sgn * 2, 0, pel.z)).sub(bed.group.localToWorld(new V3(0, 0, pel.z))).setY(0).normalize();
-  return { edge, stand, out, yaw: Math.atan2(out.x, out.z) };
+  const L = legsOf(par), feet = edge.clone().setY(0).addScaledVector(out, L.dx(SEAT + 0.09 * s));   // where the feet are, sat there
+  return { edge, out, yaw: Math.atan2(out.x, out.z), feet, stand: feet.clone().addScaledVector(out, STEP_OUT), s };
+}
+// the legs' measures (the rig reads them standing): where a knee comes from the hips at a given height, the feet flat under it
+function legsOf(par) {
+  const r = par.p.rig, s = (par.p.group.userData.h || 1.75) / 1.75, th = (r && r.thighLen) || 0.42 * s, ca = (r && r.calfLen) || 0.42 * s, knee = ca + 0.08 * s;
+  return { stand: th + knee, dx: (hip) => { const dy = Math.min(th * 0.999, Math.max(-th, hip - knee)); return Math.sqrt(th * th - dy * dy); } };
 }
 // the pelvis in the group's own frame (the clip holds it still), for laying the body where its hips should be
 function pelvisLocal(par) {
@@ -617,7 +645,7 @@ async function lieDown(par, dur = 1.8) {
   const ok = await tween(dur * s0, (k) => { par.sit = s0 * (1 - k); });
   par.st = 'asleep'; return ok;
 }
-// from sitting up, the legs swung out over the edge, and up onto the feet beside the bed (u: 0 lying sat up .. 1 sat on the edge)
+// from sitting up, the legs swung out over the edge (u: 0 sat up in bed .. 1 sat on the edge, the shins down to the floor)
 function swingPose(par, u) {
   const p = par.p, spot = W().parentsBed[par.who], bs = bedside(par), sgn = par.who === 'dad' ? 1 : -1;
   const yaw = (spot.yaw ?? Math.PI / 2) + sgn * (Math.PI / 2) * u, pitch = -Math.PI / 2 * (1 - u);
@@ -629,26 +657,34 @@ function swingPose(par, u) {
   p.group.position.copy(hip).sub(off); p.group.updateMatrixWorld(true);
   // the legs: from along the bed (toward its foot) round to over the edge, then the shins down to the floor
   const foot = new V3(Math.sin(spot.yaw ?? Math.PI / 2), 0, Math.cos(spot.yaw ?? Math.PI / 2)), sideDir = bs.out;
-  const th = foot.clone().multiplyScalar(Math.cos(u * Math.PI / 2)).addScaledVector(sideDir, Math.sin(u * Math.PI / 2)).normalize();
+  // (lifted a little as they come round, clear of the quilt's rolled edge)
+  const th = foot.clone().multiplyScalar(Math.cos(u * Math.PI / 2)).addScaledVector(sideDir, Math.sin(u * Math.PI / 2)).add(new V3(0, 0.2 * Math.sin(Math.PI * Math.min(1, u / 0.75)), 0)).normalize();
   const kn = sm(cl((u - 0.45) / 0.55, 0, 1)), shin = th.clone().multiplyScalar(1 - kn).add(new V3(0, -1, 0).multiplyScalar(kn)).normalize();
   const ft = th.clone().multiplyScalar(1 - kn).addScaledVector(sideDir, kn).normalize();
   par.bed.legs = { thigh: th, shin, foot: ft, w: 1 };
   // the hands on the thighs
-  const s = (p.group.userData.h || 1.75) / 1.75, lap = hip.clone().addScaledVector(th, 0.3 * s); lap.y += 0.1;
-  par.bed.arms = { L: { at: lap.clone().addScaledVector(new V3(-th.z, 0, th.x), 0.1), w: 1, grip: 0.3 }, R: { at: lap.clone().addScaledVector(new V3(-th.z, 0, th.x), -0.1), w: 1, grip: 0.3 } };
+  const s = bs.s, lap = hip.clone().addScaledVector(th, 0.3 * s); lap.y += 0.12;
+  const back = foot.clone().multiplyScalar(-Math.cos(u * Math.PI / 2)).addScaledVector(sideDir, -Math.sin(u * Math.PI / 2));   // behind the trunk: the pillows, turning to the bed's middle
+  par.bed.arms = { L: { at: lap.clone().addScaledVector(new V3(-th.z, 0, th.x), 0.1), w: 1, grip: 0.3, pole: elbowsOut(p, 'L', back) }, R: { at: lap.clone().addScaledVector(new V3(-th.z, 0, th.x), -0.1), w: 1, grip: 0.3, pole: elbowsOut(p, 'R', back) } };
   par.sit = 1 - u; par.bed.sit = par.sit; par.bed.rest = false; par.bed.awake = true;
   p.pose = { sleep: par.who === 'mom' ? 1 : -1, bed: par.bed };
 }
-// sat on the edge (u = 1): the body upright on the floor, seated by the standing pose's own sit()
-// (from: where they stood before sitting down, else a step out from the edge)
-function seated(par, k = 1, from = null) {
-  const p = par.p, bs = bedside(par), pl = pelvisLocal(par);
+// sat on the edge and standing up from it (h: 0 sat, 1 stood), the feet where they are: the standing pose's own sit(), the seat rising
+// under the hips until the legs are straight, the body over the feet and leaning into it halfway
+function seated(par, h = 0) {
+  const p = par.p, bs = bedside(par), pl = pelvisLocal(par), L = legsOf(par);
   p.sleeping = false; par.inBed = false; p.busy = true; p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, bs.yaw, 0);
-  const off = new V3(pl.x, 0, pl.z).applyAxisAngle(new V3(0, 1, 0), bs.yaw), edge = bs.edge.clone().setY(0).sub(off);
-  const g = from ? from.clone().setY(0).lerp(edge, sm(k)) : edge.clone().addScaledVector(bs.out, (1 - k) * 0.5);
-  p.group.position.copy(g);
-  p.pose = { sit: k, seat: 0.58, lean: 0.35 * Math.sin(Math.PI * (1 - k)) }; p.sitNow = k;
+  const hip0 = SEAT + 0.09 * bs.s, hip = hip0 + (L.stand - hip0) * sm(h);
+  const off = new V3(pl.x, 0, pl.z).applyAxisAngle(new V3(0, 1, 0), bs.yaw);
+  p.group.position.copy(bs.feet).addScaledVector(bs.out, -L.dx(hip)).sub(off).setY(0);
+  if (h >= 0.999) { p.pose = null; p.sitNow = 0; }
+  else { p.pose = { sit: 1, seat: hip - 0.09 * bs.s, lean: 0.4 * Math.sin(Math.PI * h) }; p.sitNow = 1; }
   p.group.updateMatrixWorld(true);
+}
+// a step straight out from the bed, or back to it (the walks start and end clear of its box)
+function stepAt(par, k) {
+  const bs = bedside(par), pl = pelvisLocal(par), off = new V3(pl.x, 0, pl.z).applyAxisAngle(new V3(0, 1, 0), bs.yaw);
+  par.p.group.position.copy(bs.feet).addScaledVector(bs.out, STEP_OUT * k).sub(off).setY(0);
 }
 async function getOut(par) {
   const tok = TOK, p = par.p, bed = bedOf();
@@ -660,18 +696,22 @@ async function getOut(par) {
   par.inBed = true; par.swing = true;
   const ok = await tween(1.6, (k) => swingPose(par, k), (k) => k); par.swing = false; if (!ok) return false;
   par.bed.legs = null; par.bed.arms = { L: null, R: null };
-  seated(par, 1);
+  seated(par, 0);
   sound('bed_creak', placed(par.pelvis0 ? par.pelvis0.x : -6.8, 0.6, par.pelvis0 ? par.pelvis0.z : 0.4), { gain: 0.35 });
-  if (!(await tween(1.1, (k) => seated(par, 1 - k)))) return false;
-  p.pose = null; p.sitNow = 0; if (p.rig) p.rig.play('idle', { fade: 0.4, speed: 1 });
+  if (!(await tween(1.1, (k) => seated(par, k)))) return false;
+  if (p.rig) { p.rig.play('walk', { fade: 0.2, speed: 0.6 }); }
+  if (!(await tween(0.45, (k) => stepAt(par, k)))) return false;
+  if (p.rig) p.rig.play('idle', { fade: 0.4, speed: 1 });
   return tok === TOK;
 }
 async function getIn(par) {
   const tok = TOK, p = par.p, bs = bedside(par);
   if (!(await goTo(par, bs.stand, { near: 0.06 }))) return false;
   await turnTo(par, bs.stand.x + bs.out.x, bs.stand.z + bs.out.z, 0.6); if (tok !== TOK) return false;   // his back to the bed
-  const from = p.group.position.clone();
-  if (!(await tween(1.0, (k) => seated(par, k, from)))) return false;
+  if (p.rig) p.rig.play('walk', { fade: 0.2, speed: -0.6 });
+  if (!(await tween(0.45, (k) => stepAt(par, 1 - k)))) return false;
+  if (p.rig) p.rig.play('idle', { fade: 0.3, speed: 1 });
+  if (!(await tween(1.0, (k) => seated(par, 1 - k)))) return false;
   par.inBed = true; p.sleeping = true;
   sound('bed_creak', placed(bs.edge.x, 0.6, bs.edge.z), { gain: 0.35 });
   par.swing = true;
@@ -727,9 +767,11 @@ function aimTick(par, dt) {
   // the eyes where the beam goes (or on you), the hand holding the torch out in front of the chest, a little raised to point at a face
   const look = g.clone().add(new V3(par.aim.x * 3, 1.0 + par.aim.y * 3 + 0.6, par.aim.z * 3));
   p.gaze = par.gazeOn === 'you' ? G.camera.position : look;
-  if (par.who === 'dad' && torch && torch.held && !par.handBusy) {
-    const s = (p.group.userData.h || 1.75) / 1.75, local = new V3(-0.1 * s, (1.02 + 0.25 * Math.max(0, par.aim.y + 0.2)) * s, 0.34 * s);
-    p.pose = { ...(p.pose || {}), R: { reachLocal: local, palm: 'in', grip: 0.9 } };
+  // the torch held out and pointed with the arm: the hand most of an arm's length from the shoulder along the beam, so the forearm (and
+  // the torch along the hand) points where the beam should go
+  if (par.who === 'dad' && torch && torch.held && !par.handBusy && p.rig && p.rig.bones.R_UpperArm) {
+    const sh = p.rig.bones.R_UpperArm.getWorldPosition(new V3()), s = (p.group.userData.h || 1.75) / 1.75;
+    p.pose = { ...(p.pose || {}), R: { reach: sh.addScaledVector(par.aim, 0.5 * s), palm: 'in', grip: 0.55 } };
   }
 }
 async function takeTorch(par) {
@@ -944,16 +986,17 @@ async function upMom(par) {
 // the bottom bunk: she sits on its front edge (the top bunk's underside is 1.29 m up and comes out to z 3.32, so she sits hunched forward,
 // her head out in front of it), facing your door. stand: where she stands before sitting down
 function bunkSeat() {
-  const c = W().colliders.find((q) => q.id === 'bunk') || { minX: 7.243, maxX: 9.483, minZ: 3.181, maxZ: 4.531 };
+  const c = W().colliders.find((q) => q.prop === 'bunk' && q.on !== false) || { minX: 7.243, maxX: 9.483, minZ: 3.181, maxZ: 4.531 };   // (the model's own footprint)
   const x = c.minX + (c.maxX - c.minX) * 0.45, lb = W().lowerBunk;
-  return { hip: new V3(x, (lb && lb.top) || 0.527, c.minZ + 0.27), stand: new V3(x, 0, c.minZ - 0.37), seat: ((lb && lb.top) || 0.527) + 0.03, yaw: Math.PI };
+  // (the hips just behind the front of the mattress, on the comforter, which stands about 9 cm over the mattress's top)
+  return { hip: new V3(x, (lb && lb.top) || 0.527, c.minZ + 0.18), stand: new V3(x, 0, c.minZ - 0.37), seat: ((lb && lb.top) || 0.527) + 0.1, yaw: Math.PI };
 }
 function sitOnBunk(par, k, from) {
   const p = par.p, B = bunkSeat(), pl = pelvisLocal(par);
   p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, B.yaw, 0);
   const off = new V3(pl.x, 0, pl.z).applyAxisAngle(new V3(0, 1, 0), B.yaw), at = B.hip.clone().setY(0).sub(off);
   p.group.position.copy(from).setY(0).lerp(at, sm(k));
-  p.pose = { sit: k, seat: B.seat, lean: 0.45 * k }; p.sitNow = k; p.group.updateMatrixWorld(true);
+  p.pose = { sit: k, seat: B.seat, lean: 0.52 * k }; p.sitNow = k; p.group.updateMatrixWorld(true);
 }
 // her rounds: your room, the bathroom, the hall, the office, the spare room, the living room, the kitchen, the dining room
 const SEARCH = ['kidMid', 'bathMid', 'hallM', 'r2Mid', 'sMid', 'hallW', 'livC', 'kit2', 'dinS', 'livMid'];
@@ -1028,16 +1071,16 @@ function thresholds() {
   if (!allowed() || anyUp()) return;
   const n = night(), N = LEDGER.N, D = PAR.dad, M = PAR.mom, f = F();
   if (f.script || f.cutscene) return;
-  // a mutter through the door, the light on behind it for twenty seconds
-  const over = N >= TH.mutter * Math.min(D.mult, M.mult);
-  if (over && !LEDGER.wasOver && T - LEDGER.lastMutter > 45 && D.inBed && (M.inBed || !M.p.group.visible)) mutter();
-  LEDGER.wasOver = over;
-  if (n < 3) return;
+  const over = N >= TH.mutter * Math.min(D.mult, M.mult), crossed = over && !LEDGER.wasOver; LEDGER.wasOver = over;
   const canWake = (q) => q.inBed && q.p.group.visible && (q.woke === 0 || n >= 7);
-  // Mom, from night five, past 0.9 (before Dad: by then she is the one lying awake)
-  if (n >= 5 && canWake(M) && N >= TH.mom * M.mult && M.st !== 'up') { if (D.st === 'sitting') { D.st = 'light'; lieDown(D, 1.2); } M.st = 'up'; upMom(M).catch((e) => console.warn('parents: Mom failed', e)); return; }
-  // Dad: stirs past 0.6, up past 0.8
-  if (canWake(D) && D.st === 'asleep' && D.stirCool <= 0 && N >= TH.stir * D.mult) stir(D).catch((e) => console.warn('parents: Dad failed', e));
+  if (n >= 3) {
+    // Mom, from night five, past 0.9 (before Dad: by then she is the one lying awake)
+    if (n >= 5 && canWake(M) && N >= TH.mom * M.mult && M.st !== 'up') { if (D.st === 'sitting') { D.st = 'light'; lieDown(D, 1.2); } M.st = 'up'; upMom(M).catch((e) => console.warn('parents: Mom failed', e)); return; }
+    // Dad: stirs past 0.6, up past 0.8
+    if (canWake(D) && D.st === 'asleep' && D.stirCool <= 0 && N >= TH.stir * D.mult) { stir(D).catch((e) => console.warn('parents: Dad failed', e)); return; }
+  }
+  // a mutter through the door, the light on behind it for twenty seconds (when nobody is getting up over it)
+  if (crossed && T - LEDGER.lastMutter > 45 && D.inBed && (M.inBed || !M.p.group.visible)) mutter();
 }
 async function stir(par) {
   const tok = TOK; par.st = 'sitting';
@@ -1170,8 +1213,10 @@ export const test = {
     par.sit = sit; par.roll = roll; par.shift = Math.sign(roll) * SHIFT * Math.min(1, Math.abs(roll) / ROLL); par.armOut.L = par.armOut.R = 0; par.armOut[who === 'dad' ? 'L' : 'R'] = arm;
     bedTick(par, 0);
   },
-  swing(who, u) { const par = PAR[who]; if (!par.pelvis0 && par.p.rig) { par.pelvis0 = par.p.rig.bones.Pelvis.getWorldPosition(new V3()); par.pelvisBed = bedOf().toLocal(par.pelvis0.clone()); } swingPose(par, u); },
-  seated(who, k) { seated(PAR[who], k); },
+  swing(who, u) { const par = PAR[who]; if (!par.pelvis0 && par.p.rig) { par.pelvis0 = par.p.rig.bones.Pelvis.getWorldPosition(new V3()); par.pelvisBed = bedOf().toLocal(par.pelvis0.clone()); bedOf().one(who, false); } par.inBed = true; par.swing = true; par.p.sleeping = true; swingPose(par, u); },
+  seated(who, h) { const par = PAR[who]; par.swing = false; par.bed.legs = null; par.bed.arms = { L: null, R: null }; seated(par, h); },
+  stepOut(who, k) { stepAt(PAR[who], k); },
+  bunkSeat: () => bunkSeat(),
   onBunk(k = 1) { const par = PAR.mom; par.inBed = false; par.p.sleeping = false; par.p.busy = true; par.p.group.visible = true; sitOnBunk(par, k, bunkSeat().stand); },
   // a parent stood at (x, z) facing yaw, walking (or still), Dad's torch in his hand and lit
   standAt(who, x, z, yaw, { walk = false, torchLit = who === 'dad' } = {}) {
