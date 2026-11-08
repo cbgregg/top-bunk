@@ -141,7 +141,7 @@ const STEPS = {
       for (const [a0, b0] of edges) for (const [a, b] of [[a0, b0], [b0, a0]]) {
         const [ax, az, ay = 0] = N[a], [bx, bz] = N[b], door = nav.edgeDoor(a, b), dm = door && W.doors[door].mid;
         reset(); E.lookTarget = null; E.root.position.set(ax, ground(ax, az, ay), az); E.faceTowards(bx, bz, 1);
-        const low = false;   // (it walks every edge on its feet below level 5, the laundry bent double under the joists)
+        const low = !!(nav.crawlEdge && nav.crawlEdge(a, b));   // (on its feet below level 5, on all fours on the laundry's own edges, as the hunter goes them)
         E.mode = low ? 'crawl' : spd > 2.6 ? 'run' : 'walk'; E.speed = spd / 3; E.snap = 1; E.crawlSpeed = spd;
         for (let i = 0; i < 30; i++) E.update(1 / 60);   // into its stride
         // (as the hunter walks it: a doorway is gone through at its middle)

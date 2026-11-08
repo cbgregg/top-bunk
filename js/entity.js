@@ -15,6 +15,7 @@ const _a = new V3(), _b = new V3(), _c = new V3(), _d = new V3(), _e = new V3(),
 const ARM_STRETCH = 1.4;
 const FOOT_UP = 0.165;                        // the ankle over the floor with the foot flat on it
 const NEAR4 = [[0, 0], [0.015, 0], [-0.015, 0], [0, 0.015], [0, -0.015]];
+const FACE_FRONT = 0.32;   // the front of the face ahead of the head bone
 const FOOT_PAD = 0.03;   // the room kept between a foot and the furniture
 const STEP_UP = 0.85, STEP_DOWN = 0.6;   // a floor under a foot further above the root's than four risers, or below it than three, is a wall's top or a stairwell, not a step
 // the crawl (the Ring crawl): what touches the floor, in the root's frame (+z ahead, +x its left), metres over the floor. The rig is
@@ -159,7 +160,7 @@ export class Entity {
     // boards); flinch and stun 0..1 are the light in its face and the flash; catchPose { frame 1..3, cam } is the catch, held a frame at
     // a time; cling (a ceiling height) hangs the crumple upside down from it. crawlSpeed is metres a second the hunter wants of the crawl,
     // and lungeOut the metres the crawl has lunged since the hunter last took them (it moves the root by exactly that)
-    this.duck = 0; this.duckHold = null; this.narrowK = 0; this.wallK = 0; this.snap = 0; this.flinch = 0; this.stun = 0; this.catchPose = null; this.cling = null;
+    this.duck = 0; this.duckHold = null; this.narrowK = 0; this.wallK = 0; this.ahead = Infinity; this.snap = 0; this.flinch = 0; this.stun = 0; this.catchPose = null; this.cling = null;
     this.level = 1; this.unfoldT = 0; this.onKey = null; this.onStep = null; this.sneak = false; this.crawlSpeed = 0; this.lungeOut = 0; this.gait = null; this.ground = null;
     this.blinkT = 18 + hash(7.3) * 22; this.blinkK = 0; this.eyeLagT = 0;
     // the room it takes up beyond its root while it is low: two more circles on the floor for the bodies (collide.js) to keep out of
@@ -316,8 +317,40 @@ export class Entity {
   // a contact where it belongs under the body now: lead metres further ahead (the crawl's stance narrows in a doorway)
   nominal(L, lead, out) {
     const left = L[0] === 'L' ? 1 : -1, hand = L[1] === 'H', c = hand ? CRAWL.hand : CRAWL.knee, n = this.narrowK;
-    this.T(left * c[0] * (1 - (hand ? 0.45 : 0.35) * n), 0, c[2] + lead, out); out.y = this.floorAt(out.x, out.z) + c[1];
+    this.T(left * c[0] * (1 - (hand ? 0.45 : 0.35) * n), 0, c[2] + lead, out);
+    this.contactOut(out, hand ? 0.38 : 0.14); out.y = this.floorAt(out.x, out.z) + c[1];
     return out;
+  }
+  // a hand or a knee put down beside the furniture and the walls on its floor, not in them: moved out of each box (grown by pad, the
+  // reach of the fingers or the width of the knee) toward the side the root is on
+  contactOut(p, pad) {
+    const cs = this.colliders, o = this.root.position, y0 = o.y; if (!cs) return p;
+    for (const c of cs) {
+      if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < y0 + 0.02 || (c.minY ?? -0.3) > y0 + 1.0) continue;
+      const x0 = c.minX - pad, x1 = c.maxX + pad, z0 = c.minZ - pad, z1 = c.maxZ + pad;
+      if (p.x <= x0 || p.x >= x1 || p.z <= z0 || p.z >= z1) continue;
+      let best = Infinity, bx = p.x, bz = p.z;
+      const cand = (side, x, z) => { const d = Math.hypot(x - p.x, z - p.z); if (d < best) { best = d; bx = x; bz = z; } };
+      if (o.x <= x0) cand(0, x0, p.z); if (o.x >= x1) cand(1, x1, p.z); if (o.z <= z0) cand(2, p.x, z0); if (o.z >= z1) cand(3, p.x, z1);
+      if (best === Infinity) { cand(0, x0, p.z); cand(1, x1, p.z); cand(2, p.x, z0); cand(3, p.x, z1); }
+      p.x = bx; p.z = bz;
+    }
+    return p;
+  }
+  // how far a line along the floor from (x, z) in direction (dx, dz) goes before it meets a box on the floor within 0.6 m of it (to max)
+  floorRoom(x, z, dx, dz, max) {
+    const cs = this.colliders, y0 = this.root.position.y; let best = max; if (!cs) return best;
+    for (const c of cs) {
+      if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < y0 + 0.02 || (c.minY ?? -0.3) > y0 + 0.6) continue;
+      let t0 = 0, t1 = best;
+      for (const [o, d, lo, hi] of [[x, dx, c.minX - 0.03, c.maxX + 0.03], [z, dz, c.minZ - 0.03, c.maxZ + 0.03]]) {
+        if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) { t1 = -1; break; } continue; }
+        let a = (lo - o) / d, b = (hi - o) / d; if (a > b) [a, b] = [b, a];
+        t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) break;
+      }
+      if (t1 >= t0 && t0 < best) best = t0;
+    }
+    return best;
   }
   gaitReset() {
     const g = this.gait || (this.gait = { plants: {}, lookFrom: new V3(), lookTo: new V3(), lookNow: new V3(), at: new V3() });
@@ -365,6 +398,7 @@ export class Entity {
       if (L[1] === 'H') {   // never further than the arm reaches from where its shoulder will be
         const sh = this.T(L[0] === 'L' ? 0.3 : -0.3, CRAWL.pelvis - 0.1, 0.78 + (g.lunge ? stride : 0), _b), max = this.arm ? (this.arm[0] + this.arm[1]) * 0.92 : 1;
         const d = p.to.distanceTo(sh); if (d > max) { const y = p.to.y; p.to.sub(sh).multiplyScalar(max / d).add(sh); p.to.y = y; }
+        this.contactOut(p.to, 0.38); p.to.y = this.floorAt(p.to.x, p.to.z) + CRAWL.hand[1];
       }
     }
     // the trunk: the shoulders turned against the hips the other way each step, a lean to one side on each lunge; the head's look
@@ -429,6 +463,7 @@ export class Entity {
       const pole = this.T(left * 1.2, 0.7, 0.1, _c).lerp(this.T(left * CRAWL.handPole[0] * (1 - 0.75 * this.narrowK), CRAWL.handPole[1], CRAWL.handPole[2], _d), K.elbows);
       r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], target, pole);
       if (!(sd === 'R' && this.flinch > 0.5 && K.pitch > 0.5)) this.layHand(sd, this.dirW(left * lerp(0.75, 0.42, K.arms), -0.06, lerp(0.65, 0.9, K.arms), _e));
+      this.handGuard(sd);
     }
     // the legs: each knee on the floor where its thigh reaches toward its plant, the foot trailing on its top straight behind the knee
     if (K.legs > 0.001) {
@@ -441,14 +476,55 @@ export class Entity {
         _b.set(_a.x + _d.x * R, plant.y, _a.z + _d.z * R);
         r.aim(th, ca, _c.copy(_b).sub(_a).normalize(), K.legs);
         ca.getWorldPosition(_b);
-        const back = this.dirW(left * 0.12, 0, -1, _e), fx = _b.x + back.x * L2, fz = _b.z + back.z * L2, fy = this.floorAt(fx, fz) + CRAWL.foot[1];
+        // (a wall or a box closer behind the knee than the shin and the foot are long: the foot trails straighter behind, or turned in
+        // under the body, and if there is still no room the shin comes up off the floor until the toes clear it, the foot held up)
+        let room = -1;
+        for (const out of [0.12, 0, -0.18]) {
+          this.dirW(left * out, 0, -1, _f); const rm = this.floorRoom(_b.x, _b.z, _f.x, _f.z, L2 + 0.4) - 0.28;
+          if (rm > room) { room = rm; _e.copy(_f); }
+          if (room >= L2) break;
+        }
+        const back = _e, fx = _b.x + back.x * L2, fz = _b.z + back.z * L2, fy = this.floorAt(fx, fz) + CRAWL.foot[1];
         const R2 = Math.sqrt(Math.max(0, L2 * L2 - (_b.y - fy) ** 2));
-        _c.set(_b.x + back.x * R2, fy, _b.z + back.z * R2);
-        r.aim(ca, ft, _c.sub(_b).normalize(), K.legs);
+        const el = Math.max(Math.atan2(fy - _b.y, R2), room < L2 ? Math.acos(THREE.MathUtils.clamp(room / L2, 0, 1)) : -9);
+        _c.copy(back).multiplyScalar(Math.cos(el)); _c.y = Math.sin(el);
+        r.aim(ca, ft, _c.normalize(), K.legs);
         // on its top: the ball of the foot sits near the sole, so with the top down the line from the ankle to the ball rises
         const fa = this.footAxes && this.footAxes[sd];
         if (fa) r.orient(ft, fa.toe, this.dirW(left * 0.1, 0.3, -1, _e), fa.top, _f.set(0, -1, 0), K.legs);
       }
+    }
+  }
+  // the skin of a hand and its fingers (every second vertex), and the guard: a hand with any of it under the floor is lifted, the whole
+  // arm turned up about the shoulder (the stretched arm cannot always fold short enough for a hand put down close under its shoulder,
+  // and the hand goes on past the point, into the boards)
+  handVerts() {
+    if (this._handV) return this._handV;
+    const out = { L: [], R: [] };
+    for (const m of this.rigMeshes || []) {
+      const SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight, bones = m.skeleton.bones;
+      for (let i = 0; i < SI.count; i += 2) {
+        let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
+        const k = /(?:^|_)([LR])_(?:Hand|Finger)/.exec(bones[bi].name); if (k) out[k[1]].push(m, i);
+      }
+    }
+    return (this._handV = out);
+  }
+  handGuard(sd) {
+    const r = this.rig, B = r.bones, list = this.handVerts()[sd], up = B[sd + '_UpperArm']; if (!list.length || !up) return;
+    for (let pass = 0; pass < 3; pass++) {
+      this.root.updateMatrixWorld(true);
+      let pen = 0;
+      for (let j = 0; j < list.length; j += 2) {
+        const m = list[j], i = list[j + 1];
+        _v.fromBufferAttribute(m.geometry.attributes.position, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld);
+        const d = this.floorAt(_v.x, _v.z) - _v.y; if (d > pen) { pen = d; _w.copy(_v); }
+      }
+      // (a palm pressed flat may give a few millimetres: lifted only past 12 mm, and then to 9 mm)
+      if (pen <= 0.012) break;
+      up.getWorldPosition(_g); _w.sub(_g); _w.y = 0; const h = Math.max(0.15, _w.length());
+      _k.crossVectors(_w.normalize(), _ax.set(0, 1, 0)); if (_k.lengthSq() < 1e-8) break;
+      r.rotateWorld(up, _q1.setFromAxisAngle(_k.normalize(), Math.min(0.5, (pen - 0.009) / h)));
     }
   }
   // a hand flat on the floor: the fingers swung along dir, then the hand turned about them until the palm faces down. Measured off the
@@ -595,11 +671,12 @@ export class Entity {
     }
     return THREE.MathUtils.clamp((0.95 - room) / 0.35, 0, 1);
   }
-  // how far along its heading the first wall (or shut door) is, at the height of its head; Infinity when there is none in 1.5 m
+  // how far along its heading the first wall (a shut door, a solid as tall as one: the stairwell's sides) is, at the height of its head;
+  // Infinity when there is none in 1.5 m
   wallAhead(x, z, y0, fx, fz) {
     const cs = this.colliders; let best = Infinity; if (!cs) return best;
     for (const c of cs) {
-      if (!(c.wall || c.door) || c.on === false || (c.when && !c.when()) || (c.maxY ?? 3) < y0 + 1.6 || (c.minY ?? -0.3) > y0 + 1.6) continue;
+      if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? (c.wall || c.door ? 3 : y0 + 1)) < y0 + 1.6 || (c.minY ?? -0.3) > y0 + 1.6) continue;
       let t0 = 0, t1 = 1.5;
       for (const [o, d, lo, hi] of [[x, fx, c.minX, c.maxX], [z, fz, c.minZ, c.maxZ]]) {
         if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) { t1 = -1; break; } continue; }
@@ -619,7 +696,7 @@ export class Entity {
     }
     // (ahead, only as far as it can go: a door head across a hall, past the wall its line runs into, is not one it will pass under)
     const sc = this.root.scale.y || 1;   // (the heights are its own: the peek's smaller body clears more)
-    const ahead = this.wallAhead(p.x, p.z, y0, fx, fz), reach = ahead - 0.2; this.wallK = THREE.MathUtils.clamp((1.4 - ahead) / 0.5, 0, 1);
+    const ahead = this.wallAhead(p.x, p.z, y0, fx, fz), reach = ahead - 0.2; this.ahead = ahead; this.wallK = THREE.MathUtils.clamp((1.4 - ahead) / 0.5, 0, 1);
     for (let s = -1.2; s <= 1.21; s += 0.1) {
       if (s > reach) break;
       // ahead it is down within 0.7 m, eased over the 0.5 m before; behind it comes up again as what hangs there goes 0.27 to 0.5 m back
@@ -657,9 +734,11 @@ export class Entity {
     // back so it still looks ahead: the hips come down as far as the lower foot needs, the feet stay where the clip put them over their floor
     const dk = this.catchPose ? 1 : this.duck, B = r.bones;
     rr.position.set(0, 0, 0); rr.updateMatrixWorld(true);
-    const feet = this.footPlan(dk);
-    // bent double with a wall close ahead (out of a door across a hall), the hips go back so the head does not go on into it
-    if (dk > 0.001 && this.wallK > 0 && this.duckHold == null && !this.catchPose) { rr.position.z = -0.2 * dk * this.wallK; rr.updateMatrixWorld(true); }
+    // with a wall close ahead (out of a door across a hall, onto the cellar stairs' landing) the hips go back and, upright, the back too,
+    // so its head stops short of the wall instead of going on into it
+    const back = this.duckHold == null && !this.catchPose ? this.wallK : 0;
+    const feet = this.footPlan(dk, back > 0.01);
+    if (back > 0.01) { rr.position.z = -(0.35 * dk + 0.1 * (1 - dk)) * back; rr.updateMatrixWorld(true); }
     if (dk > 0.001) {
       // bent over first: on this skeleton the thighs hang from the spine, so bending it after the legs were set would swing the feet back
       // and up off the floor
@@ -669,6 +748,13 @@ export class Entity {
     }
     // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0) - this.stun * 0.4);
+    // and if the front of its face would still go on into that wall, its back straightens (or bends back) just enough that it does not
+    if (back > 0.01) {
+      this.root.updateMatrixWorld(true); this.head.getWorldPosition(_a);
+      const p = this.root.position, fx = Math.sin(this.root.rotation.y), fz = Math.cos(this.root.rotation.y);
+      const over = (_a.x - p.x) * fx + (_a.z - p.z) * fz + FACE_FRONT - (this.ahead - 0.05);
+      if (over > 0) r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], -Math.min(0.6, over / 1.1));
+    }
     r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
     if (this.leanSide) r.bend(['Spine', 'Spine1', 'Spine2', 'Neck'], [0.2, 0.25, 0.35, 0.2], [0, 0, 1], this.leanSide);   // leaning out from behind something
     r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt + Math.sin(t * 0.7) * 0.05);
@@ -722,7 +808,7 @@ export class Entity {
   // much as the lower foot needs (and the duck's 0.42); setFeet then puts each foot that is down (or nearly) back over its own floor by
   // the knee, as the clip had it turned; a foot high in its swing hangs from the lowered hips (soleGuard keeps it off the floor). Null when
   // both feet are on the root's floor and it is not ducking: the clip's legs stand as they are.
-  footPlan(dk) {
+  footPlan(dk, keep = false) {
     const r = this.rig, B = r.bones, rr = r.root, y0 = this.root.position.y;
     const F = this._feet || (this._feet = { L: new V3(), R: new V3(), qL: new THREE.Quaternion(), qR: new THREE.Quaternion(), gL: 0, gR: 0, wL: 1, wR: 1 });
     let uneven = false, low = Infinity;
@@ -732,7 +818,7 @@ export class Entity {
       F['w' + sd] = 1 - ss(0.06, 0.22, F[sd].y - y0 - FOOT_UP);   // how far down the foot is: 1 on the floor, 0 high in its swing
       if (Math.abs(g - y0) > 0.002) uneven = true;
     }
-    if (!uneven && dk <= 0.001) return null;
+    if (!uneven && dk <= 0.001 && !keep) return null;
     // the body rides the floor smoothed over a tread's length (so it goes down a stair, not in jumps of a riser), the hips lower still
     // if a foot is over a floor lower than that
     const base = uneven ? this.baseFloor() : y0;
@@ -784,7 +870,7 @@ export class Entity {
       }
       if (best) { const [side, need] = best, d = need + 0.002; if (side === 0) out.x -= d; else if (side === 1) out.x += d; else if (side === 2) out.z -= d; else out.z += d; }
     }
-    if (out.lengthSq() > 0.36) out.setLength(0.6);   // (never more than a foot's length: past that it is the root that is wrong)
+    if (out.lengthSq() > 1) out.setLength(1);   // (never more than a stride: past that it is the root that is wrong)
     return out;
   }
   // each foot moved over the floor, as it is turned, out of whatever box it has come down in or swung into (footPush)
