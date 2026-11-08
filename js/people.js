@@ -61,13 +61,26 @@ const WRIST_FLEX = 0.2;     // the relaxed wrist: this far off the forearm's lin
 const WRIST_ROLL = 1.1;     // how far grip may turn the hand about the forearm
 const HINGE = { L: new THREE.Vector3(0, -0.135, -0.991), R: new THREE.Vector3(0, 0.135, -0.991) };   // the elbow axis in upper-arm space when the clip's own bend is too small to read it
 const legNames = (s) => [s + '_Thigh', s + '_Calf', s + '_Foot'];
-// model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look.
-export function makePerson({ model, height = 1.75, ...look } = {}) {
+// the uncanny rules (design 5.3: taught by seeing, never said). The real parents are the first body made of each model (main.js makes
+// them before anything else); every later one is a double (the night's things wearing them): its neck turns 2.4 rad where a person's
+// stops at 1.1, and slowly, the way nobody's does. The real Mom's eyes stay on you six seconds after she has said something to you.
+const MADE = {};
+export const UNCANNY = { neck: 2.4, neckSpeed: 1.6, eyesHold: 6 };
+// sitting up in bed: how far the trunk curls up from the hips (the body lies flat by a group rotation, sleepers() in main.js)
+const SIT_UP = 1.5;
+// the parts that rest on the mattress, and the flesh round each bone (a body in bed is kept from sinking further than it lay at rest)
+const BED_REST = [['Head', 0.15], ['Pelvis', 0.11], ['Spine', 0.11], ['Spine1', 0.11], ['Spine2', 0.11], ['L_UpperArm', 0.05], ['R_UpperArm', 0.05], ['L_Forearm', 0.04], ['R_Forearm', 0.04], ['L_Hand', 0.03], ['R_Hand', 0.03],
+  ['L_Thigh', 0.075], ['R_Thigh', 0.075], ['L_Calf', 0.05], ['R_Calf', 0.05], ['L_Foot', 0.07], ['R_Foot', 0.07]];   // (the heel sits well under the ankle)
+const _qBed = new THREE.Quaternion(), _qRoll = new THREE.Quaternion(), _eBed = new THREE.Euler(), _yAx = new THREE.Vector3(0, 1, 0);
+// model: 'dad' | 'mom' (assets/models/<model>.glb). The rest are the low-poly look. uncanny: true for a double (by default, any body after
+// the first of its model)
+export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
+  const made = model ? (MADE[model] = (MADE[model] || 0) + 1) : 1;
   const lp = makeLowPoly({ height, ...look });
   const g = new THREE.Group(); g.add(lp.group); g.userData.h = height;
   const head = new THREE.Object3D(); head.position.y = 1.64 * height / 1.75; g.add(head);   // the interaction target, always there
   const person = {
-    group: g, head, arms: lp.arms, rig: null, lookAt: null,
+    group: g, head, arms: lp.arms, rig: null, lookAt: null, uncanny: uncanny ?? made > 1, eyeHold: null, youAt: null,
     // what the body is doing on top of the clip:
     //   lean 0..1.4 (bend at the waist), squat 0..1 (both knees), kneel 0..1 (right knee on the floor)
     //   hold: an object both hands press on the sides of (holdW: its width when it has no box geometry, holdY: hand height above its origin)
@@ -91,10 +104,10 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const idleA = r.actions[(r.alias && r.alias.idle) || 'idle'];
       this.sitNow += ((p && p.sit || 0) - this.sitNow) * Math.min(1, dt * 3.5);
       // (the standing clip has a body's own sway and shifts: the procedural ones only add a little under it)
-      r.life(dt, { still: idleA ? idleA.getEffectiveWeight() * (r.alias ? 0.35 : 1) : 1, talking: !!r.env, asleep: !!(p && p.sleep) });
+      r.life(dt, { still: idleA ? idleA.getEffectiveWeight() * (r.alias ? 0.35 : 1) : 1, talking: !!r.env, asleep: !!(p && p.sleep && !(p.bed && p.bed.awake)) });
       this.relaxHands(r);
       if (!r.legLen && !(p && p.sleep)) this.legs(r, 0, 0);   // measure the legs (and set the root's height) once, standing
-      if (p && p.sleep) this.applyPose(r, p, 1, 0);
+      if (p && p.sleep) { this.applyPose(r, p, 1, 0); if (p.bed) this.restOnBed(r, p.bed); }
       else {
         const k = Math.min(1, dt * 7), want = p && (p.hold || p.reach || p.reachLocal || p.L || p.R) ? 1 : 0;
         // ducking under something low: this.duck is how many metres the head must come down; a little from the waist, the rest from the knees
@@ -121,7 +134,9 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
           r.root.updateMatrixWorld(true);
         }
       }
-      r.lookAt(this.lookAt, dt);
+      // the eyes held on you after a line (the real Mom), and the double's neck, which turns further and slower than a person's
+      if (this.eyeHold) { this.eyeHold.t -= dt; const at = this.eyeHold.at || this.youAt; if (this.eyeHold.t > 0 && at) this.lookAt = at; else this.eyeHold = null; }
+      r.lookAt(this.lookAt, dt, this.uncanny ? { yaw: UNCANNY.neck, pitch: 0.7, speed: UNCANNY.neckSpeed } : undefined);
       r.updateJaw(dt); r.face(dt);
       // the head marker (what the camera frames and what you talk to) rides with the head bone, so it comes down when they sit
       const hb = r.bones.Head;
@@ -138,13 +153,19 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       return pos;
     },
     // put obj in this hand: its origin sits `down` below the palm centre and `out` in front of the palm, upright, and from then on it rides with the hand bone
-    grab(obj, side = 'R', { down = 0.1, out = 0 } = {}) {
+    // quat: its world orientation as it is taken (a torch pointed the way he faces), instead of upright
+    grab(obj, side = 'R', { down = 0.1, out = 0, quat = null } = {}) {
       const r = this.rig; if (!r) { this.group.attach(obj); return; }
       this.palm(side, GE, GF);
       GE.addScaledVector(GF, out); GE.y -= down;
-      obj.position.copy(GE); obj.rotation.set(0, this.group.rotation.y, 0); obj.updateMatrixWorld(true);
+      if (obj.parent) obj.parent.updateWorldMatrix(true, false);
+      obj.position.copy(GE); if (obj.parent) obj.parent.worldToLocal(obj.position);
+      if (quat) { obj.quaternion.copy(quat); if (obj.parent) obj.quaternion.premultiply(obj.parent.getWorldQuaternion(_qu).invert()); } else obj.rotation.set(0, this.group.rotation.y, 0);
+      obj.updateMatrixWorld(true);
       r.bones[side + '_Hand'].attach(obj);
     },
+    // let go of something held: it stays where it is in the world, in `to` (put down on a nightstand)
+    release(obj, to) { if (obj && to) to.attach(obj); },
     // with nothing in the hands and someone else talking: Mom folds her arms when she is uneasy, Dad rubs the back of his neck now and then
     idlePose(dt) {
       if (!this.listening || this.sleeping || this.inCar || !this.rig) { this.fidget = 0; return null; }
@@ -174,7 +195,9 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       // once settled on something carried, the arms follow it (still capped, so nothing snaps): any lag lets the walk's sway push the hands into the box.
       // the slow blend lasts until the arms have arrived (any bone still more than 12 degrees off what it is going to), not just for its time
       const slow = this.blendT > 0 || (this.farGap || 0) > 0.21, close = !slow && this.pose && this.pose.hold;
-      const share = close ? 1 : 1 - Math.exp(-dt * (slow ? (this.longBlend > 0 ? 5 : 9) : 30)), cap = (slow ? (this.longBlend > 0 ? 120 : 200) : close ? 900 : 600) * Math.PI / 180 * dt;
+      // (carrying while walking, the follow is never held under 10 degrees a frame, or the stride's sway pushes a lagging forearm into the box)
+      const share = close ? 1 : 1 - Math.exp(-dt * (slow ? (this.longBlend > 0 ? 5 : 9) : 30)), carry = !!(this.pose && this.pose.hold && this.walking);
+      const cap = Math.max((slow ? (this.longBlend > 0 ? 120 : 200) : close ? 900 : 600) * Math.PI / 180 * dt, carry ? 10 * Math.PI / 180 : 0);
       let gap = 0;
       for (const b of this.armBones) {
         let s = this.shown.get(b);
@@ -317,11 +340,71 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       const k = THREE.MathUtils.clamp(amount, 0, 1), to = flat === 'soft' ? CURL.soft.map((f, i) => f.map((a, j) => a + (CURL.relaxed[i][j] - a) * k)) : flat ? CURL.flat : CURL.relaxed.map((f, i) => f.map((a, j) => a + (CURL.grip[i][j] - a) * k));   // (soft: open, toward relaxed by amount)
       this.curl(r, side, ax, to, CURL.relaxed, w);
     },
+    // in bed: the body never sinks further into the mattress than it lay at rest. While it lies still (bed.rest) its lowest point (each
+    // resting bone less the flesh round it) is measured; rolled or sitting up, the group is lifted by however far below that it has gone
+    restOnBed(r, bed) {
+      if (!bed.keep) return;
+      let low = Infinity;
+      for (const [n, rad] of BED_REST) { const bn = r.bones[n]; if (!bn) continue; bn.updateWorldMatrix(true, false); low = Math.min(low, bn.getWorldPosition(GA).y - rad); }
+      if (!isFinite(low)) return;
+      if (bed.rest || this.bedLow === undefined) { this.bedLow = low; return; }
+      const dy = this.bedLow - low;
+      if (dy > 1e-4) { this.group.position.y += dy; this.group.updateMatrixWorld(true); }
+      this.bedLift = Math.max(0, dy);
+    },
+    // lay this body in bed at spot ({ x, y, z, yaw }, world.js parentsBed): on its back by a group rotation, its head on the pillow; roll
+    // (radians, + onto its left side) turns it about its own length, shift moves it across the bed (metres toward its left), toFoot down
+    // the bed from the spot. The group's order stays YXZ, which is how the rest of the game knows a body is lying down
+    inBed(spot, { roll = 0, shift = 0, toFoot = 0.1, lift = 0.02 } = {}) {
+      const g2 = this.group;
+      g2.rotation.order = 'YXZ'; _qBed.setFromEuler(_eBed.set(-Math.PI / 2, spot.yaw ?? Math.PI / 2, 0, 'YXZ'));
+      if (roll) _qBed.multiply(_qRoll.setFromAxisAngle(_yAx, roll));
+      g2.quaternion.copy(_qBed);
+      const yaw = spot.yaw ?? Math.PI / 2, fx = Math.sin(yaw), fz = Math.cos(yaw);   // (the foot of the bed, from the spot: the way the body's feet point)
+      const lx = Math.cos(yaw), lz = -Math.sin(yaw);                                 // its left, lying on its back
+      g2.position.set(spot.x + fx * toFoot + lx * shift, spot.y + lift, spot.z + fz * toFoot + lz * shift);
+      g2.updateMatrixWorld(true);
+    },
     applyPose(r, p, w = 1, lean = p.lean || 0, squat = p.squat || 0, kneel = p.kneel || 0) {
       if (p.sleep) {   // asleep on the back: the head turned toward the room, the feet flat, a slow breath in the chest
-        r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * p.sleep);
-        r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], p.feet ?? 1.0);   // toes pointed along the bed, so they stay under the quilt (the breath is the life layer's)
-        r.bend(['Spine1', 'Spine2', 'Neck'], [0.35, 0.4, 0.25], [1, 0, 0], 0.12);   // the shoulders and head propped on the pillow, not sunk through it into the mattress
+        // p.bed (js/parents.js): { sit 0..1 sitting up, turn the head's turn (-1..1, else p.sleep), knee { L, R } a knee drawn up (lying on
+        // a side), legs { thigh, shin, foot, w } world directions (swung over the edge of the bed), arms { L, R: { at, pole, palm, grip, w } }
+        // hands on targets (on the lap, laid on the quilt, in front of the chest), awake (the eyes open) }
+        const b = p.bed || {}, sit = b.sit || 0, flat = 1 - sit;
+        r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * (b.turn ?? p.sleep) * (1 - 0.7 * sit));
+        if (!b.legs) r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], (p.feet ?? 1.0) * (1 - 0.5 * sit));   // toes pointed along the bed, so they stay under the quilt (the breath is the life layer's)
+        r.bend(['Spine1', 'Spine2', 'Neck'], [0.35, 0.4, 0.25], [1, 0, 0], 0.12 * flat);   // the shoulders and head propped on the pillow, not sunk through it into the mattress
+        // lying down the legs come together and the arms in against the sides (the standing clip's stance is 42 cm wide: two of them
+        // side by side in a double bed would lie with their inner hands and feet in each other)
+        if (!b.legs) { r.bend(['L_Thigh'], [1], [0, 0, 1], -0.09); r.bend(['R_Thigh'], [1], [0, 0, 1], 0.09); }
+        r.bend(['L_UpperArm'], [1], [0, 0, 1], -0.07); r.bend(['R_UpperArm'], [1], [0, 0, 1], 0.07);
+        r.bend(['L_Clavicle'], [1], [0, 1, 0], -0.25 * flat); r.bend(['R_Clavicle'], [1], [0, 1, 0], 0.25 * flat);   // the shoulders rolled forward, relaxed
+        // sitting up: the trunk curls up from the hips with the legs left lying along the bed (the thighs hang from the spine bone in this
+        // skeleton, so they are given its share back), the head tipped forward off the pillow's angle so the eyes look ahead
+        if (sit > 1e-3) {
+          const lean = SIT_UP * sit;
+          r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], lean);
+          if (r.bones.L_Thigh && r.bones.L_Thigh.parent === r.bones.Spine) r.bend(['L_Thigh', 'R_Thigh'], [1, 1], [1, 0, 0], -0.3 * lean);
+          r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], 0.18 * sit);
+        }
+        // lying on a side, the upper knee drawn up a little
+        for (const S of ['L', 'R']) { const k = (b.knee && b.knee[S]) || 0; if (k > 1e-3) { r.bend([S + '_Thigh'], [1], [1, 0, 0], -0.55 * k); r.bend([S + '_Calf'], [1], [1, 0, 0], 1.0 * k); r.bend([S + '_Foot'], [1], [1, 0, 0], -0.3 * k); } }
+        // the legs aimed in the world: swung out over the edge of the bed to sit on it
+        if (b.legs) for (const S of ['L', 'R']) {
+          const B = r.bones, w = b.legs.w ?? 1, th = b.legs.thigh[S] || b.legs.thigh;
+          r.aim(B[S + '_Thigh'], B[S + '_Calf'], th, w); r.aim(B[S + '_Calf'], B[S + '_Foot'], b.legs.shin, w); if (B[S + '_Toe0']) r.aim(B[S + '_Foot'], B[S + '_Toe0'], b.legs.foot, w);
+        }
+        // the hands on their targets; the elbows out to the side and toward the feet unless the target says otherwise
+        if (b.arms) {
+          r.hinge ||= {};   // (a body laid down before it ever stood has not had its elbows read yet)
+          this.group.getWorldQuaternion(RQ);
+          for (const [S, sg] of [['L', 1], ['R', -1]]) {
+            const a = b.arms[S]; if (!a || !a.at || (a.w ?? 1) <= 0.005) continue;
+            const pole = a.pole ? RPole.copy(a.pole) : RPole.set(sg * 0.8, -0.35, -0.45).applyQuaternion(RQ);
+            this.ik(r, S, a.at, pole.clone(), a.w ?? 1);
+            this.grip(r, S, a.palm || RG.set(0, -1, 0), a.grip ?? 0.3, a.w ?? 1);
+          }
+        }
         return;
       }
       this.legs(r, squat, kneel);
@@ -534,7 +617,10 @@ export function makePerson({ model, height = 1.75, ...look } = {}) {
       return moved;
     },
     // opts: { question, to: 'you' | 'mom' | 'dad', mood: 'warm' | 'joke' | 'uneasy' | 'scared' } shape the gestures and the face
-    talk(env, opts = {}) { this.talkOpts = opts; if (this.rig) { this.rig.talk(env); this.rig.mood = opts.mood || this.mood || null; this.rig.question = !!opts.question; } },
+    talk(env, opts = {}) {
+      this.talkOpts = opts; if (this.rig) { this.rig.talk(env); this.rig.mood = opts.mood || this.mood || null; this.rig.question = !!opts.question; }
+      if (env && model === 'mom' && !this.uncanny && (opts.to || 'you') === 'you') this.eyeHold = { at: opts.eyesOn || null, t: env.length / 30 + UNCANNY.eyesHold };   // (eyes on you through the line and six seconds after it)
+    },
   };
   // night clothes: the body material's map is swapped for the pajama repaint (made once, the first time it is asked for)
   person.night = false; person.nightOf = null;

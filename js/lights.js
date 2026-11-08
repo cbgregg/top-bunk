@@ -51,6 +51,10 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
   };
   for (let i = 0; i < NS; i++) mkSpot(true);
   for (let i = 0; i < NP; i++) mkSpot(false);
+  // one plain spot kept out of the pool for a light that is carried: Dad's torch on his night walks (js/parents.js aims it from his hand).
+  // It is in the scene from the start like the rest, dark and parked under the floor, so lighting it never changes the light count
+  const torch = new THREE.SpotLight(0xfff0d8, 0, 13, 0.36, 0.55, 1.3);
+  torch.position.set(0, -50, 0); torch.target.position.set(0, -60, 0); scene.add(torch, torch.target);
   // (a phone does without it: one light fewer for every pixel)
   const bounce = PHONE ? null : new THREE.PointLight(BOUNCE_COL, 0, 6, 1); if (bounce) { bounce.position.set(0, -50, 0); scene.add(bounce); }
 
@@ -92,7 +96,9 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
   // ---------- state ----------
   let phase = 'title', since = 0, assignT = 0, frame = 0, deaths = 0;
   const L = {
-    rooms, switches: W.switches, pool, bounce,
+    rooms, switches: W.switches, pool, bounce, torch,
+    // what moves near a lit fixture besides the thing and the doors (a parent walking the house): its shadow map is drawn again while it does
+    movers: [],
     // the room's light now (0..1, flicker included), at a point in the house; the dining end takes some of the kitchen's
     levelAt(x, z, y = 0) {
       const name = roomAt(x, z, y), r = rooms[name];

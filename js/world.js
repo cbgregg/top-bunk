@@ -1057,45 +1057,102 @@ export function buildWorld(scene) {
       rbox(-0.55, 0.55, 0.6, 0.675, -1.07, -1.0, M.floralB, 0.035, o);
       // the quilt over the sleepers: a draped sheet that rises over each body (Mom and Dad's rigs lie under it, see sleepers() in main.js)
       // and breathes, with soft folds and the top sheet turned back over it at the pillow end. set(false) flattens it: the bed looks
-      // slept in. one('dad', false) empties his side.
+      // slept in. one('dad', false) empties his side. Each side follows its sleeper: shift(name, dx) moves its rise across the bed with
+      // the body (a roll-over), torso(name, k) lets the quilt fall from the chest to the lap as they sit up, and hull(name, fn) hands it
+      // the body's limbs as capsules in the bed's own frame ([ax, ay, az, bx, by, bz, r] each, y up from the floor), so wherever a limb
+      // rises above the resting shape the quilt rises over it (it lifts at once and settles back slowly, like cloth). third(k) puts a
+      // third body under it, between the two. heightAt(x, z) is the quilt's top at a point of the bed's frame (an arm laid on it).
       bedSleepers = (() => {
         const cl = (v, a, b) => Math.max(a, Math.min(b, v)), sm = (t) => { t = cl(t, 0, 1); return t * t * (3 - 2 * t); };
         const g = new THREE.Group(); bed.add(g);
-        const X0 = -0.53, X1 = 0.53, Z0 = -1.04, Z1 = 0.44, TOP = 0.6;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
-        // the shape at a point: [Mom's rise, Dad's rise, the folds]
-        const shape = (x, z) => {
-          // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
-          // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
-          // (the last span before the foot drops toward the mattress, so the quilt hangs over the feet instead of ending in the air)
-          const along = cl((Z1 - z) / (Z1 - Z0), 0, 1), h = Math.min(0.29 - along * 0.07, 0.21 + along * 0.7) * (1 - 0.3 * sm((along - 0.9) / 0.1));
-          // across it, a flat-topped rise the width of a body, so a leg off the centre line is still under it; Dad is broader, and his
-          // plateau stays high out to the wall edge so his far elbow is covered (Mom has the door side, Dad the wall side)
-          const dm = (x - 0.23) / 0.34, dd = (x + 0.21) / 0.45, dd6 = dd * dd * dd * dd * dd * dd;
-          const edge = sm((x - X0) / 0.08) * sm((X1 - x) / 0.08) * sm((z - Z0) / 0.08) * sm((Z1 - z) / 0.08);   // the folds stay off the edges
-          const f = edge * (0.02 * Math.sin(x * 9 + 0.7) * Math.sin(z * 5.3 + 1.1) + 0.011 * Math.sin(x * 21 + z * 8));
-          return [h * 1.10 * Math.exp(-dm * dm * dm * dm * 2), h * 1.22 * Math.exp(-dd6 * 2), f];
-        };
+        const X0 = -0.58, X1 = 0.58, Z0 = -1.09, Z1 = 0.44, TOP = 0.6, NX = 38, NZ = 35;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
+        // the sheet is a little wider than the mattress (0.53 each side) so that it hangs down over the rolled edges: past EDGE it drapes to
+        // DRAPE, never over a limb, and from the side nobody is seen lying under it
+        const EDGE = 0.5, DRAPE = 0.62, FOOT = -0.98, FOOT_DRAPE = 0.69;   // (and over the foot, to just over its rolled edge)
+        const XM = 0.23, XD = -0.21, XT = 0.01;   // across the bed: where Mom's, Dad's and a third body's rises are centred at rest
+        const CHIN = 0.18, TUCK = 0.755;          // a child between them: how far up the pillows its share of the quilt comes, and how low it tucks there
+        // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
+        // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
+        // (the last span before the foot drops toward the mattress, so the quilt hangs over the feet instead of ending in the air)
+        const alongOf = (z) => cl((Z1 - z) / (Z1 + 1.04), 0, 1);   // (along the mattress, 1.04 from its middle to the foot)
+        const lengthwise = (z) => { const along = alongOf(z); return Math.min(0.29 - along * 0.07, 0.21 + along * 0.7) * (1 - 0.3 * sm((along - 0.9) / 0.1)); };
+        // across it, a flat-topped rise the width of a body, so a leg off the centre line is still under it; Dad is broader, and his
+        // plateau stays high out to the wall edge so his far elbow is covered (Mom has the door side, Dad the wall side)
+        const across = { mom: (x) => { const d = (x - XM) / 0.34; return 1.10 * Math.exp(-d * d * d * d * 2); }, dad: (x) => { const d = (x - XD) / 0.45, d2 = d * d; return 1.22 * Math.exp(-d2 * d2 * d2 * 2); },
+          third: (x) => { const d = (x - XT) / 0.26; return 0.9 * Math.exp(-d * d * d * d * 2); } };
+        // sitting up, the quilt falls from the chest into the lap: the rise over the first part of the bed goes as k does
+        const torsoFall = (z, k) => (k <= 0 ? 1 : 1 - Math.min(1, 2 * k) * (1 - sm((alongOf(z) - 0.3) / 0.28)));   // (all of it by halfway up)
+        const folds = (x, z) => { const edge = sm((x - X0) / 0.08) * sm((X1 - x) / 0.08) * sm((z - Z0) / 0.08) * sm((Z1 - z) / 0.08); return edge * (0.02 * Math.sin(x * 9 + 0.7) * Math.sin(z * 5.3 + 1.1) + 0.011 * Math.sin(x * 21 + z * 8)); };   // the folds stay off the edges
         const sheet = (x0, x1, z0, z1, nx, nz, mat, lift) => {
           const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, nx, nz); geo.rotateX(-Math.PI / 2); geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
-          const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, bm = new Float32Array(n), bd = new Float32Array(n), fo = new Float32Array(n);
-          for (let i = 0; i < n; i++) { const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z); [bm[i], bd[i], fo[i]] = shape(x, z); fo[i] += lift(x, z); }
+          const pos = geo.attributes.position, uv = geo.attributes.uv, n = pos.count, h = new Float32Array(n), fo = new Float32Array(n), up = new Float32Array(n), cur = new Float32Array(n), xs = new Float32Array(n), zs = new Float32Array(n);
+          for (let i = 0; i < n; i++) { const x = pos.getX(i), z = pos.getZ(i); uv.setXY(i, x, z); xs[i] = x; zs[i] = z; h[i] = lengthwise(z); fo[i] = folds(x, z); up[i] = lift(x, z); cur[i] = -1; }
           const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; g.add(m);
-          return { mesh: m, geo, pos, n, bm, bd, fo };
+          return { mesh: m, geo, pos, n, h, fo, up, cur, xs, zs };
         };
-        const quilt = sheet(X0, X1, Z0, Z1, 34, 34, M.floralB, () => 0);
+        const quilt = sheet(X0, X1, Z0, Z1, NX, NZ, M.floralB, () => 0);
         // the turned-back sheet: a band over the quilt's pillow end, thicker along its fold
-        const band = sheet(X0 + 0.02, X1 - 0.02, Z1 - 0.3, Z1 - 0.01, 30, 8, M.bedLinen, (x, z) => 0.012 + 0.014 * sm((z - (Z1 - 0.3)) / 0.08) * sm((Z1 - 0.1 - z) / 0.1));
-        const fx = { group: g, quilt: quilt.mesh, amount: 1, target: 1, t: 0, side: { mom: 1, dad: 1 },
-          set(on) { fx.target = on ? 1 : 0; fx.side.mom = fx.side.dad = 1; },
+        const band = sheet(-0.51, 0.51, Z1 - 0.3, Z1 - 0.01, 30, 8, M.bedLinen, (x, z) => 0.012 + 0.014 * sm((z - (Z1 - 0.3)) / 0.08) * sm((Z1 - 0.1 - z) / 0.1));
+        // a limb under the quilt: the top of an ellipse round its capsule, 3.5 cm wider than the limb so the cloth drapes off it instead of
+        // creasing at its edge. caps: flat [ax, ay, az, bx, by, bz, r] runs; returns the highest top over (x, z), or -1
+        const SKIRT = 0.035, CLOTH = 0.022;
+        const hullTop = (caps, x, z) => {
+          let best = -1;
+          for (let k = 0; k < caps.length; k += 7) {
+            const ax = caps[k], ay = caps[k + 1], az = caps[k + 2], bx = caps[k + 3], by = caps[k + 4], bz = caps[k + 5], r = caps[k + 6], R = r + SKIRT;
+            const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz, t = l2 < 1e-9 ? 0 : cl(((x - ax) * dx + (z - az) * dz) / l2, 0, 1);
+            const px = ax + dx * t - x, pz = az + dz * t - z, d2 = px * px + pz * pz; if (d2 >= R * R) continue;
+            const top = ay + (by - ay) * t + r * Math.sqrt(1 - d2 / (R * R)) + CLOTH; if (top > best) best = top;
+          }
+          return best;
+        };
+        const sideOf = () => ({ on: 1, dx: 0, torso: 0, caps: null, hull: null });
+        const fx = { group: g, quilt: quilt.mesh, amount: 1, target: 1, t: 0, side: { mom: 1, dad: 1 }, sides: { mom: sideOf(), dad: sideOf() }, k3: 0, k3Want: 0, idle: null, idleT: 0,
+          set(on) { fx.target = on ? 1 : 0; fx.side.mom = fx.side.dad = 1; for (const s of Object.values(fx.sides)) { s.dx = 0; s.torso = 0; } fx.k3Want = 0; },
           one(name, on) { fx.side[name] = on ? 1 : 0; },
+          shift(name, dx) { fx.sides[name].dx = dx; },
+          torso(name, k) { fx.sides[name].torso = cl(k, 0, 1); },
+          hull(name, fn) { fx.sides[name].hull = fn || null; },
+          third(k) { fx.k3Want = cl(k, 0, 1); },
+          // the quilt's top at (x, z) in the bed's frame, as last drawn
+          heightAt(x, z) {
+            const i = Math.round(cl((x - X0) / (X1 - X0), 0, 1) * NX) + Math.round(cl((z - Z0) / (Z1 - Z0), 0, 1) * NZ) * (NX + 1);   // (the sheet's rows run from the foot, Z0, after its turn onto the bed)
+            return quilt.pos.getY(i);
+          },
+          // the bed's frame from the world's, for the hulls and the tests
+          toLocal: (v) => g.worldToLocal(v),
           update(dt) {
-            fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5);
+            fx.t += dt; fx.amount += (fx.target - fx.amount) * Math.min(1, dt * 2.5); fx.k3 += (fx.k3Want - fx.k3) * Math.min(1, dt * 1.5);
+            // nobody can see the bed: the shape is worked out four times a second instead of every frame
+            if (fx.idle && fx.idle()) { fx.idleT -= dt; if (fx.idleT > 0) return; fx.idleT = 0.25; }
+            const ease = Math.min(1, Math.max(dt, 1 / 60) * 6);
+            for (const name of ['mom', 'dad']) { const s = fx.sides[name]; s.caps = s.hull && fx.side[name] && fx.amount > 0.05 ? s.hull() : null; }
             // breathing only ever lifts the quilt above its resting shape (the resting shape is what clears the bodies)
+            const M0 = fx.sides.mom, D0 = fx.sides.dad;
             const fm = fx.amount * fx.side.mom * (1 + (0.5 - 0.5 * Math.cos(fx.t * 1.05)) * 0.06), fd = fx.amount * fx.side.dad * (1 + (0.5 - 0.5 * Math.cos(fx.t * 0.86)) * 0.07), flat = 0.05 * (1 - fx.amount);
+            const f3 = fx.k3 * (1 + (0.5 - 0.5 * Math.cos(fx.t * 0.7)) * 0.05), k3 = fx.k3 > 0.002 ? fx.k3 : 0;
             for (const s of [quilt, band]) {
-              const { pos, n, bm, bd, fo, geo } = s;
-              // one quilt over two people: the higher rise, and a bridge where both are under it, so it does not dip to the mattress between them
-              for (let i = 0; i < n; i++) { const a = bm[i] * fm, b = bd[i] * fd; pos.setY(i, TOP + 0.04 + fo[i] + Math.max(a, b) + 0.45 * Math.min(a, b) + flat * Math.sin(pos.getX(i) * 7) * Math.sin(pos.getZ(i) * 9)); }   // rumpled when empty
+              const { pos, n, h, fo, up, cur, xs, zs, geo } = s;
+              for (let i = 0; i < n; i++) {
+                const x = xs[i], z = zs[i];
+                // one quilt over two people: the higher rise, and a bridge where both are under it, so it does not dip to the mattress between them.
+                // With a third between them the two rises stop at its sides and the cloth comes down onto it (their own limbs keep their hulls)
+                const wD = k3 ? 1 - k3 * sm((x - (XD + D0.dx + 0.12)) / 0.16) : 1, wM = k3 ? 1 - k3 * sm((XM + M0.dx - 0.12 - x) / 0.16) : 1;
+                const a = h[i] * across.mom(x - M0.dx) * torsoFall(z, M0.torso) * fm * wM, b = h[i] * across.dad(x - D0.dx) * torsoFall(z, D0.torso) * fd * wD, c = k3 ? h[i] * 0.85 * across.third(x) * f3 : 0;
+                const hi = Math.max(a, b, c), mid = a + b + c - hi - Math.min(a, b, c);   // (the second highest)
+                let y = TOP + 0.04 + fo[i] + hi + 0.45 * mid + flat * Math.sin(x * 7) * Math.sin(z * 9);   // rumpled when empty
+                const ax = Math.abs(x); if (ax > EDGE) { const s = sm((ax - EDGE) / (X1 - EDGE)); y += (DRAPE - y) * s; }   // over the side
+                if (z < FOOT) { const s = sm((FOOT - z) / (FOOT - Z0)); y += (FOOT_DRAPE - y) * s; }                       // over the foot
+                // the third one is a child, lower in the bed than its parents' heads: the middle of the pillow end is drawn up onto the pillows
+                // to its chin and tucked down there, so from its eyes the quilt is over it to the chin (and the pillows, not the sheet, under the fold)
+                let zz = z;
+                if (k3) { const d = (x - XT) / 0.14, wt = k3 * Math.exp(-d * d * d * d); if (wt > 1e-3) { zz = z + CHIN * wt * sm((z - (Z1 - 0.35)) / 0.35); y += (TUCK - y) * wt * sm((z - (Z1 - 0.1)) / 0.1); } }
+                // a limb above the resting shape lifts the cloth over it
+                for (const sd of [M0, D0]) if (sd.caps) { const top = hullTop(sd.caps, x, zz); if (top > y) y = top; }
+                // cloth: up at once (nothing may come through it), down slowly
+                const c0 = cur[i]; if (c0 < 0 || y >= c0) cur[i] = y; else cur[i] = c0 + (y - c0) * ease;
+                pos.setY(i, cur[i] + up[i]); if (pos.getZ(i) !== zz) pos.setZ(i, zz);
+              }
               pos.needsUpdate = true; geo.computeVertexNormals();
             }
           } };
