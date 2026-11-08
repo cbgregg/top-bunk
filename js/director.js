@@ -14,6 +14,7 @@
 //   D.engineHas(id) / D.mayFire(tier, reveal) / D.firedLegacy(id, tier) / D.mayEncounter(kind) / D.notedEncounter(kind)   the engine's gates
 import { rng, hashSeed, shuffle, pick, between, weighted } from './rng.js';
 import { NODES, nearestNode, dist as navDist } from './nav.js';
+import { typeAllowed } from './story.js';
 
 export const TYPES = ['thirst', 'ring', 'static', 'mimic', 'blackout', 'hunted', 'paralysis', 'teddy', 'parents', 'quiet', 'car', 'vigil'];
 export const TYPE_NAMES = {
@@ -21,25 +22,22 @@ export const TYPE_NAMES = {
   teddy: 'The Bear', parents: 'The Parents', quiet: 'The Quiet', car: 'The Drive', vigil: 'The Vigil', finale: 'Ten', poltergeist: 'Night one',
 };
 
-// nights 2..9 get a type each; night 10 is the end. The order is different for every seed.
+// nights 2..9 get a type each; night 10 is the end. The order is different for every seed, and every type falls on a night the story
+// allows it (TYPE_ALLOWED, js/story.js): the same draws as ever, the first one that keeps to the table is the seed's. About one draw in a
+// hundred and thirty does, so the cap is far past what any seed needs; the last seed asked is remembered (the stage list and every plan ask)
+let typesOf = { seed: null, out: null };
 export function nightTypes(seed) {
+  if (typesOf.seed === seed && typesOf.out) return { ...typesOf.out };
   const r = rng('types:' + seed);
-  for (let tries = 0; tries < 400; tries++) {
+  let out = null;
+  for (let tries = 0; tries < 6000 && !out; tries++) {
     const rest = shuffle(r, TYPES.filter((t) => t !== 'static' && t !== 'car' && t !== 'vigil'));
     const pool = shuffle(r, ['static', 'car', 'vigil', ...rest.slice(0, 5)]);   // eight of the twelve, and the TV, the drive and the vigil are always in
-    const ok = pool.every((t, i) => {
-      const n = i + 2;
-      if (t === 'quiet' && n < 4) return false;
-      if (t === 'blackout' && n < 3) return false;
-      if (t === 'car' && (n < 5 || n > 8)) return false;
-      if (t === 'vigil' && (n < 4 || n > 8)) return false;
-      if (t === 'paralysis' && n < 3) return false;
-      if (t === 'parents' && n < 3) return false;
-      return true;
-    });
-    if (ok) { const out = { 1: 'poltergeist', 10: 'finale' }; pool.forEach((t, i) => { out[i + 2] = t; }); return out; }
+    if (pool.every((t, i) => typeAllowed(t, i + 2))) { out = { 1: 'poltergeist', 10: 'finale' }; pool.forEach((t, i) => { out[i + 2] = t; }); }
   }
-  const out = { 1: 'poltergeist', 10: 'finale' }; ['thirst', 'static', 'ring', 'blackout', 'car', 'mimic', 'vigil', 'hunted'].forEach((t, i) => { out[i + 2] = t; }); return out;
+  if (!out) { out = { 1: 'poltergeist', 10: 'finale' }; ['thirst', 'static', 'ring', 'vigil', 'car', 'mimic', 'paralysis', 'teddy'].forEach((t, i) => { out[i + 2] = t; }); }   // keeps to the table too
+  typesOf = { seed, out };
+  return { ...out };
 }
 
 // the weather of a night, from the seed: 'clear' | 'rain' | 'storm' (rain with lightning). Night one is always clear, the last night is

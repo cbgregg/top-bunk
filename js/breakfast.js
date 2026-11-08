@@ -2,6 +2,7 @@
 // before the talk, the chairs and the table, last night's photos, and the day talks (they stop what they are doing and turn to you).
 // main.js hands over what the mornings read of it once, at boot, through bind(game).
 import { bscale, makeThing, placeBox4 } from './day.js';
+import * as story from './story.js';
 
 // what the mornings read of main.js, set once by bind()
 let THREE, V3, W, F, P, E, mom, dad, scene, camera, sfx, UI, nights, talkNow, addI, EYE, HIDE_YAW, tmp;
@@ -243,9 +244,10 @@ export function seatOn(who, i, toward) {
   // leaning in to the table (the more, the further its edge), so the hands reach the top with the elbows bent, not the arms out straight
   who.pose = { sit: 1, seat: who.seatAt, rest, lean: rest ? Math.min(0.26, 0.12 + Math.max(0, rest.L.z - 0.3) * 1.2) : 0 }; who.sitNow = 1;
 }
-// last night's photos go on the table one at a time; you say what each one is, and one of them answers. How they take it depends on how much
-// there has been in the whole run: brushed off, then uneasy, then scared (the same thresholds the ending uses, never shown)
-const REG = (c) => (c < 3 ? 'low' : c < 7 ? 'mid' : 'high');
+// last night's photos go on the table one at a time; you say what each one is, and one of them answers. How they take it is the run's
+// stance (js/story.js), the one the ending comes to: brushed off or blamed ('low'), one of them has seen it ('mid'), believed ('high').
+// REG(stance) is a stance's register; REG(count) is the run's own stance had it that much proof (each photo on the table, in turn)
+export const REG = (x) => story.register(typeof x === 'string' ? x : story.stance(undefined, { proof: +x || 0 }));
 async function photoBeat(ids) {
   ids = ids.slice(-4); const total = nights.proof.count();
   UI.subtitle('<i>You put the photos on the table.</i>', 2.6); await wait(1.4);

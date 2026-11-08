@@ -1015,10 +1015,12 @@ async function carLeaving() {
 }
 
 // ---------- night ten: the thing stands at the end of the hall, and this time they see it too ----------
-// what you found decides the end: under 3 nobody comes, 3 to 6 they come and it takes them, 7 or more they believe you and you leave
-const finaleFor = (proof) => (proof < 3 ? 'ENDING_ALONE' : proof < 7 ? 'ENDING_TAKEN' : 'ENDING_BELIEVED');
+// what Mom and Dad have come to make of it decides the end (js/story.js): dismissed or blamed, nobody comes; split, they saw it; believed,
+// you leave with them. The same stance sets the mornings' register, so the two cannot disagree. finaleFor() is the run's ending,
+// finaleFor('split') a stance's; a bare number is a photo count standing in for a stance the way #proof=N does (story.countStance)
+const finaleFor = (s) => story.ending(typeof s === 'number' ? story.countStance(s) : s || story.stance());
 async function finaleScene() {
-  const end = finaleFor(proofCount());
+  const end = finaleFor();
   F.script = true; F.cutscene = true; UI.objective(null); UI.hint(null); UI.prompt(null);
   if (nights) nights.hunter.dismiss();
   UI.pod(null); UI.blanket(false); P.pod = null; flash.intensity = 0; F.flashOn = false; F.breathCheck = false; F.breathUI = false;
@@ -1051,6 +1053,10 @@ async function finaleScene() {
 }
 // how much proof the run has (#proof=N stands in for it, to reach each ending)
 const proofCount = () => (HPARAM.proof !== undefined ? +HPARAM.proof : (RUN.evidence || []).length);
+// the story state reads the run from here: its proof, the night last played (during night n, n - 1; at the breakfast and the afternoon
+// after it, n) and, under #proof=N, the stance that many photos stands in for
+story.bind({ RUN, proof: proofCount, forced: () => (HPARAM.proof !== undefined ? story.countStance(+HPARAM.proof) : null),
+  night: () => { const m = /^([nbd])(\d+)$/.exec(F.stage || ''); return m ? +m[2] - (m[1] === 'n' ? 1 : 0) : (RUN.night || 1) - 1; } });
 // the believed ending: they see it and get you out; the night ends here and endingScript() plays the morning drive
 async function finaleBelieved() {
   UI.subtitle('<i>Dad pulls you behind him. Mom has your arm. Nobody lets go.</i>', 4.5); shake = 0.6;
@@ -1447,7 +1453,7 @@ UI.makeGrain();
 // the title, pause, options and end menus (js/menu.js opens them when the #title / #pause / #end screens show)
 function newRun(seed) {   // New game: a run from moving day on the seed it was given (or a fresh one); a saved run is lost
   store.remove('topbunk.run');
-  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, objDone: {}, briefed: false, skipTold: false, dayDone: false, hasCamera: false }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  Object.assign(RUN, { seed: seed || newSeed(), started: Date.now(), night: 1, deaths: 0, evidence: [], evidenceAt: {}, objDone: {}, briefed: false, skipTold: false, dayDone: false, hasCamera: false, story: story.fresh() }); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   nights.proof.sync();
   startGame();
 }
