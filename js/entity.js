@@ -15,6 +15,7 @@ const _a = new V3(), _b = new V3(), _c = new V3(), _d = new V3(), _e = new V3(),
 const ARM_STRETCH = 1.4;
 const FOOT_UP = 0.165;                        // the ankle over the floor with the foot flat on it
 const NEAR4 = [[0, 0], [0.015, 0], [-0.015, 0], [0, 0.015], [0, -0.015]];
+const FLAT9 = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
 const FACE_FRONT = 0.32;   // the front of the face ahead of the head bone
 const FOOT_PAD = 0.03;   // the room kept between a foot and the furniture
 const STEP_UP = 0.85, STEP_DOWN = 0.6;   // a floor under a foot further above the root's than four risers, or below it than three, is a wall's top or a stairwell, not a step
@@ -321,10 +322,19 @@ export class Entity {
     this.contactOut(out, hand ? 0.38 : 0.14); out.y = this.floorAt(out.x, out.z) + c[1];
     return out;
   }
+  // the colliders within 2.6 m of the root (all it reaches, crawling or on its feet), worked out once a frame for the tests below
+  nearColliders() {
+    const cs = this.colliders; if (!cs) return null;
+    const p = this.root.position, key = this.t + ',' + p.x + ',' + p.z;
+    if (this._nearKey === key) return this._near;
+    const out = this._near || (this._near = []); out.length = 0; this._nearKey = key;
+    for (const c of cs) if (c.minX < p.x + 2.6 && c.maxX > p.x - 2.6 && c.minZ < p.z + 2.6 && c.maxZ > p.z - 2.6) out.push(c);
+    return out;
+  }
   // a hand or a knee put down beside the furniture and the walls on its floor, not in them: moved out of each box (grown by pad, the
   // reach of the fingers or the width of the knee) toward the side the root is on
   contactOut(p, pad) {
-    const cs = this.colliders, o = this.root.position, y0 = o.y; if (!cs) return p;
+    const cs = this.nearColliders(), o = this.root.position, y0 = o.y; if (!cs) return p;
     for (const c of cs) {
       if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < y0 + 0.02 || (c.minY ?? -0.3) > y0 + 1.0) continue;
       const x0 = c.minX - pad, x1 = c.maxX + pad, z0 = c.minZ - pad, z1 = c.maxZ + pad;
@@ -339,7 +349,7 @@ export class Entity {
   }
   // how far a line along the floor from (x, z) in direction (dx, dz) goes before it meets a box on the floor within 0.6 m of it (to max)
   floorRoom(x, z, dx, dz, max) {
-    const cs = this.colliders, y0 = this.root.position.y; let best = max; if (!cs) return best;
+    const cs = this.nearColliders(), y0 = this.root.position.y; let best = max; if (!cs) return best;
     for (const c of cs) {
       if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < y0 + 0.02 || (c.minY ?? -0.3) > y0 + 0.6) continue;
       let t0 = 0, t1 = best;
@@ -495,30 +505,20 @@ export class Entity {
       }
     }
   }
-  // the skin of a hand and its fingers (every second vertex), and the guard: a hand with any of it under the floor is lifted, the whole
+  // the skin of a hand and its fingers (one vertex in each 2.5 cm cell), and the guard: a hand with any of it under the floor is lifted, the whole
   // arm turned up about the shoulder (the stretched arm cannot always fold short enough for a hand put down close under its shoulder,
   // and the hand goes on past the point, into the boards)
-  handVerts() {
-    if (this._handV) return this._handV;
-    const out = { L: [], R: [] };
-    for (const m of this.rigMeshes || []) {
-      const SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight, bones = m.skeleton.bones;
-      for (let i = 0; i < SI.count; i += 2) {
-        let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
-        const k = /(?:^|_)([LR])_(?:Hand|Finger)/.exec(bones[bi].name); if (k) out[k[1]].push(m, i);
-      }
-    }
-    return (this._handV = out);
-  }
+  handVerts() { return this._handV || (this._handV = this.skinCells(/(?:^|_)([LR])_(?:Hand|Finger)/)); }
   handGuard(sd) {
     const r = this.rig, B = r.bones, list = this.handVerts()[sd], up = B[sd + '_UpperArm']; if (!list.length || !up) return;
+    B[sd + '_Hand'].getWorldPosition(_c); const flat = this.flatFloor(_c.x, _c.z, 0.35);
     for (let pass = 0; pass < 3; pass++) {
       this.root.updateMatrixWorld(true);
       let pen = 0;
       for (let j = 0; j < list.length; j += 2) {
         const m = list[j], i = list[j + 1];
         _v.fromBufferAttribute(m.geometry.attributes.position, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld);
-        const d = this.floorAt(_v.x, _v.z) - _v.y; if (d > pen) { pen = d; _w.copy(_v); }
+        const d = (flat ?? this.floorAt(_v.x, _v.z)) - _v.y; if (d > pen) { pen = d; _w.copy(_v); }
       }
       // (a palm pressed flat may give a few millimetres: lifted only past 12 mm, and then to 9 mm)
       if (pen <= 0.012) break;
@@ -650,7 +650,7 @@ export class Entity {
   // faces, all the way down within 0.7 m of the thing overhead and eased over the 0.5 m either side, so it is low before its crown gets there
   // (and, low, how much room it has to either side: a hall or a doorway brings the crawl's hands and elbows in)
   sideRoom(x, z, y0, nx, nz, lo = 0.1, hi = 1.0, from = 0.35) {
-    const cs = this.colliders; if (!cs) return 9;
+    const cs = this.nearColliders(); if (!cs) return 9;
     for (let d = from; d <= 0.95; d += 0.1) {
       const px = x + nx * d, pz = z + nz * d;
       for (const c of cs) { if (c.on === false || (c.when && !c.when()) || (c.maxY ?? 3) < y0 + lo || (c.minY ?? -0.3) > y0 + hi || (c.dressing && !c.wall)) continue; if (px > c.minX && px < c.maxX && pz > c.minZ && pz < c.maxZ) return d; }
@@ -661,7 +661,7 @@ export class Entity {
   // (the arms swing both ways, and a jamb is thinner than a stride), at the height of its hanging arms (they reach 0.75 m out); 1 when
   // there is no room to let them hang
   armRoom() {
-    const cs = this.colliders; if (!cs) return 0;
+    const cs = this.nearColliders(); if (!cs) return 0;
     const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), y0 = p.y;
     let room = 9;
     for (const c of cs) {
@@ -674,7 +674,7 @@ export class Entity {
   // how far along its heading the first wall (a shut door, a solid as tall as one: the stairwell's sides) is, at the height of its head;
   // Infinity when there is none in 1.5 m
   wallAhead(x, z, y0, fx, fz) {
-    const cs = this.colliders; let best = Infinity; if (!cs) return best;
+    const cs = this.nearColliders(); let best = Infinity; if (!cs) return best;
     for (const c of cs) {
       if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? (c.wall || c.door ? 3 : y0 + 1)) < y0 + 1.6 || (c.minY ?? -0.3) > y0 + 1.6) continue;
       let t0 = 0, t1 = 1.5;
@@ -738,8 +738,8 @@ export class Entity {
     // back so it still looks ahead: the hips come down as far as the lower foot needs, the feet stay where the clip put them over their floor
     const dk = this.catchPose ? 1 : this.duck, B = r.bones;
     rr.position.set(0, 0, 0); rr.updateMatrixWorld(true);
-    // with a wall close ahead (out of a door across a hall, onto the cellar stairs' landing) the hips go back and, upright, the back too,
-    // so its head stops short of the wall instead of going on into it
+    // with a wall close ahead (out of a door across a hall, onto the cellar stairs' landing) the hips go back, so its head stops short of
+    // the wall instead of going on into it (and its back straightens, below, if that is not enough)
     const back = this.duckHold == null && !this.catchPose ? this.wallK : 0;
     const feet = this.footPlan(dk, back > 0.01);
     if (back > 0.01) { rr.position.z = -(0.35 * dk + 0.1 * (1 - dk)) * back; rr.updateMatrixWorld(true); }
@@ -840,21 +840,26 @@ export class Entity {
       r.rotateWorld(ft, _q1.copy(F['q' + sd]).multiply(ft.getWorldQuaternion(_q2).invert()));   // and turned as the clip had it
     }
   }
-  // how far a foot has to go over the floor to keep out of the furniture and the walls on its floor: its skin as the clip has it, 3 cm
-  // round, is taken out of each box toward the side the root is on (it never steps through to the far side of a wall)
+  // how far a foot has to go over the floor to keep out of the furniture and the walls on its floor: its skin as it is posed, 3 cm round,
+  // is taken out of each box toward the side the root is on (it never steps through to the far side of a wall)
   footPush(sd, out) {
     out.set(0, 0, 0);
-    const cs = this.colliders, p = this.root.position, y0 = p.y, list = this.soleVerts()[sd]; if (!cs || !list.length) return out;
+    const cs = this.nearColliders(), p = this.root.position, y0 = p.y, list = this.soleVerts()[sd]; if (!cs || !list.length) return out;
     const B = this.rig.bones; B[sd + '_Foot'].getWorldPosition(_c); const g = this.floorAt(_c.x, _c.z);
+    const near = this._nearC || (this._nearC = []); near.length = 0;
+    for (const c of cs) {
+      if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < g + 0.02 || (c.minY ?? -0.3) > g + 0.5) continue;
+      if (c.minX > _c.x + 0.6 || c.maxX < _c.x - 0.6 || c.minZ > _c.z + 0.6 || c.maxZ < _c.z - 0.6) continue;
+      near.push(c);
+    }
+    if (!near.length) return out;
     const V = this._footV || (this._footV = []); let n = 0;
     this.root.updateMatrixWorld(true);
     for (let j = 0; j < list.length; j += 2) {
       const m = list[j], i = list[j + 1], v = V[n] || (V[n] = new V3()); n++;
       v.fromBufferAttribute(m.geometry.attributes.position, i); m.applyBoneTransform(i, v); v.applyMatrix4(m.matrixWorld);
     }
-    for (const c of cs) {
-      if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < g + 0.02 || (c.minY ?? -0.3) > g + 0.5) continue;
-      if (c.minX > _c.x + 0.6 || c.maxX < _c.x - 0.6 || c.minZ > _c.z + 0.6 || c.maxZ < _c.z - 0.6) continue;
+    for (const c of near) {
       const x0 = c.minX - FOOT_PAD, x1 = c.maxX + FOOT_PAD, z0 = c.minZ - FOOT_PAD, z1 = c.maxZ + FOOT_PAD, ylo = (c.minY ?? -0.3) - 0.02, yhi = c.maxY ?? (c.wall || c.door ? 3 : y0 + 1);
       // the way out: to the root's side of the box (the nearest of its faces the root is beyond; any face if the root is in it). Coming
       // from that side, any of the foot past the near face is in it or through it (a wall is thinner than a foot is long)
@@ -906,23 +911,38 @@ export class Entity {
     let a = 0, b = 0; for (const d of [0, 0.075, 0.15, 0.225, 0.3]) { a += this.floorAt(p.x + fx * d, p.z + fz * d); b += this.floorAt(p.x - fx * d, p.z - fz * d); }
     return Math.min(a, b) / 5;
   }
-  // the skin of the feet (every third vertex the foot or the toes carry, and the shin's own within 0.22 m of the ankle), and the last
-  // guard: a foot with any of it under the floor under it is lifted by the knee until none is (the heel coming down on a riser's edge,
-  // the clip's toes dipping at the end of a stride)
+  // the skin of the feet (what the foot and the toes carry, and the shin's own within 0.22 m of the ankle), one vertex in each 2.5 cm
+  // cell of it, and the last guard: a foot with any of it under the floor under it is lifted by the knee until none is (the heel coming
+  // down on a riser's edge, the clip's toes dipping at the end of a stride)
   soleVerts() {
     if (this._sole) return this._sole;
-    const out = { L: [], R: [] }, B = this.rig.bones;
+    const B = this.rig.bones;
+    return (this._sole = this.skinCells(/(?:^|_)([LR])_(Foot|Toe|Calf)/, (k, v) => k[2] !== 'Calf' || v.distanceTo(B[k[1] + '_Foot'].getWorldPosition(_w)) <= 0.22));
+  }
+  // the vertices whose main bone's name matches re (its first group the side), where keep(match, vertex in the world) allows, thinned to
+  // one in each 2.5 cm cell of the body as it stands now: [mesh, index, mesh, index, ...] for each side
+  skinCells(re, keep = null) {
+    const out = { L: [], R: [] }, seen = new Set(), C = 0.025;
     this.root.updateMatrixWorld(true);
     for (const m of this.rigMeshes || []) {
       const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight, bones = m.skeleton.bones;
-      for (let i = 0; i < SI.count; i += 3) {
+      for (let i = 0; i < SI.count; i++) {
         let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
-        const k = /(?:^|_)([LR])_(Foot|Toe|Calf)/.exec(bones[bi].name); if (!k) continue;
-        if (k[2] === 'Calf') { _v.fromBufferAttribute(P, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld); if (_v.distanceTo(B[k[1] + '_Foot'].getWorldPosition(_w)) > 0.22) continue; }
-        out[k[1]].push(m, i);
+        const k = re.exec(bones[bi].name); if (!k) continue;
+        _v.fromBufferAttribute(P, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld);
+        if (keep && !keep(k, _v)) continue;
+        const cell = k[1] + Math.floor(_v.x / C) + ',' + Math.floor(_v.y / C) + ',' + Math.floor(_v.z / C); if (seen.has(cell)) continue;
+        seen.add(cell); out[k[1]].push(m, i);
       }
     }
-    return (this._sole = out);
+    return out;
+  }
+  // the floor round a point, when it is one height for `r` metres every way (the floor of a room, not a stair or a step): that height,
+  // else null. The guards below then need not look under every vertex
+  flatFloor(x, z, r) {
+    const f = this.floorAt(x, z);
+    for (const [dx, dz] of FLAT9) if (Math.abs(this.floorAt(x + dx * r, z + dz * r) - f) > 1e-4) return null;
+    return f;
   }
   // the floor under a point of the skin, 1.5 cm round it (the edge of a riser falls between the vertices the guard looks at), counting only
   // floors within STEP_UP and STEP_DOWN of the root's
@@ -935,13 +955,14 @@ export class Entity {
     const r = this.rig, B = r.bones, S = this.soleVerts(), y0 = this.root.position.y;
     for (const sd of ['L', 'R']) {
       const list = S[sd], ft = B[sd + '_Foot']; if (!list.length || !ft) continue;
+      ft.getWorldPosition(_c); const flat = this.flatFloor(_c.x, _c.z, 0.4);
       for (let pass = 0; pass < 2; pass++) {
         this.root.updateMatrixWorld(true);
         let pen = 0;
         for (let j = 0; j < list.length; j += 2) {
           const m = list[j], i = list[j + 1];
           _v.fromBufferAttribute(m.geometry.attributes.position, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld);
-          pen = Math.max(pen, this.floorNear(_v.x, _v.z, y0) + 0.004 - _v.y);
+          pen = Math.max(pen, (flat ?? this.floorNear(_v.x, _v.z, y0)) + 0.004 - _v.y);
         }
         if (pen <= 0.002 || pen > STEP_UP) break;
         ft.getWorldPosition(_g); _g.y += pen; ft.getWorldQuaternion(_hq);
