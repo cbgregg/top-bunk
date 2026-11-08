@@ -1,0 +1,10 @@
+{
+  "_": "the cars, set on their tyres rather than on their boxes (traffic.js carFit: each model's box reaches below its tyres by this much), and the wreck, which may be let down into the leaf litter of the wood on its flat tyres",
+  "car_sedan": 0.63,
+  "car_sedan2": 0.15,
+  "car_wagon": 0.21,
+  "car_pickup": 0.02,
+  "car_lt80": 0.02,
+  "car_kiri": 0.02,
+  "car_wreck": 0.15
+}

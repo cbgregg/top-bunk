@@ -1804,7 +1804,7 @@ export function buildWorld(scene) {
       const p = [], uv = [], idx = [];
       zs.forEach((z, i) => { const y = ditchAt(0, z) - 0.02 + lift; p.push(-DITCH.x, y, z, DITCH.x, y, z); uv.push(-DITCH.x, z, DITCH.x, z); if (i) { const b = i * 2; idx.push(b - 2, b, b - 1, b - 1, b, b + 1); } });
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-      const m = new THREE.Mesh(g, mat); m.receiveShadow = true; yard.add(m); return m;
+      const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.userData.tag = 'ditch'; m.userData.keep = true; yard.add(m); return m;   // (kept out of the merge: it is one long strip)
     };
     ribbon([-38.0, DITCH.z - DITCH.half, DITCH.z - 0.6, DITCH.z, DITCH.z + 0.6, DITCH.z + DITCH.half, -35.2], 0, M.grass);
     ribbon([DITCH.z - 0.36, DITCH.z - 0.2, DITCH.z, DITCH.z + 0.2, DITCH.z + 0.36], 0.006, M.dirt);   // the mud at the bottom
@@ -2036,7 +2036,7 @@ export function buildWorld(scene) {
       },
     };
   })();
-  place(yard, 'mailbox', { x: 4.7, z: -26.9, rot: Math.PI, s: 0.33 }); solid(4.45, 4.95, -27.15, -26.65, { maxY: 1.2, id: 'mailbox' });
+  place(yard, 'mailbox', { x: 4.7, z: -26.7, rot: Math.PI, s: 0.33 }); solid(4.45, 4.95, -26.95, -26.45, { maxY: 1.2, id: 'mailbox' });   // its box 0.2 m back from the asphalt's edge
   place(yard, 'trash_can', { x: 5.9, z: -26.1, rot: 0.35 }); solid(5.1, 6.7, -26.6, -25.6, { maxY: 1.1, id: 'trashCans' });
   {   // the speed limit sign a way down the road, for the +x traffic; the reflector posts along the far shoulder
     const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
@@ -2138,7 +2138,7 @@ export function buildWorld(scene) {
       const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, PL, 14, 1, true), M.siloSteel); pipe.position.y = -PL / 2; pipe.castShadow = true; pivot.add(pipe);
       const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 14), M.siloSteel); collar.position.y = -0.08; pivot.add(collar);
       siloRef = { pos: new THREE.Vector3(SX, 0, SZ), r: SR, top: STOP + 2.05, chute: pivot, pipeLength: PL,
-        swing(side = 0, out = 0) { pivot.rotation.z = Math.max(-0.45, Math.min(0.45, side)); pivot.rotation.x = Math.max(0, Math.min(0.5, out)); } };
+        swing(side = 0, out = 0) { pivot.rotation.z = Math.max(-0.45, Math.min(0.45, side)); pivot.rotation.x = -Math.max(0, Math.min(0.5, out)); } };   // (about its own x a turn the other way is out)
     }
     solid(SX - SR - 0.2, SX + SR + 0.2, SZ - SR - 0.3, SZ + SR + 0.2);   // the footing, the ladder's foot and the pipe (its height: YARD_TOPS)
     rainDiscard.push({ minX: SX - SR - 0.2, maxX: SX + SR + 0.2, minZ: SZ - SR - 0.2, maxZ: SZ + SR + 0.2, maxY: STOP + 1.6, id: 'silo' });
@@ -2279,7 +2279,8 @@ export function buildWorld(scene) {
   // ground-cover tufts and rocks (instanced)
   {
     const r = TX.rng(4242), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < SX(8.1) + 1.6 + pad && z > -6.5 - pad && z < SZ(5.1) + 1.2 + pad) && !onDrive(x, z, pad) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -25.6 - pad && z > -38.5 + pad);   // not on the house, porch path, truck, garage, or the road and its ditch
+    const ok = (x, z, pad = 0) => !(x > -9.5 - pad && x < SX(8.1) + 1.6 + pad && z > -6.5 - pad && z < SZ(5.1) + 1.2 + pad) && !onDrive(x, z, pad) && !(x > -14.5 - pad && x < -5.5 + pad && z > -14 - pad && z < -6.5 + pad) && !(z < -22.2 && z > -41.9)   // not on the house, porch path, truck, garage, or the road, its shoulders and the ditch (a tuft spreads up to 4 m: none within that of them)
+      && !(Math.abs(x - 40) < 1.2 + pad * 0.3 && z > -49 && z < 21) && !(Math.abs(z + 48) < 1.2 + pad * 0.3 && x > -61 && x < 61);   // nor in the field fences' lines
     const grass = (name, n, rmin, rmax, k0, k1) => {
       const ms = [];
       while (ms.length < n) {
@@ -2297,6 +2298,7 @@ export function buildWorld(scene) {
       for (let i = 0; i < 2600 && ms.length < 900; i++) {
         const a = r() * 6.283, d = 34 + r() * 60, x = 2 + Math.cos(a) * d, z = -6 + Math.sin(a) * d;
         if ((z > -42 && z < -22) || (x > -78 && x < -50 && z > -36 && z < 2) || r() > 0.35 + 0.65 * Math.abs(Math.sin(x * 0.07) * Math.cos(z * 0.05))) continue;   // not on the road or the barn's pad, and in drifts
+        if ((Math.abs(x - 40) < 2.2 && z > -50 && z < 22) || (Math.abs(z + 48) < 2.2 && x > -62 && x < 62)) continue;   // nor through the field fences
         const k = 1.6 + r() * 1.3; q.setFromAxisAngle(up, r() * 6.28); ms.push(m4.clone().compose(new THREE.Vector3(x, fieldH(x, z) - 0.04, z), q, sc.set(k, k * (0.9 + r() * 0.5), k)));
       }
       for (const m of ms) { const key = Math.floor(m.elements[12] / 24) + ',' + Math.floor(m.elements[14] / 24); (cells.get(key) || cells.set(key, []).get(key)).push(m); }

@@ -158,6 +158,8 @@ export function createTraffic(scene, sfx) {
     bind(o) { Object.assign(ctx, o); return traffic; },
     onBrake(fn) { listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },
     get stopped() { return cars.filter((c) => c.on && c.state === 'stopped'); },
+    // seconds until the next ordinary car is sent (a test or a scene can hold the road clear)
+    get next() { return timer; }, set next(v) { timer = v; },
     // the scare: a car in the far lane right now, from one side of the house to the other in PASS_T seconds (main.js plays its sound)
     pass() { return spawn(-1, { x: PASS_X, v: (2 * PASS_X) / PASS_T, scare: true }); },
     // an ordinary car, from either end
@@ -212,7 +214,7 @@ export function createTraffic(scene, sfx) {
               traffic.braked = (traffic.braked || 0) + 1;
               for (const fn of listeners) try { fn({ car: c, x: p.x, z: p.z }); } catch (e) { console.warn(e); }
             }
-            want = 0; decel = PANIC; wall = Math.min(wall, d - 1.0); c.blocked = 0;
+            want = 0; decel = Math.min(PANIC, Math.max(2.5, (c.v * c.v) / (2 * Math.max(0.3, d - 1.2)))); wall = Math.min(wall, d - 1.0); c.blocked = 0;
           } else if (!daylight && d < c.v * 1.0 + 2 && !c.warned && c.v > 3) {
             // after dark: the driver sees a kid in the lamps too late; the horn and the tyres, and it is still coming
             c.warned = true; horn(c, 0.8); skid(c, 1.1); decel = 5; want = 0;
