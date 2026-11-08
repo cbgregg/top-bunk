@@ -1065,7 +1065,10 @@ export function buildWorld(scene) {
       bedSleepers = (() => {
         const cl = (v, a, b) => Math.max(a, Math.min(b, v)), sm = (t) => { t = cl(t, 0, 1); return t * t * (3 - 2 * t); };
         const g = new THREE.Group(); bed.add(g);
-        const X0 = -0.53, X1 = 0.53, Z0 = -1.04, Z1 = 0.44, TOP = 0.6;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
+        const X0 = -0.58, X1 = 0.58, Z0 = -1.04, Z1 = 0.44, TOP = 0.6, NX = 38, NZ = 34;   // the bed runs along z: Z1 is the pillow end, Z0 the foot
+        // the sheet is a little wider than the mattress (0.53 each side) so that it hangs down over the rolled edges: past EDGE it drapes to
+        // DRAPE, never over a limb, and from the side nobody is seen lying under it
+        const EDGE = 0.5, DRAPE = 0.62;
         const XM = 0.23, XD = -0.21, XT = 0.01;   // across the bed: where Mom's, Dad's and a third body's rises are centred at rest
         // along the bed the rise peaks just past the shoulders, a hand's breadth over the chest, and tapers to the feet; at the pillow
         // end it dips so the heads show over it (Mom's chest tops out at 0.86, Dad's at 0.95, their feet at about 0.77)
@@ -1086,12 +1089,12 @@ export function buildWorld(scene) {
           const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; g.add(m);
           return { mesh: m, geo, pos, n, h, fo, up, cur, xs, zs };
         };
-        const quilt = sheet(X0, X1, Z0, Z1, 34, 34, M.floralB, () => 0);
+        const quilt = sheet(X0, X1, Z0, Z1, NX, NZ, M.floralB, () => 0);
         // the turned-back sheet: a band over the quilt's pillow end, thicker along its fold
-        const band = sheet(X0 + 0.02, X1 - 0.02, Z1 - 0.3, Z1 - 0.01, 30, 8, M.bedLinen, (x, z) => 0.012 + 0.014 * sm((z - (Z1 - 0.3)) / 0.08) * sm((Z1 - 0.1 - z) / 0.1));
-        // a limb under the quilt: the top of an ellipse round its capsule, 7 cm wider than the limb so the cloth drapes off it instead of
+        const band = sheet(-0.51, 0.51, Z1 - 0.3, Z1 - 0.01, 30, 8, M.bedLinen, (x, z) => 0.012 + 0.014 * sm((z - (Z1 - 0.3)) / 0.08) * sm((Z1 - 0.1 - z) / 0.1));
+        // a limb under the quilt: the top of an ellipse round its capsule, 3.5 cm wider than the limb so the cloth drapes off it instead of
         // creasing at its edge. caps: flat [ax, ay, az, bx, by, bz, r] runs; returns the highest top over (x, z), or -1
-        const SKIRT = 0.07, CLOTH = 0.022;
+        const SKIRT = 0.035, CLOTH = 0.022;
         const hullTop = (caps, x, z) => {
           let best = -1;
           for (let k = 0; k < caps.length; k += 7) {
@@ -1112,7 +1115,7 @@ export function buildWorld(scene) {
           third(k) { fx.k3Want = cl(k, 0, 1); },
           // the quilt's top at (x, z) in the bed's frame, as last drawn
           heightAt(x, z) {
-            const i = Math.round(cl((x - X0) / (X1 - X0), 0, 1) * 34) + Math.round(cl((z - Z0) / (Z1 - Z0), 0, 1) * 34) * 35;   // (the sheet's rows run from the foot, Z0, after its turn onto the bed)
+            const i = Math.round(cl((x - X0) / (X1 - X0), 0, 1) * NX) + Math.round(cl((z - Z0) / (Z1 - Z0), 0, 1) * NZ) * (NX + 1);   // (the sheet's rows run from the foot, Z0, after its turn onto the bed)
             return quilt.pos.getY(i);
           },
           // the bed's frame from the world's, for the hulls and the tests
@@ -1135,6 +1138,7 @@ export function buildWorld(scene) {
                 const a = h[i] * across.mom(x - M0.dx) * torsoFall(z, M0.torso) * fm, b = h[i] * across.dad(x - D0.dx) * torsoFall(z, D0.torso) * fd, c = f3 > 0.002 ? h[i] * 0.85 * across.third(x) * f3 : 0;
                 const hi = Math.max(a, b, c), mid = a + b + c - hi - Math.min(a, b, c);   // (the second highest)
                 let y = TOP + 0.04 + fo[i] + hi + 0.45 * mid + flat * Math.sin(x * 7) * Math.sin(z * 9);   // rumpled when empty
+                const ax = Math.abs(x); if (ax > EDGE) { const s = sm((ax - EDGE) / (X1 - EDGE)); y += (DRAPE - y) * s; }   // over the side
                 // a limb above the resting shape lifts the cloth over it
                 for (const sd of [M0, D0]) if (sd.caps) { const top = hullTop(sd.caps, x, z); if (top > y) y = top; }
                 // cloth: up at once (nothing may come through it), down slowly

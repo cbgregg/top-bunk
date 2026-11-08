@@ -67,7 +67,7 @@ const legNames = (s) => [s + '_Thigh', s + '_Calf', s + '_Foot'];
 const MADE = {};
 export const UNCANNY = { neck: 2.4, neckSpeed: 1.6, eyesHold: 6 };
 // sitting up in bed: how far the trunk curls up from the hips (the body lies flat by a group rotation, sleepers() in main.js)
-const SIT_UP = 1.32;
+const SIT_UP = 1.5;
 // the parts that rest on the mattress, and the flesh round each bone (a body in bed is kept from sinking further than it lay at rest)
 const BED_REST = [['Pelvis', 0.11], ['Spine', 0.11], ['Spine1', 0.11], ['Spine2', 0.11], ['L_UpperArm', 0.05], ['R_UpperArm', 0.05], ['L_Forearm', 0.04], ['R_Forearm', 0.04], ['L_Hand', 0.03], ['R_Hand', 0.03],
   ['L_Thigh', 0.075], ['R_Thigh', 0.075], ['L_Calf', 0.05], ['R_Calf', 0.05]];
@@ -375,12 +375,12 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
         if (!b.legs) r.bend(['L_Foot', 'R_Foot'], [1, 1], [1, 0, 0], (p.feet ?? 1.0) * (1 - 0.5 * sit));   // toes pointed along the bed, so they stay under the quilt (the breath is the life layer's)
         r.bend(['Spine1', 'Spine2', 'Neck'], [0.35, 0.4, 0.25], [1, 0, 0], 0.12 * flat);   // the shoulders and head propped on the pillow, not sunk through it into the mattress
         // sitting up: the trunk curls up from the hips with the legs left lying along the bed (the thighs hang from the spine bone in this
-        // skeleton, so they are given its share back), the head comes up to keep the eyes level
+        // skeleton, so they are given its share back), the head tipped forward off the pillow's angle so the eyes look ahead
         if (sit > 1e-3) {
           const lean = SIT_UP * sit;
           r.bend(['Spine', 'Spine1', 'Spine2'], [0.3, 0.4, 0.3], [1, 0, 0], lean);
           if (r.bones.L_Thigh && r.bones.L_Thigh.parent === r.bones.Spine) r.bend(['L_Thigh', 'R_Thigh'], [1, 1], [1, 0, 0], -0.3 * lean);
-          r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.22 * sit);
+          r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], 0.18 * sit);
         }
         // lying on a side, the upper knee drawn up a little
         for (const S of ['L', 'R']) { const k = (b.knee && b.knee[S]) || 0; if (k > 1e-3) { r.bend([S + '_Thigh'], [1], [1, 0, 0], -0.55 * k); r.bend([S + '_Calf'], [1], [1, 0, 0], 1.0 * k); r.bend([S + '_Foot'], [1], [1, 0, 0], -0.3 * k); } }
@@ -391,6 +391,7 @@ export function makePerson({ model, height = 1.75, uncanny, ...look } = {}) {
         }
         // the hands on their targets; the elbows out to the side and toward the feet unless the target says otherwise
         if (b.arms) {
+          r.hinge ||= {};   // (a body laid down before it ever stood has not had its elbows read yet)
           this.group.getWorldQuaternion(RQ);
           for (const [S, sg] of [['L', 1], ['R', -1]]) {
             const a = b.arms[S]; if (!a || !a.at || (a.w ?? 1) <= 0.005) continue;

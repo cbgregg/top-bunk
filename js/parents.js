@@ -329,9 +329,10 @@ const _q = new THREE.Quaternion(), _z = new V3(0, 0, 1);
 function torchFollow(par, light = true) {
   if (!torch || !torch.held) return;
   const p = par.p; if (!p.rig) return;
-  const palm = p.palm('R', new V3(), new V3());
+  const nrm = new V3(), palm = p.palm('R', new V3(), nrm);
   const dir = par.aim.clone().normalize();
-  torch.group.position.copy(palm).addScaledVector(dir, 0.012); torch.group.position.y -= 0.005;
+  // in the curl of the fingers: the body's axis a palm's flesh and the torch's own radius out from the palm
+  torch.group.position.copy(palm).addScaledVector(nrm, 0.027).addScaledVector(dir, 0.01);
   torch.group.quaternion.copy(_q.setFromUnitVectors(_z, dir)); torch.group.updateMatrixWorld(true);
   const L = G.lights && G.lights.torch;
   if (L && torch.on && light) {
@@ -940,16 +941,29 @@ async function upMom(par) {
     if (hidden >= MOM_HIDDEN) { par.rec.hiddenInPod = true; await momOnBunk(par); return; }
   }
 }
+// the bottom bunk: she sits on its front edge (the top bunk's underside is 1.29 m up and comes out to z 3.32, so she sits hunched forward,
+// her head out in front of it), facing your door. stand: where she stands before sitting down
+function bunkSeat() {
+  const c = W().colliders.find((q) => q.id === 'bunk') || { minX: 7.243, maxX: 9.483, minZ: 3.181, maxZ: 4.531 };
+  const x = c.minX + (c.maxX - c.minX) * 0.45, lb = W().lowerBunk;
+  return { hip: new V3(x, (lb && lb.top) || 0.527, c.minZ + 0.27), stand: new V3(x, 0, c.minZ - 0.37), seat: ((lb && lb.top) || 0.527) + 0.03, yaw: Math.PI };
+}
+function sitOnBunk(par, k, from) {
+  const p = par.p, B = bunkSeat(), pl = pelvisLocal(par);
+  p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, B.yaw, 0);
+  const off = new V3(pl.x, 0, pl.z).applyAxisAngle(new V3(0, 1, 0), B.yaw), at = B.hip.clone().setY(0).sub(off);
+  p.group.position.copy(from).setY(0).lerp(at, sm(k));
+  p.pose = { sit: k, seat: B.seat, lean: 0.45 * k }; p.sitNow = k; p.group.updateMatrixWorld(true);
+}
 // her rounds: your room, the bathroom, the hall, the office, the spare room, the living room, the kitchen, the dining room
 const SEARCH = ['kidMid', 'bathMid', 'hallM', 'r2Mid', 'sMid', 'hallW', 'livC', 'kit2', 'dinS', 'livMid'];
 // hidden forty seconds of her search: she goes to your bunk and sits on the bottom one facing the door, and says your name once
 async function momOnBunk(par) {
-  const tok = TOK, p = par.p, seat = new V3(8.42, 0, 3.32);
-  if (!(await goTo(par, new V3(8.5, 0, 2.62), { near: 0.15 }))) return endWalk(par);
-  await turnTo(par, 8.5, 2.0, 0.5); if (tok !== TOK) return;   // her back to the bunk, facing the door
-  const yaw = p.group.rotation.y, g0 = p.group.position.clone();
-  await tween(1.0, (k) => { p.group.position.lerpVectors(g0, new V3(seat.x, 0, seat.z - 0.2), k); p.pose = { sit: k, seat: 0.42 }; p.sitNow = k; }); if (tok !== TOK) return;
-  void yaw;
+  const tok = TOK, p = par.p, B = bunkSeat();
+  if (!(await goTo(par, B.stand, { near: 0.12 }))) return endWalk(par);
+  await turnTo(par, B.stand.x, B.stand.z - 2, 0.5); if (tok !== TOK) return;   // her back to the bunk, facing the door
+  const g0 = p.group.position.clone();
+  await tween(1.1, (k) => { sitOnBunk(par, k, g0); }); if (tok !== TOK) return;
   par.st = 'onBunk'; stats.momSat = T;
   await wait(1.5); if (tok !== TOK) return;
   say(par, 'mom/n5_f');
@@ -958,7 +972,7 @@ async function momOnBunk(par) {
   par.gazeOn = null; const pp = playerPos(); par.p.gaze = new V3(pp.x + (pp.x - p.group.position.x) * 2, 1.4, pp.z + (pp.z - p.group.position.z) * 2);   // past you
   par.blind = true;
   await wait(1.2); if (tok !== TOK) return;
-  await tween(0.9, (k) => { p.pose = { sit: 1 - k, seat: 0.42 }; p.sitNow = 1 - k; }); p.pose = null;
+  const g1 = bunkSeat().stand; await tween(0.9, (k) => { sitOnBunk(par, 1 - k, g1); }); p.pose = null;
   await wait(say(par, 'mom/n5_b') + 0.4); if (tok !== TOK) return;
   if (night() === 5) await handoff(par); else await endWalk(par);
 }
@@ -996,9 +1010,11 @@ async function handoff(par) {
 }
 // where the kid's eye is, lying between them (the bed's frame: the seam of the two pillows, a head's height over them)
 function kidInBed() {
-  const bed = bedOf(), pos = bed.group.localToWorld(new V3(0.0, 0.86, 0.84)), foot = bed.group.localToWorld(new V3(0.0, 0.86, -0.4));
+  // (lying, the view turns 1.25 rad either side of the way the body faces, main.js; toward the foot of the bed that leaves it looking a
+  // little toward Dad's back)
+  const bed = bedOf(), pos = bed.group.localToWorld(new V3(0.0, 0.84, 0.76)), foot = bed.group.localToWorld(new V3(0.0, 0.84, -0.4));
   const yawTo = Math.atan2(-(foot.x - pos.x), -(foot.z - pos.z));
-  return { pos, yaw: yawTo, pitch: -0.28 };
+  return { pos, yaw: Math.max(yawTo, -1.2), pitch: -0.12 };
 }
 
 // ---------- the frame ----------
@@ -1156,6 +1172,7 @@ export const test = {
   },
   swing(who, u) { const par = PAR[who]; if (!par.pelvis0 && par.p.rig) { par.pelvis0 = par.p.rig.bones.Pelvis.getWorldPosition(new V3()); par.pelvisBed = bedOf().toLocal(par.pelvis0.clone()); } swingPose(par, u); },
   seated(who, k) { seated(PAR[who], k); },
+  onBunk(k = 1) { const par = PAR.mom; par.inBed = false; par.p.sleeping = false; par.p.busy = true; par.p.group.visible = true; sitOnBunk(par, k, bunkSeat().stand); },
   // a parent stood at (x, z) facing yaw, walking (or still), Dad's torch in his hand and lit
   standAt(who, x, z, yaw, { walk = false, torchLit = who === 'dad' } = {}) {
     const par = PAR[who], p = par.p; par.inBed = false; p.sleeping = false; p.busy = true; p.group.visible = true;
@@ -1165,6 +1182,8 @@ export const test = {
     par.aim = new V3(Math.sin(yaw), -0.42, Math.cos(yaw)); aimTick(par, 0.016);
   },
   follow(who) { const par = PAR[who]; aimTick(par, 0.016); if (who === 'dad') torchFollow(par); },
+  aim(who, v) { PAR[who].aimAt = v ? new V3(v.x, v.y || 0, v.z) : null; },
+  hand(who, side, at) { const p = PAR[who].p; p.pose = { ...(p.pose || {}) }; if (at) p.pose[side] = { reach: new V3(at.x, at.y, at.z), palm: 'fwd', grip: 0.75 }; else delete p.pose[side]; },
   kidInBed,
   hullOf: (who) => hullOf(PAR[who])(),
   bodyAcross: (who) => bodyAcross(PAR[who]),
