@@ -7,7 +7,10 @@
 //   bindingLabel(action, scheme, slot)   the control's name on that device ("E", "RB", "△", "USE")
 //   glyph(action, scheme, slot)   the same as an inline badge: a key cap for the keyboard, a coloured face button / PS shape / Switch
 //                                 letter for a pad, the on-screen button's name for touch
-// One-shot actions (interact, camera, light, journal, cancel, pause, the touch COVER UP) call the functions given to initInput; menus
+// One-shot actions (interact, switch, use, light, journal, cancel, pause, the touch COVER UP) call the functions given to initInput; aim is
+// held (input.down('aim')). The thing in the hand works like a shooter's: switch swaps the flashlight and the camera (the mouse wheel too),
+// aim holds it up, use turns the light on or off or takes the photo; on a touch screen CAM is tapped to switch and held to aim, and USE is
+// the shutter while aiming. Menus
 // take the pad through input.onMenu(action) while input.menuActive() ('menuUp' 'menuDown' 'menuLeft' 'menuRight' 'menuConfirm'
 // 'menuBack' 'tabPrev' 'tabNext', once per press, directions repeating while held), and then A no longer interacts or confirms.
 import { settings, ACTIONS } from './settings.js';
@@ -28,13 +31,13 @@ const XBOX = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Start', 'L3',
 const PS = ['✕', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Create', 'Options', 'L3', 'R3', 'D-pad up', 'D-pad down', 'D-pad left', 'D-pad right', 'PS'];
 const SWITCH = ['B', 'A', 'Y', 'X', 'L', 'R', 'ZL', 'ZR', '−', '+', 'L3', 'R3', 'D-pad up', 'D-pad down', 'D-pad left', 'D-pad right', 'Home'];
 const PADNAMES = { xbox: XBOX, ps: PS, switch: SWITCH };
-const KEYNAMES = { Space: 'SPACE', ShiftLeft: 'Shift', ShiftRight: 'Right Shift', ControlLeft: 'Ctrl', ControlRight: 'Right Ctrl', AltLeft: 'Alt', AltRight: 'Right Alt', Escape: 'Esc', Enter: 'Enter', NumpadEnter: 'Enter', Backspace: 'Backspace', Tab: 'Tab', CapsLock: 'Caps',
+const KEYNAMES = { Wheel: 'Mouse wheel', Space: 'SPACE', ShiftLeft: 'Shift', ShiftRight: 'Right Shift', ControlLeft: 'Ctrl', ControlRight: 'Right Ctrl', AltLeft: 'Alt', AltRight: 'Right Alt', Escape: 'Esc', Enter: 'Enter', NumpadEnter: 'Enter', Backspace: 'Backspace', Tab: 'Tab', CapsLock: 'Caps',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Mouse0: 'Left click', Mouse1: 'Middle click', Mouse2: 'Right click', WASD: 'WASD', Arrows: 'Arrows', Mouse: 'Mouse', LS: 'Left stick', RS: 'Right stick', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", BracketLeft: '[', BracketRight: ']', Minus: '-', Equal: '=', Backquote: '`' };
 const keyName = (code) => KEYNAMES[code] || (code && (code.match(/^(Key|Digit)(.)$/) || [])[2]) || (code && code.replace(/^Numpad/, 'Num ')) || '?';
 // the on-screen buttons' own names
-const TOUCH = { move: 'the left side of the screen', look: 'the right side of the screen', sprint: 'RUN', interact: 'USE', camera: 'CAM', light: 'LIGHT', breath: 'HOLD BREATH', cancel: 'CAM', journal: 'the notebook at the top', pause: 'II',
+const TOUCH = { move: 'the left side of the screen', look: 'the right side of the screen', sprint: 'RUN', interact: 'USE', switch: 'CAM', aim: 'CAM (hold)', use: 'USE', light: 'LIGHT', breath: 'HOLD BREATH', cancel: '—', journal: 'the notebook at the top', pause: 'II',
   menuUp: 'tap', menuDown: 'tap', menuLeft: '‹', menuRight: '›', menuConfirm: 'tap', menuBack: '✕', tabPrev: 'swipe', tabNext: 'swipe', photos: 'the notebook at the top' };
-const CONTROLS = { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact / take the photo', camera: 'Camera up / down', light: 'Flashlight', breath: 'Hold your breath / the covers', cancel: 'Put the camera away', journal: 'Your journal and photos', pause: 'Pause' };
+const CONTROLS = { move: 'Move', look: 'Look', sprint: 'Sprint', interact: 'Interact', switch: 'Flashlight / camera', aim: 'Aim (hold)', use: 'Light on / off, or take the photo', light: 'Flashlight on / off', breath: 'Hold your breath / the covers', cancel: 'Lower what you aim', journal: 'Your journal and photos', pause: 'Pause' };
 
 // the keyboard's move keys, by the names the move action's slots carry
 const MOVE_KEYS = { WASD: ['KeyW', 'KeyS', 'KeyA', 'KeyD'], Arrows: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'] };
@@ -66,7 +69,8 @@ export function glyph(action, scheme = input.scheme, slot = 0) {
   }
   return `<b class="g g-kb">${esc(name)}</b>`;
 }
-export const controlsTable = () => Object.keys(CONTROLS).map((a) => [labels(a), CONTROLS[a]]);
+// (the mouse wheel also switches; it is not a slot of its own, so the table names it)
+export const controlsTable = () => Object.keys(CONTROLS).map((a) => [labels(a) + (a === 'switch' && input.scheme === 'kb' ? ' / Mouse wheel' : ''), CONTROLS[a]]);
 // the badges' look, kept with the code that writes them
 const GLYPH_CSS = `
 .g { display: inline-block; vertical-align: baseline; font-weight: 700; line-height: 1.35; white-space: nowrap; }
@@ -80,6 +84,7 @@ i.g-switch.g-face { background: #2b2b2b; }`;
 
 // ---------- the state ----------
 const keys = input.keys, mouse = { Mouse0: false, Mouse1: false, Mouse2: false };
+let wheelEdge = false;   // the mouse wheel turned (while the game holds the pointer): a switch
 let kbEdges = new Set(), mouseEdges = new Set(), pad = { btn: [], edge: [], fx: 0, fy: 0, lookX: 0, lookY: 0, mag: 0, gp: null }, tch = { fx: 0, fy: 0, held: {}, edges: new Set() };
 const latch = { sprint: false };   // sprint as a toggle (Options), flipped on each press
 let downs = {}, edges = {};        // this frame's answers by action
@@ -89,7 +94,7 @@ input.edge = (a) => !!edges[a];
 function setScheme(s) { if (input.scheme !== s) { input.scheme = s; document.body.dataset.scheme = s; if (input.onScheme) input.onScheme(s); } }
 const fire = (name, fn, ...args) => { input.fired[name] = (input.fired[name] || 0) + 1; if (fn) { try { fn(...args); } catch (e) { console.error(e); } } };
 
-export function initInput({ interact, pause, confirm, lookBy, light, cover, photos, journal, camera, cancel, cameraUp = () => false }) {
+export function initInput({ interact, pause, confirm, lookBy, light, cover, photos, journal, switch: swap, use, cancel, cameraUp = () => false }) {
   input.touchDevice = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
   if (!document.getElementById('glyph-css')) { const st = document.createElement('style'); st.id = 'glyph-css'; st.textContent = GLYPH_CSS; document.head.appendChild(st); }
 
@@ -107,6 +112,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
   // the mouse buttons count only while the game holds the pointer (a click that takes the pointer back is not a use)
   addEventListener('mousedown', (e) => { const c = 'Mouse' + e.button; if (!(c in mouse)) return; mouse[c] = true; if (document.pointerLockElement) mouseEdges.add(c); });
   addEventListener('mouseup', (e) => { const c = 'Mouse' + e.button; if (c in mouse) mouse[c] = false; });
+  addEventListener('wheel', (e) => { if (document.pointerLockElement && Math.abs(e.deltaY) > 0) wheelEdge = true; }, { passive: true });
 
   // ---------- touch ----------
   const root = document.createElement('div'); root.id = 'touch';
@@ -146,12 +152,20 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
   const endLook = (e) => { if (e.pointerId === lk.id) lk.id = null; };
   look.addEventListener('pointerup', endLook); look.addEventListener('pointercancel', endLook);
 
-  // a held button (RUN, HOLD BREATH) and a tapped one (USE, LIGHT, CAM, COVER UP): each is an action by name
+  // a held button (RUN, HOLD BREATH) and a tapped one (USE, LIGHT, COVER UP): each is an action by name. USE is the shutter while aiming
+  // ('act' is sorted into use or interact in poll)
   const held = (id, action) => { const b = $(id); b.addEventListener('pointerdown', (e) => { tch.held[action] = true; tch.edges.add(action); b.classList.add('down'); cap(b, e); show(); e.preventDefault(); });
     const up = () => { tch.held[action] = false; b.classList.remove('down'); }; b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); };
   const tapped = (id, action) => { $(id).addEventListener('pointerdown', (e) => { tch.edges.add(action); show(); e.preventDefault(); }); };
   held('t-run', 'sprint'); held('t-breath', 'breath');
-  tapped('t-act', 'interact'); tapped('t-light', 'light'); tapped('t-cam', 'camera'); tapped('t-cover', 'cover');
+  tapped('t-act', 'act'); tapped('t-light', 'light'); tapped('t-cover', 'cover');
+  // CAM: a tap switches between the flashlight and the camera; held past a quarter second it aims, until let go
+  {
+    const b = $('t-cam'); let timer = 0, aiming = false;
+    b.addEventListener('pointerdown', (e) => { clearTimeout(timer); aiming = false; b.classList.add('down'); cap(b, e); show(); e.preventDefault(); timer = setTimeout(() => { aiming = true; tch.held.aim = true; }, 250); });
+    const end = (tap) => { clearTimeout(timer); b.classList.remove('down'); if (tap && !aiming) tch.edges.add('switch'); aiming = false; tch.held.aim = false; };
+    b.addEventListener('pointerup', () => end(true)); b.addEventListener('pointercancel', () => end(false));
+  }
   $('t-pause').addEventListener('click', (e) => { fire('pause', pause); e.preventDefault(); });   // on click: on pointerdown the tap's click then landed on the pause screen and resumed
   input.setUse = (on) => $('t-act').classList.toggle('ready', !!on);
   input.setBreathVisible = (on) => $('t-breath').classList.toggle('show', !!on);
@@ -159,7 +173,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
   document.addEventListener('contextmenu', (e) => { if (input.scheme === 'touch' || document.pointerLockElement) e.preventDefault(); });
 
   // ---------- game controller ----------
-  let prev = [], rumbleAt = 0, camHeld = false;
+  let prev = [], rumbleAt = 0;
   // menu directions from the d-pad or the left stick: first press at once, then a repeat while held. A direction already held when the
   // menu opens (walking when you paused) waits for its release.
   const heldDir = {}, menuFire = (a) => { try { input.onMenu && input.onMenu(a); } catch (e) { console.error(e); } };
@@ -199,6 +213,8 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
       prev = pad.btn;
     } else prev = [];
     const menuOn = !!(input.menuActive && input.menuActive());
+    // the touch USE: the shutter (use) while aiming, else interact
+    if (tch.edges.has('act')) { tch.edges.delete('act'); tch.edges.add(tch.held.aim || padDown('aim') || slots('aim', 'kb').some((c) => keys[c] || mouse[c]) ? 'use' : 'interact'); }
     // held and pressed, by action, from every device
     downs = {}; edges = {};
     for (const a of ACTIONS) {
@@ -207,6 +223,7 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
       edges[a] = kb.some((c) => kbEdges.has(c) || mouseEdges.has(c)) || padEdge(a) || tch.edges.has(a);
     }
     edges.cover = tch.edges.has('cover');
+    if (wheelEdge) edges.switch = true;
     if (settings.get('sprintToggle')) { if (edges.sprint) latch.sprint = !latch.sprint; downs.sprint = latch.sprint; } else latch.sprint = false;
     let kx = 0, ky = 0;
     for (const m of slots('move', 'kb')) { const k = MOVE_KEYS[m]; if (k) { ky += (keys[k[0]] ? 1 : 0) - (keys[k[1]] ? 1 : 0); kx += (keys[k[3]] ? 1 : 0) - (keys[k[2]] ? 1 : 0); } }
@@ -219,16 +236,14 @@ export function initInput({ interact, pause, confirm, lookBy, light, cover, phot
     if (padOnly('interact') || kbHit('interact') || tchHit('interact')) { fire('interact', interact); if (padOnly('interact')) fire('confirm', confirm); }
     if (padEdge('pause')) fire('pause', pause);   // the keyboard's Esc is the menu's own (js/menu.js); the touch II button fires on its click
     if (padOnly('light') || kbHit('light') || tchHit('light')) fire('light', light);
-    // the camera key toggles; with Options' "hold" the right mouse button keeps it up only while held
-    const holdMouse = !!settings.get('cameraHold') && slots('camera', 'kb').includes('Mouse2');
-    if (padOnly('camera') || kbHit('camera') || tchHit('camera')) fire('camera', camera, holdMouse && kbEdge('camera') === 'Mouse2' ? 'up' : 'toggle');
-    if (camHeld && !mouse.Mouse2) fire('camera', camera, 'down');
-    camHeld = holdMouse && mouse.Mouse2;
-    if (padOnly('cancel')) fire('cancel', cancel);
+    // the thing in the hand: switch it, use it (aim is held, read as input.down('aim'))
+    if (padOnly('switch') || kbHit('switch') || tchHit('switch') || wheelEdge) fire('switch', swap);
+    if (padOnly('use') || kbHit('use') || tchHit('use')) fire('use', use);
+    if (padOnly('cancel') || kbHit('cancel')) fire('cancel', cancel);
     if (padEdge('journal') || kbHit('journal') || tchHit('journal')) { if (kbEdge('journal') === 'Tab' && photos) fire('photos', photos); else fire('journal', journal); }   // from inside the journal too: it toggles
     if (tchHit('cover')) fire('cover', cover);
     // the touch USE button shows the shutter while the camera is up
     $('t-act').classList.toggle('cam', !!cameraUp());
-    kbEdges = new Set(); mouseEdges = new Set(); tch.edges = new Set();
+    kbEdges = new Set(); mouseEdges = new Set(); tch.edges = new Set(); wheelEdge = false;
   };
 }

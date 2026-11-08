@@ -425,6 +425,7 @@ async function cameraGift() {
   interacts.splice(interacts.indexOf(it), 1); UI.objective(null);
   F.giftTaken = true; F.cutscene = true; P.vel.set(0, 0, 0);
   if (cam.parent) cam.parent.remove(cam); mom.pose = null; sfx.click();
+  RUN.film = 24;   // a fresh disposable: 24 pictures on the roll
   RUN.hasCamera = true; saveRun();
   journal.night(1, 'poltergeist'); journal.note('n1', 'Mom gave me a camera from the gas station. 24 pictures.');
   hands.raiseCamera();
