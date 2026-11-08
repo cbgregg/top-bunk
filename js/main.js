@@ -761,19 +761,26 @@ async function caught(opts = {}) {   // opts.unseen: you are hurt by something y
   killAll(); F.chase = false; F.breathCheck = false; F.echo = false; F.cutscene = true; F.breathUI = false;
   UI.blanket(false); UI.prompt(null); UI.breath(0, false); UI.objective(null); UI.hint(null); UI.stamina(1, false);
   P.mode = 'cine'; P.cam.copy(camera.position);
-  camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
-  const cp = P.cam.clone();
-  // it lunges from where it actually is when that is in front of you, so it never jumps backward as it gets you
-  let dx = fwd.x, dz = fwd.z, d0 = 1.7;
-  if (!opts.unseen && E.visible) { const ex = E.root.position.x - cp.x, ez = E.root.position.z - cp.z, d = Math.hypot(ex, ez); if (d > 0.3 && (ex * fwd.x + ez * fwd.z) / d > 0.25) { dx = ex / d; dz = ez / d; d0 = clamp(d, 0.8, 1.7); } }
-  if (!opts.unseen) { E.visible = true; E.mode = 'idle'; E.reach = 1; E.lean = 0.12; E.smileScale = 1.3; E.tilt = 0.3; E.lookTarget = camera.position; }
-  const place = (d) => { if (opts.unseen) return; E.root.position.set(cp.x + dx * d, cp.y - 2.2, cp.z + dz * d); E.faceTowards(cp.x, cp.z); };
-  place(d0);
-  sfx.scream(); sfx.jolt(1); shake = 1.4; UI.flash('rgba(255,255,255,0.5)', 0.25);
-  await tween(0.3, (k) => place(d0 - k * (d0 - 0.45)), ease.in);
-  await wait(0.4);
-  UI.fade(1, 0.05);
-  E.visible = false; sfx.drone(0, 1); sfx.tension(0, 0.3); sfx.bed('music/chase', 0, 0.3);
+  // the catch: three held frames at 9 Hz, no slide (design 6.4). 1 its face at the lens 0.6 m off, the mouth as wide as it goes; 2 its
+  // hands at the edges of the picture; 3 its face 0.2 m off, filling it (the one frame in the game where something comes through the
+  // near plane on purpose); then black. Its feet stay on the floor (entity.js catchFrame bends it down to the lens and stands it where
+  // its face is), so its legs and its smoke stay in the room
+  if (!opts.unseen) {
+    camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    if (!E.visible) E.root.position.set(camera.position.x + fwd.x * 0.9, P.pos.y, camera.position.z + fwd.z * 0.9);
+    E.root.position.y = W.groundAt ? W.groundAt(E.root.position.x, E.root.position.z, P.pos.y) : P.pos.y;
+    E.visible = true; E.mode = 'idle'; E.standUp(); E.reach = 0; E.lean = 0; E.tilt = 0.3; E.flinch = 0; E.stun = 0; E.duckHold = null; E.post = null;
+    E.lookTarget = camera.position; E.catchPose = { frame: 1, cam: camera }; E.update(0);
+  }
+  // the low piano at full, the rattle in its throat and one crack of bone, from its head; the floor shaking for 300 ms
+  const hw = E.headWorld(tmp2), at = opts.unseen ? null : { x: hw.x, y: hw.y, z: hw.z }, near = at ? { at, ref: 0.6, roll: 0.8 } : {};
+  sfx.pianoSlam(1.6);
+  if (!sfx.pick('rattle', { ...near, gain: 0.95, wet: 0.12, jitter: 0.04, rate: 0.9, maxLen: 2.6 }) && sfx.rattleSynth) sfx.rattleSynth(1);
+  sfx.pick('bone_crack', { ...near, gain: 0.85, wet: 0.1, delay: 0.14, maxLen: 1.6 });
+  sfx.pick('sub_rumble', { gain: 1, dur: 0.3 }); shake = 1.4;
+  for (let f = 1; f <= 3; f++) { if (!opts.unseen) E.catchPose = { frame: f, cam: camera }; await wait(1 / 9); }
+  UI.fade(1, 0.02);
+  E.catchPose = null; E.visible = false; sfx.drone(0, 1); sfx.tension(0, 0.3); sfx.bed('music/chase', 0, 0.3);
   await wait(1.1);
   uiMode = 'death'; unlock(); UI.show('death');
 }

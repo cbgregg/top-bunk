@@ -82,7 +82,40 @@ export function createNights(env) {
     hint: () => { UI.hint(`Hold <b>${L('breath')}</b> to hold your breath (tap it once to keep holding)`, 8); },
     lit: (x, z, y) => (env.lights ? env.lights.levelAt(x, z, y) : 0),
     onEdge: (t, x, z) => lightEdge(t, x, z),
+    // law 2's gaze (made below); the torch held up in front (the hands' aim, or the flag the older hands set); the camera's flash
+    // (the hands mark it; until they do, the photos this file sees); the run, for the seeded loom; a scripted beat that owns the loom
+    gaze: () => gaze,
+    aimed: () => { const h = env.hands; return h && typeof h.aimed === 'boolean' ? h.aimed && h.active !== 'camera' : !!F.flashAimed; },
+    flashAt: () => (env.hands && env.hands.flashAt !== undefined ? env.hands.flashAt : flashSeen),
+    run: () => env.RUN, loomOwned: () => !!F.script || !!F.loomOwned,
+    openPod: (id, o) => openPod(id, o), twitchPod: (id) => twitchPod(id),
+    crawlCaught: () => { const st = ST.on; if (st && st.kind === 'crumple' && st.crawl) crawlCatch(st); else env.caught(); },
   });
+  let flashSeen = null;
+  // the louvres (or the curtain) in front of you, as a page element: they are what moves when it opens the place
+  const podEl = () => (typeof document !== 'undefined' ? document.getElementById('pod') : null);
+  // the leaf of your hiding place moves a centimetre and back: a creak right there, the louvres shifting a hair
+  function twitchPod(id) {
+    const pod = PODS[id]; if (!pod) return;
+    const f = pod.front || [pod.look[0], 1.0, pod.look[1]];
+    if (!sfx.pick('door_creak', { gain: 0.55, at: { x: f[0], y: f[1], z: f[2] }, wet: 0.2 })) sfx.creak(0.3, D.pan(f[0], f[2]));
+    const el = podEl(); if (el) { el.style.transition = 'transform 0.12s'; el.style.transform = 'translateX(0.6%)'; later(0.14, () => { el.style.transform = ''; }); }
+  }
+  // it opens the place: the doors drawn aside over 0.8 s with its face in the gap, and the catch (main.js caught, from inside)
+  async function openPod(id, { why } = {}) {
+    const t = tok, el = podEl(), f = (PODS[id] && PODS[id].front) || [P.pos.x, 1, P.pos.z];
+    F.breathCheck = false; F.fear = 1;
+    if (id === 'bunk') UI.blanket(false);
+    else {
+      if (!sfx.pick('door_creak', { gain: 0.9, at: { x: f[0], y: f[1], z: f[2] }, rate: 0.8, wet: 0.2 })) sfx.creak(0.5, D.pan(f[0], f[2]));
+      if (id === 'tub') W.curtainSee(true);
+      if (el) { el.style.transition = 'transform 0.8s ease-in'; el.style.transform = 'translateX(62%)'; }
+    }
+    E.visible = true; E.mode = 'idle'; E.standUp(); E.lookTarget = camera.position; E.catchPose = { frame: 1, cam: camera };
+    await wait(id === 'bunk' ? 0.25 : 0.8);
+    if (el) { el.style.transition = ''; el.style.transform = ''; }
+    if (t === tok && !F.dead) env.caught({ from: 'pod', pod: id, why });
+  }
   // it waits at the edge of a lit room while you watch it. The first time, the kid works out why; after a few seconds the bulb browns out
   // and dies (lights.js flickers it as it stands near), and then it comes in
   let edgeKill = 0;
@@ -356,26 +389,39 @@ export function createNights(env) {
     }
   }
   registerStageBridge();
-  // the flash in its face: its head snaps up, and it comes for you on all fours, faster if you run
+  // the flash in its face: its head snaps up, it unfolds off its knees in five held jerks (the joints cracking on the second, fourth
+  // and fifth, the floor taking its weight on the second), and it comes for you on all fours (the hunter's crawl), faster if you run
   async function crawlAt(st) {
     if (st.crawl) return; st.crawl = { t0: 0 }; if (ST.it) { env.removeI(ST.it); ST.it = null; }
     for (const c of ST.cancel) c(); ST.cancel = [];
     if (env.photo) env.photo();
     F.fear = 1; await tween(0.14, (k) => { E.snap = k; });
     await wait(0.35); if (ST.on !== st) return;
-    E.mode = 'crawl'; E.speed = 1; E.lookTarget = camera.position; st.crawl.t0 = env.time(); st.crawl.k = 0;
-    { const e = E.root.position, at = { x: e.x, y: 0.4, z: e.z };   // it unfolds: joints going back the wrong way, then it comes
-      if (!sfx.pick('bone_crack', { gain: 0.8, at, wet: 0.1 })) sfx.heavyStep(0.5, D.pan(e.x, e.z));
-      sfx.pick('bone_crack', { gain: 0.55, at, wet: 0.1, delay: 0.18 }); }
+    const e = E.root.position;
+    E.onKey = (n) => {
+      const at = { x: e.x, y: 0.4, z: e.z };
+      if (n === 2 || n === 4 || n === 5) { if (!sfx.pick('bone_crack', { gain: n === 5 ? 0.85 : 0.7, at, wet: 0.1 })) sfx.heavyStep(0.4, D.pan(e.x, e.z)); }
+      if (n === 2) { if (!sfx.pick('floor_slap', { gain: 0.8, at: { x: e.x, y: 0.05, z: e.z }, lp: 500, wet: 0.12 })) sfx.heavyStep(0.5, D.pan(e.x, e.z)); }
+      if (n >= 5) E.onKey = null;
+    };
+    E.mode = 'unfold'; E.unfoldT = 0; E.speed = 1; E.lookTarget = camera.position; st.crawl.t0 = env.time(); st.crawl.k = 0;
   }
-  // it reaches you: the low piano and nothing else, black, and under
+  // it reaches you: three held frames at 9 Hz (its face at the lens, its hands at the edges of the picture, its face filling it), the low
+  // piano, the rattle and one crack, then black, and under
   async function crawlCatch(st) {
-    st.caught = true; revealed(); sfx.pianoSlam(1.9); UI.fade(1, 0.02); env.addShake(1.2);
-    endStage(); hideE(); F.nmDone = true;
-    await wait(0.9); if (F.live && !F.dead) nm.crawled(tok).catch((e) => console.warn('nightmare failed', e));
+    if (st.caught) return;
+    st.caught = true; revealed(); F.nmDone = true; hunter.S.state = 'open';   // (the hunter holds still: the catch plays it from here)
+    const t = tok; E.mode = 'idle'; E.standUp(); E.crawlSpeed = 0; E.lookTarget = camera.position;
+    const h = E.headWorld(new V3()), at = { x: h.x, y: h.y, z: h.z };
+    sfx.pianoSlam(1.6); sfx.pick('rattle', { gain: 0.95, at, wet: 0.12, maxLen: 2.6 }); sfx.pick('bone_crack', { gain: 0.85, at, wet: 0.1, delay: 0.14, maxLen: 1.6 }); env.addShake(1.2);
+    for (let f = 1; f <= 3; f++) { E.catchPose = { frame: f, cam: camera }; await wait(1 / 9); if (t !== tok) return; }
+    UI.fade(1, 0.02); E.catchPose = null; hunter.vanish(false);
+    endStage(); hideE();
+    await wait(0.9); if (F.live && !F.dead && t === tok) nm.crawled(tok).catch((e) => console.warn('nightmare failed', e));
   }
-  // a photo was taken (here, or of a piece of proof): with the folded one in view, it is the flash that sets it off
-  function photoTaken() { const st = ST.on; if (st && st.kind === 'crumple' && st.seen && !st.crawl && gaze.inView(st.p)) crawlAt(st); }
+  // a photo was taken (here, or of a piece of proof): with the folded one in view, it is the flash that sets it off. The hunter reads the
+  // flash too (a flash in its face stuns it), from the hands when they mark it and from here until then
+  function photoTaken() { flashSeen = env.time(); const st = ST.on; if (st && st.kind === 'crumple' && st.seen && !st.crawl && gaze.inView(st.p)) crawlAt(st); }
   // the crawler's head: the face reaches well forward of the root on all fours
   const crawlHead = () => { const e = E.root.position, ry = E.root.rotation.y; return { x: e.x + Math.sin(ry) * 0.75, z: e.z + Math.cos(ry) * 0.75 }; };
   function stageTick(dt) {

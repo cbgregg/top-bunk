@@ -7,7 +7,7 @@ import { shrinkTextures } from './pbr.js';
 const loader = new GLTFLoader();
 const load = (url) => new Promise((res, rej) => loader.load(url, res, undefined, rej)).then((g) => { shrinkTextures(g.scene); return g; });
 let animsP = null;
-export const loadAnims = () => (animsP ||= load('assets/models/anims.glb').then((g) => { for (const c of g.animations) if (/^(walk|run|idle)$/.test(c.name)) seamless(c); return g.animations; }));
+export const loadAnims = () => (animsP ||= load('assets/models/anims.glb').then((g) => { for (const c of g.animations) if (/^(walk|run|idle|sneak)$/.test(c.name)) seamless(c); return g.animations; }));
 
 // A looping clip whose last frame does not match its first pops the whole body once a cycle.
 // Find the true cycle: the time near the end where the pose is closest to frame 0; trim to it, and ease the last 12% of the cycle into the first frame.

@@ -134,7 +134,7 @@ export class Entity {
     // a time; cling (a ceiling height) hangs the crumple upside down from it. crawlSpeed is metres a second the hunter wants of the crawl,
     // and lungeOut the metres the crawl has lunged since the hunter last took them (it moves the root by exactly that)
     this.duck = 0; this.duckHold = null; this.narrowK = 0; this.snap = 0; this.flinch = 0; this.stun = 0; this.catchPose = null; this.cling = null;
-    this.level = 1; this.unfoldT = 0; this.onKey = null; this.crawlSpeed = 0; this.lungeOut = 0; this.gait = null; this.ground = null;
+    this.level = 1; this.unfoldT = 0; this.onKey = null; this.onStep = null; this.sneak = false; this.crawlSpeed = 0; this.lungeOut = 0; this.gait = null; this.ground = null;
     this.blinkT = 18 + hash(7.3) * 22; this.blinkK = 0; this.eyeLagT = 0;
     // the room it takes up beyond its root while it is low: two more circles on the floor for the bodies (collide.js) to keep out of
     const extra = (id) => { const b = addBody({ id, kind: 'thing', pos: new V3(), r: 0.45, h: 1, active: () => this.root.visible && b.on }); b.on = false; return b; };
@@ -347,6 +347,7 @@ export class Entity {
     g.sideFrom = g.sideNow; if (g.lunge) g.sideTo = ((k >> 1) & 1 ? 1 : -1) * 0.25; else if (stride === 0) g.sideTo = 0;
     g.rollFrom = g.rollNow; g.rollTo = (k & 1 ? 1 : -1) * 0.6;
     g.lookFrom.copy(g.lookNow); if (this.lookTarget) g.lookTo.copy(this.lookTarget);
+    if (this.onStep) this.onStep(k, g.swing || L, g.swing ? g.plants[g.swing].to : null, g.lunge);   // the hunter's sounds for the body on the boards
   }
   swingTo(s) {
     const g = this.gait;
@@ -567,6 +568,7 @@ export class Entity {
     if (this.mode === 'lie' || this.mode === 'sit') { this.restPose(dt); this.face(dt); return; }
     // the clip keeps pace with how fast it is actually moving (this.speed is metres per second over 3)
     if (run) r.play('run', { fade: 0.25, speed: 0.8 + this.speed * 0.3 });
+    else if (walk && this.sneak && r.actions.sneak) r.play('sneak', { fade: 0.45, speed: 0.5 + this.speed * 0.5 });   // the stalk: its own creeping cycle
     else if (walk) r.play('walk', { fade: 0.45, speed: 0.4 + this.speed * 0.45 });
     else r.play('idle', { fade: 0.5, speed: 0.3 });
     r.update(dt);
