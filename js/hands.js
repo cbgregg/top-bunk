@@ -7,8 +7,9 @@
 // are lit by the room's own lights (the nearest lamps the eye can see, the sky light, the sun when you are outside) and the flashlight's bounce.
 //
 // What he holds is a tool, one at a time in the right hand: Grandpa's flashlight or the disposable camera.
-//   switchItem()   swaps them over 0.35 s; the torch goes to the left hand while it is lit (or stays pinned under the right forearm with
-//                  settings.torchPin), and is put away while it is dark. Refused until the camera is his (st.hasCamera).
+//   switchItem()   swaps them over 0.35 s; the torch goes to the left hand keeping its light (dark, it is let down out of sight while
+//                  the camera is up, so the left hand can steady the camera), or pinned under the right forearm with settings.torchPin
+//                  while lit. Refused until the camera is his (st.hasCamera).
 //   aim(on)        held: the torch comes up to shoulder height and its beam narrows; the camera comes up to the eye, the finder shows and
 //                  the view narrows to LENS_FOV. Refused in hiding, in a cutscene and once caught; a sprint, the covers, a cutscene and
 //                  hiding put it down. Never down on its own: it stays up for as long as you hold it.
@@ -173,21 +174,22 @@ function makeViewfinder() {
 // round under it toward the box, the thumb under the near side; the forearm comes forward from low on the right, so the lamp head leads in
 // front and the box hangs below the fist. At rest it is low on the right and turned a little in across the body; it points where you
 // look, a beat behind the turn.
-const TORCH = { at: V(0.13, -0.183, -0.262), ry: 0.32, grip: V(0, 0, 0), r: LANTERN.barR, F: V(-0.55, 0.05, -0.85), pn: V(0, -1, 0.05), pole: V(0.8, -1, 0.3) };
+const TORCH = { at: V(0.13, -0.183, -0.262), ry: 0.32, grip: V(0, 0, 0), r: LANTERN.barR + 0.003, F: V(-0.55, 0.18, -0.85), pn: V(0, -1, 0.05), pole: V(0.8, -1, 0.3) };
 // aimed: brought up to shoulder height in front of the middle of the body and straightened, the arm out, steadier
 const TORCH_AIM = { at: V(0.07, -0.158, -0.3), ry: 0.04 };
 // in the left hand while the camera is in the right: the same grip, mirrored
-const TORCH_L = { at: V(-0.13, -0.19, -0.262), ry: -0.32, grip: V(0, 0, 0), r: LANTERN.barR, F: V(0.55, 0.05, -0.85), pn: V(0, -1, 0.05), pole: V(-0.8, -1, 0.3) };
+const TORCH_L = { at: V(-0.13, -0.19, -0.262), ry: -0.32, grip: V(0, 0, 0), r: LANTERN.barR + 0.003, F: V(0.55, 0.18, -0.85), pn: V(0, -1, 0.05), pole: V(-0.8, -1, 0.3) };
 // settings.torchPin: clamped under the right forearm against the chest while the right hand works the camera, its beam 35 degrees down
 const TORCH_PIN = { at: V(0.12, -0.26, -0.22), rx: -35 * Math.PI / 180 };
 // the hand-off between the hands, low in the middle, the lamp tipped down (the beam dips to the floor as it passes)
-const HANDOFF = { at: V(0.0, -0.25, -0.29), rx: -0.85 };
+const HANDOFF = { at: V(0.0, -0.215, -0.3), rx: -0.85 };
 // the camera, one-handed in the right hand: the hand round its right end, the index on the shutter button, the thumb on the back by the
-// wheel, the other three curled under. Up at the eye it is shifted right so the eye lines up with the finder; carried low it is held
-// at the chest, lens forward, ready for a shot from the hip
-const CAM_UP_R = { at: V(0.035, -0.085, -0.165), rx: 0.05, ry: 0, rz: 0 };
+// wheel, the other three curled under. Up at the eye it is shifted right so the eye lines up with the finder, and held just low enough
+// that its body stays under the finder's frame (what the frame holds is what the print holds); carried low it is held at the chest, lens
+// forward, ready for a shot from the hip
+const CAM_UP_R = { at: V(0.035, -0.104, -0.165), rx: 0.05, ry: 0, rz: 0 };
 const CAM_LOW_R = { at: V(0.118, -0.186, -0.285), rx: 0.14, ry: -0.22, rz: 0.05 };
-const CAMGRIP_R1 = { grip: V(CAM_H.x - 0.012, -0.004, 0.006), r: 0, F: V(0, 1, -0.25), pn: V(-1, 0, 0.1), pole: V(0.6, -1, 0.2) };
+const CAMGRIP_R1 = { grip: V(CAM_H.x + 0.001, -0.004, 0.006), r: 0, F: V(0, 1, -0.25), pn: V(-1, 0, 0.1), pole: V(0.6, -1, 0.2) };
 // the left hand steadying the raised camera's left end when it has no torch to hold (the palm on the end, the fingers loose over the top)
 const CAMGRIP_L = { grip: V(-CAM_H.x, -0.012, 0.002), r: 0, F: V(0, 1, -0.35), pn: V(1, 0, 0), pole: V(-0.55, -1, 0.25) };
 // where a thing goes when it is put away: straight down out of the view
@@ -387,12 +389,12 @@ export function createHands() {
     return Math.min(m, d(tipOf(bones)) - FINGER * 0.8);
   }
   // close a finger round the held thing: as far as it goes until it touches, never past MAX_CURL, never bent backwards
-  function gripChain(bones, obj, palmN, Fh, thumb, want) {
+  function gripChain(bones, obj, palmN, Fh, thumb, want, fresh) {
     const restQ = bones.map((b) => arms.rest.get(b));
     const set = (k) => { bones.forEach((b, i) => b.quaternion.copy(restQ[i])); bones[0].updateMatrixWorld(true); curlChain(bones, k, palmN, Fh, thumb); };
     if (!obj) { bones.__obj = null; set(THREE.MathUtils.clamp(want, 0, MAX_CURL)); return null; }
     // a grip holds still against its object, so the touch is found again only every few frames
-    if (bones.__obj === obj && bones.__age++ < 8) { set(bones.__k); return bones.__gap; }
+    if (!fresh && bones.__obj === obj && bones.__age++ < 8) { set(bones.__k); return bones.__gap; }
     const top = thumb ? 1.1 : MAX_CURL, k0 = thumb ? -0.35 : 0; let lo = k0, hi = top, hit = false;
     for (let k = k0; k <= top + 1e-6; k += 0.1) { set(k); if (gap(bones, obj) < 0) { hi = k; hit = true; break; } lo = k; }
     let k = Math.min(want, top);
@@ -437,8 +439,9 @@ export function createHands() {
     const fr = handFrame(side, A), obj = t.obj && t.obj.visible ? t.obj : null;
     if (obj) { obj.updateMatrixWorld(true); obj.userData.inv = new THREE.Matrix4().copy(obj.matrixWorld).invert(); }
     const r = {};
-    for (const [name, k] of [['index', t.idx ?? t.curl], ['middle', t.curl], ['ring', t.curl * 1.05], ['pinky', t.curl * 1.1]]) r[name] = gripChain(A[name], obj, fr.pn, fr.F, false, k);
-    r.thumb = gripChain(A.thumb, obj, fr.pn, fr.F, true, t.thumb);
+    const fresh = S.sw < 1;   // while the things change hands the grip moves every frame, so the touch is found every frame
+    for (const [name, k] of [['index', t.idx ?? t.curl], ['middle', t.curl], ['ring', t.curl * 1.05], ['pinky', t.curl * 1.1]]) r[name] = gripChain(A[name], obj, fr.pn, fr.F, false, k, fresh);
+    r.thumb = gripChain(A.thumb, obj, fr.pn, fr.F, true, t.thumb, fresh);
     if (!debug) return;
     if (obj) { r.palm = +obj.userData.sdf(wpos(A.hand).lerp(wpos(A.index[0]).add(wpos(A.pinky[0])).multiplyScalar(0.5), 0.55).addScaledVector(fr.pn, PALM).applyMatrix4(obj.userData.inv)).toFixed(4); r.obj = obj === torch ? 'torch' : obj === cam ? 'camera' : 'fold'; }
     for (const n of ['index', 'middle', 'ring', 'pinky', 'thumb']) if (typeof r[n] === 'number') r[n] = +r[n].toFixed(4);
@@ -588,7 +591,8 @@ export function createHands() {
       const lag = invCamQ.clone().multiply(lagQ);
       const lagged = (at, q, k = 1) => { const lq = new THREE.Quaternion().slerp(lag, k); return { at: at.clone().applyQuaternion(lq), q: lq.multiply(q) }; };
       const torchRight = () => { const e = easeUp(S.tor); const at = TORCH.at.clone().lerp(TORCH_AIM.at, e); at.y += overshoot(S.tor) * 0.012; return lagged(at, eq(0, lerp(TORCH.ry, TORCH_AIM.ry, e)), 1 - 0.6 * e); };
-      const torchLeft = () => lagged(TORCH_L.at, eq(0, TORCH_L.ry), 0.8);
+      // (in the left hand while the camera is at the eye it is held a little lower, its lamp under the finder's frame)
+      const torchLeft = () => lagged(TORCH_L.at.clone().add(tmp.set(0, -0.035 * smooth(S.cam.k), 0)), eq(0, TORCH_L.ry), 0.8);
       const torchPin = () => ({ at: TORCH_PIN.at.clone(), q: eq(TORCH_PIN.rx) });
       const handoff = () => ({ at: HANDOFF.at.clone(), q: eq(HANDOFF.rx) });
       const camRight = () => {
@@ -599,28 +603,32 @@ export function createHands() {
       };
       const away = (p) => ({ at: p.at.clone().add(AWAY), q: p.q.clone() });
       const mix = (a, b, k) => ({ at: a.at.clone().lerp(b.at, k), q: a.q.clone().slerp(b.q, k) });
-      // the torch where the camera is held: in the left hand while lit, under the right forearm with the pin, put away while dark
-      const torchBeside = (litNow, pin) => (!litNow ? null : pin ? { ...torchPin(), holder: 'pin' } : { ...torchLeft(), holder: 'L' });
+      // the torch where the camera is held: in the left hand, pointing ahead while lit and carried a little lower while dark; dark, it is
+      // let down out of sight while the camera is up, so the left hand can steady the camera. With the pin, lit, under the right forearm
+      const torchStowed = () => away(torchLeft());
+      const torchDark = () => { const p = torchLeft(); p.at.y -= 0.025; p.at.z += 0.015; return p; };
+      const torchBeside = (litNow, pin) => (litNow && pin ? { ...torchPin(), holder: 'pin' } : litNow ? { ...torchLeft(), holder: 'L' }
+        : S.cam.k > 0.5 ? { ...torchStowed(), holder: 'L', stowed: true } : { ...torchDark(), holder: 'L' });
       let T = null, C = null;   // { at, q, holder: 'R' | 'L' | 'pin' }
       const pin = !!st.torchPin;
       if (pose === 'items' || pose === 'camera') {
         if (S.script) { C = { ...camRight(), holder: 'R' }; T = has('torch', st) ? torchBeside(lit, pin) : null; }
         else if (S.sw < 1) {
-          // the swap: the item leaving the right hand goes first (to the other hand while the torch is lit, else down out of sight); the
-          // other comes up into the right hand in the second half. Halfway, one in each hand.
+          // the swap: the torch passes between the hands low in the middle (to the left one, lit or dark, keeping its light; with the pin
+          // and lit, to under the right forearm) while the camera goes down out of sight or comes up into the right hand in the second
+          // half. Halfway, one in each hand.
           const k = S.sw, a = smooth(Math.min(1, k / 0.5)), b = smooth(Math.max(0, (k - 0.5) / 0.3));
+          const pinned = S.swLit && S.swPin, side = S.swLit ? torchLeft() : torchDark();
           if (S.swFrom === 'torch') {
             const rest = torchRight();
-            if (S.swLit && !S.swPin) T = k < 0.5 ? { ...mix(rest, handoff(), a), holder: 'R' } : { ...mix(handoff(), torchLeft(), b), holder: 'L' };
-            else if (S.swLit) T = k < 0.5 ? { ...mix(rest, torchPin(), a), holder: 'R' } : { ...torchPin(), holder: 'pin' };
-            else T = k < 0.5 ? { ...mix(rest, away(rest), a), holder: 'R' } : null;
+            if (pinned) T = k < 0.5 ? { ...mix(rest, torchPin(), a), holder: 'R' } : { ...torchPin(), holder: 'pin' };
+            else T = k < 0.5 ? { ...mix(rest, handoff(), a), holder: 'R' } : { ...mix(handoff(), side, b), holder: 'L' };
             const low = camRight(); C = k >= 0.5 ? { ...mix(away(low), low, b), holder: 'R' } : null;
           } else {
             const low = camRight(); C = k < 0.5 ? { ...mix(low, away(low), a), holder: 'R' } : null;
             const rest = torchRight();
-            if (S.swLit && !S.swPin) T = k < 0.5 ? { ...mix(torchLeft(), handoff(), a), holder: 'L' } : { ...mix(handoff(), rest, b), holder: 'R' };
-            else if (S.swLit) T = k < 0.5 ? { ...torchPin(), holder: 'pin' } : { ...mix(torchPin(), rest, b), holder: 'R' };
-            else T = k >= 0.5 ? { ...mix(away(rest), rest, b), holder: 'R' } : null;
+            if (pinned) T = k < 0.5 ? { ...torchPin(), holder: 'pin' } : { ...mix(torchPin(), rest, b), holder: 'R' };
+            else T = k < 0.5 ? { ...mix(side, handoff(), a), holder: 'L' } : { ...mix(handoff(), rest, b), holder: 'R' };
           }
         } else if (S.active === 'torch') { T = has('torch', st) ? { ...torchRight(), holder: 'R' } : null; }
         else { C = { ...camRight(), holder: 'R' }; T = has('torch', st) ? torchBeside(lit, pin) : null; }
@@ -651,13 +659,13 @@ export function createHands() {
       const camR = () => gripTarget('R', held.cam.p, held.cam.q, CAMGRIP_R1, { curl: 0.85, thumb: 0.55, idx: 0.45, obj: cam, hold: true });
       if (pose === 'items' || pose === 'camera') {
         tg.R = C && C.holder === 'R' ? camR() : T && T.holder === 'R' ? torchG('R') : freeR(FREE.hidR);
-        const steady = C && !(T && T.holder === 'L') && S.cam.k > 0.6 && S.sw >= 1;
-        tg.L = T && T.holder === 'L' ? torchG('L') : steady ? gripTarget('L', held.cam.p, held.cam.q, CAMGRIP_L, { curl: 0.3, thumb: 0.2, obj: cam, hold: true }) : freeL(FREE.hidL);
+        const steady = C && !(T && T.holder === 'L' && !T.stowed) && S.cam.k > 0.6 && S.sw >= 1;
+        tg.L = steady ? gripTarget('L', held.cam.p, held.cam.q, CAMGRIP_L, { curl: 0.3, thumb: 0.2, obj: cam, hold: true }) : T && T.holder === 'L' ? torchG('L') : freeL(FREE.hidL);
       } else if (pose === 'covers') { const q0 = new THREE.Quaternion(); tg.R = gripTarget('R', FOLD.at, q0, FOLD.R, { curl: 1, thumb: 0.6, obj: foldG, r: FOLD.r }); tg.L = gripTarget('L', FOLD.at, q0, FOLD.L, { curl: 1, thumb: 0.6, obj: foldG, r: FOLD.r }); }
       else if (pose === 'breath') { tg.R = freeR(FREE.breath); tg.L = st.pod ? freeL(FREE.stillL) : gripTarget('L', FOLD.at, new THREE.Quaternion(), FOLD.L, { curl: 1, thumb: 0.6, obj: foldG, r: FOLD.r }); }
       else if (pose === 'still') { tg.R = freeR(FREE.stillR); tg.L = freeL(FREE.stillL); }
       // the torch passing to the left hand: the left comes up open to meet it before it lets the right one go
-      if (S.sw < 0.5 && S.swFrom === 'torch' && S.swLit && !S.swPin && T && tg.L && !tg.L.hold) {
+      if (S.sw < 0.5 && S.swFrom === 'torch' && !(S.swLit && S.swPin) && T && tg.L && !tg.L.hold) {
         const m = smooth(S.sw / 0.5), meet = torchG('L');
         tg.L = { ...meet, p: tg.L.p.clone().lerp(meet.p, m), q: tg.L.q.clone().slerp(meet.q, m), curl: 0.2, thumb: 0.15, obj: null, hold: false };
       }
@@ -695,7 +703,7 @@ export function createHands() {
       }
 
       // the held things, where they are
-      torch.visible = !!T && held.torch.p.y > -0.4 && (pose === 'items' || pose === 'camera');
+      torch.visible = !!T && held.torch.p.y > -0.4 && !(T.stowed && tg.L && tg.L.obj === cam) && (pose === 'items' || pose === 'camera');
       if (torch.visible) { torch.position.copy(held.torch.p); torch.quaternion.copy(held.torch.q); }
       lensM.visible = lit;
       cam.visible = !!C && held.cam.p.y > -0.4 && (pose === 'items' || pose === 'camera');

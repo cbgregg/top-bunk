@@ -15,12 +15,14 @@ From night two the whole house is open, a clock runs toward dawn, and the thing 
 | Action | Keyboard + mouse | Game controller (Xbox · PlayStation) | Touch |
 |---|---|---|---|
 | Move / Look | WASD or arrows / mouse | Left stick / right stick | Drag on the left half (floating stick) / drag on the right half |
-| Sprint (limited stamina; hold) | Shift | RT · R2 (or L3) | RUN |
-| Interact, use what you hold; the shutter when the camera is up | E or left click | A · ✕ (or X · □) | USE (a shutter while the camera is up) |
-| Camera up / down | C (toggle), right click (hold or toggle, in Options) | Y · △ (or d-pad down) | CAM |
-| Flashlight | F | RB · R1 (or d-pad up) | LIGHT |
-| Hold your breath while hiding / pull the covers over your head in the bunk (hold; tap once to keep holding) | Space | LT · L2 (or LB · L1) | HOLD BREATH / COVER UP |
-| Put the camera away | C or right click again | B · ○ | — |
+| Sprint (limited stamina; hold) | Shift | L3 | RUN |
+| Interact | E | A · ✕ (or X · □) | USE |
+| Switch what you hold: Grandpa's flashlight or the camera | Q, C or the mouse wheel | Y · △ | Tap CAM |
+| Aim what you hold (hold): the flashlight up with a narrower, longer beam, or the camera to your eye | Right click | LT · L2 | Hold CAM |
+| Use it: the flashlight on or off, or take the photo (from the hip when it is not up) | Left click | RT · R2 | USE while aiming; LIGHT |
+| Flashlight on / off, whichever hand has it | F | D-pad up | LIGHT |
+| Hold your breath while hiding / pull the covers over your head in the bunk (hold; tap once to keep holding) | Space | RB · R1 (or LB · L1) | HOLD BREATH / COVER UP |
+| Lower what you aim | Let go of right click | B · ○ | — |
 | Your journal and photos (toggle; Tab opens on the photos) | J, Tab | View · Create | The notebook at the top |
 | Pause | Esc | Start · Options | II |
 | Skip the bedtime cartoon (hold) | Esc | Start · Options | SKIP |
