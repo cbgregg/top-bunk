@@ -186,7 +186,7 @@ function chainTick(dt) {
   if (c.shut < 0 && c.t > 0.7 && (Math.hypot(P.pos.x - c.x, P.pos.z - c.z) > 0.6 || c.t > 3 || P.mode !== 'walk')) { W.setDoor('front', false); c.shut = c.t; }
   if (c.shut >= 0 && c.t > c.shut + 0.9) {
     S.chain = null;
-    if (S.knob === F.plan || F.phase !== 'night') return;
+    if (S.knob === F.plan || F.phase !== 'night' || OUTDOOR.has(roomAt(P.pos.x, P.pos.z, P.pos.y))) return;   // from outside: only when you are in
     S.knob = F.plan;
     const at = { x: 3.1, y: 1.2, z: -5.0 };
     if (!place('doorknob', at, { gain: 0.9, rate: 0.92 })) place('knock', at, { gain: 0.5, maxLen: 1 });
