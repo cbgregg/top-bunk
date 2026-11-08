@@ -13,7 +13,7 @@ import { makePerson } from './people.js';
 import * as events from './events.js';
 import * as log from './log.js';
 import { hooks } from './hooks.js';
-import { active } from './collide.js';
+import { active, fits } from './collide.js';
 
 const DAWN = 360;   // minutes after midnight
 
@@ -265,10 +265,15 @@ export function createNights(env) {
       if (!freeE() || P.mode !== 'walk') return false;
       const room = env.roomAt(P.pos.x, P.pos.z); if (!room || room === 'bath') return false;
       const p = gaze.behind(1.8, 3.4); if (!p) return false;
+      // room for it folded up, and for it to unfold onto all fours toward you (the crawl's root may come up to 0.8 m nearer as it rolls
+      // forward): nothing it reaches out to is in a wall or a piece of furniture (law 9)
+      const yaw = Math.atan2(P.pos.x - p.x, P.pos.z - p.z); if (!fits('crumple', p.x, p.z, yaw, { y: P.pos.y })) return false;
+      let shift = -1; for (let s = 0; s <= 0.8 + 1e-6 && shift < 0; s += 0.1) if (fits('crawl', p.x + Math.sin(yaw) * s, p.z + Math.cos(yaw) * s, yaw, { y: P.pos.y })) shift = s;
+      if (shift < 0) return false;
       E.root.scale.setScalar(1); E.root.position.set(p.x, P.pos.y, p.z); E.faceTowards(P.pos.x, P.pos.z, 1); E.mode = 'crumple'; E.side = rnd() < 0.5 ? -1 : 1; E.snap = 0;
       E.lookTarget = camera.position; E.visible = true; sfx.holdHush();
       if (sfx.libLoad) { sfx.libLoad('bone_crack'); sfx.libLoad('crawl'); }   // ready before the flash
-      const st = { kind: 'crumple', p, t0: env.time(), mum: 0, end: () => { if (!st.caught) hideE(); } }; ST.on = st;
+      const st = { kind: 'crumple', p, t0: env.time(), mum: 0, shift, end: () => { if (!st.caught) hideE(); } }; ST.on = st;
       ST.cancel.push(gaze.whenLookAt(p, () => {
         st.seen = env.time(); revealed(); sfx.unhush(); sfx.pianoSlam(1.25); env.addShake(0.35); F.fear = 1;
         ST.it = env.addI({ p: new V3(p.x, 0.6, p.z), r: 5.5, label: 'Take a photo', when: () => ST.on === st && !st.crawl && gaze.inView(p) && P.mode === 'walk', act: () => crawlAt(st) });
@@ -301,6 +306,7 @@ export function createNights(env) {
         if (ax * (P.pos.x - m.x) + az * (P.pos.z - m.z) < 0) { ax = -ax; az = -az; }
         let nx = -az, nz = ax; if (nx * (m.x - P.pos.x) + nz * (m.z - P.pos.z) < 0) { nx = -nx; nz = -nz; }
         const x = m.x + nx * 0.28 + ax * 0.6, z = m.z + nz * 0.28 + az * 0.6;
+        if (!fits('peek', x, z, 0, { y: P.pos.y })) continue;   // (beside some doors that spot is in the furniture: law 9)
         E.root.scale.setScalar(0.72); E.root.position.set(x, P.pos.y, z); E.faceTowards(x - nx * 3, z - nz * 3, 1); E.mode = 'idle'; E.lookTarget = camera.position;
         const ry = E.root.rotation.y, lx = Math.cos(ry), lz = -Math.sin(ry);   // its left, in the world
         E.leanSide = ((-ax) * lx + (-az) * lz > 0 ? -1 : 1) * 0.85; E.lean = 0.3; E.visible = true;
@@ -402,6 +408,7 @@ export function createNights(env) {
       const at = { x: e.x, y: 0.4, z: e.z };
       if (n === 2 || n === 4 || n === 5) { if (!sfx.pick('bone_crack', { gain: n === 5 ? 0.85 : 0.7, at, wet: 0.1 })) sfx.heavyStep(0.4, D.pan(e.x, e.z)); }
       if (n === 2) { if (!sfx.pick('floor_slap', { gain: 0.8, at: { x: e.x, y: 0.05, z: e.z }, lp: 500, wet: 0.12 })) sfx.heavyStep(0.5, D.pan(e.x, e.z)); }
+      if (n === 3 && st.shift > 0) { const a = E.root.rotation.y; e.x += Math.sin(a) * st.shift; e.z += Math.cos(a) * st.shift; }   // it rolls forward onto its hands, toward you
       if (n >= 5) E.onKey = null;
     };
     E.mode = 'unfold'; E.unfoldT = 0; E.speed = 1; E.lookTarget = camera.position; st.crawl.t0 = env.time(); st.crawl.k = 0;
@@ -1548,9 +1555,9 @@ export function createNights(env) {
       const lie = new V3(8.38, 1.9, 4.0); P.mode = 'cine'; P.cam.copy(lie);
       sfx.tension(0.05, 2); sfx.drone(0.15, 2);
       await wait(4); if (!alive(t)) return;
-      E.visible = true; E.mode = 'idle'; E.tilt = 0.5; E.lookTarget = camera.position; E.smileScale = 1; E.root.position.set(10.15, 0, 4.0); E.root.rotation.y = -Math.PI / 2;
+      E.visible = true; E.mode = 'idle'; E.tilt = 0.5; E.lookTarget = camera.position; E.smileScale = 1; E.root.position.set(10.3, 0, 3.6); E.root.rotation.y = -Math.PI / 2;
       P.yaw = -Math.PI / 2 + 0.3; sfx.stab(); env.addShake(0.6); F.fear = 1;
-      for (const x of [9.75, 9.4, 9.15, 9.05]) { await wait(2.0); E.root.position.x = x; D.flicker(0.25); sfx.heavyStep(0.5, 0); F.fear = 1; }
+      for (const x of [10.2, 10.12, 10.06, 10.0]) { await wait(2.0); E.root.position.x = x; D.flicker(0.25); sfx.heavyStep(0.5, 0); F.fear = 1; }   // up to the foot of the bunk, never into it
       await wait(2.5); sfx.violins(1, 0.2); await wait(2.2); sfx.violins(0, 0.05); sfx.ceilingThump();
       E.visible = false; F.cutscene = false; P.mode = 'bunk'; P.cam.copy(env.BUNK_SEAT); P.yaw = 0.2; F.script = false;
     },

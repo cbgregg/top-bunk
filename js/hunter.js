@@ -50,7 +50,7 @@ export function createHunter(ctx) {
     crawl: null, hold: 0, flinchT: 0, stunT: 0, flinchUsed: false, stunUsed: false, lastFlash: undefined, steps: { x: 0, z: 0, acc: 0 }, openT: 0,
   };
   const tmp = new V3(), dirv = new V3(), head = new V3();
-  E.ground = W.groundAt || null;
+  E.ground = W.groundAt || null; E.colliders = W.colliders;
   const gaze = () => (ctx.gaze ? ctx.gaze() : null);
   const logRow = (id, extra = {}) => { try { log.push({ id, seen: true, p: { x: +E.root.position.x.toFixed(2), z: +E.root.position.z.toFixed(2) }, ...extra }); } catch (e) { /* no ledger yet */ } };
 
@@ -106,7 +106,7 @@ export function createHunter(ctx) {
   function planTo(node, from = null) {
     const start = from || S.node || nearestNode(ep().x, ep().z, null, ep().y);
     const p = navPath(start, node, doorClosed); if (!p) return false;
-    S.path = p; S.pi = 0;
+    S.path = p; S.pi = 0; S.thru = -1;
     // already between the first two nodes of the new path (a replan while it walks): carry on to the second rather than turning back to the first
     if (p.length > 1) {
       const [ax, az] = NODES[p[0]], [bx, bz] = NODES[p[1]], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
@@ -146,7 +146,7 @@ export function createHunter(ctx) {
   function advance(dist, turn, crawling = false) {
     let remaining = dist, moved = 0;
     while (remaining > 1e-4 && S.pi < S.path.length) {
-      const id = S.path[S.pi], [tx, tz] = NODES[id];
+      const id = S.path[S.pi]; let [tx, tz] = NODES[id], viaDoor = false;
       if (S.pi > 0) {   // a shut door on the way into this node?
         const d = edgeDoor(S.path[S.pi - 1], id);
         if (d && doorClosed(d)) {
@@ -154,15 +154,18 @@ export function createHunter(ctx) {
           const m = W.doors[d].mid; sfx.pick('breath', { gain: 0.55, at: { x: m.x, y: 1.5, z: m.z }, rate: 0.6, wet: 0.3 });
           return false;
         }
+        // through the middle of the doorway, not wherever the straight line between the nodes crosses it: the jambs are close
+        if (d && S.thru !== S.pi) { const m = W.doors[d].mid; if (Math.hypot(m.x - ep().x, m.z - ep().z) > 0.06) { tx = m.x; tz = m.z; viaDoor = true; } else S.thru = S.pi; }
       }
       const dx = tx - ep().x, dz = tz - ep().z, d = Math.hypot(dx, dz);
-      if (S.pi < S.path.length - 1 && d < 0.32) { S.node = id; S.pi++; continue; }   // cut the corner: head for the next node before reaching this one
+      if (viaDoor && d <= remaining) { ep().x = tx; ep().z = tz; remaining -= d; moved += d; S.thru = S.pi; continue; }
+      if (S.pi < S.path.length - 1 && d < 0.32 && !viaDoor) { S.node = id; S.pi++; continue; }   // cut the corner: head for the next node before reaching this one
       // the crawl does not step through a wall or a piece of furniture to keep to its line (the last guard)
       const step = Math.min(d, remaining), nx = ep().x + (d > 1e-6 ? dx / d * step : 0), nz = ep().z + (d > 1e-6 ? dz / d * step : 0);
       if (crawling && blockedAt(nx, nz, 0.3) && !blockedAt(ep().x, ep().z, 0.3)) break;
       if (!crawling && d > 0.04) E.faceTowards(tx, tz, turn);
       ep().x = nx; ep().z = nz; remaining -= step; moved += step;
-      if (step >= d - 1e-6) { S.node = id; S.pi++; }
+      if (step >= d - 1e-6 && !viaDoor) { S.node = id; S.pi++; }
     }
     settle();
     return { arrived: S.pi >= S.path.length, moved };
@@ -189,9 +192,9 @@ export function createHunter(ctx) {
     }
     return r.arrived;
   }
-  // through a doorway on all fours from level 5; the laundry (its floor 2.4 m down, its ceiling low) always
+  // through a doorway on all fours from level 5
   function lowHere() {
-    if (ep().y < -1.2) return true;
+    // (the laundry, 2.04 m under its joists, it goes through bent double: the duck brings its crown to 1.9 m)
     if (S.level < 5) return false;
     for (const k in W.doors) { const d = W.doors[k]; if (Math.abs((d.y0 || 0) - ep().y) < 1 && Math.hypot(d.mid.x - ep().x, d.mid.z - ep().z) < (E.mode === 'crawl' ? 1.5 : 1.1)) return true; }
     return false;

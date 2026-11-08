@@ -196,43 +196,43 @@ export class Rig {
   // target (a target out of reach is met as far as the limb goes, straight at it; one too close, at the shortest the limb folds to).
   // w eases the whole move in (0 leaves the clip's limb, 1 puts the end on the point). Lifted from night one's bedside reach.
   // A stretched limb (the thing's arms are scaled along the upper bone) shears the lower one, so how far the end reaches changes with the
-  // bend in a way no triangle predicts: after the first solve the limb is corrected by measuring it. The elbow is bent about its own
-  // hinge until the shoulder-to-wrist distance is right (a secant on the angle), the whole limb is swung about the shoulder onto the
-  // target (a turn of the upper bone carries everything under it rigidly), and turned about that line so the elbow faces the pole.
-  ik2(upper, lower, end, target, pole, w = 1, rounds = 3) {
+  // bend in a way no triangle predicts. After the triangle has put the elbow on the pole's side, the bend is found by measuring: the
+  // lower bone is swung in the limb's plane, from straight to folded, and bisected until the shoulder-to-wrist distance is right; then
+  // the whole limb is turned about the shoulder onto the target (a turn of the upper bone carries everything under it rigidly) and
+  // about that line until the elbow faces the pole (which leaves the wrist where it is).
+  ik2(upper, lower, end, target, pole, w = 1) {
     if (w <= 0.001 || !upper || !lower || !end) return;
     end.updateWorldMatrix(true, false); end.getWorldPosition(_ikW); const goal = _ikG.copy(_ikW).lerp(target, w);
     this.ik2once(upper, lower, end, goal, pole);
     const reach = () => { upper.getWorldPosition(_ikS); end.getWorldPosition(_ikW); return _ikS.distanceTo(_ikW); };
-    for (let k = 0; k < rounds; k++) {
-      upper.getWorldPosition(_ikS); lower.getWorldPosition(_ikE); end.getWorldPosition(_ikW);
-      const d = _ikS.distanceTo(goal);
-      // the hinge: across the plane of the limb
-      _ikA.copy(_ikE).sub(_ikS); _ikB.copy(_ikW).sub(_ikE); _ikC.crossVectors(_ikA, _ikB);
-      if (_ikC.lengthSq() > 1e-10) {
-        _ikC.normalize();
-        let a = 0, f = reach() - d, ap = null, fp = null;
-        for (let i = 0; i < 5 && Math.abs(f) > 0.002; i++) {
-          let next = ap === null || Math.abs(f - fp) < 1e-7 ? a + 0.08 : a - f * (a - ap) / (f - fp);
-          next = THREE.MathUtils.clamp(next, a - 0.6, a + 0.6);
-          this.rotateWorld(lower, _ikQ.setFromAxisAngle(_ikC, next - a));
-          ap = a; fp = f; a = next; f = reach() - d;
-        }
+    for (let round = 0; round < 3; round++) {
+    upper.getWorldPosition(_ikS); lower.getWorldPosition(_ikE);
+    const d = _ikS.distanceTo(goal);
+    _ikA.copy(_ikE).sub(_ikS).normalize();                                     // the upper bone's line
+    _ikC.crossVectors(_ikA, _ikB.copy(goal).sub(_ikS));                         // the plane's normal (toward the target side)
+    if (_ikC.lengthSq() < 1e-10) _ikC.crossVectors(_ikA, _ikB.copy(pole).sub(_ikS));
+    if (_ikC.lengthSq() > 1e-10) {
+      _ikC.normalize();
+      const bend = (a) => { this.aim(lower, end, _ikD.copy(_ikA).applyAxisAngle(_ikC, a), 1); return reach(); };
+      let lo = 0, hi = Math.PI - 0.12;
+      if (bend(lo) > d) {
+        for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (bend(mid) > d) lo = mid; else hi = mid; }
+        bend((lo + hi) / 2);
       }
-      // onto the target: the whole limb turned about the shoulder
-      upper.getWorldPosition(_ikS); end.getWorldPosition(_ikW);
-      _ikA.copy(_ikW).sub(_ikS).normalize(); _ikB.copy(goal).sub(_ikS).normalize();
-      this.rotateWorld(upper, _ikQ.setFromUnitVectors(_ikA, _ikB));
-      // the elbow toward the pole: a turn about the shoulder-target line, which leaves the wrist where it is
-      lower.getWorldPosition(_ikE); _ikU.copy(_ikB);
-      _ikA.copy(_ikE).sub(_ikS); _ikA.addScaledVector(_ikU, -_ikA.dot(_ikU));
-      _ikP.copy(pole).sub(_ikS); _ikP.addScaledVector(_ikU, -_ikP.dot(_ikU));
-      if (_ikA.lengthSq() > 1e-8 && _ikP.lengthSq() > 1e-8) {
-        _ikA.normalize(); _ikP.normalize();
-        const ang = Math.atan2(_ikM.crossVectors(_ikA, _ikP).dot(_ikU), _ikA.dot(_ikP));
-        this.rotateWorld(upper, _ikQ.setFromAxisAngle(_ikU, ang));
-      }
-      end.getWorldPosition(_ikW); if (_ikW.distanceToSquared(goal) < 1e-6) break;
+    }
+    // onto the target: the whole limb turned about the shoulder
+    upper.getWorldPosition(_ikS); end.getWorldPosition(_ikW);
+    _ikA.copy(_ikW).sub(_ikS).normalize(); _ikB.copy(goal).sub(_ikS).normalize();
+    this.rotateWorld(upper, _ikQ.setFromUnitVectors(_ikA, _ikB));
+    // the elbow toward the pole: a turn about the shoulder-target line
+    lower.getWorldPosition(_ikE); _ikU.copy(_ikB);
+    _ikA.copy(_ikE).sub(_ikS); _ikA.addScaledVector(_ikU, -_ikA.dot(_ikU));
+    _ikP.copy(pole).sub(_ikS); _ikP.addScaledVector(_ikU, -_ikP.dot(_ikU));
+    if (_ikA.lengthSq() > 1e-8 && _ikP.lengthSq() > 1e-8) {
+      _ikA.normalize(); _ikP.normalize();
+      this.rotateWorld(upper, _ikQ.setFromAxisAngle(_ikU, Math.atan2(_ikM.crossVectors(_ikA, _ikP).dot(_ikU), _ikA.dot(_ikP))));
+    }
+    end.getWorldPosition(_ikW); if (_ikW.distanceToSquared(goal) < 1e-4) break;   // (a sheared bend can need a second look)
     }
   }
   ik2once(upper, lower, end, target, pole, bLen) {

@@ -17,7 +17,7 @@ const ARM_STRETCH = 1.4;
 // tipped past level so the hips ride over the shoulders; the hands and knees are put on the boards, the feet trail behind on their tops
 const CRAWL = {
   pitch: 1.62, pelvis: 0.6,
-  hand: [0.45, 0.058, 1.26], handPole: [0.95, 2.1, 0.1], handLift: 0.13,
+  hand: [0.45, 0.062, 1.26], handPole: [0.95, 2.1, 0.1], handLift: 0.13,
   knee: [0.3, 0.17, -0.12], kneeLift: 0.06, foot: [0.34, 0.072],
   hold: 0.72,                      // of each step the pose is held, then it jumps to the next in what is left (two or three frames)
 };
@@ -290,7 +290,7 @@ export class Entity {
   // a contact where it belongs under the body now: lead metres further ahead (the crawl's stance narrows in a doorway)
   nominal(L, lead, out) {
     const left = L[0] === 'L' ? 1 : -1, hand = L[1] === 'H', c = hand ? CRAWL.hand : CRAWL.knee, n = this.narrowK;
-    this.T(left * c[0] * (1 - (hand ? 0.42 : 0.35) * n), 0, c[2] + lead, out); out.y = this.floorAt(out.x, out.z) + c[1];
+    this.T(left * c[0] * (1 - (hand ? 0.45 : 0.35) * n), 0, c[2] + lead, out); out.y = this.floorAt(out.x, out.z) + c[1];
     return out;
   }
   gaitReset() {
@@ -397,10 +397,10 @@ export class Entity {
     this.root.updateMatrixWorld(true);
     for (const sd of ['L', 'R']) {
       const left = sd === 'L' ? 1 : -1;
-      const cr = this.T(left * 0.4, 0, 0.6, _a); cr.y = this.floorAt(cr.x, cr.z) + 0.068;
+      const cr = this.T(left * 0.4, 0, 0.6, _a); cr.y = this.floorAt(cr.x, cr.z) + 0.08;
       const target = _b.copy(cr).lerp(g.plants[sd + 'H'].cur, K.arms);
       if (this.flinch > 0.01 && K.pitch > 0.5 && sd === 'R') { this.head.getWorldPosition(_c); _c.addScaledVector(this.dirW(-0.3, -0.5, 0.4, _d), 0.32); target.lerp(_c, this.flinch); }   // a hand up over the face
-      const pole = this.T(left * 1.2, 0.7, 0.1, _c).lerp(this.T(left * CRAWL.handPole[0], CRAWL.handPole[1], CRAWL.handPole[2], _d), K.elbows);
+      const pole = this.T(left * 1.2, 0.7, 0.1, _c).lerp(this.T(left * CRAWL.handPole[0] * (1 - 0.75 * this.narrowK), CRAWL.handPole[1], CRAWL.handPole[2], _d), K.elbows);
       r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], target, pole);
       if (!(sd === 'R' && this.flinch > 0.5 && K.pitch > 0.5)) this.layHand(sd, this.dirW(left * lerp(0.75, 0.42, K.arms), -0.06, lerp(0.65, 0.9, K.arms), _e));
     }
@@ -546,14 +546,35 @@ export class Entity {
 
   // how far down it has to come for what hangs over it: a door head (2.03), a fixture, the laundry's ceiling. Sampled along the way it
   // faces, all the way down within 0.7 m of the thing overhead and eased over the 0.5 m either side, so it is low before its crown gets there
+  // (and, low, how much room it has to either side: a hall or a doorway brings the crawl's hands and elbows in)
+  sideRoom(x, z, y0, nx, nz, lo = 0.1, hi = 1.0, from = 0.35) {
+    const cs = this.colliders; if (!cs) return 9;
+    for (let d = from; d <= 0.95; d += 0.1) {
+      const px = x + nx * d, pz = z + nz * d;
+      for (const c of cs) { if (c.on === false || (c.when && !c.when()) || (c.maxY ?? 3) < y0 + lo || (c.minY ?? -0.3) > y0 + hi || (c.dressing && !c.wall)) continue; if (px > c.minX && px < c.maxX && pz > c.minZ && pz < c.maxZ) return d; }
+    }
+    return 9;
+  }
+  // on its feet: how close the walls and the furniture are to either side, from the root and a stride ahead, at the height of its
+  // hanging arms (they reach 0.75 m out); 1 when there is no room to let them hang
+  armRoom() {
+    const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw);
+    let room = 9;
+    for (const s of [0, 0.45, 0.9]) { const x = p.x + fx * s, z = p.z + fz * s; room = Math.min(room, this.sideRoom(x, z, p.y, fz, -fx, 0.5, 2.3, 0.25), this.sideRoom(x, z, p.y, -fz, fx, 0.5, 2.3, 0.25)); }
+    return THREE.MathUtils.clamp((0.95 - room) / 0.35, 0, 1);
+  }
   autoDuck() {
     const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), y0 = p.y;
     let need = 0, narrow = 0;
+    if (this.mode === 'crawl' || this.mode === 'unfold') for (const s of [1.1, 0.4]) {
+      const x = p.x + fx * s, z = p.z + fz * s, room = Math.min(this.sideRoom(x, z, y0, fz, -fx), this.sideRoom(x, z, y0, -fz, fx));
+      narrow = Math.max(narrow, THREE.MathUtils.clamp((0.95 - room) / 0.4, 0, 1));
+    }
     for (let s = -1.2; s <= 1.21; s += 0.1) {
       const clear = headClear(p.x + fx * s, p.z + fz * s, y0 + 0.5, 0.25) - y0; if (clear > 2.95) continue;
       const w = 1 - ss(0.7, 1.2, Math.abs(s));
       need = Math.max(need, THREE.MathUtils.clamp((2.72 - clear) / 0.7, 0, 1) * w);
-      if (clear < 2.3) narrow = Math.max(narrow, w);   // a doorway: the crawl's hands and knees come in
+      if (clear < 2.3) narrow = Math.max(narrow, w);   // a doorway: the crawl's hands and knees come in, the elbows up instead of out
     }
     this.narrowK = narrow;
     return need;
@@ -579,18 +600,17 @@ export class Entity {
       // where the clip put the feet: they stay there while the hips come down
       const feet = this._feet || (this._feet = { L: new V3(), R: new V3(), qL: new THREE.Quaternion(), qR: new THREE.Quaternion() });
       for (const sd of ['L', 'R']) { B[sd + '_Foot'].getWorldPosition(feet[sd]); B[sd + '_Foot'].getWorldQuaternion(feet['q' + sd]); }
-      rr.position.y = -0.4 * dk; rr.updateMatrixWorld(true);
+      rr.position.y = -0.42 * dk; rr.updateMatrixWorld(true);
       this.root.updateMatrixWorld(true);
       for (const sd of ['L', 'R']) {
         const ft = B[sd + '_Foot'];
         r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, feet[sd], this.T((sd === 'L' ? 0.25 : -0.25), 0.9, 1.8, _a));
         r.rotateWorld(ft, _q1.copy(feet['q' + sd]).multiply(ft.getWorldQuaternion(_q2).invert()));   // and turned as the clip had it
       }
-      r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 1.12 * dk);
+      r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 1.2 * dk);
       r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.45 * dk);
       r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], -0.12 * dk);
     }
-    this.plantToes();
     // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0) - this.stun * 0.4);
     r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
@@ -608,6 +628,17 @@ export class Entity {
         r.aim(r.bones[s + '_Forearm'], r.bones[s + '_Hand'], dir, this.reach);
       }
     }
+    // room only for its body: the long arms drawn in, the hands held in front of its hips, the elbows back (a hall, a doorway, beside a
+    // wardrobe), so nothing of it goes into a wall
+    const tuck = this.catchPose || this.reach > 0.2 || this.flinch > 0.3 ? 0 : this.armRoom();
+    this.tuckK = tuck;
+    if (tuck > 0.01) {
+      this.root.updateMatrixWorld(true);
+      const B = r.bones, drop = 0.4 * dk;
+      r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 1, 0], -0.3 * tuck);   // the shoulders drawn in and forward
+      for (const sd of ['L', 'R']) { const left = sd === 'L' ? 1 : -1; r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], this.T(left * 0.17, 1.02 - drop, 0.3, _a), this.T(left * 0.4, 1.5 - drop, -0.8, _b), tuck); }
+    }
+    this.groundFeet(); this.plantToes();
     this.relaxHands(r);
     if (this.post) this.post(r, dt);   // a scene's own pose on top (night one's bedside: an arm reaching a point, the head put somewhere)
     if (this.catchPose) { this.catchFrame(r); this.face(dt); return; }
@@ -627,6 +658,19 @@ export class Entity {
       r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], 0.5 * this.stun);
     }
     this.face(dt);
+  }
+  // on the stairs (or anywhere the floor under a foot is higher than under the root) a foot the clip puts down is lifted onto its step,
+  // the knee bending forward for it
+  groundFeet() {
+    const r = this.rig, B = r.bones, y0 = this.root.position.y;
+    for (const sd of ['L', 'R']) {
+      const ft = B[sd + '_Foot']; if (!ft) continue;
+      ft.getWorldPosition(_a); const g = this.floorAt(_a.x, _a.z);
+      const toe = B[sd + '_Toe0']; let lift = g + 0.165 - _a.y;
+      if (toe) { toe.getWorldPosition(_c); _c.addScaledVector(_d.copy(_c).sub(_a), 0.35); lift = Math.max(lift, this.floorAt(_c.x, _c.z) + 0.035 - _c.y); }   // (the toes over the next step up)
+      if (lift <= 0.003 || g - y0 > 0.6) continue;
+      _a.y += lift; r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, _a, this.T(sd === 'L' ? 0.25 : -0.25, 0.9, 1.8, _b));
+    }
   }
   // the clip's toes now and then dip a little under the boards at the end of a stride: each foot turned up just enough that the ball
   // of the foot rests on the floor, and an ankle that would go under is lifted the same way
@@ -690,16 +734,15 @@ export class Entity {
     if (this.mode === 'lie') {
       const a = -Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
       rr.rotation.set(a, 0, 0); rr.position.set(0, 0.13 - (pr.y * c - pr.z * s), -(pr.y * s + pr.z * c)); rr.updateMatrixWorld(true);
-      r.bend(['L_Thigh', 'R_Thigh'], [1, 1], [1, 0, 0], -1.05); r.bend(['L_Calf', 'R_Calf'], [1, 1], [1, 0, 0], 1.75);
-      r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], 0.25);
+      r.bend(['L_Thigh', 'R_Thigh'], [1, 1], [1, 0, 0], -1.3); r.bend(['L_Calf', 'R_Calf'], [1, 1], [1, 0, 0], 2.25);
+      r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], 0.5);   // the chin down on its chest (the bunk is barely long enough)
       this.relaxHands(r);
-      r.lookAt(this.lookTarget, dt, { yaw: 1.4, pitch: 0.9, speed: 6 });
     } else {
-      const seat = this.seatH ?? 0.47;
+      // (its shins are longer than a chair is high: the hips sit where the feet are flat on the floor, the thighs over the seat)
       rr.rotation.set(0, 0, 0); rr.position.set(0, 0, 0); rr.updateMatrixWorld(true);
       r.bend(['L_Thigh', 'R_Thigh'], [1, 1], [1, 0, 0], -1.5); r.bend(['L_Calf', 'R_Calf'], [1, 1], [1, 0, 0], 1.5);
-      rr.updateMatrixWorld(true); this.local(B.Pelvis, _a);
-      rr.position.y = seat + 0.1 - _a.y; rr.updateMatrixWorld(true);
+      rr.updateMatrixWorld(true); this.local(B.L_Foot, _a);
+      rr.position.y = 0.13 - _a.y; rr.updateMatrixWorld(true);
       r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 0.25);
       if (this.tableH) for (const sd of ['L', 'R']) {
         const left = sd === 'L' ? 1 : -1;
