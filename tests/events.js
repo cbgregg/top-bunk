@@ -320,8 +320,9 @@ async function headlessOne(page, d, night) {
   await section('headless', async () => {
     const out = [], fails = [];
     // night four for the beats of nights two to nine (every stage scare is in by then, Mom's double included), night one for its own;
-    // a fixed seed whose fourth night is a hunted night: its scene is an objective and nothing else takes the bunk or the thing
-    for (const [hash, nightN] of [['#night4&seed=F3PC-0001', 4], ['#night1', 1]]) {
+    // a fixed seed and a hunted night four: its scene is an objective and nothing else takes the bunk or the thing (the type is named, as
+    // the seed's own night four is whatever the story allows there)
+    for (const [hash, nightN] of [['#night4&seed=F3PC-0001&type=hunted', 4], ['#night1', 1]]) {
       const { page, w, ctx } = await nightPage(browser, hash, { init: nightN === 1 ? () => { window.__n1fast = 0.3; } : null });
       if (nightN === 1) await until(page, () => Array.isArray(window.__n1log), null, 60e3);
       await climbDown(page);
@@ -343,7 +344,7 @@ async function headlessOne(page, d, night) {
 
   // ---------- pace: six minutes on night three, walking, then still ----------
   await section('pace', async () => {
-    const SIX = 360, HASH = '#night3&seed=F3PC-0005';   // a fixed seed: night three is a thirst night, whose scene asks nothing of a player in the bunk
+    const SIX = 360, HASH = '#night3&seed=F3PC-0005&type=thirst';   // a fixed seed and a thirst night three, whose scene asks nothing of a player in the bunk
     // the walk
     const A = await nightPage(browser, HASH);
     await climbDown(A.page);

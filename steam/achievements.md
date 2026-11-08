@@ -27,9 +27,9 @@ Players' unlocks are stored under the API name, so keep each name fixed once the
 | `MOVING_DAY` | The third box is put down in your room on moving day. |
 | `NIGHT_1` to `NIGHT_9` | Dawn of that night, at the "You made it" card. |
 | `NIGHT_10` | Any ending, once its end screen is up. |
-| `ENDING_TAKEN` | Night ten ends with three to six pieces of proof found. End screen: "They saw it." |
-| `ENDING_ALONE` | Night ten ends with fewer than three pieces of proof. End screen: "They never believed you." |
-| `ENDING_BELIEVED` | Night ten ends with seven or more pieces of proof and the morning drive away from the house. End screen: "They believed you." |
+| `ENDING_TAKEN` | Night ten ends with Mom or Dad having seen it for themselves (the run's stance is *split*). End screen: "They saw it." |
+| `ENDING_ALONE` | Night ten ends with the parents still dismissing it or blaming you (the stance is *dismiss* or *blame*). End screen: "They never believed you." |
+| `ENDING_BELIEVED` | Night ten ends with the parents believing you (the stance is *believe*) and the morning drive away from the house. End screen: "They believed you." |
 | `THE_DRAWING` | "Look at the drawing" in the hall. |
 | `UNDER_THE_COVERS` | You hide under the covers on the top bunk. |
 | `HIDING_PLACE` | You hide in one of the three closets or behind the shower curtain. |
