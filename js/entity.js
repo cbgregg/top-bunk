@@ -696,7 +696,11 @@ export class Entity {
     }
     // (ahead, only as far as it can go: a door head across a hall, past the wall its line runs into, is not one it will pass under)
     const sc = this.root.scale.y || 1;   // (the heights are its own: the peek's smaller body clears more)
-    const ahead = this.wallAhead(p.x, p.z, y0, fx, fz), reach = ahead - 0.2; this.ahead = ahead; this.wallK = THREE.MathUtils.clamp((1.4 - ahead) / 0.5, 0, 1);
+    const ahead = this.wallAhead(p.x, p.z, y0, fx, fz), reach = ahead - 0.2;
+    // (a door head with the shut door, or the wall, right under it is as much in its face as the wall is: the front door, chained)
+    let face = ahead;
+    for (let s = 0; s < Math.min(ahead, 1.4); s += 0.05) if (headClear(p.x + fx * s, p.z + fz * s, y0 + 0.5, 0.02) - y0 < 2.68 * sc) { if (ahead - s < 0.3) face = s; break; }
+    this.ahead = face; this.wallK = THREE.MathUtils.clamp((1.4 - face) / 0.5, 0, 1);
     for (let s = -1.2; s <= 1.21; s += 0.1) {
       if (s > reach) break;
       // ahead it is down within 0.7 m, eased over the 0.5 m before; behind it comes up again as what hangs there goes 0.27 to 0.5 m back
@@ -749,11 +753,12 @@ export class Entity {
     // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0) - this.stun * 0.4);
     // and if the front of its face would still go on into that wall, its back straightens (or bends back) just enough that it does not
-    if (back > 0.01) {
+    if (back > 0.01) for (let pass = 0; pass < 3; pass++) {
       this.root.updateMatrixWorld(true); this.head.getWorldPosition(_a);
       const p = this.root.position, fx = Math.sin(this.root.rotation.y), fz = Math.cos(this.root.rotation.y);
       const over = (_a.x - p.x) * fx + (_a.z - p.z) * fz + FACE_FRONT - (this.ahead - 0.05);
-      if (over > 0) r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], -Math.min(0.6, over / 1.1));
+      if (over <= 0.005) break;
+      r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], -Math.min(0.4, over / 1.1));
     }
     r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
     if (this.leanSide) r.bend(['Spine', 'Spine1', 'Spine2', 'Neck'], [0.2, 0.25, 0.35, 0.2], [0, 0, 1], this.leanSide);   // leaning out from behind something
