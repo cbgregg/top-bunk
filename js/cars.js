@@ -2,10 +2,10 @@
 // the house, with traffic. Used for the road-trip dream, and for driving away at the end. Car-local axes: +x forward, +y up, +z right.
 import * as THREE from 'three';
 import { loadProp } from './props.js';
-import { carFit } from './traffic.js';
+import { carFit, paintCar, CAR_MODELS } from './traffic.js';
 
 const std = (c, r = 0.8, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
-const NPC_MODELS = ['car_sedan', 'car_pickup', 'car_sedan2', 'car_wagon'];
+const NPC_MODELS = ['car_sedan', 'car_pickup', 'car_sedan2', 'car_wagon', 'car_lt80', 'car_kiri'].filter((n) => CAR_MODELS.includes(n));
 
 // the other cars on the road: a box stand-in that the real model (assets/props/car_*.glb, the same cars traffic.js drives past the house)
 // replaces when it has loaded; both face +x. The tail lights are the one part kept, since they go bright when the traffic brakes
@@ -19,7 +19,7 @@ function makeNpcCar(color, i) {
   g.userData.tail = tail;
   loadProp(NPC_MODELS[i % NPC_MODELS.length]).then((p) => {
     const b = p.box, m = p.scene.clone(true), fit = carFit(p); m.position.set(-(b.min.x + b.max.x) / 2, -fit.floor - 0.005, -(b.min.z + b.max.z) / 2);   // tyres on the road, not the model's box
-    m.traverse((o) => { if (o.isMesh && /bodymat/i.test(o.material.name)) { o.material = o.material.clone(); o.material.color.set(color).multiplyScalar(1.6); } });
+    paintCar(m, color);   // the same paint as the cars past the house (a little over the colour, a clear coat, road dirt low down)
     for (const s of standIn) s.visible = false;
     for (const t of tails) { t.position.x = b.min.x - (b.min.x + b.max.x) / 2 + 0.02; t.position.y = fit.tail; t.position.z = Math.sign(t.position.z) * ((b.max.z - b.min.z) / 2 - 0.32); t.scale.set(1, 0.9, 0.5); }
     g.add(m);
@@ -90,7 +90,7 @@ export function createCar(scene) {
   // the hood ahead, a little shake of the road
   const hood = box(G, 1.2, 0.08, 1.7, std(0x6f2a22, 0.4, 0.3), 2.85, 0.92, 0);
   // ---- outside: the street ----
-  const traffic = []; const colors = [0x2a4a7a, 0x8a8f96, 0x7a1f1f, 0xd9d3c2, 0x2d5a3d, 0x1f1f24, 0xb08a2a];
+  const traffic = []; const colors = [0x2a4a7a, 0x8a8f96, 0x7a1f1f, 0xd9d3c2, 0x2d5a3d, 0x1f1f24, 0x7a6a4a];   // no yellow: that is the school bus, never drawn
   const sceneRoot = new THREE.Group(); scene.add(sceneRoot);
   for (let i = 0; i < 9; i++) { const c = makeNpcCar(colors[i % colors.length], i); sceneRoot.add(c); traffic.push({ g: c, lane: i < 6 ? 1 : -1, off: 0, v: 0, rel: 0 }); c.visible = false; }
 
@@ -100,7 +100,8 @@ export function createCar(scene) {
     // the seat you sit in: back right, or (after the front seats empty) the passenger seat
     eye: new THREE.Vector3(-0.62, 1.0, 0.0), seatName: 'back',
     place(x, z, heading) { car.x = x; car.z = z; car.heading = heading; },
-    show(on) { G.visible = on; for (const t of traffic) t.g.visible = on && t.active !== false; },
+    // on the road the dream drives on through where the firs stand across it at x ±150 (world.js roadEnds): they go while it does
+    show(on) { G.visible = on; for (const t of traffic) t.g.visible = on && t.active !== false; const trees = scene.getObjectByName('roadTreeline'), far = scene.getObjectByName('roadFar'); if (trees) trees.visible = !(on && car.road); if (far) far.visible = !!(on && car.road); },
     setSeat(name) { car.seatName = name; car.eye.set(name === 'front' ? 0.82 : -0.62, name === 'front' ? 1.02 : 1.0, name === 'front' ? 0.42 : 0.0); },
     // world position/yaw of the car, and the camera in it
     apply() { G.position.set(car.x, 0.0, car.z); G.rotation.y = car.heading; },

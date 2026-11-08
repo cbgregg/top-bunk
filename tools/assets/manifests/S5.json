@@ -1,0 +1,5 @@
+[
+  { "name": "car_lt80", "uid": "e2678da920cc4be68dbc193727919ffb", "by": "DanielZhabotinsky", "title": "Fairheaven LT '80 - Low poly model", "tex": 512, "tris": 9000 },
+  { "name": "car_kiri", "uid": "5c17c582ef9549798f694b660feea42a", "by": "DanielZhabotinsky", "title": "Kiri '86 - Low poly model", "tex": 512, "tris": 9000 },
+  { "name": "car_wreck", "uid": "db2df46c49f9441286c84c66208ef7ac", "by": "rashad-brahimli", "title": "Abandoned Generic Sedan 2 - Game Ready", "tex": 512, "tris": 10000 }
+]

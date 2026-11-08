@@ -1,11 +1,14 @@
 // The weather: rain that follows the camera, the ground going wet and dark under it, and on storm nights lightning over the field across the
 // road with the thunder rolling in after it. Which nights are wet comes from the run's seed (weatherFor in director.js).
-// The rain is one cloud of short line streaks in a box around the camera; the shader drops every streak that would fall inside the house or the
-// garage, so from indoors the rain only shows through the windows. Kinds: 'clear' | 'wet' (after a rainy night: the ground still dark) | 'rain' | 'storm'.
+// The rain is one cloud of short line streaks in a box around the camera; the shader drops every streak that would fall under a roof (the
+// boxes in W.rainDiscard: the house, the garage, the truck's box, the silo, the barn, whatever a plugin adds; read again whenever the list
+// grows), so from indoors the rain only shows through the windows; and none below the ground, but for the ditch across the road. Kinds: 'clear' | 'wet' (after a rainy night: the ground still dark) | 'rain' | 'storm'.
 import * as THREE from 'three';
 import { PHONE } from './gfx.js';
+import { DITCH } from './world.js';
 
 const N = PHONE ? 600 : 2400;   // streaks in the cloud
+export const MAX_ROOFS = 12;    // the discard boxes the shader holds
 
 export function createWeather(scene, camera, W, sfx) {
   // ---- the streaks: two vertices each; seed = where in the box, end = top (1) or bottom (0) of the streak, rnd = its own speed ----
@@ -21,6 +24,15 @@ export function createWeather(scene, camera, W, sfx) {
     time: { value: 0 }, center: { value: new THREE.Vector3() }, size: { value: new THREE.Vector3(28, 14, 28) }, fall: { value: 9.5 }, len: { value: 0.45 },
     wind: { value: new THREE.Vector2(0.12, 0.04) }, alpha: { value: 0 }, color: { value: new THREE.Color(0xb9c4d2) },
   }]);
+  // the roofs: box i spans roofLo[i]..roofHi[i] (x, y, z); unused slots are empty boxes
+  uniforms.roofLo = { value: Array.from({ length: MAX_ROOFS }, () => new THREE.Vector3(1e6, 1e6, 1e6)) };
+  uniforms.roofHi = { value: Array.from({ length: MAX_ROOFS }, () => new THREE.Vector3(-1e6, -1e6, -1e6)) };
+  let roofs = -1;
+  const readRoofs = () => {
+    const list = W.rainDiscard || []; roofs = list.length;
+    if (list.length > MAX_ROOFS) console.warn(`rain: ${list.length} roofs, the shader holds ${MAX_ROOFS}`);
+    for (let i = 0; i < MAX_ROOFS; i++) { const b = list[i]; if (b) { uniforms.roofLo.value[i].set(b.minX, b.minY ?? -10, b.minZ); uniforms.roofHi.value[i].set(b.maxX, b.maxY ?? 3.4, b.maxZ); } else { uniforms.roofLo.value[i].set(1e6, 1e6, 1e6); uniforms.roofHi.value[i].set(-1e6, -1e6, -1e6); } }
+  };
   const mat = new THREE.ShaderMaterial({
     uniforms, transparent: true, depthWrite: false, fog: true,
     vertexShader: `
@@ -40,12 +52,11 @@ export function createWeather(scene, camera, W, sfx) {
         #include <fog_vertex>
       }`,
     fragmentShader: `
-      uniform vec3 color; varying float vA; varying vec3 vW;
+      uniform vec3 color; uniform vec3 roofLo[${MAX_ROOFS}], roofHi[${MAX_ROOFS}]; varying float vA; varying vec3 vW;
       #include <fog_pars_fragment>
       void main() {
-        if (vW.y < 0.0) discard;
-        if (vW.y < 3.4 && vW.x > -8.3 && vW.x < 8.3 && vW.z > -4.7 && vW.z < 3.8) discard;        // inside the house
-        if (vW.y < 3.4 && vW.x > -14.2 && vW.x < -7.4 && vW.z > -13.8 && vW.z < -6.8) discard;   // the garage
+        if (vW.y < (vW.z > ${(DITCH.z - DITCH.half).toFixed(2)} && vW.z < ${(DITCH.z + DITCH.half).toFixed(2)} ? -${DITCH.depth.toFixed(2)} : 0.0)) discard;   // the ground (the ditch dips under it)
+        for (int i = 0; i < ${MAX_ROOFS}; i++) { if (all(greaterThan(vW, roofLo[i])) && all(lessThan(vW, roofHi[i]))) discard; }   // under a roof
         gl_FragColor = vec4(color, vA);
         #include <fog_fragment>
       }`,
@@ -89,9 +100,12 @@ export function createWeather(scene, camera, W, sfx) {
       sfx.thunder(delay, gain * (0.5 + 0.5 * Math.max(0, 1 - delay / 5)));
     },
     bolt,
+    // the roofs as the shader has them (tests): [{ lo: [x, y, z], hi: [x, y, z] }]
+    roofs() { readRoofs(); return uniforms.roofLo.value.slice(0, Math.min(roofs, MAX_ROOFS)).map((lo, i) => ({ lo: lo.toArray(), hi: uniforms.roofHi.value[i].toArray() })); },
     // night: whether the stars are meant to be out (they go behind the cloud while it rains)
     update(dt, inside = false, night = false) {
       S.time += dt; S.inside = inside;
+      if ((W.rainDiscard ? W.rainDiscard.length : 0) !== roofs) readRoofs();
       const cloud = S.k > 0.2; if (cloud !== S.cloud || night !== S.night) { S.cloud = cloud; S.night = night; W.stars.visible = W.moon.visible = night && !cloud; }
       const rate = S.goal > S.k ? dt / 7 : dt / 4;   // rain comes on over a few seconds and stops a little faster
       S.k += Math.max(-rate, Math.min(rate, S.goal - S.k));

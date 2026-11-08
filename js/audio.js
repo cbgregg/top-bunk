@@ -17,7 +17,7 @@ const WARM = ['step_wood', 'step_carpet', 'step_tile', 'step_grass', 'step_grave
   'page_turn', 'sub_rumble', 'metal_swell', 'bowed_metal', 'radio_static', 'phone_ring', 'door_slam', 'chair_scrape',
   'ui_tick', 'ui_tone', 'rattle', 'bone_crack', 'floor_slap', 'cloth', 'radio_tune'];   // the menu's two sounds, the catch's, the crawl's set, the radio's tuner
 const LONG = { car_pass: 3, thunder: 4, kettle: 1 };   // keys of long takes: only this many of them are kept in memory
-const SURFACE = { wood: 'step_wood', carpet: 'step_carpet', tile: 'step_tile', gravel: 'step_gravel', grass: 'step_grass', stairs: 'step_stairs' };
+const SURFACE = { wood: 'step_wood', carpet: 'step_carpet', tile: 'step_tile', gravel: 'step_gravel', grass: 'step_grass', stairs: 'step_stairs', asphalt: 'step_tile' };   // sneakers on the road: the hard step
 // how loud each key sits next to the synth it replaces (every take is first evened out, see even())
 const LEVEL = { step_carpet: 1.1, step_tile: 0.72, step_grass: 0.71, step_gravel: 0.65, step_wood: 0.8, step_stairs: 0.8, step_heavy: 1.9, creak: 0.34, creak_heavy: 0.4,
   door_open: 0.35, door_creak: 0.35, door_close: 1.3, door_slam: 1.2, knock: 1.1, clock_tick: 0.43, clock_strike: 3.4, clock_gear: 1.5, heartbeat: 1.4, whisper: 0.42,
