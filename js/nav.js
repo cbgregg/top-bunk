@@ -76,3 +76,42 @@ export function path(from, to, doorClosed = () => false) {
 }
 export function pathLength(p) { let t = 0; for (let i = 1; i < p.length; i++) t += dist(p[i - 1], p[i]); return t; }
 export function edgeDoor(a, b) { const e = ADJ[a].find((x) => x.to === b); return e && e.door; }
+
+// ---------- outside: nowhere out there is safe ----------
+// The porch, the drive down to the mailbox, the yard's far corners, the gate in the west fence, the track and the barn, and the spot 0.6 m
+// outside the front and back doors where the thing stands when it comes after a player who has gone out (js/doors.js, the leash);
+// frontOut is on the front step (its top is 0.14 m up). A kid who comes up out of the cellar finds it at backOut too, on the stoop above
+// him: the cellar stairs (1.07 m between their walls) are narrower than its arms hang. They join the graph at the stoop and the yard's
+// corners. drive2 stands beside the moving truck rather than on the drive (the truck is parked over it), and driveE, garPad and yardSW2
+// are the corners that keep each edge a straight, clear line round the truck, the garage and the trees. The barn's edge goes through its
+// door (W.doors.barn, when the barn is a place; until then nothing stops it).
+// These edges are joined only while the night needs them (outside(true): the player is out, the thing is out after them, or the night
+// has sent them out), so on a night spent indoors the thing never chooses to start at the mailbox and come in through the back door.
+export const OUTSIDE = {
+  porch: [3.1, -5.6], frontOut: [3.1, -5.1, 0.14], drive1: [2.3, -10], driveE: [5.0, -11.0], drive2: [4.75, -20], mailbox: [4.7, -26],
+  garPad: [-4.0, -8.6], yardNW: [-20, 8], yardSW2: [-16, -5.5], gate: [-27, -16],
+  track1: [-36, -15], track2: [-45, -14.1], track3: [-52, -13.2], barnDoor: [-58.0, -12], barnMid: [-64, -12], barnLoft: [-64, -6, 3.2],
+  backOut: [-1.6, 5.27],
+};
+const OUTSIDE_EDGES = [
+  ['frontOut', 'porch'], ['porch', 'drive1'], ['drive1', 'driveE'], ['driveE', 'drive2'], ['drive2', 'mailbox'],
+  ['drive1', 'garPad'], ['garPad', 'yardSW'],
+  ['yardB2', 'yardNW'], ['yardNW', 'yardSW2'], ['yardSW', 'yardSW2'], ['yardSW2', 'gate', 'gate'],
+  ['gate', 'track1'], ['track1', 'track2'], ['track2', 'track3'], ['track3', 'barnDoor'], ['barnDoor', 'barnMid', 'barn'], ['barnMid', 'barnLoft'],
+  ['backOut', 'stoop'],
+];
+for (const k in OUTSIDE) { NODES[k] = OUTSIDE[k]; ADJ[k] = []; }
+const OUT_LINKS = OUTSIDE_EDGES.map(([a, b, door]) => { const d = dist(a, b); return [a, { to: b, d, door }, b, { to: a, d, door }]; });
+let outsideOn = false;
+// join (true) or part (false) the outside edges; returns whether they are joined
+export function outside(on) {
+  on = !!on; if (on === outsideOn) return on;
+  outsideOn = on;
+  for (const [a, ea, b, eb] of OUT_LINKS) {
+    if (on) { ADJ[a].push(ea); ADJ[b].push(eb); }
+    else { const i = ADJ[a].indexOf(ea); if (i >= 0) ADJ[a].splice(i, 1); const j = ADJ[b].indexOf(eb); if (j >= 0) ADJ[b].splice(j, 1); }
+  }
+  return on;
+}
+export const outsideJoined = () => outsideOn;
+export const OUTSIDE_EDGE_LIST = OUTSIDE_EDGES.map((e) => e.slice());
