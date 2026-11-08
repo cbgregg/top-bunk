@@ -20,7 +20,7 @@ import { settings, flicker } from './settings.js';
 import { menu } from './menu.js';
 import { achievements } from './achievements.js';
 import { store } from './store.js';
-import { createHands } from './hands.js';
+import { createHands, printCrop, PRINT_W, PRINT_H, LENS_FOV, FILM } from './hands.js';
 import { createJournal } from './journal.js';
 import { createFirstNight } from './firstnight.js';
 import { createLights } from './lights.js';
@@ -127,27 +127,84 @@ const BATH_I = 95;
 // the flashlight: a spot light carried on the camera (see toggleLight)
 const flash = new THREE.SpotLight(0xfff1d2, 0, 15, 0.5, 0.55, 1.2);
 // the disposable camera: a flash bulb at the lens (always in the scene, dark, so taking a photo never changes the lights and recompiles the
-// shaders), and a grab of the frame it lit, cropped to a print and given a cheap camera's look
-const bulb = new THREE.PointLight(0xfff4e2, 0, 7, 2); scene.add(bulb);
+// shaders) that lights the room for two frames a shot (hands.flashLight, the flash the thing answers), and a grab of the frame it lit,
+// cropped to a print by the finder's own frame (printCrop) and given a cheap camera's look
+const bulb = new THREE.PointLight(0xfff4e2, 0, 7, 2); scene.add(bulb); hands.flashLight = bulb;
+let bulbFrames = 0, bulbHeld = false;   // frames of light left (counted down in handsTick), and night one's longer hold
 function grabPrint() {
-  const src = renderer.domElement, w = 288, h = 216, c = document.createElement('canvas'); c.width = w; c.height = h;
-  const x = c.getContext('2d'), sw = src.width, sh = src.height, k = Math.min(sw / w, sh / h) * 0.8, cw = w * k, ch = h * k;
-  x.filter = 'sepia(0.22) saturate(0.85) contrast(1.08)'; x.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h); x.filter = 'none';
+  const src = renderer.domElement, w = PRINT_W, h = PRINT_H, c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'), r = printCrop(src.width, src.height);
+  x.filter = 'sepia(0.22) saturate(0.85) contrast(1.08)'; x.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, w, h); x.filter = 'none';
   const v = x.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.85); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(10,6,0,0.55)');
   x.fillStyle = v; x.fillRect(0, 0, w, h);
   return c.toDataURL('image/jpeg', 0.62);
 }
-function takePhoto() {
-  bulb.position.copy(camera.position); camera.getWorldDirection(tmp); bulb.position.addScaledVector(tmp, -0.25); bulb.intensity = 3.2;   // a cheap flash: bright up close, gone by the far wall
-  let url = null;
-  // F.flashFx (night one): something is put into the print before it is taken, and into the room for the flash after it
+// a shot: through the finder at the eye, or from the chest when the camera is not up (a hip shot: the camera where the right hand carries
+// it, looking where you look, the print tilted 6-10 degrees). One exposure off the roll (RUN.film; at none, the dead click and no print),
+// refused while it winds on, the print kept with the run (RUN.photos) and any proof inside the print's own frame within 3 m taken as proof.
+// The run's first shot logs 'firstShot'. Returns the print (a jpeg data url) or null.
+const shotPos = new V3(), shotQ = new THREE.Quaternion(), saveQ = new THREE.Quaternion(), saveP = new V3(), shotCam = new THREE.PerspectiveCamera();
+let lastShot = null;
+function filmLeft() { return Number.isFinite(RUN.film) ? RUN.film : FILM; }
+function takePhoto({ hip = false } = {}) {
+  if (!hands.canShoot) return null;
+  if (filmLeft() <= 0) { if (!sfx.pick('switch', { gain: 0.25, rate: 0.6, wet: 0.02, maxLen: 0.4 })) sfx.click(); return null; }   // the wheel will not turn: a dead click
+  RUN.film = filmLeft() - 1;
+  // where the print is taken from: the eye, or the chest, and the lens's own field of view either way
+  const tilt = hip ? (6 + Math.random() * 4) * (Math.random() < 0.5 ? -1 : 1) * Math.PI / 180 : 0;
+  camera.updateMatrixWorld();
+  if (hip) hands.hipPose(camera, shotPos, shotQ, tilt); else { camera.getWorldPosition(shotPos); camera.getWorldQuaternion(shotQ); }
+  const shot = makeShot(shotPos, shotQ, hip, tilt);
+  bulb.position.copy(shotPos); tmp.set(0, 0, -1).applyQuaternion(shotQ); bulb.position.addScaledVector(tmp, -0.25); bulb.intensity = 3.2;   // a cheap flash: bright up close, gone by the far wall
+  // F.flashFx (night one) and F.printFx (the photo beats): something is put into the print before it is taken, and into the room for the
+  // flash after it
   if (F.flashFx) F.flashFx('print');
-  try { camera.updateMatrixWorld(); gfx.render(0); url = grabPrint(); } catch (e) { url = null; }   // the frame the flash lit, read before the browser shows it (the hands are drawn after it, so they are not in the print)
+  F.printFx?.('print', shot);
+  let url = null;
+  const fov0 = camera.fov; saveP.copy(camera.position); saveQ.copy(camera.quaternion);
+  try {
+    camera.position.copy(shotPos); camera.quaternion.copy(shotQ); camera.fov = LENS_FOV; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    gfx.render(0); url = grabPrint();   // the frame the flash lit, read before the browser shows it (the hands are drawn after it, so they are not in the print)
+  } catch (e) { url = null; } finally { camera.position.copy(saveP); camera.quaternion.copy(saveQ); camera.fov = fov0; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); }
   const held = F.flashFx ? F.flashFx('after') : 0;   // how long the flash shows it (ms)
-  hands.snap();
+  F.printFx?.('after', shot);
+  hands.snap(); hands.flashFrames = 0; hands.flashAt = gameTime; hands.flashPos = bulb.position.clone();
+  bulbFrames = 2;
+  if (held) { bulbHeld = true; setTimeout(() => { bulbHeld = false; bulb.intensity = 0; }, held); }
   UI.flash(settings.get('reduceFlashing') ? 'rgba(255,250,240,0.45)' : held ? 'rgba(255,250,240,0.6)' : 'rgba(255,250,240,0.95)', held ? 0.35 : 0.5); sfx.shutter(); sfx.winder();
-  setTimeout(() => { bulb.intensity = 0; }, held || 120);
+  // kept: every shot goes in the run with the others; the first of the run teaches a rule
+  if (!(RUN.shots > 0)) log.push({ id: 'firstShot', seen: true, how: hip ? 'hip' : 'finder' });
+  RUN.shots = (RUN.shots || 0) + 1;
+  if (url) (RUN.photos ||= {})['shot' + RUN.shots] = url;
+  shot.url = url; shot.kinds = proofInShot(shot); lastShot = shot;
+  if (nights && nights.proof && nights.proof.accept) nights.proof.accept(shot);
+  else for (const k of shot.kinds) proofTaken(k, url);
+  if (nights && nights.stage && nights.stage.photoTaken) nights.stage.photoTaken();   // a crumpled thing in the flash answers it
+  saveRun();
   return url;
+}
+// what a shot saw: the print's own frame (the centre crop of the lens's view) as a frustum, and a test for a point in it within reach
+function makeShot(pos, q, hip, tilt) {
+  const aspect = camera.aspect, c = printCrop(innerWidth, innerHeight), fx = c.w / innerWidth, fy = c.h / innerHeight;
+  const fov = 2 * Math.atan(Math.tan(LENS_FOV * Math.PI / 360) * fy) * 180 / Math.PI;
+  shotCam.fov = fov; shotCam.aspect = aspect * fx / fy; shotCam.near = 0.05; shotCam.far = 30; shotCam.position.copy(pos); shotCam.quaternion.copy(q);
+  shotCam.updateProjectionMatrix(); shotCam.updateMatrixWorld(true);
+  const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(shotCam.projectionMatrix, shotCam.matrixWorldInverse));
+  const p0 = pos.clone(), q0 = q.clone();
+  return { t: gameTime, pos: p0, quat: q0, fov: LENS_FOV, printFov: fov, aspect: shotCam.aspect, hip, tilt, frustum,
+    sees: (p, reach = 3) => p0.distanceTo(p) <= reach && frustum.containsPoint(p) && !sightBlocked(p0.x, p0.z, p.x, p.z) };
+}
+// the proof in a shot: what is out tonight and not yet kept, inside the print's frame within 3 m
+function proofInShot(shot) {
+  if (!nights || !nights.proof || !nights.proof.shown) return [];
+  const have = RUN.evidence || [];
+  return nights.proof.shown().filter((k) => !have.includes(k) && nights.proof.defs[k] && shot.sees(new V3(...nights.proof.defs[k].at)));
+}
+// kept as proof, the way the proof photo keeps one (until the proof system takes a shot itself: nights.proof.accept)
+function proofTaken(k, url) {
+  const d = nights.proof.defs[k];
+  (RUN.evidence ||= []).push(k); (RUN.evidenceAt ||= {})[k] = F.night || RUN.night || 1; if (url) (RUN.photos ||= {})[k] = url;
+  UI.print(url, d.cap); if (d.took) d.took();
 }
 // the journal (js/journal.js): it writes itself from what happens; J, the right stick pressed in, the pause menu or the notebook on a touch screen
 const journal = createJournal({ RUN, save: () => saveRun(), sfx: { pageTurn: () => sfx.pageTurn() },
@@ -287,18 +344,22 @@ function confirmPress() {
 }
 const canLook = () => !paused && !F.cutscene && !F.dead && (P.mode === 'walk' || P.mode === 'bunk' || P.mode === 'hide' || P.mode === 'car' || P.mode === 'seat' || P.mode === 'lie');
 function lookBy(dyaw, dpitch) { if (!canLook()) return; P.yaw += dyaw * look.s; P.pitch = clamp(P.pitch + dpitch * look.s * look.y, -1.45, 1.45); }
-// the disposable camera up to the eye, or back down (the camera key and Y toggle; the right mouse button can hold it up instead)
-function cameraKey(how = 'toggle') {
-  if (!(uiMode === 'playing' && P.mode === 'walk' && !F.cutscene && hasCamera())) return;
-  if (how === 'toggle' || (how === 'up') !== hands.cameraOut) hands.toggleCamera();
+// the thing in the hand (js/hands.js): switch the flashlight and the camera, and use whichever is out (the aim is held: handsTick reads it)
+const inPlay = () => (uiMode === 'playing' || uiMode === 'test') && !F.cutscene && !F.dead;
+function switchItem() { if (inPlay()) hands.switchItem(); }
+function useItem() {
+  if (!inPlay()) return;
+  const r = hands.use();
+  if (r === 'light') toggleLight();
+  else if (r === 'shot' || r === 'hip') takePhoto({ hip: r === 'hip' });
 }
 // the journal button (J, View, the notebook) toggles: from the journal it goes back to the game
 function toggleJournal() { if (uiMode === 'pause' && menu.state.open.includes('journal')) setPause(false); else openJournal(); }
 initInput({
   interact: () => { if (uiMode === 'playing') pressE = true; }, pause: () => setPause(uiMode === 'playing'), confirm: confirmPress, lookBy,
-  light: () => toggleLight(), camera: cameraKey, cancel: () => { if (hands.cameraOut) cameraKey('down'); },
+  light: () => toggleLight(), switch: switchItem, use: useItem, cancel: () => hands.cancel(),
   cover: () => { if (canBunkCover()) hideUnderCovers(); }, photos: () => openPhotos(), journal: toggleJournal,
-  cameraUp: () => hands.raised,   // the touch USE button shows the shutter while the camera is up
+  cameraUp: () => hands.raised,   // the touch USE button shows the shutter while the camera is up (USE is the shutter while aiming)
 });
 // the controls table and the "begin" line follow whichever device you last used
 function renderControls() {
@@ -665,7 +726,7 @@ function movePlayer(dt) {
   let wx = fx * f + rx * s, wz = fz * f + rz * s; const wl = Math.hypot(wx, wz), mag = Math.min(1, wl);   // a gentle stick push walks slowly
   if (wl > 0) { wx /= wl; wz /= wl; }
   const sprint = input.down('sprint') && wl > 0 && f > 0 && !P.carrying && !P.exhausted && P.stamina > 0.01;
-  const speed = (P.carrying ? 1.6 : sprint ? 4.4 : 2.0) * (0.35 + 0.65 * mag);   // m/s: kept slow so the house takes a while to cross
+  const speed = (P.carrying ? 1.6 : sprint ? 4.4 : 2.0) * (0.35 + 0.65 * mag) * hands.walkK;   // m/s: kept slow so the house takes a while to cross (slower while aiming)
   P.sprinting = sprint;
   if (sprint) P.stamina -= dt / 6; else P.stamina = Math.min(1, P.stamina + dt / 4);
   if (P.stamina <= 0.01 && !P.exhausted) { P.exhausted = true; sfx.gasp(); }
@@ -750,7 +811,8 @@ function handheld(dt) {
   F.fear = Math.max(0, F.fear - dt * 0.12);
   const want = baseFov + (P.sprinting && walk > 0.5 ? 6 : 0) - F.fear * 5 + (P.mode === 'hide' ? -6 : 0) + fovOff;
   fovNow += (want - fovNow) * Math.min(1, dt * 4);
-  if (Math.abs(camera.fov - fovNow) > 0.05) { camera.fov = fovNow; camera.updateProjectionMatrix(); }
+  const fv = lensFov();   // with the camera up, the finder's
+  if (Math.abs(camera.fov - fv) > 0.05 || (hands.zoom >= 1 && camera.fov !== fv)) { camera.fov = fv; camera.updateProjectionMatrix(); }
 }
 
 // ---------- getting caught, and starting over ----------
@@ -1347,16 +1409,33 @@ function loop(now) {
 }
 // the disposable camera is the kid's once Mom has given it to him (RUN.hasCamera); older saves, and any night from the second on, have it
 function hasCamera() { return RUN.hasCamera !== false || (RUN.night || 1) >= 2; }
+// Grandpa's flashlight is his from the first dinner (moving day's evening): every night has it, and every day after moving day
+function hasTorch() { return F.phase === 'night' || (RUN.night || 1) >= 2 || !!RUN.dayDone; }
+// the view through the camera's finder: the player's field of view narrows to the lens's as the camera comes up to the eye (hands.zoom)
+const lensFov = () => (hands.zoom > 0 ? lerp(fovNow, LENS_FOV, hands.zoom) : fovNow);
+let zoomWas = 0, beamWas = 0;
 function handsTick(dt) {
   if (started && nights && F.live) {
     if (P.mode === 'hide' && P.pod && nights.hunter.busy && nights.hunter.state === 'search') journal.learn('still');
   }
   const holding = P.mode === 'hide' && (input.down('breath') || breathLatch);
-  const hidden = !started || paused || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || P.mode === 'seat' || (uiMode !== 'playing' && uiMode !== 'test');
+  const hidden = !started || F.cutscene || F.dead || P.mode === 'cine' || P.mode === 'car' || P.mode === 'seat' || (uiMode !== 'playing' && uiMode !== 'test' && uiMode !== 'pause');
   const walk = P.mode === 'walk' ? Math.min(1, P.speed / 2.2) : 0;
-  hands.update(dt, camera, { hasCamera: hasCamera(), cameraNear: !!(nights && nights.proof && nights.proof.near && F.live && nights.proof.near(P.pos)), keepCamera: !!F.photoHold, mode: P.mode, pod: P.pod, flashOn: F.flashOn && flash.intensity > 0, holding, fear: F.fear, walk, bob: P.bob, hidden: hidden && !hands.busy, world: scene, blocked: sightBlocked, outdoors: roomAt(P.pos.x, P.pos.z, P.pos.y) === 'out', night: F.phase === 'night' });
-  // the beam comes out of the torch in the hand when it shows, else from beside the eye
-  if (F.flashOn && hands.visible()) hands.lens(flash.position); else flash.position.set(0.12, -0.14, 0);
+  hands.update(dt, camera, { hasCamera: hasCamera(), hasTorch: hasTorch(), film: filmLeft(), torchPin: !!settings.get('torchPin'), aim: input.down('aim'), sprint: !!P.sprinting, breath: input.down('breath'),
+    cutscene: !!F.cutscene, dead: !!F.dead, frozen: paused, mode: P.mode, pod: P.pod, flashOn: F.flashOn && flash.intensity > 0, holding, fear: F.fear, walk, bob: P.bob, hidden, world: scene, blocked: sightBlocked, outdoors: roomAt(P.pos.x, P.pos.z, P.pos.y) === 'out', night: F.phase === 'night' });
+  // the beam comes out of the torch in whichever hand has it when it shows, else from beside the eye; aimed, it narrows and reaches further
+  if (F.flashOn && hands.torchShown) hands.lens(flash.position); else flash.position.set(0.12, -0.14, 0);
+  flash.target.position.copy(hands.beamDir(tmp)).multiplyScalar(3);
+  const b = hands.beam;
+  flash.angle = 0.5 + (0.32 - 0.5) * b; flash.distance = 15 * (1 + 0.5 * b);
+  if (F.flashOn && flash.intensity > 0 && (b > 0 || beamWas > 0)) flash.intensity = 26 * (1 + 0.35 * b);
+  beamWas = b;
+  // the finder's field of view, settled in the same frame as the raise that set it
+  if (started && (hands.zoom > 0 || zoomWas > 0)) { const fv = lensFov(); if (camera.fov !== fv && (Math.abs(camera.fov - fv) > 0.05 || hands.zoom >= 1)) { camera.fov = fv; camera.updateProjectionMatrix(); } }
+  zoomWas = hands.zoom;
+  // the camera's flash: two frames of light, then dark (night one's flash holds a little longer, by its own timer)
+  if (bulbFrames > 0) { bulbFrames--; hands.flashFrames = (hands.flashFrames || 0) + 1; }
+  else if (!bulbHeld && bulb.intensity > 0) bulb.intensity = 0;
 }
 
 // ---------- the boot, behind the loading screen ----------
@@ -1475,6 +1554,6 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 requestAnimationFrame(loop);
 boot();
-window.__game = { cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
+window.__game = { cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, useItem, switchItem, get lastShot() { return lastShot; }, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
   // the boundaries, for tests/sweep.js: the module, the bodies, the player's step and the camera, driven a frame at a time with the loop frozen
   collide, PB, keys, movePlayer, updateCamera, resolvePlayer, toggleDoor, climbUp, climbDown, hideUnderCovers, toBunk, car, LIE, LADDER_MID, LADDER_FLOOR, CLIMB_WP1, CLIMB_WP2, LEAN_OUT, LEAN_DOWN, EYE, R, stepTimers: (dt) => { gameTime += dt; runTimers(); } };

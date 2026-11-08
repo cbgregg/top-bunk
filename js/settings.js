@@ -7,15 +7,19 @@ const KEY = 'topbunk.settings';
 // mouse buttons) and the controller (Standard-mapping button numbers: 0 A · 1 B · 2 X · 3 Y · 4 LB · 5 RB · 6 LT · 7 RT · 8 View ·
 // 9 Start · 10 L3 · 11 R3 · 12-15 the d-pad; LS / RS the sticks). js/input.js reads it live, so a remap shows up in every prompt,
 // the Controls table and the bedtime cartoon at once. The action names are the contract every module reads by.
+// What is in the hand works like a tool in a shooter: switch (flashlight <-> camera; the mouse wheel too), aim (held: the torch up and
+// its beam narrow, the camera to the eye), use (the light on or off, or the shutter), and the light on its own button whichever hand has it.
 export const DEFAULT_BINDINGS = {
   move: { kb: ['WASD', 'Arrows'], pad: ['LS'] },
   look: { kb: ['Mouse'], pad: ['RS'] },
-  sprint: { kb: ['ShiftLeft', 'ShiftRight'], pad: [7, 10] },
-  interact: { kb: ['KeyE', 'Mouse0'], pad: [0, 2] },
-  camera: { kb: ['KeyC', 'Mouse2'], pad: [3, 13] },
-  light: { kb: ['KeyF'], pad: [5, 12] },
-  breath: { kb: ['Space'], pad: [6, 4] },
-  cancel: { kb: ['KeyC', 'Mouse2'], pad: [1] },
+  sprint: { kb: ['ShiftLeft', 'ShiftRight'], pad: [10] },
+  interact: { kb: ['KeyE'], pad: [0, 2] },
+  switch: { kb: ['KeyQ', 'KeyC'], pad: [3] },
+  aim: { kb: ['Mouse2'], pad: [6] },
+  use: { kb: ['Mouse0'], pad: [7] },
+  light: { kb: ['KeyF'], pad: [12] },
+  breath: { kb: ['Space'], pad: [5, 4] },
+  cancel: { kb: [], pad: [1] },
   journal: { kb: ['KeyJ', 'Tab'], pad: [8] },
   pause: { kb: ['Escape'], pad: [9] },
   menuUp: { kb: ['ArrowUp', 'KeyW'], pad: [12] },
@@ -47,6 +51,8 @@ const copyBindings = (b) => { const o = {}; for (const a in b) o[a] = { kb: [...
 // (or a stick's name); a slot that is not one of those falls back to the default
 const cleanBindings = (v) => {
   const out = copyBindings(DEFAULT_BINDINGS); if (!v || typeof v !== 'object') return out;
+  if (!('use' in v)) return out;   // saved before the tool in the hand had aim and use: that layout put sprint and breath on the triggers
+
   for (const a of ACTIONS) {
     const e = v[a]; if (!e || typeof e !== 'object') continue;
     if (Array.isArray(e.kb)) { const kb = e.kb.filter((c) => typeof c === 'string' && c).slice(0, 2); if (kb.length) out[a].kb = kb; }
