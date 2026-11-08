@@ -677,6 +677,8 @@ let BASE = '';
     // the world only through js/hooks.js and W.plugin, never by editing update() or build()
     await check(17, 'doors', async () => {
       const src = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+      // walk forward until the player gets there (or `ms` of wall time passes): a busy machine draws fewer frames, so a fixed hold covers less
+      const walkUntil = async (page, fn, ms) => { await page.keyboard.down('KeyW'); try { await until(page, fn, null, ms); } catch (e) { /* judged by the caller */ } finally { await page.keyboard.up('KeyW'); } };
       const doorsSrc = src('js/doors.js'), mainSrc = src('js/main.js'), worldSrc = src('js/world.js');
       const upd = (mainSrc.match(/\nfunction update\(dt\) \{[\s\S]*?\n\}\n/) || [''])[0];
       ok(/W\.plugin\(/.test(doorsSrc) && /export function tick\(/.test(doorsSrc) && /export function install\(/.test(doorsSrc), 'js/doors.js: no install(game) with W.plugin, or no tick');
@@ -723,19 +725,19 @@ let BASE = '';
         await stand(page, -1.6, 3.3, -1.6, 4.67);
         await until(page, () => window.__game.W.doors.back.a === 1, null, 10e3);
         const d = await door('back'); ok(d.target === 1 && !d.on, `back door: ${JSON.stringify(d)}`);
-        await hold(page, 'KeyW', 1800);
+        await walkUntil(page, () => window.__game.P.pos.z > 5.4, 15e3);
         const z = await page.evaluate(() => window.__game.P.pos.z);
         ok(z > 5.2, `walking through the open back door reached only z ${z.toFixed(2)}`);
         // from the stoop west down the outside stairs to the foot, then the basement door
         await stand(page, -1.83, 5.3, -3.8, 5.3);
-        await hold(page, 'KeyW', 3600);
+        await walkUntil(page, () => { const p = window.__game.P.pos; return p.y < -2.3 && p.x < -6.3; }, 25e3);
         const f = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y }));
         ok(f.y < -2.2 && f.x < -6.0, `the outside stairs: ${JSON.stringify(f)}`);
         await page.evaluate(() => { window.__game.P.yaw = 0; window.__game.P.pitch = 0; }); await sleep(500);
         ok((await prompt(page)) === 'E Open the door', `basement door prompt "${await prompt(page)}"`);
         await page.keyboard.press('KeyE');
         await until(page, () => window.__game.W.doors.basement.a === 1, null, 10e3);
-        await hold(page, 'KeyW', 1800);
+        await walkUntil(page, () => window.__game.P.pos.z < 4.0, 15e3);
         const p = await page.evaluate(() => ({ x: window.__game.P.pos.x, y: window.__game.P.pos.y, z: window.__game.P.pos.z }));
         const room = await roomAt(page, p.x, p.z, p.y);
         ok(room === 'laundry' && p.z < 4.3, `through the basement door: ${JSON.stringify(p)} in ${room}`);
