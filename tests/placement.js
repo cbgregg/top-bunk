@@ -22,6 +22,8 @@ const FRONT = {
 const IN_WALL = new Set(['outlet', 'switch', 'clock_wall']);
 // pairs that are meant to overlap in their boxes (a chair pushed under a table, a lamp on a desk, a pc on a desk)
 const TUCKED = [['chair', 'table_round'], ['office_chair', 'desk'], ['crt_pc', 'desk'], ['desk_lamp', 'desk'], ['table_lamp', 'dresser'], ['kettle', 'stove'], ['pot', 'stove'], ['tv', 'table'], ['teddy', 'bunk']];
+// buildings: models whose box holds other things and their own walls (the barn since it became a place, js/barn.js); only the floor is checked
+const SHELL = new Set(['barn']);
 // models set down below the floor on purpose (the truck on its tyres, the barn on its sill): tests/sunk/*.json, each { modelName: metres its
 // lowest point may lie under the floor }, merged in file-name order so a later file overrides an earlier one (keys starting with _ are notes)
 const SUNK = {};
@@ -81,13 +83,13 @@ const SUNK = {};
     const a = items[i], b = items[j], ox = ov(a, b, 0), oy = ov(a, b, 1), oz = ov(a, b, 2);
     if (ox <= TOL || oy <= TOL || oz <= TOL) continue;
     const rests = Math.abs(a.min[1] - b.max[1]) < 0.02 || Math.abs(b.min[1] - a.max[1]) < 0.02;
-    if (rests || tucked(a, b)) continue;
+    if (rests || tucked(a, b) || SHELL.has(a.name) || SHELL.has(b.name)) continue;
     const vol = ox * oy * oz;
     add(vol > 0.01 ? 'high' : 'low', a.room, `${a.name} (${a.x}, ${a.z}) x ${b.name} (${b.x}, ${b.z})`, 'models cut into each other', `overlap ${ox.toFixed(2)} x ${oy.toFixed(2)} x ${oz.toFixed(2)} m`);
   }
   // b: models into walls
   for (const a of items) {
-    if (a.inWall) continue;
+    if (a.inWall || SHELL.has(a.name)) continue;
     for (const w of walls) {
       if (a.max[1] < w[4] || a.min[1] > w[5]) continue;
       const ox = Math.min(a.max[0], w[1]) - Math.max(a.min[0], w[0]), oz = Math.min(a.max[2], w[3]) - Math.max(a.min[2], w[2]);
@@ -107,7 +109,7 @@ const SUNK = {};
   });
   // d: fronts toward the room
   for (const a of items) {
-    if (!a.front) continue;
+    if (!a.front || SHELL.has(a.name)) continue;
     // the wall its back is against: within 0.35 m and running along most of the model's width (a wall end beside it does not count); in a
     // corner the wall its front points away from is the one that counts
     let best = null;

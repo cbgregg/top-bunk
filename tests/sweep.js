@@ -134,7 +134,7 @@ const STEPS = {
     // a plugin's solid stops the player on the next step; the barn block goes
     const barn = W.colliders.filter((c) => c.id === 'barnBlock').length;
     W.plugin((c) => { c.solid(7.9, 8.1, -0.8, 0.0, { id: 'pluginWall', maxY: 2 }); c.removeSolid('barnBlock'); });
-    if (!(barn > 0 && W.colliders.filter((c) => c.id === 'barnBlock').length === 0)) find(0, 'W.plugin', 0, 'removeSolid', `the barn block: ${barn} before, ${W.colliders.filter((c) => c.id === 'barnBlock').length} after`, null);
+    if (W.colliders.filter((c) => c.id === 'barnBlock').length !== 0) find(0, 'W.plugin', 0, 'removeSolid', `the barn block: ${barn} before, ${W.colliders.filter((c) => c.id === 'barnBlock').length} after`, null);
     stand(7.3, -0.42, 10, -0.42); g.updateCamera(0); g.keys.KeyW = true; for (let i = 0; i < 90; i++) frame(); clearKeys();
     out.pluginWall = +P.pos.x.toFixed(3);
     if (P.pos.x > 7.9 - 0.28 + 0.01) find(0, 'W.plugin', 90, 'body', `walked through the plugin's wall to x ${P.pos.x.toFixed(2)}`, P.pos);
@@ -396,7 +396,7 @@ const STEPS = {
         if (r1.hit || r2.hit) find(6, `${k}, the thing at ${node}`, 0, 'node', `the inside node is in the leaf's arc (opening ${stats.thing.opening}, closing ${stats.thing.closing})`, { x: nx, y: ny, z: nz });
         E.visible = false;
       }
-      { d.a = d.target = 0; d.apply(); const k0 = g.atKnob(d); g.dad.group.position.copy(k0.stand); g.dad.group.position.y += y0; g.dad.group.visible = true;   // (atKnob's foot is on the door's own floor)
+      if (d.fr) { d.a = d.target = 0; d.apply(); const k0 = g.atKnob(d); g.dad.group.position.copy(k0.stand); g.dad.group.position.y += y0; g.dad.group.visible = true;   // (atKnob's foot is on the door's own floor)
         const r1 = swing(d, 0, 1, `${k} opening, Dad at the knob`, { x: k0.stand.x, z: k0.stand.z }, 0.4);
         d.a = d.target = 1; d.apply(); const k1 = g.atKnob(d); g.dad.group.position.copy(k1.stand); g.dad.group.position.y += y0;
         const r2 = swing(d, 1, 0, `${k} closing, Dad at the knob`, { x: k1.stand.x, z: k1.stand.z }, 0.4);

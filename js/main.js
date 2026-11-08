@@ -292,7 +292,7 @@ const windowSpots = W.windows.filter((w) => w.pane).map((w) => w.pane.getWorldPo
 let roomT = 0;
 function hearRoom(dt) {   // the room you are in sets the reverb and the beds; outside, how near the road is; inside, how near a window
   roomT -= dt;
-  const room = roomAt(P.pos.x, P.pos.z, P.pos.y);
+  const room = W.barn && W.barn.inside(P.pos.x, P.pos.z) ? 'barn' : roomAt(P.pos.x, P.pos.z, P.pos.y);   // the barn is a room of its own to the ear (js/barn.js)
   if (room === sfx.room && roomT > 0) return;
   roomT = 0.5;
   if (room === 'out') sfx.setRoom(room, { road: Math.abs(camera.position.z + 30.5) });
@@ -1526,7 +1526,7 @@ async function boot() {
   bindBreakfast({ THREE, V3, W, F, P, E, mom, dad, scene, camera, sfx, UI, nights, talkNow, addI, EYE, HIDE_YAW, tmp,
     wait, waitFor, later, tween, ease, lerp, lerpAngle, angDiff, clamp, say, setPhase, sleepers, resetNight, toBunk, panFor, get gameTime() { return gameTime; } });
   // 0. the modules hook in (js/hooks.js): each one's install(game) runs once, here, with the world built and before the game can start
-  hooks.install({ W, F, P, RUN, E, camera, scene, sfx, lights, nights, hunter: nights.hunter, gaze: nights.stage.gaze, events, log, UI, input, settings, mom, dad, hands, journal, menu, hooks });
+  hooks.install({ W, F, P, RUN, E, camera, scene, sfx, lights, nights, hunter: nights.hunter, gaze: nights.stage.gaze, events, log, UI, input, settings, mom, dad, hands, journal, menu, hooks, addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); } });   // addI/removeI: a module's own things to use (the barn door)
   // 1. the files: done when three's manager has nothing in flight and nothing new has started for a moment (a model's textures come after it)
   // (counted in polls, not by the clock: the trailer's renderer stops the clocks)
   let idle = 0, last = -1;
