@@ -341,16 +341,21 @@ function nlMult(m, flick = true) {
   }
 }
 
-// Mom and Dad sleep in their bed at night (flat on their backs: the standing model laid down); they are awake and upright otherwise.
-function sleepers(on) {
-  for (const [p, spot] of [[mom, W.parentsBed.mom], [dad, W.parentsBed.dad]]) {
+// Mom and Dad sleep in their bed at night (flat on their backs: the standing model laid down, person.inBed); they are awake and upright
+// otherwise. only: 'mom' or 'dad' alone, the other left as they are (one of them back to bed, or up). From here js/parents.js animates
+// them in bed (the roll-overs, an arm out, sitting up, getting up and back in) and is told each time a night lays them down.
+function sleepers(on, only = null) {
+  for (const [name, p, spot] of [['mom', mom, W.parentsBed.mom], ['dad', dad, W.parentsBed.dad]]) {
+    if (only && only !== name) continue;
     p.sleeping = on; p.busy = on || p.busy && false; p.pose = null; p.setNight(on);
     // asleep: the rig lies on its back with its head on the pillow, under the quilt (the quilt's ridges follow them), in a sleeping pose
-    if (on) { p.group.visible = true; p.group.rotation.order = 'YXZ'; p.group.rotation.set(-Math.PI / 2, spot.yaw ?? Math.PI / 2, 0); p.group.position.set(spot.x, spot.y, spot.z);
-      { const toFoot = new V3(0, -1, 0).applyEuler(p.group.rotation); toFoot.y = 0; p.group.position.addScaledVector(toFoot.normalize(), p === dad ? 0.16 : 0.1); p.group.position.y += 0.02; } p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }   // (toward the foot so the head clears the headboard - Dad is taller - and 2 cm up so it rests on the pillow, not in the mattress)
+    // (toward the foot so the head clears the headboard - Dad is taller - and 2 cm up so it rests on the pillow, not in the mattress)
+    if (on) { p.group.visible = true; p.inBed(spot, { toFoot: p === dad ? 0.16 : 0.1 }); p.lookAt = null; p.pose = { sleep: p === mom ? 1 : -1 }; if (p.rig) p.rig.play('idle', { fade: 0, speed: 0.05 }); }
     else if (p.group.rotation.order === 'YXZ') { p.group.rotation.order = 'XYZ'; p.group.rotation.set(0, 0, 0); }
+    if (only) W.bedSleepers.one(name, on);
   }
-  W.bedSleepers.set(on);
+  if (!only) W.bedSleepers.set(on);
+  if (hooks.parents.laid) hooks.parents.laid(on, only);
 }
 
 // ---------- phases (lighting) ----------
@@ -877,20 +882,50 @@ async function startGame() {
 // ---------- the family at work: Dad carries boxes in from the truck and unpacks them, Mom unpacks the kitchen ----------
 const rampY = (x, z) => (W.TRUCK && W.TRUCK.rampY ? W.TRUCK.rampY(x, z) : 0);   // the ramp (4.3 m, from the sill at z -14.5 to the gravel), then the bed's floor; fades out at the ramp's sides (no step up or down). The same ramp is the player's floor through W.groundAt
 
+// someone walks a list of points. Each step is swept against the bodies (collide.js) before it is taken: with you standing in the way
+// (the front door, a doorway) they stop and wait where they are, the walk held, and go on once you have moved; nobody is ever pushed
+// through. The routes themselves are laid clear of the walls and the furniture
+function walkBlocked(who, x, z) {
+  const me = who === mom ? 'mom' : who === dad ? 'dad' : null;
+  for (const b of collide.bodies) {
+    if (b.id === me || b.kind !== 'player' || (b.active && !b.active())) continue;
+    const r = (collide.body(me) || { r: 0.35 }).r + b.r, g = who.group.position, now = Math.hypot(b.pos.x - g.x, b.pos.z - g.z), then = Math.hypot(b.pos.x - x, b.pos.z - z);
+    if (then < r && then < now + 1e-4) return b;   // (stepping away from someone already that close is allowed)
+  }
+  return null;
+}
 async function walkTo(who, pts, speed = 1.25) {
   const run = chore.run, g = who.group.position;
+  let stride = 0, held = false;
+  const hold = (on) => { if (on === held) return; held = on; if (who.rig) { if (on) idle(who); else who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 }); } };
+  // one step toward (x, z), unless it would walk into you
+  const step = (x, z) => {
+    if (walkBlocked(who, x, z)) { hold(true); return; }
+    hold(false);
+    const moved = Math.hypot(x - g.x, z - g.z); g.x = x; g.z = z; g.y = rampY(g.x, g.z);
+    if ((stride += moved) > 0.72) { stride = 0; stepSound(g); }
+  };
   for (const p of pts) {
     if (!stillOn(run)) return false;
     const x0 = g.x, z0 = g.z, d = Math.hypot(p.x - x0, p.z - z0);
     if (d < 0.03) continue;
-    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed, turnT = Math.min(dur, 0.25 + Math.abs(angDiff(yaw0, want)) * 0.3); let stride = 0;   // a turn takes time in proportion to its angle
-    if (who.rig) who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 }); who.walking = speed / 1.25;
+    const yaw0 = who.group.rotation.y, want = Math.atan2(p.x - x0, p.z - z0), dur = d / speed, turnT = Math.min(dur, 0.25 + Math.abs(angDiff(yaw0, want)) * 0.3);   // a turn takes time in proportion to its angle
+    if (who.rig) who.rig.play('walk', { fade: 0.25, speed: speed / 1.25 }); who.walking = speed / 1.25; held = false;
     await htween(who, dur, (k) => {
       if (!stillOn(run)) return;
-      g.x = x0 + (p.x - x0) * k; g.z = z0 + (p.z - z0) * k; g.y = rampY(g.x, g.z);
-      if ((stride += speed * 0.0167) > 0.72) { stride = 0; stepSound(g); }
+      step(x0 + (p.x - x0) * k, z0 + (p.z - z0) * k);
       who.group.rotation.y = lerpAngle(yaw0, want, ease.inOut(Math.min(1, k * dur / turnT)));
     }, ease.lin);
+    // held up on the way: the rest of the leg once the way is clear
+    let last = gameTime;
+    while (Math.hypot(p.x - g.x, p.z - g.z) > 0.01) {
+      await waitFor(() => gameTime > last); if (!stillOn(run)) return false;
+      const dt = gameTime - last; last = gameTime;
+      if (who.held) continue;
+      const left = Math.hypot(p.x - g.x, p.z - g.z), k = Math.min(1, speed * dt / left);
+      step(g.x + (p.x - g.x) * k, g.z + (p.z - g.z) * k);
+    }
+    hold(false);
   }
   who.walking = 0;
   if (!stillOn(run)) return false;
