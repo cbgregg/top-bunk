@@ -51,8 +51,9 @@ const OUTDOOR = new Set(['out', 'stoop', 'garage']);
 const SIDE = {
   front: { free: null }, back: { free: [0, 1] }, basement: { free: [0, -1], y: -2.4 }, garage: { free: [0, -1] },
 };
-// where the thing stands for the leash, by the door you came out of (nav.js: 0.6 m out from each door's middle)
-const LEASH = { front: 'frontOut', back: 'backOut', basement: 'cellarOut' };
+// where the thing stands for the leash, by the door you came out of (nav.js: 0.6 m out from each door's middle). Out of the cellar door
+// it is the stoop above you: the stairwell (1.07 m between its walls) is narrower than its arms hang
+const LEASH = { front: 'frontOut', back: 'backOut', basement: 'backOut' };
 
 let G = null, T = 0, LINES = {};
 // timers on the game's clock (they stop with the pause and are dropped with the night)
@@ -298,10 +299,20 @@ export function leash(door = 'back') {
   if (hunter.state !== 'away') hunter.vanish(false);
   hunter.sight(spot.id, { dur: 3, lookTime: 0.6, then: 'hunt', chase: true, chaseDist: 2.4, tilt: 0.35 });
   E.root.position.set(spot.x, spot.y, spot.z); E.faceTowards(P.pos.x, P.pos.z, 1);
+  const e = E.root.position;
+  S.lastLeash = { door, at: { x: spot.x, y: spot.y, z: spot.z }, e: [e.x, e.y, e.z], yaw: E.root.rotation.y, visible: E.visible, state: hunter.state, player: { x: P.pos.x, z: P.pos.z }, out: S.outT, t: T, night: F.night };
   S.leashAt = T; S.outT = 0;
-  S.lastLeash = { door, at: { x: spot.x, y: spot.y, z: spot.z }, player: { x: P.pos.x, z: P.pos.z }, t: T, night: F.night };
   G.log.push({ id: 'leash', seen: false, how: door, p: { x: spot.x, z: spot.z } });
   return S.lastLeash;
+}
+
+// the front step under the thing: the floor model (W.groundAt) has no step at the front door, so a thing put there for the leash, or
+// running off it after you, would stand with its feet in the concrete; it is kept on the step's top (0.14 m, the lower step 0.07)
+const STEP = [2.05, 4.15, -6.0, -4.55];
+function stepTick() {
+  const E = G.E, p = E.root.position;
+  if (!E.visible || G.F.dead || p.y < -0.5 || !inside(STEP, p.x, p.z)) return;
+  const top = p.z > -5.6 ? 0.14 : 0.07; if (p.y < top) p.y = top;
 }
 
 // the thing's outside paths are joined while the night is out there: the player is out, it is out after them, or the night opened it
@@ -351,7 +362,7 @@ export function tick(dt) {
   }
   if (F.phase === 'night') {
     const fr = G.W.doors.front; if (fr && fr.max !== CHAIN) fr.max = CHAIN;
-    beatsTick(); chainTick(dt); refusalTick(); forestCatchTick(); leashTick(dt); navTick();
+    beatsTick(); chainTick(dt); refusalTick(); forestCatchTick(); leashTick(dt); navTick(); stepTick();
   } else if (nav.outsideJoined()) nav.outside(false);
   dimTick(dt);
 }

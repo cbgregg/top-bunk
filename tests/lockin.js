@@ -333,30 +333,21 @@ const SCENES = {
     const { pg, ctx, errs } = await night('#night3&type=hunted');
     try {
       await quiet(pg); await climbDown(pg); await pg.evaluate(lib);
-      await pg.evaluate(() => {   // watch every frame: the thing's position, facing and state from the moment the leash is set
-        const g = window.__game; window.__seen = { states: [], first: null };
-        const step = async () => {
-          const st = (await import('/js/doors.js')).test.state, s = g.nights.hunter.state;
-          if (window.__seen.states[window.__seen.states.length - 1] !== s) window.__seen.states.push(s);
-          if (st.lastLeash && !window.__seen.first) { const e = g.E.root.position; window.__seen.first = { t: g.gameTime, e: [e.x, e.y, e.z], yaw: g.E.root.rotation.y, p: [g.P.pos.x, g.P.pos.z], visible: g.E.visible }; }
-          if (!window.__seen.stop) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-      });
-      const t0 = await pg.evaluate(() => window.__game.gameTime);
       await stand(pg, 3.1, -5.6, 3.1, -12);
-      await until(pg, () => !!window.__seen.first, null, 30e3);
-      await playFor(pg, 1.5);
-      const r = await pg.evaluate(() => { window.__seen.stop = true; return { ...window.__seen, front: [window.__game.W.doors.front.mid.x, window.__game.W.doors.front.mid.z] }; });
-      const f = r.first, dt = f.t - t0, want = [r.front[0], r.front[1] - 0.6];
-      ok(dt <= 2.0, `the leash took ${dt.toFixed(2)} s`);
+      await until(pg, () => !!window.__lock.doors.test.state.lastLeash, null, 30e3);
+      const L = await pg.evaluate(() => { const g = window.__game, d = g.W.doors.front; return { ...window.__lock.doors.test.state.lastLeash, front: [d.mid.x, d.mid.z] }; });
+      await until(pg, () => { const g = window.__game; return g.nights.hunter.state === 'hunt' || g.F.dead; }, null, 15e3);
+      const after = await pg.evaluate(() => ({ state: window.__game.nights.hunter.state, dead: window.__game.F.dead }));
+      const want = [L.front[0], L.front[1] - 0.6], f = L;
+      ok(L.out <= 2.0, `the leash took ${L.out.toFixed(2)} s outside`);
       ok(Math.hypot(f.e[0] - want[0], f.e[2] - want[1]) < 0.05, `the thing at (${f.e[0].toFixed(2)}, ${f.e[2].toFixed(2)}), want 0.6 m outside the front door (${want[0].toFixed(2)}, ${want[1].toFixed(2)})`);
-      const face = Math.atan2(f.p[0] - f.e[0], f.p[1] - f.e[2]); let dy = face - f.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+      ok(Math.abs(f.e[1] - 0.14) < 0.005, `the thing should stand on the front step's top (0.14 m), not in it: y ${f.e[1].toFixed(3)}`);
+      const face = Math.atan2(f.player.x - f.e[0], f.player.z - f.e[2]); let dy = face - f.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
       ok(Math.abs(dy) < 0.2 && f.visible, `facing the player: off by ${dy.toFixed(2)} rad, visible ${f.visible}`);
-      const si = r.states.indexOf('sight'), hi = r.states.indexOf('hunt');
-      ok(si >= 0 && hi > si, `sight then hunt: ${r.states.join(' > ')}`);
+      ok(L.door === 'front' && L.state === 'sight', `the leash: by the ${L.door} door, the thing in "${L.state}" (want sight)`);
+      ok(after.state === 'hunt' || after.dead, `then the hunt: ${JSON.stringify(after)}`);
       ok(!errs.length, `page errors: ${errs.slice(0, 2).join(' | ')}`);
-      return `placed after ${dt.toFixed(2)} s at (${f.e[0].toFixed(2)}, ${f.e[2].toFixed(2)}) facing the player (${dy.toFixed(2)} rad); ${r.states.join(' > ')}`;
+      return `placed after ${L.out.toFixed(2)} s outside, at (${f.e[0].toFixed(2)}, ${f.e[1].toFixed(2)}, ${f.e[2].toFixed(2)}) on the step facing the player (${dy.toFixed(2)} rad); sight, then ${after.dead ? 'the hunt caught them' : 'hunt'}`;
     } finally { await ctx.close(); }
   },
 
