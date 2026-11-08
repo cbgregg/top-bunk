@@ -16,6 +16,7 @@
 //           line, and parents.js never mentions the thing's lure lines (mom/n1_call_*)
 //   bed     night two, three minutes of them asleep at __clockMul 1: each turns over at least once and Dad's arm comes out once; the quilt's
 //           rise over each of them moves with the body (within 3 cm); two renders from their door two seconds apart differ at the ridge
+// Each night is played as the quiet type (#nightN&type=quiet), so no night's own scene takes the house while the parents are measured.
 //   node tests/parents.js [--port N] [--only dad,bunk,pod,mom,rules,bed] [--base <rev>]   (--base: the revision whose update() is F0's)
 const http = require('http');
 const fs = require('fs');
@@ -89,7 +90,7 @@ const stand = (page, x, z, tx, tz) => page.evaluate(([x, z, tx, tz]) => {
 }, [x, z, tx, tz]);
 // sample the parents every quarter second until done() says so (or the time is up): what was seen on the way
 async function follow(page, done, ms = 120e3) {
-  const t0 = Date.now(), seen = { strip: false, door: false, eAtUp: null, torchOnMom: false, samples: 0 };
+  const t0 = Date.now(), seen = { strip: false, door: false, eAtUp: null, eAfterUp: false, torchOnMom: false, samples: 0 };
   for (;;) {
     const s = await P(page, (par, g) => {
       const d = g.W.doors.parents, t = par.test.stats;
@@ -98,6 +99,7 @@ async function follow(page, done, ms = 120e3) {
     seen.samples++;
     if (s.strip) seen.strip = true; if (s.door) seen.door = true;
     if (s.up && seen.eAtUp === null) seen.eAtUp = s.eVis;
+    if (s.up && s.eVis) seen.eAfterUp = true;
     if (s.mom !== 'asleep' && s.mom !== 'day' && s.torch) seen.torchOnMom = true;
     if (await P(page, done)) break;
     if (Date.now() - t0 > ms) throw new Error('timed out following the parents: ' + JSON.stringify(s));
@@ -109,7 +111,7 @@ const nightRec = (page, n) => page.evaluate((n) => { const r = window.__game.RUN
 
 // ---------- the scenes ----------
 async function dadKitchen(browser) {
-  const { page, w, ctx } = await nightPage(browser, '#night3');
+  const { page, w, ctx } = await nightPage(browser, '#night3&type=quiet');
   try {
     await quiet(page);
     await stand(page, 1.5, 2.6, 0.5, 1.0);
@@ -117,6 +119,7 @@ async function dadKitchen(browser) {
     await P(page, (par, g) => { g.E.root.position.set(3.6, 0, 3.9); g.E.visible = true; g.E.mode = 'idle'; });
     await P(page, (par) => par.noise(6, { x: 1.5, z: 2.6 }, 'test'));
     const seen = await follow(page, (par) => { const t = par.test.stats; return t.foundAt != null || (t.up && par.state('dad') === 'asleep'); }, 150e3);
+    await P(page, (par) => new Promise((res) => { const t0 = Date.now(), poll = () => (par.test.stats.said.includes('dad/n3_e') || Date.now() - t0 > 15000 ? res() : setTimeout(poll, 200)); poll(); }));
     const st = await P(page, (par, g) => { const t = par.test.stats; return { up: t.up, foundAt: t.foundAt, arrivedAt: t.arrivedAt, maxPen: t.maxPen, penAt: t.penAt, entered: t.enteredAt, blamed: g.RUN.story && g.RUN.story.blamed, said: t.said, states: t.states, eVis: g.E.visible }; });
     const rec = await nightRec(page, 3);
     ok(seen.strip, 'the light never showed under their shut door');
@@ -127,16 +130,17 @@ async function dadKitchen(browser) {
     const took = st.foundAt - st.up.at; ok(took <= 25, `he took ${took.toFixed(1)} s to reach you`);
     ok(rec && rec.woke[0] && rec.woke[0].found === true, 'woke[0].found is not true: ' + JSON.stringify(rec && rec.woke));
     ok(st.blamed === 1, 'RUN.story.blamed is ' + st.blamed);
-    ok(seen.eAtUp === false || seen.eAtUp === null ? true : false, 'the thing was still showing when he got up');
-    ok(st.entered && st.entered.eVisible === false, 'the thing was showing when he came into your room: ' + JSON.stringify(st.entered));
+    // the thing (shown in the kitchen beforehand) gone from the moment he got up, so it was gone before he came anywhere near your room
+    ok(!seen.eAfterUp, 'the thing was showing while he was up');
+    ok(!st.entered || st.entered.eVisible === false, 'the thing was showing when he came into your room: ' + JSON.stringify(st.entered));
     ok(rec.log.some((e) => e.id === 'dadWalk'), "the log has no 'dadWalk'");
     ok(st.said.includes('dad/n3_b'), 'he said nothing to you: ' + st.said.join(','));
     clean(w);
-    return `found in ${took.toFixed(1)} s, worst depth ${(st.maxPen * 100).toFixed(2)} cm, said ${st.said.join(' ')}, the thing gone (${st.entered.room})`;
+    return `found in ${took.toFixed(1)} s, worst depth ${(st.maxPen * 100).toFixed(2)} cm, said ${st.said.join(' ')}, the thing gone from his getting up (${seen.samples} samples)`;
   } finally { await ctx.close(); }
 }
 async function dadBunk(browser) {
-  const { page, w, ctx } = await nightPage(browser, '#night3');
+  const { page, w, ctx } = await nightPage(browser, '#night3&type=quiet');
   try {
     await quiet(page);
     await until(page, () => window.__game.P.mode === 'bunk', null, 30e3);
@@ -153,7 +157,7 @@ async function dadBunk(browser) {
   } finally { await ctx.close(); }
 }
 async function dadPod(browser) {
-  const { page, w, ctx } = await nightPage(browser, '#night3');
+  const { page, w, ctx } = await nightPage(browser, '#night3&type=quiet');
   try {
     await quiet(page);
     await stand(page, 8.14, 1.6, 8.14, 0.8);
@@ -169,7 +173,7 @@ async function dadPod(browser) {
   } finally { await ctx.close(); }
 }
 async function momNight5(browser) {
-  const { page, w, ctx } = await nightPage(browser, '#night5');
+  const { page, w, ctx } = await nightPage(browser, '#night5&type=quiet');
   try {
     await quiet(page);
     await stand(page, 10.46, -3.0, 10.46, -3.9);
@@ -177,7 +181,7 @@ async function momNight5(browser) {
     await until(page, () => window.__game.P.mode === 'hide' && window.__game.P.pod === 'closet_spare', null, 20e3);
     await P(page, (par) => par.noise(14, { x: -2.2, z: 1.14 }, 'test'));
     // she gets up, goes to your door, searches, and sits on your bunk
-    const seen = await follow(page, (par) => par.test.stats.momSat != null || par.state('mom') === 'asleep', 300e3);
+    const seen = await follow(page, (par) => par.test.stats.momSat != null || (par.test.stats.up && par.state('mom') === 'asleep'), 300e3);
     let st = await P(page, (par) => { const t = par.test.stats; return { up: t.up, first: t.firstGoal, atDoor: t.momAtDoor, sat: t.momSat, said: t.said.slice(), states: t.states }; });
     ok(st.up && st.up.who === 'mom', 'Mom did not get up: ' + JSON.stringify(st.up) + ' ' + st.states.join(' > '));
     ok(!seen.torchOnMom, 'a torch was lit while Mom was up');
@@ -198,8 +202,9 @@ async function momNight5(browser) {
       const cam = g.camera, probe = collide.eyeProbe(cam, { mode: 'lie' });
       // the real surfaces: rays from the eye every way, against every mesh near it (the people's skin by their bones)
       const ray = new THREE.Raycaster(); ray.near = 0; ray.far = 0.13; let hit = null;
-      const near = []; g.scene.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && o.visible && o.geometry && o.geometry.boundingSphere !== undefined) { o.geometry.computeBoundingSphere(); const s = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld); if (s.distanceToPoint(cam.position) < 0.13) near.push(o); } });
-      for (let i = 0; i < 200 && !hit; i++) { const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, d = new THREE.Vector3(Math.sqrt(1 - u * u) * Math.cos(a), u, Math.sqrt(1 - u * u) * Math.sin(a)); ray.set(cam.position, d); const h = ray.intersectObjects(near, false)[0]; if (h) hit = { what: h.object.name || h.object.geometry.type, d: h.distance }; }
+      const shown = (o) => { for (let n = o; n; n = n.parent) if (!n.visible) return false; return true; };
+      const near = []; g.scene.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && shown(o) && o.geometry && o.geometry.boundingSphere !== undefined) { o.geometry.computeBoundingSphere(); const s = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld); if (s.distanceToPoint(cam.position) < 0.13) near.push(o); } });
+      for (let i = 0; i < 200 && !hit; i++) { const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, d = new THREE.Vector3(Math.sqrt(1 - u * u) * Math.cos(a), u, Math.sqrt(1 - u * u) * Math.sin(a)); ray.set(cam.position, d); const h = ray.intersectObjects(near, false)[0]; if (h) { let n = h.object, path = []; for (let i = 0; n && i < 4; i++, n = n.parent) path.push(n.name || n.type); hit = { what: h.object.geometry.type + ' in ' + path.join('/'), d: h.distance }; } }
       let bone = Infinity; for (const p of [g.mom, g.dad]) p.rig.root.traverse((b) => { if (b.isBone) { const r = /Head/.test(b.name) ? 0.1 : /Spine|Pelvis/.test(b.name) ? 0.13 : 0.05; bone = Math.min(bone, b.getWorldPosition(new THREE.Vector3()).distanceTo(cam.position) - r); } });
       return { mode: g.P.mode, pen: probe.pen, hit, bone, said: par.test.stats.said.slice(-3), mom: par.state('mom') };
     });
@@ -220,7 +225,7 @@ async function rules(browser) {
   ok(!/n1_call/.test(pj), 'parents.js names the lure lines (mom/n1_call_*)');
   ok(!/\bfunction update\(dt\)[^]*?main\.js/.test('') && !/from '\.\/main\.js'/.test(pj) && !/__game/.test(pj), 'parents.js reaches into main.js');
   // night three: one wake, then nothing past 0.8 gets him up again
-  let { page, w, ctx } = await nightPage(browser, '#night3');
+  let { page, w, ctx } = await nightPage(browser, '#night3&type=quiet');
   let out = '';
   try {
     await quiet(page);
@@ -237,7 +242,7 @@ async function rules(browser) {
     clean(w); out += 'one wake on night three; ';
   } finally { await ctx.close(); }
   // night seven: x1.3 after a wake (0.9 is not enough, 1.2 is), and the thing gone from his beam without a flicker
-  ({ page, w, ctx } = await nightPage(browser, '#night7'));
+  ({ page, w, ctx } = await nightPage(browser, '#night7&type=quiet'));
   try {
     await quiet(page);
     await until(page, () => window.__game.P.mode === 'bunk', null, 30e3);
@@ -272,7 +277,7 @@ async function rules(browser) {
 }
 async function bed(browser) {
   // three minutes of night two at __clockMul 1, the frame running: the roll-overs, the arm, the quilt following each body
-  const { page, w, ctx } = await nightPage(browser, '#night2');
+  const { page, w, ctx } = await nightPage(browser, '#night2&type=quiet');
   try {
     await quiet(page);
     await until(page, () => window.__game.P.mode === 'bunk', null, 30e3);

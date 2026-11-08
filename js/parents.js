@@ -474,7 +474,7 @@ function plan(par, to) {
   const pts = pull(occ, [{ x: g.x, z: g.z }, ...path.slice(1)]);
   // the first shut door on the way: the route stops at it
   let prev = { x: g.x, z: g.z };
-  for (let i = 0; i < pts.length; i++) { const on = doorsOn(prev, pts[i]); if (on.length) return { door: on[0].d, occ }; prev = pts[i]; }
+  for (let i = 0; i < pts.length; i++) { const on = doorsOn(prev, pts[i]); if (on.length) return { door: on[0].d, from: prev, occ }; prev = pts[i]; }   // (from: the side it is come to from)
   return { pts, occ };
 }
 
@@ -517,13 +517,14 @@ function footstep(g) {
 }
 // walk to a point: planned on the grid, a shut door on the way opened by its knob (the slide door by its pull), held while you stand in
 // the way; false when the way could not be found or the night moved on
-async function goTo(par, to, { speed = SPEED[par.who], near = 0.12 } = {}) {
+// (doors: false for the walk to a door's own knob, which never goes through another door first)
+async function goTo(par, to, { speed = SPEED[par.who], near = 0.12, doors = true } = {}) {
   const tok = TOK;
   for (let tries = 0; tries < 6; tries++) {
     if (par.halt) return false;
     const g = par.p.group.position; if (Math.hypot(to.x - g.x, to.z - g.z) <= near) return true;
     const pl = plan(par, to); if (!pl) return false;
-    if (pl.door) { if (!(await openDoor(par, pl.door)) || tok !== TOK) return false; continue; }
+    if (pl.door) { if (!doors || !(await openDoor(par, pl.door, pl.from)) || tok !== TOK) return false; continue; }
     par.walk = { pts: pl.pts, i: 0, speed, done: null, held: 0, blocked: 0, stride: 0 };
     stats.walks++;
     const ok = await until(() => par.walk.done !== null || par.halt);
@@ -558,12 +559,13 @@ function atKnob(d, reach = 0.4) {
 }
 // the side of a door's wall line a point is on (the knob's own side for a hinged door is its hall face)
 function sideOf(d, x, z) { const c = d.col, alongX = c.maxX - c.minX > c.maxZ - c.minZ; return alongX ? Math.sign(z - d.mid.z) : Math.sign(x - d.mid.x); }
-async function openDoor(par, d) {
-  const tok = TOK, g = par.p.group.position, p = par.p;
+// (from: a point on the side it is come to from, on the way: the door's wall line runs on past other rooms on both sides)
+async function openDoor(par, d, from = null) {
+  const tok = TOK, g = from || par.p.group.position, p = par.p;
   if (d.slide) {
     // the barn door: from inside their room the flush pull (near the leaf's shut edge), from the dining room the handle
     const inside = sideOf(d, g.x, g.z) < 0, c = d.col, pullZ = (c.minZ + 0.16), st = inside ? new V3(c.minX - 0.42, 0, pullZ + 0.17) : new V3(c.maxX + 0.45, 0, pullZ + 0.15);
-    if (!(await goTo(par, st, { near: 0.08 })) || tok !== TOK) return false;
+    if (!(await goTo(par, st, { near: 0.08, doors: false })) || tok !== TOK) return false;
     await turnTo(par, inside ? st.x + 1 : st.x - 1, st.z, 0.4); if (tok !== TOK) return false;
     const pull = () => new V3(inside ? c.minX - 0.03 : c.maxX + 0.07, 1.08, d.hz - (d.slide.half - 0.16) + d.slide.open[1] * d.slide.travel * d.a);
     const pose = p.pose = { ...(p.pose || {}), L: { reach: pull(), palm: 'fwd', grip: 0.75 } };
@@ -576,11 +578,16 @@ async function openDoor(par, d) {
     return until(() => d.a >= Math.min(d.max ?? 1, 1) - 0.02 || d.blocked, 2.5);
   }
   const k = atKnob(d);
-  // on the side the leaf swings away from: stand at the knob; on the other side the knob's twin, the leaf coming toward him
+  // on the side the leaf swings away from: stand at the knob (main.js's atKnob). On the side it swings toward: past the latch, beyond
+  // the leaf's reach, the arm out to the knob, so the opening leaf comes round in front of him and never into him
   const here = sideOf(d, g.x, g.z), hall = sideOf(d, k.stand.x, k.stand.z);
   let st = k.stand, knob = k.knob;
-  if (here !== hall) { const n = new V3(d.mid.x - k.stand.x, 0, d.mid.z - k.stand.z); st = new V3(d.mid.x + n.x, 0, d.mid.z + n.z); knob = new V3(k.knob.x + (d.mid.x - k.knob.x) * 2 * 0, 0.98, k.knob.z); }
-  if (!(await goTo(par, st, { near: 0.1 })) || tok !== TOK) return false;
+  if (here !== hall) {
+    const c = d.col, alongX = c.maxX - c.minX > c.maxZ - c.minZ, along = new V3(Math.cos(d.rotC), 0, -Math.sin(d.rotC)), n = alongX ? new V3(0, 0, here) : new V3(here, 0, 0);
+    st = new V3(d.hx, 0, d.hz).addScaledVector(along, (d.w || 0.81) + 0.36).addScaledVector(n, 0.3);
+    knob = new V3(d.hx, 0.98, d.hz).addScaledVector(along, 0.72).addScaledVector(n, 0.06);
+  }
+  if (!(await goTo(par, st, { near: 0.1, doors: false })) || tok !== TOK) return false;
   await turnTo(par, knob.x, knob.z, 0.4); if (tok !== TOK) return false;
   const pose = p.pose = { ...(p.pose || {}), L: { reach: knob.clone(), palm: 'fwd', grip: 0.85 } };
   if (!(await wait(0.4))) return false;
@@ -963,14 +970,14 @@ async function upMom(par) {
   const spots = SEARCH.map((id) => new V3(NODES[id][0], 0, NODES[id][1]));
   let hidden = 0, calls = 0, nextCall = T, lastT = T;
   const tick = () => {
-    if (inPod()) hidden += T - lastT; lastT = T;   // the seconds of her search you have spent hidden
+    if (inPod()) hidden += T - lastT; lastT = T; stats.momHidden = hidden;   // the seconds of her search you have spent hidden
     if (T >= nextCall) { say(par, MOM_CALLS[calls++ % 2]); nextCall = T + 4; }
     return false;
   };
   for (let i = 0; tok === TOK; i = (i + 1) % spots.length) {
     if (outside()) { par.rec.outside = true; await momOutside(par); return; }
     let seen = false;
-    const w = walking(par, spots[i], { near: 0.3 });
+    const w = walking(par, spots[i], { near: 0.3 }); stats.momSpot = SEARCH[i];
     await until(() => { tick(); if (sees(par)) { seen = true; return true; } return hidden >= MOM_HIDDEN || outside() || w.done; }, 40);
     await w.stop(); if (tok !== TOK) return;
     if (seen) { await blame(par); return; }
@@ -1054,7 +1061,7 @@ async function handoff(par) {
 function kidInBed() {
   // (lying, the view turns 1.25 rad either side of the way the body faces, main.js; toward the foot of the bed that leaves it looking a
   // little toward Dad's back)
-  const bed = bedOf(), pos = bed.group.localToWorld(new V3(0.0, 0.84, 0.76)), foot = bed.group.localToWorld(new V3(0.0, 0.84, -0.4));
+  const bed = bedOf(), pos = bed.group.localToWorld(new V3(0.0, 0.875, 0.74)), foot = bed.group.localToWorld(new V3(0.0, 0.875, -0.4));
   const yawTo = Math.atan2(-(foot.x - pos.x), -(foot.z - pos.z));
   return { pos, yaw: Math.max(yawTo, -1.2), pitch: -0.12 };
 }
