@@ -1,7 +1,8 @@
 // a shroud of black smoke over a figure: soft dark billboards born on its limbs that swell, drift up and out and die, so the body
 // under them reads as a shape in the dark and not as a man in clothes. One instanced draw; the anchors are bones (or any objects),
 // each particle sits a little off the line from its anchor to the next, and the drift and the fade run on the card from a seed and
-// the clock. Count scales with the graphics preset; 'low' draws none.
+// the clock. Count scales with the graphics preset (entity.js WISPS: 'low' still draws a few hundred, the phone 120); the anchors are
+// the bones, so the wisps go wherever the pose puts them (down on the floor with the crawl).
 import * as THREE from 'three';
 
 let smokeTex = null;

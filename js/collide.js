@@ -20,11 +20,18 @@ export const bodies = [];
 export const NEAR = 0.13;        // how close the eye may come to anything (the near plane's corner reach at 70 degrees, 16:9)
 export const PLAYER_R = 0.28, PLAYER_H = 1.6;
 const LEAF_T = 0.03;             // half the leaf's thickness plus a hair: a body touching a shut door's strip (0.32 from the wall line) does not count as hit
-// the thing's extents by pose, from the collision audit: the radius round the root and the height of the crown. The creature package
-// fills in the rest (crumple, crawl, peek, lie, sit); until then a pose it does not know uses the standing extents
+// the thing's extents by pose: the radius round the root and the height of its highest point, measured from its skinned vertices
+// (tests/sweep_thing.js). The low and lying poses reach well ahead of or behind the root, so they are given as circles along it
+// ([ahead, radius], ahead in the root's own frame, turned by yaw) instead of one circle round the root
 export const POSES = {
-  idle: { r: 0.61, h: 2.66 }, walk: { r: 0.86, h: 2.66 }, run: { r: 1.06, h: 2.63 },
-  crumple: { r: 1.45, h: 1.26 }, crawl: { r: 1.34, h: 1.4 }, peek: { r: 0.84, h: 1.77 },
+  idle: { r: 0.76, h: 2.66 }, walk: { r: 0.86, h: 2.66 }, run: { r: 1.06, h: 2.63 },   // standing, the long arms hang 0.75 out
+  crumple: { r: 0.72, h: 1.27, circles: [[0.3, 0.72]] },                            // knees under it, hands on the floor beside them: 0.92 ahead, 0.31 behind, 0.68 to a side
+  crawl: { r: 0.62, h: 1.0, circles: [[1.05, 0.62], [0, 0.5], [-0.75, 0.45]] },     // hands 1.66 ahead, feet 1.12 behind, elbows 0.7 out above the hands, the crown under 0.95
+  unfold: { r: 0.62, h: 1.72, circles: [[0.3, 0.72], [1.05, 0.62], [-0.75, 0.45]] },
+  peek: { r: 0.42, h: 1.92 },                                                        // at 0.72 scale, behind a jamb, leaning out
+  lie: { r: 0.5, h: 0.75, circles: [[-0.85, 0.45], [0.15, 0.5]] },                  // on its back, knees up: the crown 1.4 behind the root
+  sit: { r: 0.65, h: 1.95 },
+  crouch: { r: 0.75, h: 1.95 },                                                      // the duck held all the way (crown 1.95)
 };
 // what hangs over the floor: boxes { minX, maxX, minZ, maxZ, y0, y1, id } (door heads, joists, the arch, the ceilings) and spheres
 // { x, y, z, r, id } (the light fixtures' domes)
@@ -241,8 +248,16 @@ export function eyeClear(camera, opts = {}) {
 // does `pose` (a key of POSES) stand clear at (x, z) on its floor, with headroom for its crown? yaw is kept for the fuller shapes to come
 export function fits(pose, x, z, yaw = 0, { y, skip = null } = {}) {
   const ext = POSES[pose] || POSES.idle, y0 = y ?? S.groundAt(x, z, 0);
-  if (probe(x, z, ext.r, y0, ext.h, skip).pen > 0) return false;
-  return headClear(x, z, y0, Math.min(ext.r, 0.3)) >= y0 + ext.h;
+  // (the thing's own bodies never count against it)
+  const self = (b) => b === skip || b.kind === 'thing';
+  for (const [ahead, r] of ext.circles || [[0, ext.r]]) {
+    const cx = x + Math.sin(yaw) * ahead, cz = z + Math.cos(yaw) * ahead;
+    for (const c of S.colliders) { if (!active(c) || !onFloor(c, y0, ext.h)) continue; if (boxPen(c, cx, cz, r) > 0) return false; }
+    for (const k in S.doors) { const s = leafOf(S.doors[k]); if (!s || !leafOnFloor(s, y0, ext.h)) continue; if (r + s.t - segNear(s, cx, cz).d > 0) return false; }
+    for (const o of bodies) { if (self(o) || !isOn(o) || !sameFloor(o.pos.y, y0)) continue; if (r + o.r - Math.hypot(cx - o.pos.x, cz - o.pos.z) > 0) return false; }
+    if (headClear(cx, cz, y0, Math.min(r, 0.3)) < y0 + ext.h) return false;
+  }
+  return true;
 }
 
 // a name for a shape in a report
