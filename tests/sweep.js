@@ -396,7 +396,7 @@ const STEPS = {
         if (r1.hit || r2.hit) find(6, `${k}, the thing at ${node}`, 0, 'node', `the inside node is in the leaf's arc (opening ${stats.thing.opening}, closing ${stats.thing.closing})`, { x: nx, y: ny, z: nz });
         E.visible = false;
       }
-      { d.a = d.target = 0; d.apply(); const k0 = g.atKnob(d); g.dad.group.position.copy(k0.stand); g.dad.group.position.y += y0; g.dad.group.visible = true;   // (atKnob's foot is on the door's own floor)
+      if (d.fr) { d.a = d.target = 0; d.apply(); const k0 = g.atKnob(d); g.dad.group.position.copy(k0.stand); g.dad.group.position.y += y0; g.dad.group.visible = true;   // (atKnob's foot is on the door's own floor)
         const r1 = swing(d, 0, 1, `${k} opening, Dad at the knob`, { x: k0.stand.x, z: k0.stand.z }, 0.4);
         d.a = d.target = 1; d.apply(); const k1 = g.atKnob(d); g.dad.group.position.copy(k1.stand); g.dad.group.position.y += y0;
         const r2 = swing(d, 1, 0, `${k} closing, Dad at the knob`, { x: k1.stand.x, z: k1.stand.z }, 0.4);

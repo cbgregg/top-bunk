@@ -810,6 +810,9 @@ function gateLeaf(ctx, M) {
   const { yard, W } = ctx, leaf = yard.children.find((o) => o.isGroup && Math.abs(o.position.x - GATE.hx) < 0.01 && Math.abs(o.position.z - GATE.hz) < 0.01 && o.children.length >= 4);
   if (!leaf) return null;
   leaf.name = 'gateLeaf';
+  // hung in a frame turned the way the house's leaves are (its length along the frame's x), so whatever reads a leaf's angle reads this one
+  const hinge = new THREE.Group(); hinge.name = 'gateHinge'; hinge.position.copy(leaf.position); yard.add(hinge);
+  hinge.add(leaf); leaf.position.set(0, 0, 0); leaf.rotation.set(0, Math.PI / 2, 0);
   // the chain round the latch post that holds it shut (shown only while it is shut)
   const chainG = new THREE.Group(); chainG.name = 'gateChain'; chainG.position.set(GATE.hx, 0, -14.6); yard.add(chainG);
   const link = new THREE.TorusGeometry(0.016, 0.0042, 6, 12); link.scale(1, 1.45, 1);
@@ -817,13 +820,13 @@ function gateLeaf(ctx, M) {
   const lock = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.02), M.chrome); lock.position.set(0.11, 0.88, 0.0); chainG.add(lock);
   const rotC = -Math.PI / 2, rotO = GATE.open - Math.PI / 2, angD = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
   const col = ctx.solid(GATE.hx - 0.3, GATE.hx + 0.3, GATE.hz, -14.6, { door: 'gate', on: false, maxY: 1.6 });
-  const d = { name: 'gate', a: 1, target: 1, max: 1, col, mid: new V3(GATE.hx, 1.0, (GATE.hz - 14.6) / 2), hx: GATE.hx, hz: GATE.hz, y0: 0, w: GATE.w, blocked: null, g: leaf, rotC, rotO, gate: true };
+  const d = { name: 'gate', a: 1, target: 1, max: 1, col, mid: new V3(GATE.hx, 1.0, (GATE.hz - 14.6) / 2), hx: GATE.hx, hz: GATE.hz, y0: 0, w: GATE.w, blocked: null, g: hinge, rotC, rotO, gate: true };
   const strip = () => {
     const shut = d.a < 0.08;
     if (shut && !col.on && collide.bodies.some((b) => (!b.active || b.active()) && collide.onFloor(col, b.pos.y, b.h) && b.pos.x > col.minX - b.r && b.pos.x < col.maxX + b.r && b.pos.z > col.minZ - b.r && b.pos.z < col.maxZ + b.r)) { col.armWhenClear = true; return; }
     col.on = shut; col.armWhenClear = false;
   };
-  d.apply = () => { leaf.rotation.y = rotC + angD(rotC, rotO) * d.a + Math.PI / 2; chainG.visible = d.a < 0.02; strip(); };
+  d.apply = () => { hinge.rotation.y = rotC + angD(rotC, rotO) * d.a; chainG.visible = d.a < 0.02; strip(); };
   // the schedule's hook: open (d0-d4 by day, from night six at night) or shut (by day from d5); the leaf swings there, swept like any other
   d.setState = (state, { now = false } = {}) => {
     const open = state === 'open' || state === true;
