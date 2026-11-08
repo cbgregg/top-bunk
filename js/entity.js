@@ -13,6 +13,10 @@ const _v = new V3(), _w = new V3(), _x = new V3(), _y = new V3(), _z = new V3(),
 const _lat = new V3(), _palm = new V3(), _p2 = new V3(), _cax = new V3(), _cr = new V3();
 const _a = new V3(), _b = new V3(), _c = new V3(), _d = new V3(), _e = new V3(), _f = new V3(), _g = new V3(), _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const ARM_STRETCH = 1.4;
+const FOOT_UP = 0.165;                        // the ankle over the floor with the foot flat on it
+const NEAR4 = [[0, 0], [0.015, 0], [-0.015, 0], [0, 0.015], [0, -0.015]];
+const FOOT_PAD = 0.03;   // the room kept between a foot and the furniture
+const STEP_UP = 0.85, STEP_DOWN = 0.6;   // a floor under a foot further above the root's than four risers, or below it than three, is a wall's top or a stairwell, not a step
 // the crawl (the Ring crawl): what touches the floor, in the root's frame (+z ahead, +x its left), metres over the floor. The rig is
 // tipped past level so the hips ride over the shoulders; the hands and knees are put on the boards, the feet trail behind on their tops
 const CRAWL = {
@@ -82,6 +86,28 @@ function skinWeights(geo, body, refVerts, bind, head, neck) {
   geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
 }
 
+// how near box c comes to the line through (x, z) along (fx, fz), over the stretch of it from lo to hi metres along: the box turned into
+// the line's frame (along, across), cut to the stretch, and its nearest corner across (0 when it lies over the line there, Infinity when
+// it does not reach the stretch)
+function stripGap(c, x, z, fx, fz, lo, hi) {
+  let poly = [[c.minX, c.minZ], [c.maxX, c.minZ], [c.maxX, c.maxZ], [c.minX, c.maxZ]].map(([px, pz]) => [(px - x) * fx + (pz - z) * fz, (px - x) * fz - (pz - z) * fx]);
+  poly = clipAlong(clipAlong(poly, lo, 1), hi, -1);
+  if (!poly.length) return Infinity;
+  let pos = false, neg = false, m = Infinity;
+  for (const [, l] of poly) { if (l >= 0) pos = true; if (l <= 0) neg = true; m = Math.min(m, Math.abs(l)); }
+  return pos && neg ? 0 : m;
+}
+// the part of polygon pts ([along, across] points) with s * (along - v) >= 0
+function clipAlong(pts, v, s) {
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], da = s * (a[0] - v), db = s * (b[0] - v);
+    if (da >= 0) out.push(a);
+    if ((da >= 0) !== (db >= 0)) { const t = da / (da - db); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+  }
+  return out;
+}
+
 export class Entity {
   constructor(scene) {
     this.root = new THREE.Group();
@@ -133,7 +159,7 @@ export class Entity {
     // boards); flinch and stun 0..1 are the light in its face and the flash; catchPose { frame 1..3, cam } is the catch, held a frame at
     // a time; cling (a ceiling height) hangs the crumple upside down from it. crawlSpeed is metres a second the hunter wants of the crawl,
     // and lungeOut the metres the crawl has lunged since the hunter last took them (it moves the root by exactly that)
-    this.duck = 0; this.duckHold = null; this.narrowK = 0; this.snap = 0; this.flinch = 0; this.stun = 0; this.catchPose = null; this.cling = null;
+    this.duck = 0; this.duckHold = null; this.narrowK = 0; this.wallK = 0; this.snap = 0; this.flinch = 0; this.stun = 0; this.catchPose = null; this.cling = null;
     this.level = 1; this.unfoldT = 0; this.onKey = null; this.onStep = null; this.sneak = false; this.crawlSpeed = 0; this.lungeOut = 0; this.gait = null; this.ground = null;
     this.blinkT = 18 + hash(7.3) * 22; this.blinkK = 0; this.eyeLagT = 0;
     // the room it takes up beyond its root while it is low: two more circles on the floor for the bodies (collide.js) to keep out of
@@ -555,13 +581,34 @@ export class Entity {
     }
     return 9;
   }
-  // on its feet: how close the walls and the furniture are to either side, from the root and a stride ahead, at the height of its
-  // hanging arms (they reach 0.75 m out); 1 when there is no room to let them hang
+  // on its feet: how close the walls and the furniture come to either side of it, anywhere from 0.85 m behind the root to 0.9 m ahead
+  // (the arms swing both ways, and a jamb is thinner than a stride), at the height of its hanging arms (they reach 0.75 m out); 1 when
+  // there is no room to let them hang
   armRoom() {
-    const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const cs = this.colliders; if (!cs) return 0;
+    const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), y0 = p.y;
     let room = 9;
-    for (const s of [0, 0.45, 0.9]) { const x = p.x + fx * s, z = p.z + fz * s; room = Math.min(room, this.sideRoom(x, z, p.y, fz, -fx, 0.5, 2.3, 0.25), this.sideRoom(x, z, p.y, -fz, fx, 0.5, 2.3, 0.25)); }
+    for (const c of cs) {
+      if (c.on === false || (c.when && !c.when()) || (c.maxY ?? 3) < y0 + 0.5 || (c.minY ?? -0.3) > y0 + 2.3 || (c.dressing && !c.wall)) continue;
+      if (c.minX > p.x + 1.8 || c.maxX < p.x - 1.8 || c.minZ > p.z + 1.8 || c.maxZ < p.z - 1.8) continue;
+      room = Math.min(room, stripGap(c, p.x, p.z, fx, fz, -0.85, 0.9));
+    }
     return THREE.MathUtils.clamp((0.95 - room) / 0.35, 0, 1);
+  }
+  // how far along its heading the first wall (or shut door) is, at the height of its head; Infinity when there is none in 1.5 m
+  wallAhead(x, z, y0, fx, fz) {
+    const cs = this.colliders; let best = Infinity; if (!cs) return best;
+    for (const c of cs) {
+      if (!(c.wall || c.door) || c.on === false || (c.when && !c.when()) || (c.maxY ?? 3) < y0 + 1.6 || (c.minY ?? -0.3) > y0 + 1.6) continue;
+      let t0 = 0, t1 = 1.5;
+      for (const [o, d, lo, hi] of [[x, fx, c.minX, c.maxX], [z, fz, c.minZ, c.maxZ]]) {
+        if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) { t1 = -1; break; } continue; }
+        let a = (lo - o) / d, b = (hi - o) / d; if (a > b) [a, b] = [b, a];
+        t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) break;
+      }
+      if (t1 >= t0 && t0 < best) best = t0;
+    }
+    return best;
   }
   autoDuck() {
     const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), y0 = p.y;
@@ -570,11 +617,24 @@ export class Entity {
       const x = p.x + fx * s, z = p.z + fz * s, room = Math.min(this.sideRoom(x, z, y0, fz, -fx), this.sideRoom(x, z, y0, -fz, fx));
       narrow = Math.max(narrow, THREE.MathUtils.clamp((0.95 - room) / 0.4, 0, 1));
     }
+    // (ahead, only as far as it can go: a door head across a hall, past the wall its line runs into, is not one it will pass under)
+    const sc = this.root.scale.y || 1;   // (the heights are its own: the peek's smaller body clears more)
+    const ahead = this.wallAhead(p.x, p.z, y0, fx, fz), reach = ahead - 0.2; this.wallK = THREE.MathUtils.clamp((1.4 - ahead) / 0.5, 0, 1);
     for (let s = -1.2; s <= 1.21; s += 0.1) {
-      const clear = headClear(p.x + fx * s, p.z + fz * s, y0 + 0.5, 0.25) - y0; if (clear > 2.95) continue;
-      const w = 1 - ss(0.7, 1.2, Math.abs(s));
-      need = Math.max(need, THREE.MathUtils.clamp((2.72 - clear) / 0.7, 0, 1) * w);
-      if (clear < 2.3) narrow = Math.max(narrow, w);   // a doorway: the crawl's hands and knees come in, the elbows up instead of out
+      if (s > reach) break;
+      // ahead it is down within 0.7 m, eased over the 0.5 m before; behind it comes up again as what hangs there goes 0.27 to 0.5 m back
+      // (its head and shoulders, bent forward, are well past it by then, and a head left down would go on into the wall across a hall)
+      const w = 1 - ss(0.7, 1.2, Math.abs(s)), wd = s >= 0 ? w : 1 - ss(0.12, 0.35, -s);
+      const clear = (headClear(p.x + fx * s, p.z + fz * s, y0 + 0.5, 0.15) - y0) / sc;   // (the crown's own width: a door head beside its way is not over it)
+      if (clear <= 2.95) {
+        need = Math.max(need, THREE.MathUtils.clamp((2.72 - clear) / 0.7, 0, 1) * wd);
+        if (clear < 2.3) narrow = Math.max(narrow, w);   // a doorway: the crawl's hands and knees come in, the elbows up instead of out
+      }
+      // and the shoulders, 0.38 m to either side of its line: the haunch of an arch comes down lower than its crown
+      if (wd > 0.001) for (const side of [1, -1]) {
+        const cs = (headClear(p.x + fx * s + fz * 0.38 * sc * side, p.z + fz * s - fx * 0.38 * sc * side, y0 + 0.5, 0.08) - y0) / sc;
+        if (cs <= 2.95) need = Math.max(need, THREE.MathUtils.clamp((2.25 - cs) / 0.45, 0, 1) * wd);
+      }
     }
     this.narrowK = narrow;
     return need;
@@ -593,25 +653,19 @@ export class Entity {
     else if (walk) r.play('walk', { fade: 0.45, speed: 0.4 + this.speed * 0.45 });
     else r.play('idle', { fade: 0.5, speed: 0.3 });
     r.update(dt);
-    // under a door head: down on bent knees (the feet stay on the floor), bent over, the head lifted back so it still looks ahead
+    // each foot on its own floor (a stair's tread, the front step) and, under a door head, down on bent knees, bent over, the head lifted
+    // back so it still looks ahead: the hips come down as far as the lower foot needs, the feet stay where the clip put them over their floor
     const dk = this.catchPose ? 1 : this.duck, B = r.bones;
     rr.position.set(0, 0, 0); rr.updateMatrixWorld(true);
+    const feet = this.footPlan(dk);
+    // bent double with a wall close ahead (out of a door across a hall), the hips go back so the head does not go on into it
+    if (dk > 0.001 && this.wallK > 0 && this.duckHold == null && !this.catchPose) { rr.position.z = -0.2 * dk * this.wallK; rr.updateMatrixWorld(true); }
     if (dk > 0.001) {
-      // where the clip put the feet: they stay there while the hips come down
-      const feet = this._feet || (this._feet = { L: new V3(), R: new V3(), qL: new THREE.Quaternion(), qR: new THREE.Quaternion() });
-      for (const sd of ['L', 'R']) { B[sd + '_Foot'].getWorldPosition(feet[sd]); B[sd + '_Foot'].getWorldQuaternion(feet['q' + sd]); }
-      rr.position.y = -0.42 * dk; rr.updateMatrixWorld(true);
       // bent over first: on this skeleton the thighs hang from the spine, so bending it after the legs were set would swing the feet back
       // and up off the floor
       r.bend(['Spine', 'Spine1', 'Spine2'], [0.35, 0.35, 0.3], [1, 0, 0], 1.2 * dk);
       r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.45 * dk);
       r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], -0.12 * dk);
-      this.root.updateMatrixWorld(true);
-      for (const sd of ['L', 'R']) {
-        const ft = B[sd + '_Foot'];
-        r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, feet[sd], this.T((sd === 'L' ? 0.25 : -0.25), 0.9, 1.8, _a));
-        r.rotateWorld(ft, _q1.copy(feet['q' + sd]).multiply(ft.getWorldQuaternion(_q2).invert()));   // and turned as the clip had it
-      }
     }
     // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
     r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0) - this.stun * 0.4);
@@ -640,7 +694,8 @@ export class Entity {
       r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 1, 0], -0.3 * tuck);   // the shoulders drawn in and forward
       for (const sd of ['L', 'R']) { const left = sd === 'L' ? 1 : -1; r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], this.T(left * 0.17, 1.02 - drop, 0.3, _a), this.T(left * 0.4, 1.5 - drop, -0.8, _b), tuck); }
     }
-    this.groundFeet(); this.plantToes();
+    if (feet) this.setFeet(feet);   // (after every bend of the back: the legs hang from it)
+    this.plantToes(); this.keepFeetOut(); this.soleGuard();   // (the toes turned up first: that swings them further out over the floor)
     this.relaxHands(r);
     if (this.post) this.post(r, dt);   // a scene's own pose on top (night one's bedside: an arm reaching a point, the head put somewhere)
     if (this.catchPose) { this.catchFrame(r); this.face(dt); return; }
@@ -661,17 +716,147 @@ export class Entity {
     }
     this.face(dt);
   }
-  // on the stairs (or anywhere the floor under a foot is higher than under the root) a foot the clip puts down is lifted onto its step,
-  // the knee bending forward for it
-  groundFeet() {
-    const r = this.rig, B = r.bones, y0 = this.root.position.y;
+  // ---------- the feet on the floor ----------
+  // The floor is not always the root's: on the cellar stairs each foot is over its own tread, at the front door one may be on the step.
+  // footPlan takes where the clip put each foot (and how it turned it) and the highest floor under its sole, and lets the hips down by as
+  // much as the lower foot needs (and the duck's 0.42); setFeet then puts each foot that is down (or nearly) back over its own floor by
+  // the knee, as the clip had it turned; a foot high in its swing hangs from the lowered hips (soleGuard keeps it off the floor). Null when
+  // both feet are on the root's floor and it is not ducking: the clip's legs stand as they are.
+  footPlan(dk) {
+    const r = this.rig, B = r.bones, rr = r.root, y0 = this.root.position.y;
+    const F = this._feet || (this._feet = { L: new V3(), R: new V3(), qL: new THREE.Quaternion(), qR: new THREE.Quaternion(), gL: 0, gR: 0, wL: 1, wR: 1 });
+    let uneven = false, low = Infinity;
     for (const sd of ['L', 'R']) {
-      const ft = B[sd + '_Foot']; if (!ft) continue;
-      ft.getWorldPosition(_a); const g = this.floorAt(_a.x, _a.z);
-      const toe = B[sd + '_Toe0']; let lift = g + 0.165 - _a.y;
-      if (toe) { toe.getWorldPosition(_c); _c.addScaledVector(_d.copy(_c).sub(_a), 0.35); lift = Math.max(lift, this.floorAt(_c.x, _c.z) + 0.035 - _c.y); }   // (the toes over the next step up)
-      if (lift <= 0.003 || g - y0 > 0.6) continue;
-      _a.y += lift; r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, _a, this.T(sd === 'L' ? 0.25 : -0.25, 0.9, 1.8, _b));
+      const ft = B[sd + '_Foot']; ft.getWorldPosition(F[sd]); ft.getWorldQuaternion(F['q' + sd]);
+      const g = this.soleFloor(sd, y0); F['g' + sd] = g; low = Math.min(low, g);
+      F['w' + sd] = 1 - ss(0.06, 0.22, F[sd].y - y0 - FOOT_UP);   // how far down the foot is: 1 on the floor, 0 high in its swing
+      if (Math.abs(g - y0) > 0.002) uneven = true;
+    }
+    if (!uneven && dk <= 0.001) return null;
+    // the body rides the floor smoothed over a tread's length (so it goes down a stair, not in jumps of a riser), the hips lower still
+    // if a foot is over a floor lower than that
+    const base = uneven ? this.baseFloor() : y0;
+    rr.position.y = base - y0 - Math.min(0.45, Math.max(0, base - low)) - 0.42 * dk; rr.updateMatrixWorld(true);
+    return F;
+  }
+  setFeet(F) {
+    const r = this.rig, B = r.bones, y0 = this.root.position.y;
+    this.root.updateMatrixWorld(true);
+    for (const sd of ['L', 'R']) {
+      const ft = B[sd + '_Foot'], w = F['w' + sd]; if (w < 0.01) continue;
+      ft.getWorldPosition(_g); _f.copy(F[sd]); _f.y += F['g' + sd] - y0; _g.lerp(_f, w);
+      r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, _g, this.T(sd === 'L' ? 0.25 : -0.25, 0.9, 1.8, _b));
+      r.rotateWorld(ft, _q1.copy(F['q' + sd]).multiply(ft.getWorldQuaternion(_q2).invert()));   // and turned as the clip had it
+    }
+  }
+  // how far a foot has to go over the floor to keep out of the furniture and the walls on its floor: its skin as the clip has it, 3 cm
+  // round, is taken out of each box toward the side the root is on (it never steps through to the far side of a wall)
+  footPush(sd, out) {
+    out.set(0, 0, 0);
+    const cs = this.colliders, p = this.root.position, y0 = p.y, list = this.soleVerts()[sd]; if (!cs || !list.length) return out;
+    const B = this.rig.bones; B[sd + '_Foot'].getWorldPosition(_c); const g = this.floorAt(_c.x, _c.z);
+    const V = this._footV || (this._footV = []); let n = 0;
+    this.root.updateMatrixWorld(true);
+    for (let j = 0; j < list.length; j += 2) {
+      const m = list[j], i = list[j + 1], v = V[n] || (V[n] = new V3()); n++;
+      v.fromBufferAttribute(m.geometry.attributes.position, i); m.applyBoneTransform(i, v); v.applyMatrix4(m.matrixWorld);
+    }
+    for (const c of cs) {
+      if (c.on === false || (c.when && !c.when()) || (c.dressing && !c.wall) || (c.maxY ?? 3) < g + 0.02 || (c.minY ?? -0.3) > g + 0.5) continue;
+      if (c.minX > _c.x + 0.6 || c.maxX < _c.x - 0.6 || c.minZ > _c.z + 0.6 || c.maxZ < _c.z - 0.6) continue;
+      const x0 = c.minX - FOOT_PAD, x1 = c.maxX + FOOT_PAD, z0 = c.minZ - FOOT_PAD, z1 = c.maxZ + FOOT_PAD, ylo = (c.minY ?? -0.3) - 0.02, yhi = c.maxY ?? (c.wall || c.door ? 3 : y0 + 1);
+      // the way out: to the root's side of the box (the nearest of its faces the root is beyond; any face if the root is in it). Coming
+      // from that side, any of the foot past the near face is in it or through it (a wall is thinner than a foot is long)
+      const sides = []; if (p.x <= x0) sides.push(0); if (p.x >= x1) sides.push(1); if (p.z <= z0) sides.push(2); if (p.z >= z1) sides.push(3);
+      const through = sides.length > 0; if (!through) sides.push(0, 1, 2, 3);
+      let best = null;
+      for (const side of sides) {
+        let need = 0, inside = false;
+        for (let k = 0; k < n; k++) {
+          const v = V[k], px = v.x + out.x, pz = v.z + out.z;
+          if (v.y < ylo || v.y > yhi) continue;
+          if (side < 2 ? (pz <= z0 || pz >= z1 || (side === 0 ? px <= x0 || (!through && px >= x1) : px >= x1 || (!through && px <= x0)))
+            : (px <= x0 || px >= x1 || (side === 2 ? pz <= z0 || (!through && pz >= z1) : pz >= z1 || (!through && pz <= z0)))) continue;
+          inside = true; need = Math.max(need, side === 0 ? px - x0 : side === 1 ? x1 - px : side === 2 ? pz - z0 : z1 - pz);
+        }
+        if (!inside) { best = null; break; }
+        if (!best || need < best[1]) best = [side, need];
+      }
+      if (best) { const [side, need] = best, d = need + 0.002; if (side === 0) out.x -= d; else if (side === 1) out.x += d; else if (side === 2) out.z -= d; else out.z += d; }
+    }
+    if (out.lengthSq() > 0.36) out.setLength(0.6);   // (never more than a foot's length: past that it is the root that is wrong)
+    return out;
+  }
+  // each foot moved over the floor, as it is turned, out of whatever box it has come down in or swung into (footPush)
+  keepFeetOut() {
+    const r = this.rig, B = r.bones, push = this._push || (this._push = new V3());
+    for (const sd of ['L', 'R']) {
+      const ft = B[sd + '_Foot']; if (!ft || this.footPush(sd, push).lengthSq() < 1e-8) continue;
+      ft.getWorldPosition(_g).add(push); ft.getWorldQuaternion(_hq);
+      r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, _g, this.T(sd === 'L' ? 0.25 : -0.25, 0.9, 1.8, _b));
+      r.rotateWorld(ft, _q1.copy(_hq).multiply(ft.getWorldQuaternion(_q2).invert()));
+    }
+  }
+  // the highest floor under a foot as it is now: under the heel, the ankle, the ball and the tips of the toes (a floor much higher or
+  // lower than the root's is a wall's top or a stairwell beside the step: STEP_UP, STEP_DOWN)
+  soleFloor(sd, y0) {
+    const B = this.rig.bones, ft = B[sd + '_Foot'], toe = B[sd + '_Toe0'];
+    ft.getWorldPosition(_c); let g = -Infinity;
+    const at = (x, z) => { const f = this.floorAt(x, z); if (f - y0 < STEP_UP && y0 - f < STEP_DOWN) g = Math.max(g, f); };
+    at(_c.x, _c.z);
+    if (toe) { toe.getWorldPosition(_d); _e.copy(_d).sub(_c); for (const k of [-0.3, 1, 1.4]) at(_c.x + _e.x * k, _c.z + _e.z * k); }
+    return g === -Infinity ? y0 : g;
+  }
+  // the floor under the body: the floor along its heading averaged over a stair's tread (0.3 m) ahead of the root and behind it, and the
+  // lower of the two. It changes smoothly as the root goes over a riser, and it is never above the root's own floor (the downhill side's
+  // average is not), so the head is never higher over that floor than on the flat
+  baseFloor() {
+    const p = this.root.position, yaw = this.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw);
+    let a = 0, b = 0; for (const d of [0, 0.075, 0.15, 0.225, 0.3]) { a += this.floorAt(p.x + fx * d, p.z + fz * d); b += this.floorAt(p.x - fx * d, p.z - fz * d); }
+    return Math.min(a, b) / 5;
+  }
+  // the skin of the feet (every third vertex the foot or the toes carry, and the shin's own within 0.22 m of the ankle), and the last
+  // guard: a foot with any of it under the floor under it is lifted by the knee until none is (the heel coming down on a riser's edge,
+  // the clip's toes dipping at the end of a stride)
+  soleVerts() {
+    if (this._sole) return this._sole;
+    const out = { L: [], R: [] }, B = this.rig.bones;
+    this.root.updateMatrixWorld(true);
+    for (const m of this.rigMeshes || []) {
+      const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight, bones = m.skeleton.bones;
+      for (let i = 0; i < SI.count; i += 3) {
+        let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
+        const k = /(?:^|_)([LR])_(Foot|Toe|Calf)/.exec(bones[bi].name); if (!k) continue;
+        if (k[2] === 'Calf') { _v.fromBufferAttribute(P, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld); if (_v.distanceTo(B[k[1] + '_Foot'].getWorldPosition(_w)) > 0.22) continue; }
+        out[k[1]].push(m, i);
+      }
+    }
+    return (this._sole = out);
+  }
+  // the floor under a point of the skin, 1.5 cm round it (the edge of a riser falls between the vertices the guard looks at), counting only
+  // floors within STEP_UP and STEP_DOWN of the root's
+  floorNear(x, z, y0) {
+    let g = -Infinity;
+    for (const [dx, dz] of NEAR4) { const f = this.floorAt(x + dx, z + dz); if (f - y0 < STEP_UP && y0 - f < STEP_DOWN) g = Math.max(g, f); }
+    return g === -Infinity ? y0 : g;
+  }
+  soleGuard() {
+    const r = this.rig, B = r.bones, S = this.soleVerts(), y0 = this.root.position.y;
+    for (const sd of ['L', 'R']) {
+      const list = S[sd], ft = B[sd + '_Foot']; if (!list.length || !ft) continue;
+      for (let pass = 0; pass < 2; pass++) {
+        this.root.updateMatrixWorld(true);
+        let pen = 0;
+        for (let j = 0; j < list.length; j += 2) {
+          const m = list[j], i = list[j + 1];
+          _v.fromBufferAttribute(m.geometry.attributes.position, i); m.applyBoneTransform(i, _v); _v.applyMatrix4(m.matrixWorld);
+          pen = Math.max(pen, this.floorNear(_v.x, _v.z, y0) + 0.004 - _v.y);
+        }
+        if (pen <= 0.002 || pen > STEP_UP) break;
+        ft.getWorldPosition(_g); _g.y += pen; ft.getWorldQuaternion(_hq);
+        r.ik2(B[sd + '_Thigh'], B[sd + '_Calf'], ft, _g, this.T(sd === 'L' ? 0.25 : -0.25, 0.9, 1.8, _b));
+        r.rotateWorld(ft, _q1.copy(_hq).multiply(ft.getWorldQuaternion(_q2).invert()));
+      }
     }
   }
   // the clip's toes now and then dip a little under the boards at the end of a stride: each foot turned up just enough that the ball

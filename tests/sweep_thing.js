@@ -151,8 +151,12 @@ const STEPS = {
         const scene = `${a} -> ${b} at a ${label}${low ? ' (crawling)' : ''}`;
         let s = 0, f = 0;
         while (s < len) {
-          let d = spd / 60; if (low) { E.update(1 / 60); d = E.lungeOut; E.lungeOut = 0; } else E.update(1 / 60);
-          s = Math.min(len, s + d); const p = E.root.position, [x, z, to] = at(s); p.x = x; p.z = z; p.y = ground(p.x, p.z, p.y); E.faceTowards(to[0], to[1], Math.min(1, 8 / 60));
+          // a frame as the game runs it: the hunter moves the root (by the lunge the crawl made last frame), then the body is posed there,
+          // then the frame is what is drawn and checked
+          let d = spd / 60; if (low) { d = E.lungeOut; E.lungeOut = 0; }
+          // (and, as the hunter does, it turns toward where it is going only while it is not there: at the node itself there is no way to face)
+          s = Math.min(len, s + d); const p = E.root.position, [x, z, to] = at(s); p.x = x; p.z = z; p.y = ground(p.x, p.z, p.y); if (Math.hypot(to[0] - x, to[1] - z) > 0.04) E.faceTowards(to[0], to[1], Math.min(1, 8 / 60));
+          E.update(1 / 60);
           f++; out.frames++;
           if (f % 4 === 0) {
             const top = bodyCheck('edges', scene);
