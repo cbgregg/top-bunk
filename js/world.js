@@ -1663,8 +1663,8 @@ export function buildWorld(scene) {
   const fixture = (name, x, z, intensity = 9) => {
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.lamp.clone());
     dome.rotation.x = Math.PI; dome.position.set(x, H - 0.005, z); house.add(dome);
-    // the light itself is not here: lights.js lends the nearest lit fixtures a light each from a fixed pool, so the number of lights never
-    // changes (a change recompiles every shader) and a dark house costs nothing
+    // the light itself is not here: lights.js lights each fixture's room from inside the shaders and lends its two shadowed spots to the
+    // fixtures that matter most, so the number of lights never changes (a change recompiles every shader) and a dark house costs nothing
     bulbs[name] = { dome, base: intensity, pos: new THREE.Vector3(SX(x), H - 0.3, SZ(z)), room: name.startsWith('hall') ? 'hall' : name };
   };
   fixture('bed', 6.5, 1.4); fixture('hall1', 4.8, -0.9); fixture('hall2', 7.0, -0.9); fixture('bath', 4.15, 1.0, 7);

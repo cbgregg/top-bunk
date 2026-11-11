@@ -306,7 +306,7 @@ const P = {
   breath: 1, breathT: 0, inhale: true, pod: null, podYaw: 0,
 };
 const F = { stage: 'day', night: 0, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0, over: false };
-// the ceiling lights and their switches (lights.js): a fixed pool of lights lent to the nearest lit fixtures, so switching never recompiles
+// the ceiling lights and their switches (lights.js): each lit room lit in the shaders, two shadowed spots lent where they show, so switching never recompiles
 const lights = createLights({ W, scene, camera, sfx, PHONE, F, E, renderer });
 lights.movers = [mom.group, dad.group];   // their shadows under the ceiling lights are drawn again as they move
 let shake = 0, uiMode = 'title', paused = false, started = false, pressE = false;
