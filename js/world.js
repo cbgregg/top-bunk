@@ -134,7 +134,7 @@ export function buildWorld(scene) {
     plaster: TX.plaster(), tile: TX.tile(),
     siding: TX.siding(), grass: TX.grass(), dirt: TX.dirt(), shingles: TX.shingles(), barn: TX.barnBoards(),
     plaid: TX.plaid(), rug: TX.rug(), mattress: TX.mattress(),
-    drawing0: TX.drawing(0), drawing1: TX.drawing(1), painting: TX.painting(),
+    drawing0: TX.drawing(0), drawing1: TX.drawing(1), matboard: TX.matboard(),
     floralA: TX.floral('#cdaaa3', '#a4505f', '#6d8461', 41), floralB: TX.floral('#9fb7ab', '#d98c8c', '#496b5c', 52), floralC: TX.floral('#8d5a60', '#d6b0a0', '#4d6a50', 63),
   };
   const std = (o) => new THREE.MeshStandardMaterial(o);
@@ -683,7 +683,7 @@ export function buildWorld(scene) {
   // per frame: the doors swing, the bear falls, the laundry's bulb and drip run, the footprints follow their things
   const tick = (dt) => { if (teddy && teddy.step) teddy.step(dt); stepDoors(dt); fxTick(dt); for (const f of followers) fitFollower(f); };
 
-  // small decor builders: figurines, wall plates, shelves, a wreath
+  // small decor builders: figurines and shelves
   const rnd = TX.rng(2002);
   const knickMats = [0xd9b8c4, 0x9fc0b4, 0xe8d8a0, 0xb7a0d0, 0xf0f0ea, 0xc47a6a, 0x7aa4c4].map((c) => std({ color: c, roughness: 0.3 }));
   function knick(x, y, z, n, spread, along = 'x') {
@@ -695,27 +695,16 @@ export function buildWorld(scene) {
     }
   }
   function shelf(x0, x1, y, z0, z1) { return rbox(x0, x1, y, y + 0.025, z0, z1, M.oak, 0.008); }
-  function plate(x, y, z, ry, r, color) {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; house.add(g);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.012, 28), std({ color: 0xece6d6, roughness: 0.2 })); rim.rotation.x = Math.PI / 2; g.add(rim);
-    const mid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r * 0.72, 0.014, 28), std({ color, roughness: 0.25 })); mid.rotation.x = Math.PI / 2; g.add(mid);
-  }
-  function wreath(x, y, z, ry) {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; house.add(g);
-    const t = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.045, 8, 28), std({ color: 0x7a6a4a, roughness: 1 })); g.add(t);
-    for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28, f = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), knickMats[i % knickMats.length]); f.position.set(Math.cos(a) * 0.19, Math.sin(a) * 0.19, 0.03); g.add(f); }
-    const bow = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.03), std({ color: 0x9a3b4a, roughness: 0.6 })); bow.position.set(0, -0.19, 0.04); g.add(bow);
-  }
   function heater(x0, x1, y, z0, z1) { rbox(x0, x1, y, y + 0.17, z0, z1, M.heater, 0.012, { cast: false }); box(x0, x1, y + 0.1, y + 0.12, z0 - 0.002, z1 + 0.002, M.black, { uv: false, cast: false }); }
-  // a framed picture: tex is a canvas texture, or the name of a photograph in assets/photos (a painting stands in until it loads)
+  // a framed picture: tex is a canvas texture, or the name of a photograph in assets/photos (the bare mat shows until it loads)
   const photoLoader = new THREE.TextureLoader();
   function picture(w, h, tex) {
-    const isPhoto = typeof tex === 'string', mat = std({ map: isPhoto ? T.painting : tex, roughness: 0.6 });
+    const isPhoto = typeof tex === 'string', mat = std({ map: isPhoto ? T.matboard : tex, roughness: 0.6 });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     if (isPhoto) photoLoader.load(`assets/photos/${tex}.webp`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; mat.map = t; mat.needsUpdate = true;
       const a = t.image.width / t.image.height; mesh.scale.set(Math.min(1, a * h / w), Math.min(1, w / (a * h)), 1);   // keep the photo's proportions inside the frame
-    }, undefined, () => { /* no file: the painting stays */ });
+    }, undefined, () => { /* no file: the mat stays */ });
     return mesh;
   }
   function frameZ(zc, y, x, w, h, tex, face) {   // picture on a wall that runs along z (face +1 looks toward +x)
@@ -852,7 +841,6 @@ export function buildWorld(scene) {
     }
     frameX(5.4, 1.5, -1.5, 0.34, 0.26, 'rainier', 1); frameX(6.0, 1.55, -1.5, 0.3, 0.24, 'sunset', 1); frameX(6.6, 1.5, -1.5, 0.26, 0.22, 'family1', 1);
     frameX(4.95, 1.55, -0.3, 0.3, 0.24, 'family1', -1); frameX(6.25, 1.5, -0.3, 0.3, 0.24, 'moraine', -1); frameX(7.85, 1.55, -0.3, 0.2, 0.26, 'family2', -1);
-    wreath(8.01, 1.55, -0.9, -Math.PI / 2);
     shelf(7.6, 8.0, 1.95, -1.3, -0.5); knick(7.8, 1.975, -0.9, 4, 0.7, 'z');
   }
   // crayon drawing taped to the hall wall at kid height
@@ -942,8 +930,7 @@ export function buildWorld(scene) {
   box(2.75, 3.2, 0.55, 1.2, -3.85, -2.55, M.crt, { uv: false });
   tagEnd();
   const cTv = solid(2.65, 3.25, -3.95, -2.45);
-  // curio shelves and wall plates
-  plate(3.21, 1.9, -1.9, -Math.PI / 2, 0.12, 0xa84a5a); plate(3.21, 1.9, -4.0, -Math.PI / 2, 0.12, 0x4a6fa8);
+  // photographs on the end walls
   frameZ(-2.9, 1.75, 3.3, 0.5, 0.4, 'rainier', -1); frameZ(-0.7, 1.6, -3.3, 0.46, 0.36, 'family2', 1);
   // the family wall over the couch: old prints hung at whatever height the nail went in. Some are wrong: faces scratched out (rocker,
   // ellis), someone in the trees behind the boy, one hung upside down, one frame with only its backing left, and a pale patch where a frame came down
@@ -1013,7 +1000,6 @@ export function buildWorld(scene) {
     solid(-1.4, 3.25, 2.85, 3.55); solid(2.4, 3.25, -0.2, 2.9);
     box(-1.35, 0.3, 0.95, 1.5, 3.5, 3.51, M.lino, { uv: true });   // backsplash
     knick(0.6, 0.95, 3.3, 2, 0.2); knick(2.6, 0.95, 3.3, 2, 0.2);
-    plate(-0.5, 1.5, -0.21, 0, 0.14, 0x4a6fa8); plate(0.0, 1.5, -0.21, 0, 0.14, 0xa84a5a); plate(2.8, 1.6, -0.21, 0, 0.14, 0x4a8a6a);
   }
   tagStart('dining');
   box(-0.36, 0.74, 0.7, 0.75, 0.74, 1.84, M.oak, { uv: false });
@@ -1469,16 +1455,14 @@ export function buildWorld(scene) {
     prop('pot', { x: 3.02, y: 0.96, z: 1.49, rot: 0 });
     prop('plant1', { x: -1.65, z: 3.17 }, { box: [-1.9, -1.4, 2.92, 3.42] });   // in the corner by the pantry, clear of the back door
   }
-  // the old dining end is a nook now: the sideboard with the good plates on the west wall, coats and shoes by the back door, and a
+  // the old dining end is a nook now: the sideboard on the west wall, coats and shoes by the back door, and a
   // little table under the wall phone with the phone book on it. Built in groups at plan spots, so they keep their size through the stretch
   {
     const g = (x, z) => { const o = new THREE.Group(); o.position.set(x, 0, z); house.add(o); return o; };
     const mesh = (geo, mat, parent, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; };
     const bx = (parent, w, h, d, x, y, z, mat) => mesh(new THREE.BoxGeometry(w, h, d), mat, parent, x, y, z);
-    // the sideboard, front to the room, and a plate rail over it
+    // the sideboard, front to the room
     prop('dresser', { x: -3.052, z: 2.02, rot: PI / 2, s: 0.56 }, { box: [-3.242, -2.862, 1.41, 2.63] });   // 1.22 wide, 0.7 tall, 0.38 deep
-    for (const [dz, c] of [[-0.42, 0x4a6fa8], [-0.14, 0xece6d6], [0.14, 0xa84a5a], [0.42, 0xece6d6]]) plate(-3.3 + (WT / 2 + 0.035) / 1.12, 1.41, 2.02 + dz / 1.12, PI / 2, 0.12, c);   // (plan spots; the stretch here is 1.12)
-    const rail = g(-3.3, 2.02); bx(rail, 0.1, 0.022, 1.25, WT / 2 + 0.05, 1.28, 0, M.oak); bx(rail, 0.012, 0.03, 1.25, WT / 2 + 0.095, 1.31, 0, M.oak);
     // coats on hooks over a shoe rack, west of the back door (it swings the other way, along its hinge side)
     const cs = g(-3.025, 3.39), back = 0.158;
     bx(cs, 0.44, 0.07, 0.02, 0, 1.66, back - 0.01, M.oak);

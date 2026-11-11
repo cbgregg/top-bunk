@@ -242,15 +242,11 @@ export function drawing(v = 0) {
   return t;
 }
 
-// a pastel floral still life, shown in a frame until its photograph loads
-export function painting() {
-  const W = 256, Hh = 256, [c, g] = mk(W, Hh), r = rng(302);
-  g.fillStyle = '#e9d9c3'; g.fillRect(0, 0, W, Hh);
-  g.fillStyle = '#a9b9a0'; g.fillRect(0, 170, W, 86);
-  g.fillStyle = '#5b7fa6'; g.beginPath(); g.moveTo(98, 250); g.quadraticCurveTo(80, 190, 108, 160); g.lineTo(148, 160); g.quadraticCurveTo(176, 190, 158, 250); g.fill();
-  for (let i = 0; i < 16; i++) { const a = r() * 6.28, d = 20 + r() * 55; g.fillStyle = ['#c25a6e', '#e8b0b8', '#f4e6c0', '#9a5aa0'][i % 4]; g.beginPath(); g.arc(128 + Math.cos(a) * d, 110 + Math.sin(a) * d * 0.7, 14 + r() * 8, 0, 7); g.fill(); }
-  g.strokeStyle = '#6d8461'; g.lineWidth = 5; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(128, 160); g.quadraticCurveTo(128 + (i - 2.5) * 22, 130, 128 + (i - 2.5) * 34, 90); g.stroke(); }
-  grain(g, W, Hh, 10, r);
+// the bare mat in a picture frame: off-white board with a little tooth, shown until the frame's photograph loads
+export function matboard() {
+  const W = 128, Hh = 128, [c, g] = mk(W, Hh), r = rng(302);
+  g.fillStyle = '#d8d0c0'; g.fillRect(0, 0, W, Hh);
+  grain(g, W, Hh, 6, r);
   return toTex(c, { wrap: false });
 }
 
