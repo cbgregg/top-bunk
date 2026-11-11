@@ -831,7 +831,7 @@ let BASE = '';
 
     // ---------- 21: the light switches ----------
     // a switch by its own prompt, the room lit; every switch in the house on and off twice over with the frame drawn each time, and not one
-    // shader built after the first round (switching only changes how bright the pooled lights are); the breaker and the dawn
+    // shader built after the first round (switching only changes numbers the shaders are sent, never a light); the breaker and the dawn
     // ---------- 22: night one plays to where you are: three ways through it, no drawing ----------
     await check(22, 'night one, three ways', async () => {
       const runs = [];
