@@ -356,6 +356,7 @@ export function gameHelpers(game) {
     night(o = {}) {
       H.phase('night');
       if (o.lights !== undefined) game.nlMult(o.lights, false);
+      game.lights.roof = o.roof ?? 1;   // (how much of the sky the roof keeps out of the rooms: all of its share unless the shot says)
       W.bathSpot.intensity = o.spot || 0; F.flicker = !!o.flicker;
     },
     flashlight(on) { if (flash) flash.intensity = on ? 26 : 0; F.flashOn = !!on; },

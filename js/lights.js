@@ -7,10 +7,11 @@
 // The cost of a light is paid by every pixel, and a change in the NUMBER of lights recompiles every shader in the scene (that is what made
 // starting a game slow). So no fixture has a light of its own. Every lit fixture lights its room from inside the shaders (ROOM_PARS and
 // ROOM_LIGHT below): the same cone and fall-off as a spot light at the shade, kept to the room's own walls and to what passes through its
-// doorways, with the room's soft bounce on top. That costs a pixel nothing while the house is dark and is there from any distance, so a lit
-// room is lit from wherever you see it. What it cannot do is cast a shadow, so two shadowed spots, made once and always in the scene, are
-// lent to the fixtures that matter most to the picture; a fixture's own light fades out as the spot fades in over it, and back again when
-// the spot leaves, so nothing pops as you walk. Switching a light only changes numbers, never the count.
+// doorways, with the room's soft bounce on top (and out of every open doorway, a pool on the floor outside it). That costs a pixel
+// nothing while the house is dark and is there from any distance, so a lit room is lit from wherever you see it. What it cannot do is
+// cast a shadow, so two shadowed spots, made once and always in the scene, are lent to the fixtures that matter most to the picture; a
+// fixture's own light fades out as the spot fades in over it, and back again when the spot leaves, so nothing pops as you walk.
+// Switching a light only changes numbers, never the count.
 import * as THREE from 'three';
 import { roomAt, ROOMS, SX, SZ, H, WT } from './world.js';
 import { flicker as calm } from './settings.js';
@@ -41,15 +42,19 @@ const GAPS = [
 // ---------- the fixtures' light, in the shaders ----------
 // the spot every fixture is: straight down from the shade, the cone and reach the lent spots have too
 const REACH = 7.5, CONE = 1.2, PENUMBRA = 0.85, BOUNCE_Y = 1.15;
-const ROOM_LIGHTS = 10, ROOM_GAPS = 16, ROOM_NAMES = Object.keys(ROOMS);
+// the bounce a lit room sends out of an open doorway at night, per metre of opening, and how far it carries (by day every room is lit)
+const SPILL = { night: 1.6 }, SPILL_REACH = 4;
+const ROOM_LIGHTS = 10, ROOM_GAPS = 20, ROOM_NAMES = Object.keys(ROOMS);
 // one set of numbers for every material (the array is shared, so a write here is seen by all of them). A pixel knows which room it is
 // in from the plan's wall lines (ROOM_PARS), and is lit by that room's short list: its own lit fixtures, and the lit fixtures next door
 // whose light comes in through a gap in the wall. Only what is lit is listed, so a dark house costs a pixel nothing:
 // list: for each room [its first fixture, how many, its first gap, how many]; pos: a fixture (x, y, z) and its bounce's reach; spot: its
-// own light, colour times candela (what a lent spot is not giving); fill: its bounce the same way; gap: a gap [where the wall line is,
-// from, to, the lintel's height plus four times the number of the fixture whose light comes through it (negative for a wall that runs
-// along x)]; cells: the plan, which room each cell between the wall lines is; roof: [the share of the sky's light the roof keeps out,
-// 1 while any fixture is lit]. They are kept few: a phone has little room for them
+// own light, colour times candela (what a lent spot is not giving), and the x of the middle of its room; fill: its share of the room's
+// bounce the same way, and the z of the middle of the room (the bounce comes from there, as one light for the whole room); gap: a gap
+// [where the wall line is, from, to, the lintel's height plus four times the number of the fixture whose light comes through it plus 64
+// times the sixteenths of a fixture's bounce it carries out with it (negative for a wall that runs along x)]; cells: the plan, which room each cell
+// between the wall lines is; roof: [the share of the sky's light the roof keeps out, 1 while any fixture is lit, the bounce out of a
+// doorway per metre of it]. They are kept few: a phone has little room for them
 const ROOM = {};
 // the plan as the shaders read it: the wall lines each way, and which room every cell between them is (-1: not a room)
 const CUTS = [0, 2].map((k) => [...new Set(Object.values(ROOMS).flatMap((r) => [r[k], r[k + 1]]))].sort((p, q) => p - q));
@@ -107,7 +112,7 @@ if ( houseRoof.x + houseRoof.y > 0.0 ) {
 			vec3 c = roomSpot( i, 1.0, toL, dist );
 			float w = ( c.r + c.g + c.b ) * d;
 			if ( w > roomTop ) { roomSum += roomTopColor * saturate( dot( roomN, roomTopDir ) ); roomTopColor = c; roomTopDir = toL / dist; roomTop = w; } else roomSum += c * d;
-			vec3 toB = vec3( toL.x, ${BOUNCE_Y.toFixed(2)} - roomP.y, toL.z );
+			vec3 toB = vec3( roomLightSpot( i ).w, ${BOUNCE_Y.toFixed(2)}, roomLightFill( i ).w ) - roomP;
 			float bd = max( length( toB ), 0.01 ), bcut = saturate( 1.0 - pow4( bd / lp.w ) );
 			roomSum += roomLightFill( i ).rgb * ( bcut * bcut * saturate( dot( roomN, toB ) / bd ) / bd );
 		}
@@ -115,7 +120,8 @@ if ( houseRoof.x + houseRoof.y > 0.0 ) {
 		int k0 = int( roomL.z ), k1 = k0 + int( roomL.w );
 		for ( int k = k0; k < k1; k ++ ) {
 			vec4 ga = roomGap( k );
-			float gw = abs( ga.w );
+			float gw = abs( ga.w ), carries = floor( gw / 64.0 );
+			gw -= 64.0 * carries; carries /= 16.0;
 			int i = int( gw * 0.25 );
 			vec3 lp = roomLightPos( i ).xyz, toL = lp - roomP;
 			vec2 a = ga.w < 0.0 ? lp.zx : lp.xz, b = ga.w < 0.0 ? roomP.zx : roomP.xz;
@@ -124,6 +130,13 @@ if ( houseRoof.x + houseRoof.y > 0.0 ) {
 			float vis = saturate( ( q - ga.y ) / soft + 0.5 ) * saturate( ( ga.z - q ) / soft + 0.5 ) * saturate( ( gw - 4.0 * float( i ) - y ) / soft + 0.5 );
 			float dist = max( length( toL ), 0.001 );
 			roomSum += roomSpot( i, vis, toL, dist ) * saturate( dot( roomN, toL ) / dist );
+			// and the lit room itself, seen through the opening: its bounce, from the middle of the gap, strongest straight out of it
+			if ( carries * houseRoof.z > 0.0 ) {
+				float mid = 0.5 * ( ga.y + ga.z ), along = b.y - mid;
+				vec3 toG = ga.w < 0.0 ? vec3( -along, ${BOUNCE_Y.toFixed(2)} - roomP.y, ga.x - roomP.z ) : vec3( ga.x - roomP.x, ${BOUNCE_Y.toFixed(2)} - roomP.y, -along );
+				float gd = max( length( toG ), 0.3 ), gcut = saturate( 1.0 - pow4( gd / ${SPILL_REACH.toFixed(1)} ) );
+				roomSum += roomLightFill( i ).rgb * ( carries * houseRoof.z * min( ga.z - ga.y, 1.2 ) * gcut * gcut * ( 1.0 - 0.7 * along * along / ( gd * gd ) ) * saturate( dot( roomN, toG ) / gd ) / ( gd * gd + 1.0 ) );
+			}
 		}
 		if ( roomTop > 0.0 ) {
 			directLight.color = roomTopColor;
@@ -137,14 +150,14 @@ if ( houseRoof.x + houseRoof.y > 0.0 ) {
 #endif
 `;
 // the sky's light (the hemisphere and the image of the sky) under the roof: in the rooms it is cut by houseRoof.x (the cellar is as
-// black as it was)
+// black as it was). A mirror and the taps keep what they reflect: with nothing in them they are black holes in a lit room
 const ROOM_ROOF = `
 #if defined( RE_IndirectDiffuse ) && defined( RE_Direct )
 if ( houseRoof.x > 0.0 ) {
 	float sky = houseRoom < 0 ? 1.0 : 1.0 - houseRoof.x;
 	irradiance *= sky; iblIrradiance *= sky;
 	#if defined( RE_IndirectSpecular )
-	radiance *= sky; clearcoatRadiance *= sky;
+	radiance *= mix( sky, 1.0, metalnessFactor ); clearcoatRadiance *= sky;
 	#endif
 }
 #endif
@@ -179,24 +192,27 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
   // ---------- the fixtures, and the gaps their light passes into the rooms next door ----------
   const fixtures = Object.values(W.bulbs).slice(0, ROOM_LIGHTS), lists = ROOM_NAMES.map((name) => ({ own: fixtures.filter((b) => b.room === name), gaps: [] }));
   const col = new THREE.Color();
-  for (const b of fixtures) {
-    b.lent = 0; b.slot = -1;
-    for (const g of GAPS) {
-      if (!g.rooms.includes(b.room)) continue;
-      const to = ROOM_NAMES.indexOf(g.rooms[0] === b.room ? g.rooms[1] : g.rooms[0]), d = g.door ? W.doors[g.door] : null;
-      if (to < 0 || (g.door && !d)) continue;
-      const o = { b, door: d, top: g.top ?? (d ? 2.03 : H) };
+  for (const b of fixtures) { b.lent = 0; b.slot = -1; b.behind = 0; }
+  for (const g of GAPS) for (const from of g.rooms) {
+    const to = ROOM_NAMES.indexOf(g.rooms[0] === from ? g.rooms[1] : g.rooms[0]), d = g.door ? W.doors[g.door] : null, bs = fixtures.filter((b) => b.room === from);
+    if (to < 0 || (g.door && !d) || !bs.length) continue;
+    const through = bs.map((b) => {
+      const o = { b, door: d, top: g.top ?? (d ? 2.03 : H), carries: 0, to: rooms[ROOM_NAMES[to]] };
       if (d) { o.alongX = Math.abs(d.col.maxX - d.col.minX) > Math.abs(d.col.maxZ - d.col.minZ); o.at = o.alongX ? d.mid.z : d.mid.x; o.c = o.alongX ? d.mid.x : d.mid.z; o.w = g.w ?? d.w; }
       else if (g.c !== undefined) { o.alongX = true; o.at = SZ(g.z); o.c = SX(g.c); o.w = g.w; }
       else if (Array.isArray(g.x)) { o.alongX = true; o.at = SZ(g.z); o.lo = SX(g.x[0]) + WT / 2; o.hi = SX(g.x[1]) - WT / 2; }
       else { o.alongX = false; o.at = SX(g.x); o.lo = SZ(g.z[0]) + WT / 2; o.hi = SZ(g.z[1]) - WT / 2; }
       if (o.lo === undefined) { o.lo = o.c - o.w / 2; o.hi = o.c + o.w / 2; }
-      // a gap far along the wall from the shade takes its light at a graze, a sliver on the jamb: not worth a pixel's time
       const across = Math.abs((o.alongX ? b.pos.z : b.pos.x) - o.at), v = o.alongX ? b.pos.x : b.pos.z, along = Math.max(0, o.lo - v, v - o.hi);
-      if (along > 2.5 * across + 0.5) continue;
-      lists[to].gaps.push(o);
-    }
+      o.graze = along - 2.5 * across;
+      return o;
+    }).sort((p, q) => p.graze - q.graze);
+    // a gap far along the wall from the shade takes its light at a graze, a sliver on the jamb: not worth a pixel's time. The squarest
+    // on stays whatever its angle, and takes the whole room's bounce out through the gap with it
+    through[0].carries = bs.length;
+    for (const o of through) if (o.carries || o.graze <= 0.5) lists[to].gaps.push(o);
   }
+  { const n = lists.reduce((a, li) => a + li.gaps.length, 0); if (n > ROOM_GAPS) console.error(`lights: ${n} ways through the walls and room for ${ROOM_GAPS} (ROOM_GAPS): some doorways will pass no light`); }
   // how much of a door's opening the light gets through: a hinged leaf lets a sliver past its latch edge that widens as it swings, a
   // sliding one uncovers the opening from the end it leaves
   const doorGap = (o) => {
@@ -262,7 +278,7 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
   }
 
   // ---------- state ----------
-  let phase = 'title', since = 0, assignT = 0, frame = 0, deaths = 0;
+  let phase = 'title', since = 0, assignT = 0, frame = 0, deaths = 0, here = null;
   const L = {
     rooms, switches: W.switches, pool, torch,
     // what moves near a lit fixture besides the thing and the doors (a parent walking the house): its shadow map is drawn again while it does
@@ -319,6 +335,8 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
     },
     // every room off at once (night one's crescendo); each switch you can hear click
     allOff({ silent = false } = {}) { for (const r of Object.values(rooms)) if (r.on) L.set(r.name, false, { silent }); },
+    // how much of the night's roof stands, 0..1 (the trailer lets the sky back in for a shot that is lit by nothing else)
+    roof: 1,
     update(dt) { step(dt); },
   };
   // ---------- the house works the lights (nights two to ten) ----------
@@ -381,7 +399,7 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
   function step(dt) {
     since += dt; frame++;
     const kPhase = K[phase] || 0;
-    ROOM.roof[0] = ROOF[phase] || 0;
+    ROOM.roof[0] = (ROOF[phase] || 0) * L.roof; ROOM.roof[2] = SPILL[phase] || 0;
     // ---- each room: on/off, the delay before a cold bulb catches, the flicker near the thing ----
     const ex = E && E.visible ? E.root.position : null;
     for (const r of Object.values(rooms)) {
@@ -408,11 +426,16 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
     const shadowsOn = NS > 0 && phase === 'night' && renderer.shadowMap.enabled;
     if (assignT <= 0) {
       assignT = 0.15;
-      const here = roomAt(camera.position.x, camera.position.z, camera.position.y - 1.4);
+      // (the room you are in changes once you are half a metre into the next, so standing in a doorway swaps nothing)
+      const at = roomAt(camera.position.x, camera.position.z, camera.position.y - 1.4), q = at !== here && rectOf(at), m = 0.5;
+      if (at !== here && (!rectOf(here) || !q || (camera.position.x > q[0] + m && camera.position.x < q[1] - m && camera.position.z > q[2] + m && camera.position.z < q[3] - m))) here = at;
       camera.getWorldDirection(fwd);
+      for (const b of fixtures) { const dx = b.pos.x - camera.position.x, dz = b.pos.z - camera.position.z, d = Math.hypot(dx, dz); b.behind = d > 0.5 && (dx * fwd.x + dz * fwd.z) / d < 0.1 ? b.behind + 0.15 : 0; }
       const want = shadowsOn ? fixtures.filter((b) => b.out > 0.002).map((b) => ({ b, s: score(b, here) })).sort((p, q) => p.s - q.s).slice(0, NS).map((x) => x.b) : [];
-      // (a spot stays a second where it is put, so two fixtures that swap places in the order do not swap it straight back)
-      for (const sp of pool) if (sp.bulb) sp.want = want.includes(sp.bulb) || (sp.held < 1 && sp.bulb.out > 0.002 && shadowsOn) ? 1 : 0;
+      // (a spot stays three seconds where it is put, so a look over the shoulder or two fixtures that swap places in the order do not
+      // send it away and straight back; the room you have just walked into does not wait for it)
+      const urgent = want.some((b) => b.room === here && !pool.some((sp) => sp.bulb === b));
+      for (const sp of pool) if (sp.bulb) sp.want = want.includes(sp.bulb) || (sp.held < 3 && !urgent && sp.bulb.out > 0.002 && shadowsOn) ? 1 : 0;
       for (const b of want) {
         if (pool.some((sp) => sp.bulb === b)) continue;
         const sp = pool.find((x) => !x.bulb); if (!sp) continue;
@@ -443,7 +466,8 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
       for (const b of li.own) {
         const own = b.base * kPhase * b.out * (1 - b.lent), fill = (BOUNCE[phase] || 0) * b.out * b.base / 9;
         if (own + fill <= 0.0005) continue;
-        const j = n * 4;
+        const j = n * 4, c = rooms[b.room].c;
+        ROOM.spot[j + 3] = c ? c.x : b.pos.x; ROOM.fill[j + 3] = c ? c.z : b.pos.z;
         ROOM.pos[j] = b.pos.x; ROOM.pos[j + 1] = b.pos.y; ROOM.pos[j + 2] = b.pos.z; ROOM.pos[j + 3] = rooms[b.room].radius + 1.6;
         col.copy(WARM).lerp(BROWN, b.brown || 0).multiplyScalar(own); ROOM.spot[j] = col.r; ROOM.spot[j + 1] = col.g; ROOM.spot[j + 2] = col.b;
         col.copy(BOUNCE_COL).lerp(BROWN, (b.brown || 0) * 0.6).multiplyScalar(fill); ROOM.fill[j] = col.r; ROOM.fill[j + 1] = col.g; ROOM.fill[j + 2] = col.b;
@@ -458,7 +482,8 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
         if (o.b.slot < 0 || m >= ROOM_GAPS) continue;
         const g = o.door ? doorGap(o) : [o.lo, o.hi];
         if (g[1] - g[0] < 0.004) continue;
-        ROOM.gap.set([o.at, g[0], g[1], (o.top + 4 * o.b.slot) * (o.alongX ? -1 : 1)], m * 4); m++;
+        // (the bounce goes out into the dark: a room with its own light on is as bright as it should be already)
+        ROOM.gap.set([o.at, g[0], g[1], (o.top + 4 * o.b.slot + 64 * Math.round(16 * o.carries * (1 - (o.to ? Math.min(1, o.to.out) : 0)))) * (o.alongX ? -1 : 1)], m * 4); m++;
       }
       ROOM.list[ri * 4 + 3] = m - ROOM.list[ri * 4 + 2];
     });
@@ -483,15 +508,16 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
     for (const m of L.movers || []) if (m.visible && Math.hypot(m.position.x - p.x, m.position.z - p.z) < 7.5) return true;
     return false;
   };
-  // which lit fixture wants a shadowed spot most: the one in your room, then the nearest; one behind you or behind a shut door counts as
-  // further away, and the fixture a spot is at already counts as nearer, so two that are much the same never trade places back and forth
+  // which lit fixture wants a shadowed spot most: the one in your room, then the nearest; one that has been behind you a while or is
+  // behind a shut door counts as further away, and the fixture a spot is at already counts as nearer, so two that are much the same
+  // never trade places back and forth
   const doorOf = Object.fromEntries(Object.entries(DOOR_ROOM).map(([d, r]) => [r, d]));
   function score(b, here) {
     const dx = b.pos.x - camera.position.x, dz = b.pos.z - camera.position.z, d = Math.hypot(dx, dz);
     let s = d;
     if (pool.some((sp) => sp.bulb === b && sp.want)) s -= 2;
     if (b.room === here) return s - 100;
-    if (d > 0.5 && (dx * fwd.x + dz * fwd.z) / d < 0.1) s += 4;
+    if (b.behind > 3) s += 4;
     const dr = W.doors[doorOf[b.room]]; if (dr && dr.a < 0.05) s += 8;
     return s;
   }

@@ -134,7 +134,7 @@ const ACT2 = [
     end(c) { c.g.vigil(false); } },
   // the shadow in the corner of the living room: there at the edge of the frame, gone when the camera turns to it
   { id: 'shadow', w: 5.5,
-    setup(c) { c.g.night({ lights: 0.35 }); c.P.pos.set(-0.37, 0, -0.54); c.sh = shadowFigure(c.W.house); c.sh.position.set(4.28, 0, -3.88); c.sh.lookAt(0, 0, -2.4); c.sh.rotation.x = 0; c.sh.visible = true; },
+    setup(c) { c.g.night({ lights: 0.35, roof: 0.15 }); c.P.pos.set(-0.37, 0, -0.54); c.sh = shadowFigure(c.W.house); c.sh.position.set(4.28, 0, -3.88); c.sh.lookAt(0, 0, -2.4); c.sh.rotation.x = 0; c.sh.visible = true; },
     update(c, k) {
       const turn = ease.inOut(clamp((k - 0.68) / 0.22, 0, 1));
       c.sh.userData.mat.opacity = Math.min(ease.out(clamp(k / 0.35, 0, 1)), 1 - ease.in(clamp((turn - 0.45) / 0.45, 0, 1)));
