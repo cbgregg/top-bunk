@@ -37,10 +37,11 @@ const KEY = 'topbunk.quality';
 const OKEY = 'topbunk.gfx';   // the custom settings and the ones that belong to no preset (frame cap, counter, contrast, gamma)
 
 // every preset as the separate settings of the Graphics page. px / fixed: the render scale the way the presets have always had it;
-// a custom setup has scale instead, a share of the display's own pixels
+// a custom setup has scale instead, a share of the display's own pixels; fsr: the upscaling (Medium and Low draw two thirds of the
+// width and height and upscale it: a third less frame time on a slow card, and sharper than drawing that small and letting the browser stretch it)
 export const OPTS = {
-  low:    { px: 1,    fixed: false, aa: 'off',   shadows: 'low',    ao: 'off',  bloom: 0,    grain: false, ca: false, vignette: false, mblur: false, tex: 'low',    grass: 'low',    draw: 'near',   weather: 'low', fsr: 'off' },
-  medium: { px: 1.25, fixed: false, aa: 'msaa2', shadows: 'medium', ao: 'off',  bloom: 0.32, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'medium', grass: 'medium', draw: 'medium', weather: 'medium', fsr: 'off' },
+  low:    { px: 1,    fixed: false, aa: 'off',   shadows: 'low',    ao: 'off',  bloom: 0,    grain: false, ca: false, vignette: false, mblur: false, tex: 'low',    grass: 'low',    draw: 'near',   weather: 'low', fsr: 'quality' },
+  medium: { px: 1.25, fixed: false, aa: 'msaa2', shadows: 'medium', ao: 'off',  bloom: 0.32, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'medium', grass: 'medium', draw: 'medium', weather: 'medium', fsr: 'quality' },
   high:   { px: 1.25, fixed: true,  aa: 'msaa4', shadows: 'high',   ao: 'low',  bloom: 0.4,  grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'high',   grass: 'high',   draw: 'far',    weather: 'high', fsr: 'off' },
   ultra:  { px: 2,    fixed: true,  aa: 'msaa4', shadows: 'ultra',  ao: 'high', bloom: 0.45, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'high',   grass: 'ultra',  draw: 'far',    weather: 'high', fsr: 'off' },
 };
