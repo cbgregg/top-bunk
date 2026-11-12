@@ -117,8 +117,8 @@ const dust = new Dust(scene, camera);
 settings.delegate('quality', { get: () => gfx.mode, set: (v) => (v === 'custom' ? gfx.toCustom() : gfx.setMode(v)), def: 'auto' });   // the options menu's Graphics row
 // the Graphics page: one setting each, handed to gfx (a change to any of the preset ones turns the preset into Custom; the personal ones
 // - frame cap, counter, contrast, gamma - go back to their defaults with Restore defaults)
-for (const k of ['scale', 'aa', 'shadows', 'ao', 'bloom', 'grain', 'ca', 'vignette', 'mblur', 'tex', 'grass', 'draw', 'weather']) settings.delegate('g_' + k, { get: () => gfx.opt(k), set: (v) => gfx.setOpt(k, v) });
-for (const [k, d] of [['cap', 0], ['counter', false], ['contrast', 1], ['gamma', 1], ['cine', !PHONE]]) settings.delegate('g_' + k, { get: () => gfx.opt(k), set: (v) => gfx.setOpt(k, typeof d === 'number' ? +v : v === 'false' ? false : !!v), def: d });
+for (const k of ['scale', 'fsr', 'aa', 'shadows', 'ao', 'bloom', 'grain', 'ca', 'vignette', 'mblur', 'tex', 'grass', 'draw', 'weather']) settings.delegate('g_' + k, { get: () => gfx.opt(k), set: (v) => gfx.setOpt(k, v) });
+for (const [k, d] of [['cap', 0], ['counter', false], ['contrast', 1], ['gamma', 1], ['cine', !PHONE], ['sharp', 80]]) settings.delegate('g_' + k, { get: () => gfx.opt(k), set: (v) => gfx.setOpt(k, typeof d === 'number' ? +v : v === 'false' ? false : !!v), def: d });
 if (window.desktop && window.desktop.toggleFullscreen) {   // the desktop build: fullscreen or a window
   let full = true; window.desktop.isFullscreen().then((v) => { full = !!v; menu.refresh(); });
   settings.delegate('g_display', { get: () => (full ? 'full' : 'window'), set: (v) => { if ((v === 'full') !== full) window.desktop.toggleFullscreen().then((now) => { full = !!now; menu.refresh(); }); } });
@@ -1507,9 +1507,9 @@ function handsTick(dt) {
 let booted = false, warming = false;
 // build the programs for the given light setups: one compile of the whole scene per setup, which hands every program to the driver at once
 // and resolves when the driver has them all (programs are shared and cached, so a setup only adds the ones it does not have yet).
-// shaders differ for the post-processing target and for the screen; the composer's target is what the game draws into
+// shaders differ for a render target and for the screen; gfx.target is what the game draws into (the chain's, the upscaler's, or none)
 async function compileSlices(phases, progress = () => {}) {
-  const rt = gfx.composer && gfx.composer.renderTarget1;
+  const rt = gfx.target;
   for (let p = 0; p < phases.length; p++) {
     if (phases[p] === 'title') titleScene(); else setPhase(phases[p], true);
     let done = null;

@@ -11,6 +11,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { store } from './store.js';
+import { FSR } from './fsr.js';
 
 // dpr is the render scale in CSS pixels; `fixed` presets render at that scale whatever the screen's own ratio is, so on a plain
 // 1080p monitor ultra draws 4K and scales down (the edges of the bunk rails and the door frames are where the picture lives)
@@ -38,10 +39,10 @@ const OKEY = 'topbunk.gfx';   // the custom settings and the ones that belong to
 // every preset as the separate settings of the Graphics page. px / fixed: the render scale the way the presets have always had it;
 // a custom setup has scale instead, a share of the display's own pixels
 export const OPTS = {
-  low:    { px: 1,    fixed: false, aa: 'off',   shadows: 'low',    ao: 'off',  bloom: 0,    grain: false, ca: false, vignette: false, mblur: false, tex: 'low',    grass: 'low',    draw: 'near',   weather: 'low' },
-  medium: { px: 1.25, fixed: false, aa: 'msaa2', shadows: 'medium', ao: 'off',  bloom: 0.32, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'medium', grass: 'medium', draw: 'medium', weather: 'medium' },
-  high:   { px: 1.25, fixed: true,  aa: 'msaa4', shadows: 'high',   ao: 'low',  bloom: 0.4,  grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'high',   grass: 'high',   draw: 'far',    weather: 'high' },
-  ultra:  { px: 2,    fixed: true,  aa: 'msaa4', shadows: 'ultra',  ao: 'high', bloom: 0.45, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'high',   grass: 'ultra',  draw: 'far',    weather: 'high' },
+  low:    { px: 1,    fixed: false, aa: 'off',   shadows: 'low',    ao: 'off',  bloom: 0,    grain: false, ca: false, vignette: false, mblur: false, tex: 'low',    grass: 'low',    draw: 'near',   weather: 'low', fsr: 'off' },
+  medium: { px: 1.25, fixed: false, aa: 'msaa2', shadows: 'medium', ao: 'off',  bloom: 0.32, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'medium', grass: 'medium', draw: 'medium', weather: 'medium', fsr: 'off' },
+  high:   { px: 1.25, fixed: true,  aa: 'msaa4', shadows: 'high',   ao: 'low',  bloom: 0.4,  grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'high',   grass: 'high',   draw: 'far',    weather: 'high', fsr: 'off' },
+  ultra:  { px: 2,    fixed: true,  aa: 'msaa4', shadows: 'ultra',  ao: 'high', bloom: 0.45, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'high',   grass: 'ultra',  draw: 'far',    weather: 'high', fsr: 'off' },
 };
 export const SHADOWS = { off: null, low: { sun: 1024, spot: 512, soft: false }, medium: { sun: 2048, spot: 1024, soft: false }, high: { sun: 2048, spot: 1024, soft: true }, ultra: { sun: 4096, spot: 2048, soft: true } };
 export const AO = { off: null, low: { samples: 8, radius: 0.55, res: 0.5 }, high: { samples: 16, radius: 0.55, res: 0.7 } };
@@ -49,7 +50,10 @@ export const TEX = { low: 2, medium: 4, high: 16 };
 export const GRASS = { off: 0, low: 0.3, medium: 0.55, high: 1, ultra: 1 };
 export const DRAW = { near: { fog: 1.7, far: 160 }, medium: { fog: 1.3, far: 260 }, far: { fog: 1, far: 400 } };
 export const WEATHER = { low: 0.25, medium: 0.6, high: 1 };
-const PERSONAL = { cap: 0, counter: false, contrast: 1, gamma: 1, cine: !PHONE };   // cap 0: no frame cap; cine: the cinematic look in conversations
+// upscaling (FSR 1): the share of the canvas's pixels each way the scene is drawn with (AMD's own ratios)
+export const UPSCALE = { off: 0, ultra: 1 / 1.3, quality: 1 / 1.5, balanced: 1 / 1.7, performance: 1 / 2 };
+// cap 0: no frame cap; cine: the cinematic look in conversations; sharp: the upscaler's sharpening, 0-100
+const PERSONAL = { cap: 0, counter: false, contrast: 1, gamma: 1, cine: !PHONE, sharp: 80 };
 // the conversations' look: the scene drawn at no less than 1.5x the display's pixels, high ambient occlusion, depth of field on the
 // speaker, sharper shadows, a light rig on the face, a film curve with a touch of halation and a 2.39:1 letterbox
 const CINE = { scale: 1.5, ao: { samples: 16, radius: 0.6, res: 0.75 }, bloom: 0.3, shadow: 2, box: 5 };
@@ -182,7 +186,7 @@ export class Gfx {
     this.quality = valid(q) ? q : this.autoQuality; this.auto = !(valid(saved) || quality);
     this.turn = 0; this._q = new THREE.Quaternion(); this.onOpts = null;
     this.time = 0; this.night = 0; this.nightGoal = 1; this.phase = 'title'; this.env = {}; this.daySky = null;
-    this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.cool = 0; this.fast = 0; this.ceiling = null;   // res: dynamic resolution scale
+    this.ft = 16; this.slow = 0; this.age = 0; this.onChange = null; this.res = 1; this.native = false; this.cool = 0; this.fast = 0; this.ceiling = null;   // res: dynamic resolution scale; native: never upscale (the trailer)
     this.cineGoal = 0; this.cineK = 0; this.cineFocus = null; this.cineHold = null; this.chain = null; this.rig = null; this._v = new THREE.Vector3(); this._f = new THREE.Vector3();
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.loadEnv();
@@ -237,23 +241,31 @@ export class Gfx {
     if (o.aa === 'ss2') d *= 2;
     return Math.min(4, d);
   }
-  // the preset as it stands (what the phone always draws with), taken through the Graphics settings
+  // the preset as it stands (what the phone always draws with), taken through the Graphics settings. dpr: the pixel ratio the scene is
+  // drawn at (before the dynamic resolution); canvas: when FSR upscales, the canvas's own pixel ratio (the display's pixels, or the render
+  // scale when that is more), else 0 and the canvas is the scene's size; fsr: the scene's share of the canvas each way
   plan() {
-    if (PHONE) return { ...QUALITY[this.quality] || QUALITY.phone, dpr: baseDpr(QUALITY[this.quality] || QUALITY.phone) };
+    const sharp = this.sharpStops(), native = Math.min(4, devicePixelRatio || 1);
+    if (PHONE) return { ...QUALITY[this.quality] || QUALITY.phone, dpr: baseDpr(QUALITY[this.quality] || QUALITY.phone), canvas: 0, fsr: 0, sharp };
     const o = this.opts, pr = this.personal, sh = SHADOWS[o.shadows];
     const post = !!AO[o.ao] || o.bloom > 0 || o.grain || o.ca || o.vignette || o.aa === 'fxaa' || o.mblur || pr.contrast !== 1 || pr.gamma !== 1 || (!!OPTS[this.quality] && this.quality !== 'low');
+    const d = this.pixelRatio(o), k = this.native ? 0 : UPSCALE[o.fsr] || 0;
     return {
-      dpr: this.pixelRatio(o), msaa: o.aa === 'msaa4' ? 4 : o.aa === 'msaa2' ? 2 : 0, ao: AO[o.ao], bloom: o.bloom, grade: post, direct: !post,
+      dpr: k ? d * k : d, canvas: k ? Math.min(4, Math.max(native, d)) : 0, fsr: k, sharp,
+      msaa: o.aa === 'msaa4' ? 4 : o.aa === 'msaa2' ? 2 : 0, ao: AO[o.ao], bloom: o.bloom, grade: post, direct: !post,
       sun: sh ? sh.sun : 512, spot: sh ? sh.spot : 256, shadows: !!sh, soft: !!(sh && sh.soft), fxaa: o.aa === 'fxaa', mblur: !!o.mblur,
     };
   }
+  // the pixel ratios a plan draws with right now: the scene's (with the dynamic resolution) and the canvas's. Without FSR they are the
+  // same and the dynamic resolution shrinks the canvas; with it the canvas keeps its size and only the scene shrinks
+  ratios(p = this.plan()) { const scene = p.dpr * this.res; return { scene, canvas: p.canvas || scene, up: !!p.canvas }; }
   build() {
     const p = this.plan();
     this.dropCine();
     if (this.composer) { for (const ps of this.composer.passes) ps.dispose?.(); this.composer.dispose?.(); this.composer = null; }
     const r = this.r, scene = this.scene;
-    const dpr = p.dpr * this.res;
-    r.setPixelRatio(dpr); r.setSize(innerWidth, innerHeight);
+    const { scene: dpr, canvas } = this.ratios(p);
+    r.setPixelRatio(canvas); r.setSize(innerWidth, innerHeight);
     if (!PHONE) {   // shadows on or off and their filter: every material's program depends on these, so they are rebuilt on change
       const type = p.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
       if (r.shadowMap.enabled !== p.shadows || r.shadowMap.type !== type) {
@@ -263,11 +275,36 @@ export class Gfx {
     }
     for (const l of scene.userData.shadowLights || []) { l.light.shadow.mapSize.set(l.sun ? p.sun : p.spot, l.sun ? p.sun : p.spot); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.autoUpdate = false; l.light.shadow.needsUpdate = true; }
     this.pass = {};
-    if (p.direct) { if (p.overlay && !this.overlay) this.buildOverlay(); return; }
+    if (p.direct) { if (p.overlay && !this.overlay) this.buildOverlay(); this.fit(p); return; }
     ({ composer: this.composer, pass: this.pass } = this.chainFor(p, dpr));
-    this.sizePasses(dpr);
+    this.fit(p);
     this.applyLook();
   }
+  // the canvas, the chain and the upscaler's targets sized for the plan at the dynamic resolution (after a build, a resize, a step of the
+  // dynamic resolution). The direct path with FSR draws into a multisampled HDR target of the scene's size, which an OutputPass tone maps
+  // into a display-ready one for the upscaler
+  fit(p = this.plan()) {
+    const { scene: dpr, canvas, up } = this.ratios(p), w = innerWidth, h = innerHeight;
+    if (!this.cineOn) this.r.setPixelRatio(canvas);
+    this.r.setSize(w, h);
+    this.up = up;
+    if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(w, h); }
+    this.sizePasses(dpr);
+    const low = up && !this.composer, lw = Math.max(1, Math.round(w * dpr)), lh = Math.max(1, Math.round(h * dpr));
+    if (low && !this.low) {
+      this.low = new THREE.WebGLRenderTarget(lw, lh, { type: THREE.HalfFloatType, samples: Math.min(4, this.r.capabilities.maxSamples || 4) });
+      this.ldr = new THREE.WebGLRenderTarget(lw, lh, { depthBuffer: false });
+      this.outPass = this.outPass || new OutputPass();
+    } else if (low) { this.low.setSize(lw, lh); this.ldr.setSize(lw, lh); }
+    else if (this.low) { this.low.dispose(); this.ldr.dispose(); this.low = this.ldr = null; }
+    if (this.chain) this.fitCine();
+  }
+  // the target the scene itself is drawn into (the shaders are built for it ahead of time): the chain's, the upscaler's, or the canvas
+  get target() { return (this.composer && this.composer.renderTarget1) || this.low || null; }
+  // FSR from a display-ready picture to the canvas
+  upscale(rt) { (this.fsr ||= new FSR(this.r)).render(rt, this.sharpStops()); }
+  // the Sharpness setting as RCAS takes it: stops below full strength (100 is full, 0 two stops down)
+  sharpStops() { return 2 * (1 - THREE.MathUtils.clamp(this.personal.sharp ?? 80, 0, 100) / 100); }
   // a post-processing chain for a plan: the everyday one, or the conversations' one (dof and the letterbox)
   chainFor(p, dpr) {
     const r = this.r, scene = this.scene, camera = this.camera, pass = {};
@@ -382,25 +419,28 @@ export class Gfx {
     this.overlay = { scene, cam: new THREE.Camera(), mat };
   }
 
-  resize() {
-    const dpr = this.plan().dpr * this.res;
-    this.r.setSize(innerWidth, innerHeight);
-    if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(innerWidth, innerHeight); }
-    this.sizePasses(dpr);
-    if (this.chain) { const ch = this.chain; ch.dpr = this.cinePlan().dpr; ch.composer.setPixelRatio(ch.dpr); ch.composer.setSize(innerWidth, innerHeight); this.sizePasses(ch.dpr, ch.pass); if (this.cineOn) this.r.setPixelRatio(ch.dpr); }
-  }
+  resize() { this.fit(); }
 
   // ---------- the conversations' look ----------
   // main.js says each frame whether a conversation is on and where the speaker's head is (null: nobody in particular)
   setCine(on, focus = null) { this.cineGoal = on && this.personal.cine && !PHONE ? 1 : 0; this.cineFocus = focus; }
+  // with FSR the conversations are drawn at the same share of their own scale and upscaled to the everyday canvas, unless that share is
+  // still as many pixels as the canvas has (then they draw straight to it, at their scale)
   cinePlan() {
-    const p = this.plan();
-    return { ...p, dpr: Math.min(4, Math.max(p.dpr, (devicePixelRatio || 1) * CINE.scale)), msaa: 4, ao: CINE.ao, bloom: Math.max(p.bloom || 0, CINE.bloom), grade: true, direct: false, dof: true, fxaa: false, mblur: false };
+    const p = this.plan(), base = p.fsr ? p.dpr / p.fsr : p.dpr, full = Math.min(4, Math.max(base, (devicePixelRatio || 1) * CINE.scale));
+    const dpr = p.fsr ? full * p.fsr : full, up = !!p.canvas && dpr < p.canvas - 0.01;
+    return { ...p, dpr, canvas: up ? p.canvas : dpr, up, msaa: 4, ao: CINE.ao, bloom: Math.max(p.bloom || 0, CINE.bloom), grade: true, direct: false, dof: true, fxaa: false, mblur: false };
   }
   makeCine() {
-    const p = this.cinePlan(), ch = this.chain = { ...this.chainFor(p, p.dpr), dpr: p.dpr };
+    const p = this.cinePlan(), ch = this.chain = { ...this.chainFor(p, p.dpr), dpr: p.dpr, canvas: p.canvas, up: p.up };
     this.sizePasses(p.dpr, ch.pass); this.applyLook(ch.pass, true);
     return ch;
+  }
+  fitCine() {
+    const ch = this.chain, p = this.cinePlan();
+    Object.assign(ch, { dpr: p.dpr, canvas: p.canvas, up: p.up });
+    ch.composer.setPixelRatio(ch.dpr); ch.composer.setSize(innerWidth, innerHeight); this.sizePasses(ch.dpr, ch.pass);
+    if (this.cineOn) this.r.setPixelRatio(ch.canvas);
   }
   dropCine() {
     if (this.cineOn) this.leaveCine();
@@ -415,7 +455,7 @@ export class Gfx {
   }
   enterCine() {
     const ch = this.chain || this.makeCine();
-    this.cineOn = true; this.r.setPixelRatio(ch.dpr); this.dofF = null; this.boxAt = null;
+    this.cineOn = true; this.r.setPixelRatio(ch.canvas); this.dofF = null; this.boxAt = null;
     // sharper shadows while it lasts: every shadow map at twice the size (the sun's is also pulled in around the speaker)
     this.shadowSave = [];
     if (this.r.shadowMap.enabled) for (const l of this.scene.userData.shadowLights || []) {
@@ -435,7 +475,7 @@ export class Gfx {
     }
     this.shadowSave = null;
     if (this.rig) for (const k in this.rig) this.rig[k].intensity = 0;
-    this.r.setPixelRatio(this.plan().dpr * this.res);
+    this.r.setPixelRatio(this.ratios().canvas);
   }
   // three lights that follow the framing: a warm key 45 degrees off the line from the lens to the face and a little above, a dim cool
   // fill from the other side, and a rim from behind that picks the head out of the room. Always in the scene (dark when not in use), so a
@@ -506,12 +546,10 @@ export class Gfx {
   // dynamic resolution: render at a lower pixel ratio when frames are slow, and creep back up when there is headroom
   // the preset's own render scale, before the dynamic factor
   baseDpr() { return this.plan().dpr; }
+  // with FSR on, only the scene's scale moves (the canvas keeps the display's pixels and FSR fills the gap)
   setRes(v) {
     if (v === this.res) return; this.res = v;
-    const dpr = this.plan().dpr * v;
-    this.r.setPixelRatio(dpr);
-    if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(innerWidth, innerHeight); }
-    this.sizePasses(dpr);
+    this.fit();
   }
 
   // adaptive: first lower the resolution a little, and if the frame time stays high step down one preset. A card with plenty of
@@ -559,17 +597,28 @@ export class Gfx {
     if (this.cineOn) {
       this.cineFrame(dt);
       const u = this.chain.pass.grade.uniforms; u.time.value = this.time; u.night.value = this.night;
-      this.chain.composer.render(dt);
+      this.chainFrame(this.chain.composer, this.chain.up, dt);
       return;
     }
     if (this.pass.grade) { const u = this.pass.grade.uniforms; u.time.value = this.time; u.night.value = this.night; }
-    if (this.composer) this.composer.render(dt);
-    else {
-      this.r.render(this.scene, this.camera);
-      if (this.overlay && (QUALITY[this.quality] || {}).overlay) {
-        const u = this.overlay.mat.uniforms; u.time.value = this.time; u.night.value = this.night; u.res.value.set(innerWidth, innerHeight);
-        this.r.autoClear = false; this.r.render(this.overlay.scene, this.overlay.cam); this.r.autoClear = true;
-      }
+    if (this.composer) { this.chainFrame(this.composer, this.up, dt); return; }
+    const r = this.r, low = this.up && this.low;
+    // the direct path: straight to the canvas (tone mapping and sRGB in every material's shader), or with FSR into the small HDR target,
+    // tone mapped into the display-ready one, and upscaled from that
+    r.setRenderTarget(low ? this.low : null);
+    r.render(this.scene, this.camera);
+    if (low) { this.outPass.renderToScreen = false; this.outPass.render(r, this.ldr, this.low); r.setRenderTarget(this.ldr); }
+    if (this.overlay && (QUALITY[this.quality] || {}).overlay) {
+      const u = this.overlay.mat.uniforms; u.time.value = this.time; u.night.value = this.night; u.res.value.set(innerWidth, innerHeight);
+      r.autoClear = false; r.render(this.overlay.scene, this.overlay.cam); r.autoClear = true;
     }
+    if (low) this.upscale(this.ldr);
+  }
+  // a chain's frame: to the canvas, or (FSR) into its own buffer, which then is upscaled. The OutputPass in the chain has tone mapped it and
+  // put it in sRGB already, and the grade and FXAA come after that, so the upscaler takes a finished picture
+  chainFrame(c, up, dt) {
+    c.renderToScreen = !up;
+    c.render(dt);
+    if (up) this.upscale(c.readBuffer);
   }
 }

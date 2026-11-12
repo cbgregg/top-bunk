@@ -292,7 +292,9 @@ export function attach(game, opts = {}) {
       if (began) return; began = true;
       if (game.W.lawn && game.W.lawn.ready) await game.W.lawn.ready;   // the grass grows in after load
       game.start(); game.gfx.auto = false;
+      game.gfx.native = true;   // no upscaling: every frame drawn at the scale asked for here, whatever the preset or the saved settings say
       if (quality) game.gfx.setQuality(quality, { save: false });
+      game.gfx.build();
       if (shadow) for (const l of game.scene.userData.shadowLights) { const sz = l.sun ? shadow : shadow / 2; l.light.shadow.mapSize.set(sz, sz); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.needsUpdate = true; }
       // ss: render at exactly that many pixels per output pixel (the frame grab scales it down); res alone is the preset's own scale times res
       if (ss) game.gfx.setRes((res || 1) * ss / game.gfx.baseDpr()); else if (res && res !== 1) game.gfx.setRes(res);
@@ -305,7 +307,7 @@ export function attach(game, opts = {}) {
       g.reset();
       try { await document.fonts.load('bold 40px "Gloria Hallelujah"'); await document.fonts.ready; } catch (e) { /* ignore */ }
       // compile every lighting variant now instead of in the middle of a shot
-      const rt = game.gfx.composer && game.gfx.composer.renderTarget1;
+      const rt = game.gfx.target;
       try { for (const p of ['title', 'day', 'morning', 'night']) { game.setPhase(p, true); if (rt) game.renderer.setRenderTarget(rt); await game.renderer.compileAsync(game.scene, camera); game.renderer.setRenderTarget(null); } } catch (e) { game.renderer.setRenderTarget(null); }
       game.setPhase('night', true);
     },
