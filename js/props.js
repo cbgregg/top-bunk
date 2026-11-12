@@ -61,14 +61,22 @@ export function place(parent, name, { x, y = 0, z, rot = 0, s = 1, wall = false,
 }
 
 // many copies of one model as instanced meshes. mats: Matrix4[] of where each copy goes (feet at the local origin).
-export function scatter(parent, name, mats, { cast = true } = {}) {
+// The copies are binned into square cells of `cell` metres, one instanced mesh per cell, so each camera (the view, the sun and the room
+// spots' shadow maps, the window mirror) only draws the cells its frustum reaches: one sphere round every copy on the property put every
+// tree in every frustum. The copies keep their order within a cell, and the picture is the same
+export function scatter(parent, name, mats, { cast = true, cell = 24 } = {}) {
+  const cells = new Map();
+  for (const m of mats) { const key = Math.floor(m.elements[12] / cell) + ',' + Math.floor(m.elements[14] / cell); (cells.get(key) || cells.set(key, []).get(key)).push(m); }
   loadProp(name).then((g) => {
     const b = g.box, norm = new THREE.Matrix4().makeTranslation(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2), out = new THREE.Group(), t = new THREE.Matrix4();
     g.scene.traverse((o) => {
       if (!o.isMesh) return;
-      const im = new THREE.InstancedMesh(o.geometry, o.material, mats.length), local = new THREE.Matrix4().multiplyMatrices(norm, o.matrixWorld);
-      mats.forEach((m, i) => im.setMatrixAt(i, t.multiplyMatrices(m, local)));
-      im.castShadow = cast; im.receiveShadow = true; im.computeBoundingSphere(); out.add(im);   // culled as a group, by the sphere around every copy
+      const local = new THREE.Matrix4().multiplyMatrices(norm, o.matrixWorld);
+      for (const list of cells.values()) {
+        const im = new THREE.InstancedMesh(o.geometry, o.material, list.length);
+        list.forEach((m, i) => im.setMatrixAt(i, t.multiplyMatrices(m, local)));
+        im.castShadow = cast; im.receiveShadow = true; im.computeBoundingSphere(); out.add(im);   // culled by the sphere round the copies in its cell
+      }
     });
     parent.add(out);
   }).catch((e) => console.warn('scatter failed:', name, e));
