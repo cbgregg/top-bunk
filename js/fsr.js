@@ -120,7 +120,7 @@ export class FSR {
     const r = this.r, c = r.domElement, w = c.width, h = c.height;
     if (this.mid.width !== w || this.mid.height !== h) this.mid.setSize(w, h);
     const eu = this.easu.material.uniforms;
-    eu.tInput.value = src.texture; eu.inSize.value.set(src.width, src.height);
+    eu.tInput.value = src.texture; eu.inSize.value.set(Math.floor(src.width), Math.floor(src.height));   // a target's size can be fractional; its texture is not
     r.setRenderTarget(this.mid); this.easu.render(r);
     const ru = this.rcas.material.uniforms;
     ru.tInput.value = this.mid.texture; ru.size.value.set(w, h); ru.con.value = Math.pow(2, -stops);
