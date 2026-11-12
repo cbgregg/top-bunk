@@ -408,7 +408,9 @@ export class Gfx {
   }
 
   // the night look without a post-processing chain: one translucent quad over the picture, a blue-black wash that deepens toward
-  // the corners and at night, with grain in its alpha. It is drawn after the scene with the depth test off
+  // the corners and at night, with grain in its alpha. It is drawn after the scene with the depth test off, into the small picture when
+  // the phone upscales. A CSS layer of the same wash and a tiled grain looks the same and costs no less a frame, and the browser would
+  // composite it at the screen's every pixel where this quad is drawn within the phone's pixel budget, so the quad stays
   buildOverlay() {
     const mat = new THREE.ShaderMaterial({
       uniforms: { time: { value: 0 }, night: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } },
