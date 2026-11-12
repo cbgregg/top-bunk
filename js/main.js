@@ -1433,11 +1433,15 @@ function fpsCount(now) {
 }
 let breathLatch = false, breathPrev = false, breathDownAt = 0, nights = null;
 let last = performance.now(), titleT = 0, frameN = 0;
+const MENU_FPS = 30;
 function loop(now) {
   requestAnimationFrame(loop);
-  // the frame cap: a frame comes only once its share of a second has passed (the browser never gives more than the display's refresh)
-  const cap = gfx.personal.cap;
-  if (cap > 0 && now - fps.lastDraw < 1000 / cap - 1.5) return;
+  // the frame cap: a frame comes only once its share of a second has passed (the browser never gives more than the display's refresh).
+  // Behind the title and the pause menu no more than 30 a second (a slow or frozen scene; the battery and the fans), unless the setting is
+  // lower; the menus still read the controller every refresh. The trailer's renderer runs the clock itself (window.__pump) and is never capped
+  const own = gfx.personal.cap, menu = (!started || paused) && !window.__pump ? MENU_FPS : 0;
+  const cap = menu && !(own > 0 && own < menu) ? menu : own;
+  if (cap > 0 && now - fps.lastDraw < 1000 / cap - 1.5) { if (menu) input.poll(); return; }
   fps.lastDraw = now; fpsCount(now);
   input.poll();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
