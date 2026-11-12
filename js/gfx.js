@@ -21,17 +21,21 @@ export const QUALITY = {
   medium: { dpr: 1.25, msaa: 2, ao: null,                          bloom: 0.32, grade: true,  sun: 2048, spot: 1024 },
   low:    { dpr: 1,    msaa: 0, ao: null,                          bloom: 0,    grade: false, sun: 1024, spot: 512, direct: true },
 };
-const baseDpr = (p) => p.fixed ? p.dpr : Math.min(devicePixelRatio || 1, p.dpr);
 // a phone or a tablet: a screen with no mouse. It gets the lighter presets whatever it picks (its memory is the limit, not its taste):
 // no multisampling, no render above its own pixels, small shadow maps, and the textures load at half size (pbr.js, props.js)
 export const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
 // the phone preset: the scene drawn straight to the screen at the screen's own pixels with the canvas's own antialiasing, no
 // post-processing chain (the night look comes from a cheap overlay instead), a small hard-edged sun shadow, no other shadow maps.
 // On a phone every preset in the menu is this one, give or take the render scale: the memory is the limit there, not the taste
+// pixels: the most the scene is drawn with (a pixel budget: a 3x screen would otherwise draw nine times what a 1x one does); up to the
+// screen's own pixels, and when the budget is less than those FSR fills the screen from it
 if (PHONE) {
-  QUALITY.phone = { dpr: 1, msaa: 0, ao: null, bloom: 0, grade: false, sun: 512, spot: 256, direct: true, overlay: true };
-  for (const k of ['ultra', 'high', 'medium', 'low']) Object.assign(QUALITY[k], QUALITY.phone, { dpr: k === 'ultra' ? 1.25 : 1 });
+  QUALITY.phone = { dpr: 1, msaa: 0, ao: null, bloom: 0, grade: false, sun: 512, spot: 256, direct: true, overlay: true, pixels: 1e6 };
+  for (const k of ['ultra', 'high', 'medium', 'low']) Object.assign(QUALITY[k], QUALITY.phone, { pixels: k === 'ultra' ? 1.25e6 : 1e6 });
 }
+// a phone whose screen has more pixels than any preset's budget always upscales, so its canvas needs no multisampling of its own (at three
+// times a phone's CSS pixels that would be a 4x buffer of some 3 million pixels holding nothing but FSR's output)
+export const PHONE_UPSCALES = PHONE && (Math.min(3, devicePixelRatio || 1) ** 2) * innerWidth * innerHeight > 1.25e6 * 1.05;
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
 const OKEY = 'topbunk.gfx';   // the custom settings and the ones that belong to no preset (frame cap, counter, contrast, gamma)
@@ -247,7 +251,12 @@ export class Gfx {
   // scale when that is more), else 0 and the canvas is the scene's size; fsr: the scene's share of the canvas each way
   plan() {
     const sharp = this.sharpStops(), native = Math.min(4, devicePixelRatio || 1);
-    if (PHONE) return { ...QUALITY[this.quality] || QUALITY.phone, dpr: baseDpr(QUALITY[this.quality] || QUALITY.phone), canvas: 0, fsr: 0, sharp };
+    if (PHONE) {
+      const q = QUALITY[this.quality] || QUALITY.phone, screen = Math.min(3, native);
+      const dpr = Math.min(screen, Math.max(1, Math.sqrt(q.pixels / Math.max(1, innerWidth * innerHeight))));
+      const up = !this.native && dpr < screen - 0.02;
+      return { ...q, dpr, canvas: up ? screen : 0, fsr: up ? dpr / screen : 0, sharp };
+    }
     const o = this.opts, pr = this.personal, sh = SHADOWS[o.shadows];
     const post = !!AO[o.ao] || o.bloom > 0 || o.grain || o.ca || o.vignette || o.aa === 'fxaa' || o.mblur || pr.contrast !== 1 || pr.gamma !== 1 || (!!OPTS[this.quality] && this.quality !== 'low');
     const d = this.pixelRatio(o), k = this.native ? 0 : UPSCALE[o.fsr] || 0;
@@ -420,6 +429,7 @@ export class Gfx {
     this.overlay = { scene, cam: new THREE.Camera(), mat };
   }
 
+  // a new window size or a turned phone: the phone's pixel budget is worked out again from the new size
   resize() { this.fit(); }
 
   // ---------- the conversations' look ----------

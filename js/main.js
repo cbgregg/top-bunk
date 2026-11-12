@@ -4,7 +4,7 @@ import { buildWorld, roomAt } from './world.js';
 import { Entity } from './entity.js';
 import { Sound } from './audio.js';
 import { makePerson } from './people.js';
-import { Gfx, PHONE, contactShadow } from './gfx.js';
+import { Gfx, PHONE, PHONE_UPSCALES, contactShadow } from './gfx.js';
 import { WindowFace } from './windowface.js';
 import { Dust } from './dust.js';
 import * as UI from './ui.js';
@@ -51,7 +51,7 @@ function saveRun() { store.set('topbunk.run', RUN); }
 const hasRun = () => RUN.night >= 2 || !!RUN.dayDone;   // moving day is kept once it is over: Continue starts night one
 
 // ---------- renderer ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: DEBUG === 'shot' });
+const renderer = new THREE.WebGLRenderer({ antialias: !PHONE_UPSCALES, powerPreference: 'high-performance', preserveDrawingBuffer: DEBUG === 'shot' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
