@@ -88,13 +88,15 @@ const EASU = /* glsl */`
     gl_FragColor = vec4(min(mx4, max(mn4, aC / aW)), 1.0);
   }`;
 
-// RCAS: each pixel pushed away from its four neighbours, as far as it can go without clipping (con: 1 at full strength)
+// RCAS: each pixel pushed away from its four neighbours, as far as it can go without clipping (con: 1 at full strength). Then the film
+// grain, at the canvas's own pixels, heavier in the shadows (the same as the grade's, which leaves it out when the picture is upscaled)
 const RCAS = /* glsl */`
   uniform sampler2D tInput;
   uniform vec2 size;
-  uniform float con;
+  uniform float con, grain, time;
   varying vec2 vUv;
   vec3 T(vec2 o) { return texture2D(tInput, vUv + o / size).rgb; }
+  float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
   void main() {
     vec3 b = T(vec2(0, -1)), d = T(vec2(-1, 0)), e = T(vec2(0)), f = T(vec2(1, 0)), h = T(vec2(0, 1));
     vec3 mn4 = min(min(b, d), min(f, h)), mx4 = max(max(b, d), max(f, h));
@@ -102,7 +104,9 @@ const RCAS = /* glsl */`
     vec3 hitMax = (1.0 - max(mx4, e)) / min(4.0 * mn4 - 4.0, -1e-5);
     vec3 lobeRGB = max(-hitMin, hitMax);
     float lobe = max(-(0.25 - 1.0 / 16.0), min(max(lobeRGB.r, max(lobeRGB.g, lobeRGB.b)), 0.0)) * con;
-    gl_FragColor = vec4(clamp((lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0), 0.0, 1.0), 1.0);
+    vec3 c = clamp((lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0), 0.0, 1.0);
+    if (grain > 0.0) c += (hash(vUv * size + fract(time) * 91.7) - 0.5) * grain * (1.15 - dot(c, vec3(0.299, 0.587, 0.114)));
+    gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
   }`;
 
 export class FSR {
@@ -110,20 +114,20 @@ export class FSR {
     this.r = renderer;
     const mat = (fragmentShader, uniforms) => new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader, depthTest: false, depthWrite: false });
     this.easu = new FullScreenQuad(mat(EASU, { tInput: { value: null }, inSize: { value: new THREE.Vector2() } }));
-    this.rcas = new FullScreenQuad(mat(RCAS, { tInput: { value: null }, size: { value: new THREE.Vector2() }, con: { value: 1 } }));
+    this.rcas = new FullScreenQuad(mat(RCAS, { tInput: { value: null }, size: { value: new THREE.Vector2() }, con: { value: 1 }, grain: { value: 0 }, time: { value: 0 } }));
     // the upsampled picture before sharpening: display values already (tone mapped, sRGB), so eight bits are enough
     this.mid = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false });
   }
   // src: the small picture, ready for display (tone mapped and in sRGB); drawn to the canvas at its own size. stops: how far the
-  // sharpening is turned down (0 is full strength, each stop halves it)
-  render(src, stops = 0.4) {
+  // sharpening is turned down (0 is full strength, each stop halves it); grain: the film grain's strength (0: none), time: its seed
+  render(src, stops = 0.4, grain = 0, time = 0) {
     const r = this.r, c = r.domElement, w = c.width, h = c.height;
     if (this.mid.width !== w || this.mid.height !== h) this.mid.setSize(w, h);
     const eu = this.easu.material.uniforms;
     eu.tInput.value = src.texture; eu.inSize.value.set(Math.floor(src.width), Math.floor(src.height));   // a target's size can be fractional; its texture is not
     r.setRenderTarget(this.mid); this.easu.render(r);
     const ru = this.rcas.material.uniforms;
-    ru.tInput.value = this.mid.texture; ru.size.value.set(w, h); ru.con.value = Math.pow(2, -stops);
+    ru.tInput.value = this.mid.texture; ru.size.value.set(w, h); ru.con.value = Math.pow(2, -stops); ru.grain.value = grain; ru.time.value = time;
     r.setRenderTarget(null); this.rcas.render(r);
   }
   dispose() { this.easu.dispose(); this.rcas.dispose(); this.easu.material.dispose(); this.rcas.material.dispose(); this.mid.dispose(); }

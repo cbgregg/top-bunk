@@ -27,22 +27,24 @@ export const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: c
 // the phone preset: the scene drawn straight to the screen at the screen's own pixels with the canvas's own antialiasing, no
 // post-processing chain (the night look comes from a cheap overlay instead), a small hard-edged sun shadow, no other shadow maps.
 // On a phone every preset in the menu is this one, give or take the render scale: the memory is the limit there, not the taste
-// pixels: the most the scene is drawn with (a pixel budget: a 3x screen would otherwise draw nine times what a 1x one does); up to the
-// screen's own pixels, and when the budget is less than those FSR fills the screen from it
+// The scene is drawn at the CSS pixels (1.25x on Ultra) whatever the screen's own ratio, and on a sharper screen FSR fills a canvas of
+// up to twice the CSS pixels from that: the same shading as ever, only the upscale on top
 if (PHONE) {
-  QUALITY.phone = { dpr: 1, msaa: 0, ao: null, bloom: 0, grade: false, sun: 512, spot: 256, direct: true, overlay: true, pixels: 1e6 };
-  for (const k of ['ultra', 'high', 'medium', 'low']) Object.assign(QUALITY[k], QUALITY.phone, { pixels: k === 'ultra' ? 1.25e6 : 1e6 });
+  QUALITY.phone = { dpr: 1, msaa: 0, ao: null, bloom: 0, grade: false, sun: 512, spot: 256, direct: true, overlay: true };
+  for (const k of ['ultra', 'high', 'medium', 'low']) Object.assign(QUALITY[k], QUALITY.phone, { dpr: k === 'ultra' ? 1.25 : 1 });
 }
-// a phone whose screen has more pixels than any preset's budget always upscales, so its canvas needs no multisampling of its own (at three
-// times a phone's CSS pixels that would be a 4x buffer of some 3 million pixels holding nothing but FSR's output)
-export const PHONE_UPSCALES = PHONE && (Math.min(3, devicePixelRatio || 1) ** 2) * innerWidth * innerHeight > 1.25e6 * 1.05;
+const PHONE_CANVAS = 2;   // the most a phone's canvas is upscaled to, in CSS pixels (past that the browser stretches it, as it always has)
+// a phone whose screen is sharper than every preset's scale always upscales, so its canvas needs no multisampling of its own (the scene's
+// target has it, and the canvas holds nothing but FSR's output)
+export const PHONE_UPSCALES = PHONE && Math.min(PHONE_CANVAS, devicePixelRatio || 1) > 1.25 + 0.02;
 const ORDER = ['ultra', 'high', 'medium', 'low'];
 const KEY = 'topbunk.quality';
 const OKEY = 'topbunk.gfx';   // the custom settings and the ones that belong to no preset (frame cap, counter, contrast, gamma)
 
 // every preset as the separate settings of the Graphics page. px / fixed: the render scale the way the presets have always had it;
 // a custom setup has scale instead, a share of the display's own pixels; fsr: the upscaling (Medium and Low draw two thirds of the
-// width and height and upscale it: a third less frame time on a slow card, and sharper than drawing that small and letting the browser stretch it)
+// render scale's width and height and upscale it to that scale: a third less frame time on a slow card, and sharper than drawing that
+// small and letting the browser stretch it)
 export const OPTS = {
   low:    { px: 1,    fixed: false, aa: 'off',   shadows: 'low',    ao: 'off',  bloom: 0,    grain: false, ca: false, vignette: false, mblur: false, tex: 'low',    grass: 'low',    draw: 'near',   weather: 'low', fsr: 'quality' },
   medium: { px: 1.25, fixed: false, aa: 'msaa2', shadows: 'medium', ao: 'off',  bloom: 0.32, grain: true,  ca: true,  vignette: true,  mblur: false, tex: 'medium', grass: 'medium', draw: 'medium', weather: 'medium', fsr: 'quality' },
@@ -59,7 +61,7 @@ export const WEATHER = { low: 0.25, medium: 0.6, high: 1 };
 export const UPSCALE = { off: 0, ultra: 1 / 1.3, quality: 1 / 1.5, balanced: 1 / 1.7, performance: 1 / 2 };
 // cap 0: no frame cap; cine: the cinematic look in conversations; sharp: the upscaler's sharpening, 0-100
 const PERSONAL = { cap: 0, counter: false, contrast: 1, gamma: 1, cine: !PHONE, sharp: 80 };
-// the conversations' look: the scene drawn at no less than 1.5x the display's pixels, high ambient occlusion, depth of field on the
+// the conversations' look: the scene drawn at no less than 1.5x the display's pixels (never upscaled), high ambient occlusion, depth of field on the
 // speaker, sharper shadows, a light rig on the face, a film curve with a touch of halation and a 2.39:1 letterbox
 const CINE = { scale: 1.5, ao: { samples: 16, radius: 0.6, res: 0.75 }, bloom: 0.3, shadow: 2, box: 5 };
 
@@ -247,21 +249,21 @@ export class Gfx {
     return Math.min(4, d);
   }
   // the preset as it stands (what the phone always draws with), taken through the Graphics settings. dpr: the pixel ratio the scene is
-  // drawn at (before the dynamic resolution); canvas: when FSR upscales, the canvas's own pixel ratio (the display's pixels, or the render
-  // scale when that is more), else 0 and the canvas is the scene's size; fsr: the scene's share of the canvas each way
+  // drawn at (before the dynamic resolution); canvas: when FSR upscales, the canvas's own pixel ratio (the render scale the setup would
+  // draw at without it, so the canvas is the size it has always been and the scene is drawn with fewer pixels), else 0 and the canvas is
+  // the scene's size; fsr: the scene's share of the canvas each way
   plan() {
     const sharp = this.sharpStops(), native = Math.min(4, devicePixelRatio || 1);
     if (PHONE) {
-      const q = QUALITY[this.quality] || QUALITY.phone, screen = Math.min(3, native);
-      const dpr = Math.min(screen, Math.max(1, Math.sqrt(q.pixels / Math.max(1, innerWidth * innerHeight))));
-      const up = !this.native && dpr < screen - 0.02;
+      const q = QUALITY[this.quality] || QUALITY.phone, dpr = Math.min(native, q.dpr), screen = Math.min(PHONE_CANVAS, native);
+      const up = !this.native && screen > dpr + 0.02;
       return { ...q, dpr, canvas: up ? screen : 0, fsr: up ? dpr / screen : 0, sharp };
     }
     const o = this.opts, pr = this.personal, sh = SHADOWS[o.shadows];
     const post = !!AO[o.ao] || o.bloom > 0 || o.grain || o.ca || o.vignette || o.aa === 'fxaa' || o.mblur || pr.contrast !== 1 || pr.gamma !== 1 || (!!OPTS[this.quality] && this.quality !== 'low');
     const d = this.pixelRatio(o), k = this.native ? 0 : UPSCALE[o.fsr] || 0;
     return {
-      dpr: k ? d * k : d, canvas: k ? Math.min(4, Math.max(native, d)) : 0, fsr: k, sharp,
+      dpr: k ? d * k : d, canvas: k ? d : 0, fsr: k, sharp,
       msaa: o.aa === 'msaa4' ? 4 : o.aa === 'msaa2' ? 2 : 0, ao: AO[o.ao], bloom: o.bloom, grade: post, direct: !post,
       sun: sh ? sh.sun : 512, spot: sh ? sh.spot : 256, shadows: !!sh, soft: !!(sh && sh.soft), fxaa: o.aa === 'fxaa', mblur: !!o.mblur,
     };
@@ -284,15 +286,17 @@ export class Gfx {
       }
     }
     for (const l of scene.userData.shadowLights || []) { l.light.shadow.mapSize.set(l.sun ? p.sun : p.spot, l.sun ? p.sun : p.spot); if (l.light.shadow.map) { l.light.shadow.map.dispose(); l.light.shadow.map = null; } l.light.shadow.autoUpdate = false; l.light.shadow.needsUpdate = true; }
-    this.pass = {};
+    this.pass = {}; this.grainAfter = 0;
     if (p.direct) { if (p.overlay && !this.overlay) this.buildOverlay(); this.fit(p); return; }
     ({ composer: this.composer, pass: this.pass } = this.chainFor(p, dpr));
     this.fit(p);
     this.applyLook();
   }
   // the canvas, the chain and the upscaler's targets sized for the plan at the dynamic resolution (after a build, a resize, a step of the
-  // dynamic resolution). The direct path with FSR draws into a multisampled HDR target of the scene's size, which an OutputPass tone maps
-  // into a display-ready one for the upscaler
+  // dynamic resolution). The direct path with FSR draws into a multisampled eight-bit target of the scene's size that three takes for the
+  // screen (isXRRenderTarget, with an sRGB texture kept in a plain RGBA8 format): every material tone maps and encodes sRGB in its own
+  // shader and the glows and strips blend after that, exactly as on the canvas, and the programs are the canvas's own (switching the
+  // upscaling on or off rebuilds no shader)
   fit(p = this.plan()) {
     const { scene: dpr, canvas, up } = this.ratios(p), w = innerWidth, h = innerHeight;
     if (!this.cineOn) this.r.setPixelRatio(canvas);
@@ -302,17 +306,17 @@ export class Gfx {
     this.sizePasses(dpr);
     const low = up && !this.composer, lw = Math.max(1, Math.round(w * dpr)), lh = Math.max(1, Math.round(h * dpr));
     if (low && !this.low) {
-      this.low = new THREE.WebGLRenderTarget(lw, lh, { type: THREE.HalfFloatType, samples: Math.min(4, this.r.capabilities.maxSamples || 4) });
-      this.ldr = new THREE.WebGLRenderTarget(lw, lh, { depthBuffer: false });
-      this.outPass = this.outPass || new OutputPass();
-    } else if (low) { this.low.setSize(lw, lh); this.ldr.setSize(lw, lh); }
-    else if (this.low) { this.low.dispose(); this.ldr.dispose(); this.low = this.ldr = null; }
+      this.low = new THREE.WebGLRenderTarget(lw, lh, { samples: Math.min(4, this.r.capabilities.maxSamples || 4), colorSpace: THREE.SRGBColorSpace });
+      this.low.texture.internalFormat = 'RGBA8'; this.low.isXRRenderTarget = true;
+    } else if (low) this.low.setSize(lw, lh);
+    else if (this.low) { this.low.dispose(); this.low = null; }
+    if (!up && this.fsr) { this.fsr.dispose(); this.fsr = null; }   // its canvas-sized buffer is only kept while it is used
     if (this.chain) this.fitCine();
   }
   // the target the scene itself is drawn into (the shaders are built for it ahead of time): the chain's, the upscaler's, or the canvas
   get target() { return (this.composer && this.composer.renderTarget1) || this.low || null; }
-  // FSR from a display-ready picture to the canvas
-  upscale(rt) { (this.fsr ||= new FSR(this.r)).render(rt, this.sharpStops()); }
+  // FSR from a display-ready picture to the canvas; the film grain is added after it, at the canvas's pixels (sharpened it would be twice as coarse)
+  upscale(rt) { (this.fsr ||= new FSR(this.r)).render(rt, this.sharpStops(), this.grainAfter, this.time); }
   // the Sharpness setting as RCAS takes it: stops below full strength (100 is full, 0 two stops down)
   sharpStops() { return 2 * (1 - THREE.MathUtils.clamp(this.personal.sharp ?? 80, 0, 100) / 100); }
   // a post-processing chain for a plan: the everyday one, or the conversations' one (dof and the letterbox)
@@ -358,7 +362,9 @@ export class Gfx {
     const o = this.opts, pr = this.personal;
     if (pass.grade) {
       const u = pass.grade.uniforms;
-      u.grain.value = o.grain ? (cine ? 0.03 : 0.045) : 0; u.ca.value = o.ca ? 0.0011 : 0; u.vignette.value = o.vignette ? 0.32 : cine ? 0.2 : 0;
+      const grain = o.grain ? (cine ? 0.03 : 0.045) : 0;
+      u.grain.value = !cine && this.up ? 0 : grain; if (!cine) this.grainAfter = this.up ? grain : 0;
+      u.ca.value = o.ca ? 0.0011 : 0; u.vignette.value = o.vignette ? 0.32 : cine ? 0.2 : 0;
       u.contrast.value = 1.04 * pr.contrast; u.gamma.value = pr.gamma;
     }
     if (pass.bloom) pass.bloom.strength = cine ? Math.max(o.bloom, CINE.bloom) : o.bloom;
@@ -410,7 +416,7 @@ export class Gfx {
   // the night look without a post-processing chain: one translucent quad over the picture, a blue-black wash that deepens toward
   // the corners and at night, with grain in its alpha. It is drawn after the scene with the depth test off, into the small picture when
   // the phone upscales. A CSS layer of the same wash and a tiled grain looks the same and costs no less a frame, and the browser would
-  // composite it at the screen's every pixel where this quad is drawn within the phone's pixel budget, so the quad stays
+  // composite it at the screen's every pixel where this quad is drawn at the scene's own, so the quad stays
   buildOverlay() {
     const mat = new THREE.ShaderMaterial({
       uniforms: { time: { value: 0 }, night: { value: 0 }, res: { value: new THREE.Vector2(1, 1) } },
@@ -431,29 +437,28 @@ export class Gfx {
     this.overlay = { scene, cam: new THREE.Camera(), mat };
   }
 
-  // a new window size or a turned phone: the phone's pixel budget is worked out again from the new size
+  // a new window size or a turned phone: the canvas, the chain and the upscaler's targets sized again
   resize() { this.fit(); }
 
   // ---------- the conversations' look ----------
   // main.js says each frame whether a conversation is on and where the speaker's head is (null: nobody in particular)
   setCine(on, focus = null) { this.cineGoal = on && this.personal.cine && !PHONE ? 1 : 0; this.cineFocus = focus; }
-  // with FSR the conversations are drawn at the same share of their own scale and upscaled to the everyday canvas, unless that share is
-  // still as many pixels as the canvas has (then they draw straight to it, at their scale)
+  // the conversations are never upscaled: they are short, the dynamic resolution leaves them alone, and the supersampling is their look
+  // (at the upscaler's share a 1x screen would draw them at 1x, where the depth of field and the AO break up on fine edges)
   cinePlan() {
-    const p = this.plan(), base = p.fsr ? p.dpr / p.fsr : p.dpr, full = Math.min(4, Math.max(base, (devicePixelRatio || 1) * CINE.scale));
-    const dpr = p.fsr ? full * p.fsr : full, up = !!p.canvas && dpr < p.canvas - 0.01;
-    return { ...p, dpr, canvas: up ? p.canvas : dpr, up, msaa: 4, ao: CINE.ao, bloom: Math.max(p.bloom || 0, CINE.bloom), grade: true, direct: false, dof: true, fxaa: false, mblur: false };
+    const p = this.plan(), base = p.fsr ? p.dpr / p.fsr : p.dpr, dpr = Math.min(4, Math.max(base, (devicePixelRatio || 1) * CINE.scale));
+    return { ...p, dpr, canvas: dpr, up: false, fsr: 0, msaa: 4, ao: CINE.ao, bloom: Math.max(p.bloom || 0, CINE.bloom), grade: true, direct: false, dof: true, fxaa: false, mblur: false };
   }
   makeCine() {
-    const p = this.cinePlan(), ch = this.chain = { ...this.chainFor(p, p.dpr), dpr: p.dpr, canvas: p.canvas, up: p.up };
+    const p = this.cinePlan(), ch = this.chain = { ...this.chainFor(p, p.dpr), dpr: p.dpr };
     this.sizePasses(p.dpr, ch.pass); this.applyLook(ch.pass, true);
     return ch;
   }
   fitCine() {
     const ch = this.chain, p = this.cinePlan();
-    Object.assign(ch, { dpr: p.dpr, canvas: p.canvas, up: p.up });
+    ch.dpr = p.dpr;
     ch.composer.setPixelRatio(ch.dpr); ch.composer.setSize(innerWidth, innerHeight); this.sizePasses(ch.dpr, ch.pass);
-    if (this.cineOn) this.r.setPixelRatio(ch.canvas);
+    if (this.cineOn) this.r.setPixelRatio(ch.dpr);
   }
   dropCine() {
     if (this.cineOn) this.leaveCine();
@@ -468,7 +473,7 @@ export class Gfx {
   }
   enterCine() {
     const ch = this.chain || this.makeCine();
-    this.cineOn = true; this.r.setPixelRatio(ch.canvas); this.dofF = null; this.boxAt = null;
+    this.cineOn = true; this.r.setPixelRatio(ch.dpr); this.dofF = null; this.boxAt = null;
     // sharper shadows while it lasts: every shadow map at twice the size (the sun's is also pulled in around the speaker)
     this.shadowSave = [];
     if (this.r.shadowMap.enabled) for (const l of this.scene.userData.shadowLights || []) {
@@ -610,22 +615,21 @@ export class Gfx {
     if (this.cineOn) {
       this.cineFrame(dt);
       const u = this.chain.pass.grade.uniforms; u.time.value = this.time; u.night.value = this.night;
-      this.chainFrame(this.chain.composer, this.chain.up, dt);
+      this.chain.composer.render(dt);
       return;
     }
     if (this.pass.grade) { const u = this.pass.grade.uniforms; u.time.value = this.time; u.night.value = this.night; }
     if (this.composer) { this.chainFrame(this.composer, this.up, dt); return; }
     const r = this.r, low = this.up && this.low;
-    // the direct path: straight to the canvas (tone mapping and sRGB in every material's shader), or with FSR into the small HDR target,
-    // tone mapped into the display-ready one, and upscaled from that
+    // the direct path: straight to the canvas (tone mapping and sRGB in every material's shader), or with FSR into the small target that
+    // the shaders treat as the canvas, and upscaled from that
     r.setRenderTarget(low ? this.low : null);
     r.render(this.scene, this.camera);
-    if (low) { this.outPass.renderToScreen = false; this.outPass.render(r, this.ldr, this.low); r.setRenderTarget(this.ldr); }
     if (this.overlay && (QUALITY[this.quality] || {}).overlay) {
       const u = this.overlay.mat.uniforms; u.time.value = this.time; u.night.value = this.night; u.res.value.set(innerWidth, innerHeight);
       r.autoClear = false; r.render(this.overlay.scene, this.overlay.cam); r.autoClear = true;
     }
-    if (low) this.upscale(this.ldr);
+    if (low) this.upscale(this.low);
   }
   // a chain's frame: to the canvas, or (FSR) into its own buffer, which then is upscaled. The OutputPass in the chain has tone mapped it and
   // put it in sRGB already, and the grade and FXAA come after that, so the upscaler takes a finished picture
