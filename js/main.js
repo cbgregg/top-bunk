@@ -1366,12 +1366,23 @@ function flickerTick(dt) {
 // the house's idle noises on a night come from the night engine's whisper tier now, each placed where it happens (js/events.js): nothing
 // here is panned to a random stereo position any more
 function ambienceTick(dt) {}
+// a parent asleep where you cannot see them (another room, out of the view, not near) is posed every fourth frame with the time since
+// (asleep, all that moves is the breathing); the frame they could come into view they are posed with all of it at once
+const lodFrustum = new THREE.Frustum(), lodM = new THREE.Matrix4(), lodS = new THREE.Sphere();
+function poseDt(p, dt) {
+  const g = p.group.position, asleep = (p.sleeping || (p.pose && p.pose.sleep)) && !p.talking && !p.inCar && !(p.rig && p.rig.env) && !(p.pose && p.pose.bed && p.pose.bed.awake);
+  let seen = !asleep || Math.hypot(g.x - camera.position.x, g.z - camera.position.z) < 6 || roomAt(g.x, g.z, g.y) === roomAt(camera.position.x, camera.position.z, camera.position.y - 1.2);
+  if (!seen) { lodM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); lodFrustum.setFromProjectionMatrix(lodM); seen = lodFrustum.intersectsSphere(lodS.set(lodS.center.set(g.x, g.y + 0.8, g.z), 2.5)); }
+  p.lodDt = (p.lodDt || 0) + dt; p.lodN = seen ? 0 : ((p.lodN || 0) + 1) % 4;
+  if (!seen && p.lodN) return -1;
+  const d = p.lodDt; p.lodDt = 0; return d;
+}
 // family idle: the parents duck under the truck roof, look at you when you are near and turn to face you
 function familyIdleTick(dt) {
   if (mom.group.visible) {
     mom.duck = truckDuck(mom); dad.duck = truckDuck(dad);
     talkGaze();
-    mom.update(gameTime, dt); dad.update(gameTime, dt);
+    for (const p of [mom, dad]) { const d = poseDt(p, dt); if (d >= 0) p.update(gameTime, d); }
     for (const p of [mom, dad]) {
       if (p.sleeping || p.inCar) continue;
       const g = p.group.position, near = Math.hypot(P.pos.x - g.x, P.pos.z - g.z) < 4.5;
