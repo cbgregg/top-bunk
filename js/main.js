@@ -25,6 +25,7 @@ import { createJournal } from './journal.js';
 import { createFirstNight } from './firstnight.js';
 import { createLights, createLamps } from './lights.js';
 import { createCull } from './cull.js';
+import { createSunShadow } from './sunshadow.js';
 import { createCartoon } from './cartoon.js';
 import { hooks } from './hooks.js';
 import * as collide from './collide.js';
@@ -309,6 +310,7 @@ const P = {
 const F = { stage: 'day', night: 0, phase: 'title', boxes: 0, momReady: false, talkedMom: false, splashed: false, chase: false, echo: false, dead: false, cutscene: false, morningReady: false, flashOn: false, breathCheck: false, breathUI: false, grace: 0, birds: false, flicker: false, fear: 0, live: false, script: false, clock: 0, blackout: false, clockGlitch: 0, drawingLevel: 0, over: false };
 // the ceiling lights and their switches (lights.js): each lit room lit in the shaders, two shadowed spots lent where they show, so switching never recompiles
 const lights = createLights({ W, scene, camera, sfx, PHONE, F, E, renderer });
+const sunShadow = createSunShadow({ renderer, scene, light: W.sun });   // the sun's map of what stands still, kept; only what moves is drawn again
 const cull = createCull({ renderer, scene, camera, W });   // the outside left out of the view while no way out of the house is in it
 const lamps = createLamps({ scene });   // the point lights and unshadowed spots, run by area in the shaders instead of by every pixel
 lights.movers = [mom.group, dad.group];   // their shadows under the ceiling lights are drawn again as they move
@@ -1647,6 +1649,6 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 requestAnimationFrame(loop);
 boot();
-window.__game = { cull, lamps, cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, useItem, switchItem, get lastShot() { return lastShot; }, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
+window.__game = { cull, lamps, sunShadow, cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, useItem, switchItem, get lastShot() { return lastShot; }, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
   // the boundaries, for tests/sweep.js: the module, the bodies, the player's step and the camera, driven a frame at a time with the loop frozen
   collide, PB, keys, movePlayer, updateCamera, resolvePlayer, toggleDoor, climbUp, climbDown, hideUnderCovers, toBunk, car, LIE, LADDER_MID, LADDER_FLOOR, CLIMB_WP1, CLIMB_WP2, LEAN_OUT, LEAN_DOWN, EYE, R, stepTimers: (dt) => { gameTime += dt; runTimers(); } };
