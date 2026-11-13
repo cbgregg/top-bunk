@@ -110,12 +110,15 @@ export function createCull({ renderer, scene, camera, W }) {
   const ok = (o) => o.isMesh && !o.isSkinnedMesh && o.children.length === 0 && o.frustumCulled !== false && (o.onBeforeRender === THREE.Object3D.prototype.onBeforeRender || o.userData.cullOk);
   function collect() {
     const old = new Map(list.map((e) => [e.o, e])); list = [];
-    scene.traverse((o) => { if (ok(o)) list.push(old.get(o) || { o, m: new Float32Array(16).fill(NaN), v: -1, out: false, box: new THREE.Box3() }); });
+    scene.traverse((o) => { if (ok(o)) list.push(old.get(o) || { o, m: new Float64Array(16).fill(NaN), v: -1, out: false, box: new THREE.Box3() }); });
   }
   // is it wholly outside the house (clear of every room by MARGIN, or above the ceilings)? Its box in the world is kept in e.box
   function classify(e) {
     const o = e.o, g = o.geometry, box = e.box; if (!g || !g.attributes.position) return false;
-    if (o.isInstancedMesh) { o.computeBoundingBox(); box.copy(o.boundingBox).applyMatrix4(o.matrixWorld); }
+    if (o.isInstancedMesh) {   // (over every copy, not the share of them drawn at the moment, and wide enough for the grass to lean in the wind)
+      const n = o.count; o.count = o.instanceMatrix.count; o.computeBoundingBox(); o.count = n;
+      box.copy(o.boundingBox).applyMatrix4(o.matrixWorld); if (o.userData.cullOk) box.expandByScalar(0.5);
+    }
     else { if (!g.boundingBox || e.v >= 0) g.computeBoundingBox(); box.copy(g.boundingBox).applyMatrix4(o.matrixWorld); }
     if (box.isEmpty() || !Number.isFinite(box.min.x + box.max.x + box.min.y + box.max.y)) return false;
     if (box.min.y > ROOF_Y) return true;
@@ -123,7 +126,8 @@ export function createCull({ renderer, scene, camera, W }) {
     return true;
   }
   // moved, or its vertices or copies changed, since it was last looked at
-  const version = (o) => o.geometry.attributes.position.version + (o.isInstancedMesh ? o.instanceMatrix.version * 4096 : 0);
+  // (a model's attributes are interleaved: the version is its buffer's; read off the attribute it is undefined, and NaN equals nothing)
+  const version = (o) => { const a = o.geometry.attributes.position; return ((a.isInterleavedBufferAttribute ? a.data.version : a.version) || 0) + (o.isInstancedMesh ? o.instanceMatrix.version * 4096 : 0); };
   const changed = (e) => {
     const a = e.o.matrixWorld.elements, m = e.m, v = e.o.geometry && e.o.geometry.attributes.position ? version(e.o) : 0; let c = v !== e.v;
     for (let i = 0; i < 16 && !c; i++) if (a[i] !== m[i]) c = true;
