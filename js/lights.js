@@ -30,7 +30,7 @@ const ROOF = { night: 0.8 };
 const DOOR_ROOM = { kid: 'bed', bath: 'bath', spare: 'spare', room2: 'room2', parents: 'parents' };
 // the ways through the inside walls, on the plan (world.js): a door by its name, or an opening that is always there. A fixture's light
 // passes through the ones in its own room's walls into the room on the other side
-const GAPS = [
+export const GAPS = [
   { rooms: ['bed', 'hall'], door: 'kid' }, { rooms: ['bath', 'hall'], door: 'bath' }, { rooms: ['spare', 'hall'], door: 'spare' }, { rooms: ['room2', 'hall'], door: 'room2' },
   { rooms: ['parents', 'dining'], door: 'parents', w: 1.1, top: 2.05 },
   { rooms: ['hall', 'living'], x: 3.3, z: [-1.5, -0.3] },        // the hall's open end

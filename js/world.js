@@ -2456,7 +2456,7 @@ export function buildWorld(scene) {
       await tick();
       const im = new THREE.InstancedMesh(geo, mat, list.length);
       list.forEach(([m, cc], i) => { im.setMatrixAt(i, m); im.setColorAt(i, cc); });
-      im.receiveShadow = true; im.computeBoundingSphere(); g.add(im); meshes.push(im);
+      im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cullOk = true; g.add(im); meshes.push(im);   // (cull.js may skip it: its onBeforeRender only sets what it draws)
       // each cell draws all of its blades when it is near, a share of them further off (they are shrinking into the ground out there anyway), and
       // a handful at the far end: the blades in a cell are in random order, so a shorter count thins evenly
       const full = list.length, c = im.boundingSphere.center;
