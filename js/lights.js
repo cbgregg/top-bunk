@@ -590,11 +590,18 @@ export function createLamps({ scene }) {
     if (!(o.isPointLight || (o.isSpotLight && !o.castShadow && !o.map)) || !(o.decay < 16)) return;
     lamps.push({ o, mask: o.layers.mask, w: 0 }); o.layers.disableAll();
   }
-  function collect() { scene.traverse((o) => { if (o.isLight) take(o); }); }
+  // (one taken out of the scene is let go: its layers given back, as if it had never been taken, and taken again if it comes back)
+  function collect() {
+    for (let i = lamps.length - 1; i >= 0; i--) {
+      const l = lamps[i]; let p = l.o; while (p.parent) p = p.parent;
+      if (p !== scene) { l.o.layers.mask = l.mask; known.delete(l.o); lamps.splice(i, 1); }
+    }
+    scene.traverse((o) => { if (o.isLight) take(o); });
+  }
   const shown = (l, cam) => {
     const o = l.o; if (!o.visible || !(o.intensity > 0) || (o.color.r + o.color.g + o.color.b) <= 0 || !(l.mask & cam.layers.mask)) return false;
-    for (let p = o.parent; p; p = p.parent) if (!p.visible) return false;
-    return true;
+    let p = o.parent; for (; p && p.parent; p = p.parent) if (!p.visible) return false;
+    return p === scene && scene.visible;
   };
   const reaches = (a, x, y, z, r) => { const dx = Math.max(a[0] - x, 0, x - a[1]), dy = y < a[2] ? a[2] - y : y > a[3] ? y - a[3] : 0, dz = Math.max(a[4] - z, 0, z - a[5]); return dx * dx + dy * dy + dz * dz <= r * r; };
   const lit = [], rad = [], warned = { v: false };
