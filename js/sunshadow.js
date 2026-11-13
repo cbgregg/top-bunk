@@ -26,8 +26,19 @@ export function createSunShadow({ renderer, scene, light }) {
     if (o.isInstancedMesh) v += o.instanceMatrix.version * 4099 + o.count * 65537;
     return v;
   };
-  const matOne = (m) => (m ? m.id * 8191 + m.version + (m.map ? m.map.id * 131071 : 0) + (m.alphaMap ? m.alphaMap.id * 524287 : 0) : 0);
-  const matOf = (o) => { if (!Array.isArray(o.material)) return matOne(o.material); let v = 0; for (const m of o.material) v = v * 31 + matOne(m); return v; };
+  // (what the depth pass reads of a material, not its version: the library bumps that twice a draw for every two-sided see-through one)
+  const tex = (t, cut) => (t ? t.id * 131 + (cut ? t.version : 0) : 0);
+  const matOne = (m) => {
+    if (!m) return 0;
+    const cut = m.alphaTest > 0 || m.alphaHash;
+    return m.id * 8191 + tex(m.map, cut) * 17 + tex(m.alphaMap, cut) * 524287 + tex(m.displacementMap, true) * 65599 + (m.displacementScale || 0) * 7919 + (m.displacementBias || 0) * 3571
+      + m.alphaTest * 1e6 + (m.alphaHash ? 3 : 0) + (m.visible ? 0 : 5) + (m.wireframe ? 11 : 0) + m.side * 13 + (m.shadowSide ?? 7) * 19 + (m.clippingPlanes ? m.clippingPlanes.length * 23 : 0) + (m.clipShadows ? 29 : 0);
+  };
+  const matOf = (o) => {
+    let v = (o.customDepthMaterial ? matOne(o.customDepthMaterial) * 37 : 0);
+    if (!Array.isArray(o.material)) return v + matOne(o.material);
+    for (const m of o.material) v = v * 31 + matOne(m); return v;
+  };
   // (a caster that has moved goes back to standing still once it has held still for CALM of the map's updates: the kept map is drawn
   // again with it then; skinned and morphing ones always move)
   const CALM = 40;
@@ -55,7 +66,7 @@ export function createSunShadow({ renderer, scene, light }) {
     walk(scene);
     for (const [o, e] of reg) if (e.seen !== seen) {   // hidden, or gone: the kept map is drawn again the first time it is missed
       if (!e.moves && e.seen === seen - 1) changed = true;
-      if (!o.parent) reg.delete(o);
+      if (!o.parent || seen - e.seen > 100) reg.delete(o);   // (gone, or not seen in a long while: forgotten, and new again if it comes back)
     }
     self.stats.moving = moving.length; self.stats.still = still.length;
     return changed;
@@ -88,6 +99,7 @@ export function createSunShadow({ renderer, scene, light }) {
   const render = sm.render;
   sm.render = function (lights, sc, cam) {
     const s = light.shadow;
+    if (sc === scene && kept && (!sm.enabled || !light.castShadow || !s.map)) { kept.dispose(); kept = null; valid = false; }   // (shadows off: the kept map is let go)
     if (!self.enabled || sc !== scene || !sm.enabled || !(sm.autoUpdate || sm.needsUpdate) || sm.type === THREE.VSMShadowMap || !lights.includes(light) || !(s.autoUpdate || s.needsUpdate)) return render.call(this, lights, sc, cam);
     const others = lights.filter((l) => l !== light), was = sm.needsUpdate, target = renderer.getRenderTarget(), face = renderer.getActiveCubeFace(), level = renderer.getActiveMipmapLevel();
     if (others.length) { render.call(this, others, sc, cam); sm.needsUpdate = was; }
