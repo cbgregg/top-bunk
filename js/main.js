@@ -1524,7 +1524,28 @@ async function compileSlices(phases, progress = () => {}) {
     mark('compiled ' + phases[p] + ' (' + renderer.info.programs.length + ' programs)');
     progress((p + 1) / phases.length); await tick();
   }
+  warmShadows();
   progress(1);
+}
+// compile() builds no shadow map's depth programs, so the first frame the people or the creature throw a shadow (a morning's first
+// frame, the title) would build them then and hold the picture. One draw of the scene into a single pixel of the target, with the sun's
+// map drawn and everyone shown for it, builds them here; who is shown is put back before anything else runs
+function warmShadows() {
+  if (!renderer.shadowMap.enabled) return;
+  const rt = gfx.target, shown = [mom.group, dad.group, E.root].map((o) => [o, o.visible]);
+  const sc = new THREE.Vector4(), test = renderer.getScissorTest(); renderer.getScissor(sc);
+  const rsc = rt && rt.scissor.clone(), rtest = rt && rt.scissorTest;
+  try {
+    for (const [o] of shown) o.visible = true;
+    W.sun.shadow.needsUpdate = true;
+    if (rt) { rt.scissor.set(0, 0, 1, 1); rt.scissorTest = true; } else { renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true); }
+    renderer.setRenderTarget(rt || null); renderer.render(scene, camera);
+  } catch (e) { /* built on first use */ } finally {
+    for (const [o, v] of shown) o.visible = v;
+    if (rt) { rt.scissor.copy(rsc); rt.scissorTest = rtest; }
+    renderer.setScissor(sc); renderer.setScissorTest(test); renderer.setRenderTarget(null);
+    W.sun.shadow.needsUpdate = true;
+  }
 }
 async function boot() {
   // moving day and the mornings (js/day.js, js/breakfast.js) take what they read of main.js, once; what changes under them is read through getters
