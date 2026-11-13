@@ -11,7 +11,8 @@
 // nothing while the house is dark and is there from any distance, so a lit room is lit from wherever you see it. What it cannot do is
 // cast a shadow, so two shadowed spots, made once and always in the scene, are lent to the fixtures that matter most to the picture; a
 // fixture's own light fades out as the spot fades in over it, and back again when the spot leaves, so nothing pops as you walk.
-// Switching a light only changes numbers, never the count.
+// Switching a light only changes numbers, never the count. The other lights that cast no shadow (lamps, night lights, the flashlight...) are
+// run the same way, by area (createLamps, at the end).
 import * as THREE from 'three';
 import { roomAt, ROOMS, SX, SZ, H, WT } from './world.js';
 import { flicker as calm } from './settings.js';
@@ -45,6 +46,10 @@ const REACH = 7.5, CONE = 1.2, PENUMBRA = 0.85, BOUNCE_Y = 1.15;
 // the bounce a lit room sends out of an open doorway at night, per metre of opening, and how far it carries (by day every room is lit)
 const SPILL = { night: 1.6 }, SPILL_REACH = 4;
 const ROOM_LIGHTS = 10, ROOM_GAPS = 20, ROOM_NAMES = Object.keys(ROOMS);
+// the lamps (createLamps below): every point light and every spot that casts no shadow, by area. A pixel looks up its area (its room, or a
+// square of the yard LAMP_CELL metres wide, or what is past them all) and runs the lamps that reach it there and no others
+const LAMPS = 20, LAMP_SPOTS = 8, LAMP_REFS = 192, LAMP_X0 = -72, LAMP_Z0 = -56, LAMP_CELL = 16, LAMP_NX = 7, LAMP_NZ = 5;
+const LAMP_AREAS = ROOM_NAMES.length + LAMP_NX * LAMP_NZ + 1;
 // one set of numbers for every material (the array is shared, so a write here is seen by all of them). A pixel knows which room it is
 // in from the plan's wall lines (ROOM_PARS), and is lit by that room's short list: its own lit fixtures, and the lit fixtures next door
 // whose light comes in through a gap in the wall. Only what is lit is listed, so a dark house costs a pixel nothing:
@@ -65,7 +70,8 @@ for (let iz = 0; iz <= CUTS[1].length; iz++) for (let ix = 0; ix <= CUTS[0].leng
 }
 while (CELLS.length % 4) CELLS.push(-1);
 // (one array for all of it, each part a stretch of it: a material sends it to its shader in one go, however many parts there are)
-const PARTS = { list: ROOM_NAMES.length, pos: ROOM_LIGHTS, spot: ROOM_LIGHTS, fill: ROOM_LIGHTS, gap: ROOM_GAPS, cells: CELLS.length / 4, roof: 1 }, AT = {};
+const PARTS = { list: ROOM_NAMES.length, pos: ROOM_LIGHTS, spot: ROOM_LIGHTS, fill: ROOM_LIGHTS, gap: ROOM_GAPS, cells: CELLS.length / 4, roof: 1,
+  lampArea: Math.ceil(LAMP_AREAS / 4), lampRef: LAMP_REFS / 16, lampPos: LAMPS, lampCol: LAMPS, lampSpot: LAMP_SPOTS, lampPen: LAMP_SPOTS / 4 }, AT = {};
 { let at = 0; for (const k in PARTS) { AT[k] = at; at += PARTS[k]; } ROOM.data = new Float32Array(at * 4); for (const k in PARTS) ROOM[k] = ROOM.data.subarray(AT[k] * 4, (AT[k] + PARTS[k]) * 4); }
 ROOM.cells.set(CELLS);
 const steps = (cuts, v) => cuts.map((c) => `step( ${c.toFixed(3)}, ${v} )`).join(' + ');
@@ -80,6 +86,12 @@ uniform vec4 roomData[ ${ROOM.data.length / 4} ];
 #define roomGap( i ) roomData[ ${AT.gap} + ( i ) ]
 #define roomCells( i ) roomData[ ${AT.cells} + ( i ) ]
 #define houseRoof roomData[ ${AT.roof} ]
+#define lampArea( i ) roomData[ ${AT.lampArea} + ( i ) ]
+#define lampRef( i ) roomData[ ${AT.lampRef} + ( i ) ]
+#define lampPos( i ) roomData[ ${AT.lampPos} + ( i ) ]
+#define lampCol( i ) roomData[ ${AT.lampCol} + ( i ) ]
+#define lampSpot( i ) roomData[ ${AT.lampSpot} + ( i ) ]
+#define lampPen( i ) roomData[ ${AT.lampPen} + ( i ) ]
 // the room a point on the main floor is in: the rectangles run to the middle of the walls, so each face of a wall is in its own room
 int roomAt( const in vec3 p ) {
 	if ( p.y < -0.25 || p.y > ${(H + 0.06).toFixed(2)} ) return -1;
@@ -94,10 +106,41 @@ vec3 roomSpot( const in int i, const in float vis, const in vec3 toL, const in f
 `;
 const ROOM_LIGHT = `
 #if defined( RE_Direct )
-int houseRoom = -1;
+vec3 roomP = cameraPosition + geometryPosition * mat3( viewMatrix );
+int houseRoom = houseRoof.x + houseRoof.y + houseRoof.w > 0.0 ? roomAt( roomP ) : -1;
+// the lamps that reach this pixel's area, each exactly as the library lights a point light or a spot (a spot's number of its cone, plus
+// one, is kept sixteen times over with its fall-off)
+if ( houseRoof.w > 0.0 ) {
+	int area = houseRoom;
+	if ( area < 0 ) {
+		vec2 sq = floor( ( roomP.xz - vec2( ${LAMP_X0.toFixed(1)}, ${LAMP_Z0.toFixed(1)} ) ) / ${LAMP_CELL.toFixed(1)} );
+		area = sq.x >= 0.0 && sq.x < ${LAMP_NX.toFixed(1)} && sq.y >= 0.0 && sq.y < ${LAMP_NZ.toFixed(1)} ? ${ROOM_NAMES.length} + int( sq.x ) + ${LAMP_NX} * int( sq.y ) : ${LAMP_AREAS - 1};
+	}
+	int lampAt = int( lampArea( area / 4 )[ area % 4 ] ), lampN = lampAt % 512;
+	lampAt /= 512;
+	for ( int k = lampAt; k < lampAt + lampN; k ++ ) {
+		int i = ( int( lampRef( k / 16 )[ ( k / 4 ) % 4 ] ) >> ( 5 * ( k % 4 ) ) ) & 31;
+		vec4 lp = lampPos( i ), lc = lampCol( i );
+		float spot = floor( lc.w / 16.0 ), spotAttenuation = 1.0;
+		vec3 lVector = ( viewMatrix * vec4( lp.xyz, 1.0 ) ).xyz - geometryPosition;
+		directLight.direction = normalize( lVector );
+		if ( spot > 0.0 ) {
+			int s = int( spot ) - 1;
+			vec4 sd = lampSpot( s );
+			spotAttenuation = getSpotAttenuation( sd.w, lampPen( s / 4 )[ s % 4 ], dot( directLight.direction, normalize( mat3( viewMatrix ) * sd.xyz ) ) );
+		}
+		if ( spotAttenuation > 0.0 ) {
+			directLight.color = lc.rgb * spotAttenuation;
+			directLight.color *= getDistanceAttenuation( length( lVector ), lp.w, lc.w - 16.0 * spot );
+			directLight.visible = ( directLight.color != vec3( 0.0 ) );
+		} else {
+			directLight.color = vec3( 0.0 );
+			directLight.visible = false;
+		}
+		RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+	}
+}
 if ( houseRoof.x + houseRoof.y > 0.0 ) {
-	vec3 roomP = cameraPosition + geometryPosition * mat3( viewMatrix );
-	houseRoom = roomAt( roomP );
 	vec4 roomL = roomList( max( houseRoom, 0 ) );
 	if ( houseRoom >= 0 && roomL.y + roomL.w > 0.0 ) {
 		vec3 roomN = geometryNormal * mat3( viewMatrix ), roomSum = vec3( 0.0 ), roomTopColor = vec3( 0.0 ), roomTopDir = vec3( 0.0, 1.0, 0.0 );
@@ -522,4 +565,92 @@ export function createLights({ W, scene, camera, sfx, PHONE, F, E, renderer }) {
     return s;
   }
   return L;
+}
+
+// ---------- the lamps: the scene's point lights and unshadowed spots, by area ----------
+// Every light the library runs is run by every pixel of every lit material, lit or not, near or not: two dozen lamps (the night lights,
+// the bedside lamp, the TV, the porch, the flashlight, the car's dome, the street light, a conversation's key and fill...) most of them dark
+// or rooms away. So the library is shown none of them: each is kept out of its light list (its layers), and before each draw of the scene
+// the ones that give light are written into the shaders' numbers with the areas they reach (each room, the yard in LAMP_CELL squares, and
+// what is past them). A pixel runs only its area's lamps, each by the library's own formulas, so it is lit exactly as before. The game
+// keeps working its lights as it always has (on, off, moved, shown, hidden, added later) and none of that rebuilds a shader any more.
+// Shadow-casting spots stay the library's: their maps are drawn for them. LAMPS are lit at once at most (LAMP_SPOTS of them spots); past
+// that the faintest where you are wait their turn (it has never come to that: a night has a dozen lit)
+export function createLamps({ scene }) {
+  const lamps = [], known = new WeakSet(), wp = new THREE.Vector3(), tp = new THREE.Vector3(), cp = new THREE.Vector3();
+  const self = { lamps, stats: { lit: 0, refs: 0, over: false, dropped: 0 } };
+  const areas = [];
+  for (const n of ROOM_NAMES) { const r = ROOMS[n]; areas.push([r[0] - 0.05, r[1] + 0.05, -0.3, H + 0.11, r[2] - 0.05, r[3] + 0.05]); }
+  for (let j = 0; j < LAMP_NZ; j++) for (let i = 0; i < LAMP_NX; i++) areas.push([LAMP_X0 + i * LAMP_CELL, LAMP_X0 + (i + 1) * LAMP_CELL, -Infinity, Infinity, LAMP_Z0 + j * LAMP_CELL, LAMP_Z0 + (j + 1) * LAMP_CELL]);
+  const GX1 = LAMP_X0 + LAMP_NX * LAMP_CELL, GZ1 = LAMP_Z0 + LAMP_NZ * LAMP_CELL;
+  // any light the library would run that a shadow map does not need, taken over once (a light added later is taken over the frame it is
+  // added, before the library counts it)
+  function take(o) {
+    if (known.has(o)) return; known.add(o);
+    if (!(o.isPointLight || (o.isSpotLight && !o.castShadow && !o.map)) || !(o.decay < 16)) return;
+    lamps.push({ o, mask: o.layers.mask, w: 0 }); o.layers.disableAll();
+  }
+  function collect() { scene.traverse((o) => { if (o.isLight) take(o); }); }
+  const shown = (l, cam) => {
+    const o = l.o; if (!o.visible || !(o.intensity > 0) || (o.color.r + o.color.g + o.color.b) <= 0 || !(l.mask & cam.layers.mask)) return false;
+    for (let p = o.parent; p; p = p.parent) if (!p.visible) return false;
+    return true;
+  };
+  const reaches = (a, x, y, z, r) => { const dx = Math.max(a[0] - x, 0, x - a[1]), dy = y < a[2] ? a[2] - y : y > a[3] ? y - a[3] : 0, dz = Math.max(a[4] - z, 0, z - a[5]); return dx * dx + dy * dy + dz * dz <= r * r; };
+  const lit = [], rad = [], warned = { v: false };
+  const byWeight = (p, q) => q.w - p.w;
+  function write(cam) {
+    collect();
+    let cand = lamps.filter((l) => shown(l, cam));
+    let spots = cand.filter((l) => l.o.isSpotLight).length;
+    if (cand.length > LAMPS || spots > LAMP_SPOTS) {   // (more than there is room for: the brightest where the view is)
+      cam.getWorldPosition(cp);
+      for (const l of cand) { l.o.getWorldPosition(wp); l.w = l.o.intensity * (l.o.color.r + l.o.color.g + l.o.color.b) / Math.max(1, wp.distanceToSquared(cp)); }
+      cand.sort(byWeight); const keep = []; spots = 0;
+      for (const l of cand) { if (keep.length >= LAMPS) break; if (l.o.isSpotLight) { if (spots >= LAMP_SPOTS) continue; spots++; } keep.push(l); }
+      self.stats.dropped = cand.length - keep.length; cand = keep;
+      if (!warned.v) { warned.v = true; console.warn('lamps: more lit at once than', LAMPS, '(' + LAMP_SPOTS + ' spots): the faintest left out'); }
+    } else self.stats.dropped = 0;
+    lit.length = rad.length = 0; let s = 0;
+    for (const { o } of cand) {
+      const i = lit.length, j = i * 4; lit.push(o); rad.push(o.distance > 0 ? o.distance : Infinity);
+      o.getWorldPosition(wp);
+      ROOM.lampPos[j] = wp.x; ROOM.lampPos[j + 1] = wp.y; ROOM.lampPos[j + 2] = wp.z; ROOM.lampPos[j + 3] = o.distance;
+      ROOM.lampCol[j] = o.color.r * o.intensity; ROOM.lampCol[j + 1] = o.color.g * o.intensity; ROOM.lampCol[j + 2] = o.color.b * o.intensity; ROOM.lampCol[j + 3] = o.decay;
+      if (o.isSpotLight) {
+        tp.setFromMatrixPosition(o.target.matrixWorld); tp.subVectors(wp, tp).normalize();
+        const k = s * 4; ROOM.lampSpot[k] = tp.x; ROOM.lampSpot[k + 1] = tp.y; ROOM.lampSpot[k + 2] = tp.z; ROOM.lampSpot[k + 3] = Math.cos(o.angle); ROOM.lampPen[s] = Math.cos(o.angle * (1 - o.penumbra));
+        ROOM.lampCol[j + 3] += 16 * ++s;
+      }
+    }
+    // each area's list: where it starts in the refs and how many, the refs four to a number
+    let at = 0, over = false;
+    ROOM.lampRef.fill(0);
+    for (let a = 0; a < areas.length + 1 && !over; a++) {
+      const start = at;
+      for (let i = 0; i < lit.length; i++) {
+        const r = rad[i], x = ROOM.lampPos[i * 4], y = ROOM.lampPos[i * 4 + 1], z = ROOM.lampPos[i * 4 + 2];
+        if (!(a < areas.length ? reaches(areas[a], x, y, z, r) : (r === Infinity || x - r < LAMP_X0 || x + r > GX1 || z - r < LAMP_Z0 || z + r > GZ1))) continue;
+        if (at >= LAMP_REFS) { over = true; break; }
+        ROOM.lampRef[at >> 2] += i * 2 ** (5 * (at & 3)); at++;
+      }
+      ROOM.lampArea[a] = start * 512 + (at - start);
+    }
+    if (over) {   // (more than the refs hold: every area runs every lamp, which is slower and still the same picture)
+      ROOM.lampRef.fill(0); for (let i = 0; i < lit.length; i++) ROOM.lampRef[i >> 2] += i * 2 ** (5 * (i & 3));
+      for (let a = 0; a < areas.length + 1; a++) ROOM.lampArea[a] = lit.length;
+      at = lit.length;
+    }
+    ROOM.roof[3] = lit.length ? 1 : 0;
+    self.stats.lit = lit.length; self.stats.refs = at; self.stats.over = over;
+  }
+  // written as the scene is drawn and cleared after it, so the hands (a scene of their own, lit by their own lights) and anything else
+  // drawn with these materials sees none of the house's lamps; a draw inside the scene's own (the mirrors) keeps them
+  let depth = 0;
+  const before = scene.onBeforeRender, after = scene.onAfterRender;
+  scene.onBeforeRender = function (r, s, cam, ...rest) { if (depth++ === 0) write(cam); return before.call(this, r, s, cam, ...rest); };
+  scene.onAfterRender = function (...a) { const v = after.apply(this, a); if (--depth <= 0) { depth = 0; ROOM.roof[3] = 0; } return v; };
+  self.collect = collect;
+  collect();
+  return self;
 }

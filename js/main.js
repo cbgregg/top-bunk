@@ -23,7 +23,7 @@ import { store } from './store.js';
 import { createHands, printCrop, PRINT_W, PRINT_H, LENS_FOV, FILM } from './hands.js';
 import { createJournal } from './journal.js';
 import { createFirstNight } from './firstnight.js';
-import { createLights } from './lights.js';
+import { createLights, createLamps } from './lights.js';
 import { createCull } from './cull.js';
 import { createCartoon } from './cartoon.js';
 import { hooks } from './hooks.js';
@@ -310,6 +310,7 @@ const F = { stage: 'day', night: 0, phase: 'title', boxes: 0, momReady: false, t
 // the ceiling lights and their switches (lights.js): each lit room lit in the shaders, two shadowed spots lent where they show, so switching never recompiles
 const lights = createLights({ W, scene, camera, sfx, PHONE, F, E, renderer });
 const cull = createCull({ renderer, scene, camera, W });   // the outside left out of the view while no way out of the house is in it
+const lamps = createLamps({ scene });   // the point lights and unshadowed spots, run by area in the shaders instead of by every pixel
 lights.movers = [mom.group, dad.group];   // their shadows under the ceiling lights are drawn again as they move
 let shake = 0, uiMode = 'title', paused = false, started = false, pressE = false;
 // the breath key pulls the covers up only once held a moment, and not right after you sit down
@@ -446,7 +447,8 @@ function setPhase(p, silent = false) {
     else { f.color.set(0xffd7a0); f.intensity = i < 2 ? 4.5 : 3; }
   });
   nlBase = night ? 1 : 0; nlMult(nlBase, false);
-  // which lights exist this phase (changing this recompiles the shaders, so it happens only here, behind the fade)
+  // which lights exist this phase (the car light casts a shadow, so showing it recompiles the shaders: it happens only here, behind the fade;
+  // the night lights and the face light are lamps, js/lights.js, and cost nothing to show)
   for (const n of W.nightLights) n.light.visible = night;
   W.faceLight.visible = W.carLight.visible = night;
   W.porchLight.intensity = p === 'title' ? 7 : 0; W.porchBulb.material.emissiveIntensity = p === 'title' ? 4 : 0;
@@ -1518,6 +1520,7 @@ async function compileSlices(phases, progress = () => {}) {
   const rt = gfx.target;
   for (let p = 0; p < phases.length; p++) {
     if (phases[p] === 'title') titleScene(); else setPhase(phases[p], true);
+    lamps.collect();   // (a light made since is taken over before the shaders are built, so they are built for the count they will draw with)
     let done = null;
     try { if (rt) renderer.setRenderTarget(rt); done = renderer.compileAsync(scene, camera); } catch (e) { /* built on first draw */ } finally { renderer.setRenderTarget(null); }
     if (done) await done;
@@ -1644,6 +1647,6 @@ titleScene();
 if (matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches) $('mobile').classList.add('show');
 requestAnimationFrame(loop);
 boot();
-window.__game = { cull, cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, useItem, switchItem, get lastShot() { return lastShot; }, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
+window.__game = { cull, lamps, cartoon, bedtime, knobOf, atKnob, vigil, FN, lights, sitInChair, standUp, placeBox4, seatThem, sitSpot, kidBoxes, get seat() { return seat; }, seatOn, seatHeight, kitchen, KSPOT, KPOSE, GRIP, carryPos, makeThing, HOLD, DAD_HOME, EVE_MOM, speak, caught, openPhotos, openJournal, journal, takePhoto, useItem, switchItem, get lastShot() { return lastShot; }, hands, input, settings, menu, achievements, nights, RUN, toggleLight, sleepers, kitchenLife, sightBlocked, startGame, setPause, finaleFor, WF, carPass, faceAtWindow, weather, traffic, gfx, sfx, P, F, W, E, camera, scene, renderer, setPhase, nlMult, BATH_I, mom, dad, BUNK_SEAT, BUNK_LIE, UI, cam: () => { updateCamera(0); E.update(0.016); }, start: () => { started = true; uiMode = 'test'; UI.hide('title'); }, get gameTime() { return gameTime; },
   // the boundaries, for tests/sweep.js: the module, the bodies, the player's step and the camera, driven a frame at a time with the loop frozen
   collide, PB, keys, movePlayer, updateCamera, resolvePlayer, toggleDoor, climbUp, climbDown, hideUnderCovers, toBunk, car, LIE, LADDER_MID, LADDER_FLOOR, CLIMB_WP1, CLIMB_WP2, LEAN_OUT, LEAN_DOWN, EYE, R, stepTimers: (dt) => { gameTime += dt; runTimers(); } };
