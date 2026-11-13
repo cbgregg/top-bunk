@@ -43,7 +43,8 @@ export function createSunShadow({ renderer, scene, light }) {
         for (let i = 0; i < 16 && !moved; i++) if (a[i] !== e.m[i]) moved = true;
         const v = shapeOf(o), mat = matOf(o);
         if (fresh) { if (!e.moves) changed = true; }
-        else if (moved || v !== e.v || mat !== e.mat) { e.calm = 0; if (!e.moves) { e.moves = true; changed = true; } }
+        else if (moved || v !== e.v) { e.calm = 0; if (!e.moves) { e.moves = true; changed = true; } }
+        else if (mat !== e.mat && !e.moves) changed = true;   // (a material changed, as every one does with the graphics settings: drawn again, it has not moved)
         else if (e.moves && !e.always && ++e.calm >= CALM) { e.moves = false; changed = true; }
         if (!e.moves && e.seen !== seen - 1 && !fresh) changed = true;   // shown again
         e.m.set(a); e.v = v; e.mat = mat; e.seen = seen;
