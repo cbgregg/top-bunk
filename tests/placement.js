@@ -2,6 +2,9 @@
 //   node tests/placement.js [--port N] [--json out.json] [--tol 0.03]
 // Reports models that cut into each other, into a wall or the floor, that float, or whose front faces a wall; exit 1 when it finds any.
 // A model set down below the floor on purpose has its allowance in tests/sunk/<package>.json ({ modelName: metres }).
+// The things about the house (js/decor.js) are checked too: what each stands on (by what it says and by a ray to what is drawn under it),
+// that a sheet on a wall or a door shows in front of its face, walls, switches, outlets, windows, the doors' swings, and each
+// footprint's distance from the ways through the house and the yard and from the places to hide.
 const http = require('http'), fs = require('fs'), path = require('path');
 const { Readable } = require('stream');
 const ROOT = path.resolve(__dirname, '..');
@@ -78,13 +81,26 @@ const SUNK = {};
     // the things about the house: each one's box and what it says it stands on; the doors' leaves, the plates on the walls, the panes, the
     // thing's and the parents' ways through the rooms and the places to hide, which none of them may be in the way of
     const nav = await import('/js/nav.js'), r3 = (v) => +v.toFixed(3);
+    // what is really there: a ray down from under each thing that stands on something (the gap to whatever is drawn below it, itself
+    // and the other small things apart), and a look at each picture from the room side (what the eye meets first must be the picture)
+    const rc = new THREE.Raycaster(), shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+    const isDecor = (o) => { for (let p = o; p; p = p.parent) if (p.name && p.name.startsWith('decor:')) return true; return false; }, within = (o, h) => { for (let p = o; p; p = p.parent) if (p === h) return true; return false; };
+    const solidMeshes = []; g.scene.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && !o.isInstancedMesh && shown(o)) solidMeshes.push(o); });
+    const cast = (from, dir, far, skip) => { rc.set(new THREE.Vector3(...from), new THREE.Vector3(...dir)); rc.far = far; const h = rc.intersectObjects(solidMeshes, false).filter((x) => !skip(x.object)); return h.length ? h[0] : null; };
+    const gapUnder = (r) => {
+      if (r.kind !== 'on' || !r.box || !isFinite(r.box[0])) return null;
+      const b = r.box, cx = (b[0] + b[1]) / 2, cz = (b[4] + b[5]) / 2, dx = (b[1] - b[0]) / 4, dz = (b[5] - b[4]) / 4; let best = null;
+      for (const [x, z] of [[cx, cz], [cx - dx, cz - dz], [cx + dx, cz - dz], [cx - dx, cz + dz], [cx + dx, cz + dz]]) { const h = cast([x, b[2] + 0.004, z], [0, -1, 0], 0.3, (o) => (r.holder ? within(o, r.holder) : isDecor(o))); if (h && (best === null || h.distance - 0.004 < best)) best = h.distance - 0.004; }
+      return best === null ? 9 : r3(best);
+    };
+    const seen = (r) => (r.probes || []).map(([x, y, z, nx, nz]) => { const h = cast([x + nx * 0.3, y, z + nz * 0.3], [-nx, 0, -nz], 0.34, () => false); return !!h && isDecor(h.object) && h.distance < 0.301; });
     const decor = W.decor ? {
-      items: W.decor.items.map((r) => ({ name: r.name, kind: r.kind, y: r.y, box: r.box && r.box.map(r3), model: !!r.model, ground: r.box ? Wm.groundAt((r.box[0] + r.box[1]) / 2, (r.box[4] + r.box[5]) / 2, r.box[2]) : 0 })),
+      items: W.decor.items.map((r) => ({ name: r.name, kind: r.kind, y: r.y, box: r.box && r.box.map(r3), model: !!r.model, gap: gapUnder(r), seen: seen(r), ground: r.box ? Wm.groundAt((r.box[0] + r.box[1]) / 2, (r.box[4] + r.box[5]) / 2, r.box[2]) : 0 })),
       solids: W.colliders.filter((c) => c.decor).map((c) => ({ id: c.id, b: [c.minX, c.maxX, c.minZ, c.maxZ].map(r3), low: (c.minY ?? 0) < -1 })),
       doors: Object.entries(W.doors).map(([k, d]) => ({ k, hx: d.hx, hz: d.hz, w: d.w, y0: d.y0 || 0, rotC: d.rotC, rotO: d.rotO, slide: d.slide || null })),
       plates: [...W.switches.map((s) => s.g.getWorldPosition(new THREE.Vector3()).toArray()), ...W.nightLights.map((n) => n.pos.toArray()), ...items.filter((i) => i.name === 'outlet').map((i) => [i.x, i.y, i.z])],
       panes: W.windows.filter((w) => w.pane).map((w) => { const b = new THREE.Box3().setFromObject(w.pane); return [b.min.x, b.max.x, b.min.y, b.max.y, b.min.z, b.max.z]; }),
-      nodes: nav.NODES, edges: Object.entries(nav.ADJ).flatMap(([a, l]) => l.filter((e) => a < e.to).map((e) => [a, e.to])),
+      nodes: nav.NODES, edges: [...Object.entries(nav.ADJ).flatMap(([a, l]) => l.filter((e) => a < e.to).map((e) => [a, e.to])), ...(nav.outsideJoined() ? [] : nav.OUTSIDE_EDGE_LIST.map((e) => [e[0], e[1]]))],   // (the ways about the yard too, joined or not)
       pods: g.nights && g.nights.PODS ? Object.values(g.nights.PODS).filter((p) => p.stand).map((p) => p.stand) : [],
     } : null;
     return { items, decor, walls: walls.map((c) => [c.minX, c.maxX, c.minZ, c.maxZ, c.minY ?? -0.3, c.maxY ?? 3]), furn: furn.map((c) => [c.minX, c.maxX, c.minZ, c.maxZ]), ground: items.map((i) => Wm.groundAt(i.x, i.z, i.min[1])) };
@@ -162,6 +178,8 @@ const SUNK = {};
       // what it stands on
       if (it.kind === 'floor' && Math.abs(b[2] - it.ground) > 0.02) add('high', room, `${it.name} ${at}`, b[2] > it.ground ? 'floats over the floor' : 'sinks into the floor', `base ${b[2]} floor ${it.ground}`);
       if (it.kind === 'on' && Math.abs(b[2] - it.y) > 0.02) add('high', room, `${it.name} ${at}`, b[2] > it.y ? 'floats over what it stands on' : 'sinks into what it stands on', `base ${b[2]} top ${it.y}`);
+      if (it.gap !== null && Math.abs(it.gap) > 0.02) add('high', room, `${it.name} ${at}`, it.gap > 0 ? 'nothing drawn under it' : 'sunk into what is under it', it.gap === 9 ? 'nothing within 0.3 m below' : `${it.gap} m to what is below`);
+      if (it.seen.some((v) => !v)) add('high', room, `${it.name} ${at}`, 'a sheet on a wall or a door is behind its face', `${it.seen.filter((v) => !v).length} of ${it.seen.length}`);
       if (it.kind === 'flat' && (Math.abs(b[2] - it.y) > 0.006 || b[3] - b[2] > 0.08)) add('high', room, `${it.name} ${at}`, 'a flat thing off the floor or too tall to walk over', `${b[2]}..${b[3]}`);
       if (it.kind === 'floor' && !decor.solids.some((s) => cx > s.b[0] && cx < s.b[1] && cz > s.b[2] && cz < s.b[3]) && !furn.some((f) => cx > f[0] && cx < f[1] && cz > f[2] && cz < f[3])) add('high', room, `${it.name} ${at}`, 'stands on the floor with no footprint', '');
       if (it.kind === 'floor') { const s = decor.solids.find((q) => cx > q.b[0] && cx < q.b[1] && cz > q.b[2] && cz < q.b[3]); if (s && (b[0] < s.b[0] - 0.06 || b[1] > s.b[1] + 0.06 || b[4] < s.b[2] - 0.06 || b[5] > s.b[3] + 0.06)) add('low', room, `${it.name} ${at}`, 'reaches out past its footprint', `box x ${b[0]}..${b[1]} z ${b[4]}..${b[5]}, footprint ${s.b}`); }

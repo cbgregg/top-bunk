@@ -588,6 +588,35 @@ export function decorSheet(small = false) {
   cell('blocks', 192, 48, (w, h, r) => { ['A', 'B', 'C', '7'].forEach((s, i) => { g.fillStyle = '#d9c08a'; g.fillRect(i * 48 - (i ? 0 : 4), -4, 48 + 4, h + 8); g.strokeStyle = ['#c2452f', '#3c76a8', '#4f9a58', '#e0b23c'][i]; g.lineWidth = 5; g.strokeRect(i * 48 + 5, 5, 38, 38); text(s, i * 48 + 24, 26, `bold 28px ${SLAB}`, ['#c2452f', '#3c76a8', '#4f9a58', '#b0452f'][i]); }); });
   cell('crayons', 96, 128, (w, h, r) => { g.fillStyle = '#e0b23c'; g.fillRect(-4, -4, w + 8, h + 8); poly([[0, 34], [w / 2, 60], [w, 34], [w, 74], [w / 2, 100], [0, 74]], '#3f8a3a'); text('CRAYONS', w / 2, 20, `bold 16px ${SLAB}`, '#2a4a2a', 'center', w - 10); text('24', w / 2, 68, `bold 22px ${SLAB}`, '#f1dc8a'); });
   // the garage: the bench's perforated hardboard, an old plate, a tin sign; the laundry's soap powder
+  // more for the walls: tulips in a jug, a boat on the lake, a bird on a branch; the quilt on the blanket chest; labels for jars
+  cell('pr_flowers', 224, 288, (w, h, r) => {
+    g.fillStyle = '#d9cfb2'; g.fillRect(-4, -4, w + 8, h + 8); g.fillStyle = '#8a6a4a'; g.fillRect(-4, h * 0.78, w + 8, h); g.fillStyle = 'rgba(0,0,0,0.12)'; g.beginPath(); g.ellipse(w / 2 + 14, h * 0.8, 52, 9, 0, 0, 7); g.fill();
+    const stems = [[-58, 96], [-30, 62], [-4, 44], [26, 60], [54, 92], [10, 84], [-40, 108]];
+    g.strokeStyle = '#4f6a44'; g.lineWidth = 3; g.lineCap = 'round'; for (const [dx, ty] of stems) { g.beginPath(); g.moveTo(w / 2 + dx * 0.15, h * 0.56); g.quadraticCurveTo(w / 2 + dx * 0.5, (h * 0.56 + ty) / 2, w / 2 + dx, ty + 16); g.stroke(); }
+    for (const [dx, ty] of [[-44, 150], [38, 142], [-20, 128]]) poly([[w / 2 + dx * 0.3, h * 0.55], [w / 2 + dx, ty], [w / 2 + dx * 0.75, ty + 30]], '#5f7a4c');
+    stems.forEach(([dx, ty], i) => { const x = w / 2 + dx, c2 = ['#a8322a', '#d9a426', '#c9566a', '#e6dcc0', '#a8322a', '#d9a426', '#c9566a'][i]; poly([[x - 12, ty], [x - 6, ty + 8], [x, ty - 2], [x + 6, ty + 8], [x + 12, ty], [x + 10, ty + 24], [x, ty + 30], [x - 10, ty + 24]], c2); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x, ty + 2, 10, 26); });
+    g.fillStyle = '#4f6f8a'; g.beginPath(); g.moveTo(w / 2 - 24, h * 0.54); g.lineTo(w / 2 + 24, h * 0.54); g.bezierCurveTo(w / 2 + 50, h * 0.64, w / 2 + 44, h * 0.78, w / 2 + 28, h * 0.8); g.lineTo(w / 2 - 28, h * 0.8); g.bezierCurveTo(w / 2 - 44, h * 0.78, w / 2 - 50, h * 0.64, w / 2 - 24, h * 0.54); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(w / 2 - 26, h * 0.6, 8, h * 0.14); g.fillStyle = '#e6dcc0'; g.fillRect(w / 2 - 34, h * 0.66, 68, 5);
+    for (let i = 0; i < w * h / 500; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '255,250,235' : '40,35,25'},${0.03 + r() * 0.05})`; g.fillRect(r() * w, r() * h, 2 + r() * 8, 1 + r() * 2); }
+  });
+  cell('pr_boat', 288, 224, (w, h, r) => {
+    land(0, 0, w, h, r, 'lake', 1);
+    const bx = w * 0.52, by = h * 0.7; poly([[bx - 44, by], [bx + 46, by], [bx + 34, by + 14], [bx - 34, by + 14]], '#6a2824'); g.fillStyle = '#e9e2cf'; g.fillRect(bx - 44, by - 3, 90, 4);
+    g.fillStyle = '#4a3a28'; g.fillRect(bx - 2, by - 92, 3, 92); poly([[bx + 4, by - 90], [bx + 4, by - 8], [bx + 48, by - 8]], '#efe9d8'); poly([[bx - 5, by - 78], [bx - 5, by - 8], [bx - 36, by - 8]], '#d9cfb2');
+    g.fillStyle = 'rgba(235,240,235,0.35)'; g.fillRect(bx - 40, by + 16, 84, 3); g.fillRect(bx - 28, by + 23, 60, 2);
+  });
+  cell('pr_bird', 224, 224, (w, h, r) => {
+    g.fillStyle = '#cfd6c4'; g.fillRect(-4, -4, w + 8, h + 8);
+    g.strokeStyle = '#5a4630'; g.lineCap = 'round'; g.lineWidth = 9; g.beginPath(); g.moveTo(-4, 168); g.quadraticCurveTo(110, 140, w + 4, 158); g.stroke(); g.lineWidth = 4; g.beginPath(); g.moveTo(150, 151); g.lineTo(196, 112); g.moveTo(52, 158); g.lineTo(24, 128); g.stroke();
+    for (const [x, y, a] of [[198, 106, -0.7], [20, 122, 0.8], [180, 128, -0.3]]) { g.save(); g.translate(x, y); g.rotate(a); poly([[0, -14], [8, 0], [0, 14], [-8, 0]], '#5f7a4c'); g.restore(); }
+    poly([[66, 118], [34, 150], [48, 152], [78, 132]], '#3d4f6a');
+    g.fillStyle = '#4f6f8a'; g.beginPath(); g.ellipse(100, 116, 40, 27, -0.25, 0, 7); g.fill(); g.fillStyle = '#b8562c'; g.beginPath(); g.ellipse(112, 124, 26, 18, -0.25, 0, 7); g.fill();
+    g.fillStyle = '#4f6f8a'; g.beginPath(); g.arc(136, 90, 19, 0, 7); g.fill(); poly([[152, 84], [170, 90], [152, 96]], '#c9a23c'); g.fillStyle = '#1c1c1c'; g.fillRect(140, 84, 5, 5);
+    poly([[74, 104], [116, 100], [104, 124], [70, 122]], '#3d4f6a'); g.strokeStyle = '#3a2a1c'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(102, 140); g.lineTo(102, 152); g.moveTo(114, 139); g.lineTo(114, 150); g.stroke();
+    noise(0, 0, w, h, 14, r);
+  });
+  cell('quilt', 192, 192, (w, h, r) => { const cs = ['#7a3a3a', '#c9bfa8', '#3d4f6a', '#8e9a7a', '#b8863c', '#d9cfb2']; for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const x = i * 48, y = j * 48, a = cs[(i * 3 + j * 5) % 6], b = cs[(i * 2 + j + 3) % 6]; g.fillStyle = a; g.fillRect(x - (i ? 0 : 4), y - (j ? 0 : 4), 52, 52); if ((i + j) % 2) poly([[x, y], [x + 48, y], [x, y + 48]], b); else poly([[x + 24, y + 6], [x + 42, y + 24], [x + 24, y + 42], [x + 6, y + 24]], b); } g.strokeStyle = 'rgba(240,235,220,0.5)'; g.lineWidth = 1; g.setLineDash([3, 3]); for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(i * 48, 0); g.lineTo(i * 48, h); g.moveTo(0, i * 48); g.lineTo(w, i * 48); g.stroke(); } g.setLineDash([]); noise(0, 0, w, h, 24, r); });
+  cell('lbl', 192, 40, (w, h, r) => { ['NAILS', 'SCREWS', 'BOLTS'].forEach((s, i) => { g.fillStyle = '#d9cfa6'; g.fillRect(i * 64 - (i ? 0 : 4), -4, 68, h + 8); text(s, i * 64 + 32, h / 2 + 1, `15px ${MARK}`, '#2a2622', 'center', 56); }); noise(0, 0, w, h, 14, r); });
   cell('pegboard', 384, 192, (w, h, r) => { g.fillStyle = '#8a6a48'; g.fillRect(-4, -4, w + 8, h + 8); g.fillStyle = 'rgba(40,26,14,0.55)'; for (let y = 6; y < h; y += 12) for (let x = 6; x < w; x += 12) g.fillRect(x - 1, y - 1, 2.5, 2.5); stains(g, w, r, 5, 'rgba(60,40,20,0.2)', 80); noise(0, 0, w, h, 12, r); });
   cell('plate', 192, 96, (w, h, r) => { g.fillStyle = '#d9d6c6'; g.fillRect(-4, -4, w + 8, h + 8); g.strokeStyle = '#2f5a3a'; g.lineWidth = 4; g.strokeRect(5, 5, w - 10, h - 10); text('FARM 482', w / 2, 54, `bold 38px ${SANS}`, '#2f5a3a', 'center', w - 24); text('EVERGREEN', w / 2, 18, `bold 12px ${SANS}`, '#2f5a3a'); stains(g, w, r, 4, 'rgba(110,70,30,0.3)', 40); noise(0, 0, w, h, 12, r); });
   cell('tinsign', 256, 160, (w, h, r) => { g.fillStyle = '#b8862c'; g.fillRect(-4, -4, w + 8, h + 8); g.fillStyle = '#7a221c'; g.fillRect(10, 10, w - 20, h - 20); g.strokeStyle = '#e6d6a6'; g.lineWidth = 2; g.strokeRect(16, 16, w - 32, h - 32); text('FEED', w / 2, 56, `bold 46px ${SLAB}`, '#e6d6a6'); text('& SEED', w / 2, 104, `bold 34px ${SLAB}`, '#e6d6a6'); bars(70, 130, w - 140, 1, 8, '#e6d6a6', r); stains(g, w, r, 6, 'rgba(60,30,10,0.35)', 50); noise(0, 0, w, h, 14, r); });
