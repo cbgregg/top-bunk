@@ -266,6 +266,28 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('crate blocks', 'in', 0.008); box(7.2, 0.01, 3.05, 0.045, 0.045, 0.045, 0xd9c08a, { ry: 0.4, faces: [null, null, ['blocks', [0.75, 0, 1, 1]], null, null, null] }); box(7.3, 0.01, 3.07, 0.045, 0.045, 0.045, 0xd9c08a, { ry: 1.0, faces: [null, null, ['blocks', [0.5, 0, 0.75, 1]], null, null, null] });
   }
 
+  // ---------- the bathroom ----------
+  {
+    cluster('bath towels', 4.84, 1.2, 1.5);
+    item('towel bar', 'wall'); rod([4.84, 1.36, 1.14], [4.84, 1.36, 1.82], 0.009, 0xdfe2e4, { mat: 'metal' }); for (const z of [1.16, 1.8]) { rod([4.768, 1.36, z], [4.84, 1.36, z], 0.009, 0xdfe2e4, { mat: 'metal' }); cyl(4.769, 1.36, z, 0.022, 0.006, 0xdfe2e4, { mat: 'metal', rz: -PI / 2 }); }
+    cloth('z', 1.2, 1.47, [[4.826, 0.98], [4.828, 1.345], [4.84, 1.374], [4.853, 1.345], [4.856, 0.84]], 0x4f7f86, { cast: true, n: 5 }); cloth('z', 1.5, 1.77, [[4.826, 0.92], [4.828, 1.345], [4.84, 1.374], [4.853, 1.345], [4.856, 0.9]], 0xe2dccb, { cast: true, n: 5 });
+    cluster('bath sink', 6.5, 0.95, 1.64);
+    item('hand towel', 'wall'); { const g = new THREE.TorusGeometry(0.06, 0.006, 6, 16); g.rotateY(PI / 2); add(g, 0xdfe2e4, { mat: 'metal', m: M4(6.648, 1.33, 2.4) }); rod([6.693, 1.39, 2.4], [6.648, 1.39, 2.4], 0.008, 0xdfe2e4, { mat: 'metal' }); }
+    cloth('z', 2.32, 2.48, [[6.652, 0.95], [6.651, 1.262], [6.647, 1.276], [6.642, 1.262], [6.639, 0.9]], 0xd9cfae, { n: 4, wobble: 0.003 });
+    item('tooth brushes', 'on', 0.902); cyl(6.5, 0.902, 1.4, 0.032, 0.095, 0xe9e7df, { mat: 'satin', r2: 0.036 }); rod([6.49, 0.91, 1.4], [6.47, 1.07, 1.385], 0.005, 0x3c76a8, { mat: 'satin', seg: 5 }); rod([6.505, 0.91, 1.405], [6.525, 1.075, 1.42], 0.005, 0xc2452f, { mat: 'satin', seg: 5 }); rod([6.5, 0.91, 1.39], [6.5, 1.05, 1.37], 0.0045, 0x4f9a58, { mat: 'satin', seg: 5 });
+    item('soap', 'on', 0.902); box(6.5, 0.902, 1.89, 0.05, 0.022, 0.08, 0xc9d6b4, { round: 0.009, mat: 'satin' });
+    cluster('bath toilet', 4.9, 1.0, 2.7);
+    item('toilet paper', 'wall'); rod([4.799, 0.7, 2.33], [4.87, 0.7, 2.33], 0.006, 0xdfe2e4, { mat: 'metal' }); rod([4.87, 0.7, 2.33], [4.87, 0.7, 2.2], 0.006, 0xdfe2e4, { mat: 'metal' }); cyl(4.87, 0.7, 2.2, 0.052, 0.1, 0xf0eee6, { rx: PI / 2, cell: 'nap' });
+    item('spare roll', 'on', 0.842); cyl(4.93, 0.842, 2.62, 0.052, 0.1, 0xf0eee6, { cell: 'nap' }); cyl(4.93, 0.942, 2.62, 0.02, 0.001, 0x9a8a70);
+    item('bath shelf', 'wall'); box(4.848, 1.5, 2.76, 0.16, 0.02, 0.54, 0x9c6b3c, { mat: 'satin', cast: true }); for (const z of [2.56, 2.96]) box(4.83, 1.41, z, 0.12, 0.09, 0.016, 0x9c6b3c, { mat: 'satin' });
+    for (let i = 0; i < 3; i++) box(4.85, 1.52 + i * 0.05, 2.66, 0.14, 0.05, 0.24, [0x4f7f86, 0xe2dccb, 0x8e4a5c][i], { round: 0.02, cell: 'nap' });
+    cyl(4.85, 1.52, 2.9, 0.052, 0.1, 0xf0eee6, { cell: 'nap' }); cyl(4.85, 1.52, 2.99, 0.03, 0.12, 0x9fc0b4, { mat: 'satin', r2: 0.02 });
+    model('d_plunger', { x: 4.94, z: 3.44 }); foot('plunger', 4.84, 5.04, 3.34, 3.54, 0.42);
+    cluster('tub things', 6.3, 0.585, 4.2);
+    model('d_duck', { x: 6.25, y: 0.585, z: 3.83, s: 0.4, rot: 2.2, kind: 'on' });
+    item('shampoo', 'on', 0.585); cyl(6.4, 0.585, 4.46, 0.03, 0.17, 0xd9c9a0, { mat: 'satin', r2: 0.024 }); cyl(6.4, 0.755, 4.46, 0.015, 0.025, 0x3a3a3a, { mat: 'satin' }); cyl(6.3, 0.585, 4.47, 0.027, 0.2, 0x4f6a8a, { mat: 'satin' }); cyl(6.3, 0.785, 4.47, 0.012, 0.02, 0xe8e6de, { mat: 'satin' });
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
