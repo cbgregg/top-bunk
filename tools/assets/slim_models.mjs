@@ -1,7 +1,7 @@
 // slims glTF models into the small meshopt-compressed GLBs in assets/props.
 //   node tools/assets/slim_models.mjs [name ...]
 //       cuts the triangle count of the Poly Haven props already in assets/props to their budget (textures untouched)
-//   node tools/assets/slim_models.mjs --in model.gltf --out assets/props/name.glb [--tris 6000] [--tex 1024] [--keep regex] [--drop regex] [--list]
+//   node tools/assets/slim_models.mjs --in model.gltf --out assets/props/name.glb [--tris 6000] [--tex 1024] [--keep regex] [--drop regex] [--plain] [--list]
 //       one downloaded model (tools/assets/fetch_sketchfab.py calls this): keeps only the nodes matching --keep (and not --drop),
 //       converts spec-gloss materials, welds and simplifies to --tris triangles, resizes every texture to --tex px as WebP, meshopt-compresses
 // install its tools first: cd tools && npm install
@@ -45,6 +45,13 @@ if (argv.includes('--in')) {
   const before = tris(doc);
   await doc.transform(unpartition(), metalRough(), dedup(), prune(), flatten(), join(), weld());
   if (tris(doc) > budget) await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: budget / tris(doc), error: 0.02, lockBorder: true }));
+  if (argv.includes('--plain')) {   // a small thing keeps its colour map only: the roughness and metalness maps become their averages, the normal map goes
+    for (const m of root.listMaterials()) {
+      const t = m.getMetallicRoughnessTexture();
+      if (t) { const ch = (await sharp(Buffer.from(t.getImage())).stats()).channels, at = (i) => ch[Math.min(i, ch.length - 1)].mean / 255; m.setRoughnessFactor(+(m.getRoughnessFactor() * at(1)).toFixed(3)); m.setMetallicFactor(+(m.getMetallicFactor() * at(2)).toFixed(3)); }
+      m.setMetallicRoughnessTexture(null); m.setNormalTexture(null); m.setOcclusionTexture(null);
+    }
+  }
   await doc.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [tex, tex], quality: 82 }), prune(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
   for (const t of root.listTextures()) t.setName('');   // texture names carry the original file names
   fs.mkdirSync(path.dirname(out), { recursive: true });

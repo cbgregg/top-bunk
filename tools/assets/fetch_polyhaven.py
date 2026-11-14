@@ -49,7 +49,6 @@ MODELS = {
     'd_suitcase': ('vintage_suitcase', 1200, 512, 'suitcase_02'),
     'd_cardbox': ('cardboard_box_01', 1500, 512),
     'd_notepads': ('office_notepads', 666, 256),
-    'd_stationery': ('stationery_supplies', 600, 256),
     'd_clipboard': ('clipboard', 700, 256),
     'd_bleach': ('bleach_bottle', 700, 256),
     'd_cleaner': ('multi_cleaner_5_litre', 700, 256),
@@ -61,15 +60,13 @@ MODELS = {
     'd_spraycans': ('spray_paint_bottles', 1200, 256),
     'd_tin': ('cleaner_tin_01', 600, 256),
     'd_oiltin': ('oil_tin', 600, 256),
-    'd_saw': ('handsaw_wood', 500, 256),
+    'd_saw': ('handsaw_wood', 500, 512),
     'd_hammer': ('cross_pein_hammer', 400, 256),
     'd_wrench': ('combination_wrench', 400, 256),
     'd_screwdriver': ('flathead_screwdriver', 400, 256),
     'd_jerrycan': ('plastic_jerrycan', 900, 256),
     'd_cement': ('cement_bag', 844, 256),
     'd_handtruck': ('hand_truck', 2500, 512),
-    'd_dartboard': ('dartboard', 900, 512),
-    'd_hose': ('garden_hose_wall_mounted_01', 2500, 512),
     'd_wateringcan': ('watering_can_metal_01', 1500, 256),
     'd_porchchair': ('plastic_monobloc_chair_01', 2000, 512),
     'd_claypot': ('planter_pot_clay', 800, 256),
@@ -78,6 +75,11 @@ MODELS = {
     'd_crate': ('plastic_crate_02', 900, 256),
 }
 
+
+# the small ones (a tin, a bottle, a hammer) keep only their colour map: slim_models.mjs --plain
+PLAIN = {'d_alarm', 'd_bowl', 'd_lemon', 'd_frame', 'd_vase', 'd_vase2', 'd_jug', 'd_football', 'd_bat', 'd_ball', 'd_duck', 'd_plunger', 'd_notepads', 'd_clipboard',
+         'd_bleach', 'd_cleaner', 'd_gallon', 'd_spray', 'd_spraycans', 'd_tin', 'd_oiltin', 'd_saw', 'd_hammer', 'd_wrench', 'd_screwdriver', 'd_jerrycan', 'd_cement',
+         'd_wateringcan', 'd_claypot', 'd_boots', 'd_crate'}
 
 def get(u, tries=3):
     for i in range(tries):
@@ -119,6 +121,8 @@ def one(name, force, list_only, manifest):
         args = ['node', SLIM, '--in', main, '--out', out, '--tris', str(tris), '--tex', str(tex)]
         if keep:
             args += ['--keep', keep[0]]
+        if name in PLAIN:
+            args.append('--plain')
         if list_only:
             args.append('--list')
         r = subprocess.run(args, capture_output=True, text=True)
