@@ -5,6 +5,7 @@
 
 flashlight.glb   Grandpa's torch, the one the kid carries: Poly Haven `vintage_flashlight` (Omar M. El-Safy)
 torch_dad.glb    Dad's own torch for his night walks: Poly Haven `small_plastic_torch` (Abiyyu Panggalih)
+d_*.glb          the things a family has about the house (js/decor.js): cushions, shelves, a laundry basket, the garage's shelves and tools
 
 Each model's licence and authors are read from the Poly Haven API (api.polyhaven.com/info/<id>) before anything is downloaded, and the
 script stops if the asset is not CC0 (every Poly Haven asset is; the check is there so a changed listing cannot slip through). The glTF
@@ -21,10 +22,60 @@ OUT = os.path.join(HERE, '..', '..', 'assets', 'props')
 SLIM = os.path.join(HERE, 'slim_models.mjs')
 UA = {'User-Agent': 'Mozilla/5.0 (top-bunk asset fetch)'}
 
-# name: (Poly Haven id, triangle budget, texture size in px)
+# name: (Poly Haven id, triangle budget, texture size in px[, node-name regex to keep (for a model that comes as a set)])
 MODELS = {
     'flashlight': ('vintage_flashlight', 3000, 512),
     'torch_dad': ('small_plastic_torch', 3000, 512),
+    # the house lived in (js/decor.js)
+    'd_cushion': ('throw_pillows_01', 700, 256, 'pillow01'),
+    'd_cushion2': ('throw_pillows_01', 700, 256, 'pillow02'),
+    'd_shelves': ('wooden_display_shelves_01', 2400, 512),
+    'd_kidshelf': ('painted_wooden_shelves', 524, 512),
+    'd_kidtable': ('small_wooden_table_01', 900, 512),
+    'd_stool': ('painted_wooden_stool', 676, 256),
+    'd_alarm': ('alarm_clock_01', 1500, 256),
+    'd_bowl': ('wooden_bowl_01', 900, 256),
+    'd_lemon': ('lemon', 300, 256),
+    'd_frame': ('standing_picture_frame_01', 600, 256),
+    'd_vase': ('ceramic_vase_03', 600, 256),
+    'd_vase2': ('brass_vase_03', 600, 256),
+    'd_jug': ('jug_01', 800, 256),
+    'd_boombox': ('boombox', 2200, 512),
+    'd_football': ('american_football', 500, 256),
+    'd_bat': ('baseball_bat', 400, 256),
+    'd_ball': ('baseball_01', 200, 256),
+    'd_duck': ('rubber_duck_toy', 600, 256),
+    'd_plunger': ('plunger', 500, 256),
+    'd_suitcase': ('vintage_suitcase', 1200, 512, 'suitcase_02'),
+    'd_cardbox': ('cardboard_box_01', 1500, 512),
+    'd_notepads': ('office_notepads', 666, 256),
+    'd_stationery': ('stationery_supplies', 600, 256),
+    'd_clipboard': ('clipboard', 700, 256),
+    'd_bleach': ('bleach_bottle', 700, 256),
+    'd_cleaner': ('multi_cleaner_5_litre', 700, 256),
+    'd_gallon': ('plastic_bottle_gallon', 800, 256),
+    'd_spray': ('all_purpose_cleaner', 700, 256),
+    'd_gshelves': ('steel_frame_shelves_01', 2500, 512),
+    'd_ladder': ('wooden_ladder_02', 1500, 512),
+    'd_toolbox': ('metal_toolbox', 1800, 512),
+    'd_spraycans': ('spray_paint_bottles', 1200, 256),
+    'd_tin': ('cleaner_tin_01', 600, 256),
+    'd_oiltin': ('oil_tin', 600, 256),
+    'd_saw': ('handsaw_wood', 500, 256),
+    'd_hammer': ('cross_pein_hammer', 400, 256),
+    'd_wrench': ('combination_wrench', 400, 256),
+    'd_screwdriver': ('flathead_screwdriver', 400, 256),
+    'd_jerrycan': ('plastic_jerrycan', 900, 256),
+    'd_cement': ('cement_bag', 844, 256),
+    'd_handtruck': ('hand_truck', 2500, 512),
+    'd_dartboard': ('dartboard', 900, 512),
+    'd_hose': ('garden_hose_wall_mounted_01', 2500, 512),
+    'd_wateringcan': ('watering_can_metal_01', 1500, 256),
+    'd_porchchair': ('plastic_monobloc_chair_01', 2000, 512),
+    'd_claypot': ('planter_pot_clay', 800, 256),
+    'd_boots': ('rubber_boots', 1200, 256, 'boots_dirt'),
+    'd_bin': ('metal_trash_can', 1400, 512, '^metal_trash_can(_handle_(left|right))?$'),
+    'd_crate': ('plastic_crate_02', 900, 256),
 }
 
 
@@ -47,7 +98,7 @@ def licence(id_):
 
 
 def one(name, force, list_only, manifest):
-    id_, tris, tex = MODELS[name]
+    id_, tris, tex, *keep = MODELS[name]
     out = os.path.join(OUT, name + '.glb')
     if os.path.exists(out) and not force and not list_only:
         print(f'{name}: already there ({os.path.getsize(out) // 1024} KB); --force fetches it again')
@@ -66,6 +117,8 @@ def one(name, force, list_only, manifest):
             os.makedirs(os.path.dirname(p), exist_ok=True)
             open(p, 'wb').write(get(v['url']))
         args = ['node', SLIM, '--in', main, '--out', out, '--tris', str(tris), '--tex', str(tex)]
+        if keep:
+            args += ['--keep', keep[0]]
         if list_only:
             args.append('--list')
         r = subprocess.run(args, capture_output=True, text=True)

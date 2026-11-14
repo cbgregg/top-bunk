@@ -127,6 +127,7 @@ three.js with a post-processing chain: an HDR sky and image-based lighting, ambi
 | Sky and ambient light | Poly Haven HDRIs (CC0), `tools/assets/fetch_sky.py` into `assets/sky/` |
 | Furniture, plants, a tree, rocks, grass | Poly Haven models (CC0), compressed by `tools/assets/fetch_models.py` into `assets/props/` |
 | Fixtures, appliances, the bunk, the cars on the road, the mailbox and the cans | Sketchfab models (CC BY 4.0, each listed in `CREDITS.md`), fetched and compressed by `tools/assets/fetch_sketchfab.py` into `assets/props/` |
+| The things about the house: rugs, books, posters, towels, tools, bikes | Small things built in code and painted on one sheet (`js/decor.js`, `js/textures.js`), with Poly Haven (CC0) and Sketchfab (CC BY 4.0) models listed in `CREDITS.md`, fetched by `tools/assets/fetch_polyhaven.py` and `tools/assets/fetch_sketchfab.py --manifest tools/assets/manifests/decor.json` |
 | Photographs in the frames | Public domain, from Wikimedia Commons, `tools/assets/fetch_photos.py` into `assets/photos/` |
 | Kitchen, bathroom, windows, house | Built in code (`js/world.js`) |
 
