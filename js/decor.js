@@ -360,6 +360,39 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     foot('drying rack', -7.85, -7.17, 0.37, 0.95, 0, cellar);
   }
 
+  // ---------- the garage ----------
+  {
+    const by = 0.88;
+    cluster('bench', -12.0, by, -13.1, { parent: yard });
+    model('d_boombox', { x: -11.25, y: by, z: -13.1, s: 0.8, rot: 0.15, kind: 'on', parent: yard });
+    model('d_toolbox', { x: -12.75, y: by, z: -13.08, rot: -0.2, kind: 'on', parent: yard });
+    model('d_spraycans', { x: -12.05, y: by, z: -13.22, rot: 0.4, kind: 'on', parent: yard });
+    model('d_tin', { x: -13.2, y: by, z: -13.15, s: 1.6, kind: 'on', parent: yard });
+    item('rag', 'on', by); rumple(-11.8, by, -12.98, 0.26, 0.2, 0x8a3a30, { seed: 2, ry: 0.5, h: 0.025 });
+    // tools on the board over the bench
+    item('peg board', 'wall'); box(-12.0, 1.16, -13.366, 2.0, 0.7, 0.008, 0x8a6a48, { faces: [null, null, null, null, 'pegboard', null] });
+    model('d_saw', { x: -12.55, y: 1.44, z: -13.34, rot: PI / 2, kind: 'wall', parent: yard });
+    model('d_hammer', { x: -11.95, y: 1.36, z: -13.348, kind: 'wall', parent: yard });
+    model('d_wrench', { x: -11.6, y: 1.34, z: -13.35, rx: PI / 2, kind: 'wall', parent: yard });
+    model('d_screwdriver', { x: -11.3, y: 1.4, z: -13.345, kind: 'wall', parent: yard });
+    for (const [x, y] of [[-12.4, 1.6], [-12.7, 1.6], [-11.95, 1.66], [-11.6, 1.69], [-11.3, 1.67]]) rod([x, y, -13.362], [x, y + 0.012, -13.33], 0.004, 0x9a9a9a, { mat: 'metal', seg: 5 });
+    // shelves, the ladder, the mower, a bike, things on the walls
+    model('d_gshelves', { x: -13.657, z: -11.8, s: 0.085, rot: PI / 2, parent: yard }); foot('garage shelves', -13.88, -13.43, -12.3, -11.3, 1.82);
+    for (const [n, x, y, z, r, sc] of [['d_cleaner', -13.66, 0.114, -12.08, 1.3, 1], ['d_gallon', -13.68, 0.114, -11.8, 1.9, 1], ['d_oiltin', -13.66, 0.114, -11.52, 1.5, 1], ['d_tin', -13.66, 0.544, -12.1, 0, 1.7], ['d_tin', -13.68, 0.544, -11.9, 2, 1.7], ['d_spray', -13.67, 0.544, -11.55, 1.7, 1], ['d_spraycans', -13.68, 0.974, -11.5, 1.4, 1], ['d_cardbox', -13.66, 1.404, -11.85, 0.08, 0.9]])
+      model(n, { x, y, z, rot: r, s: sc, kind: 'on', parent: yard });
+    cluster('garage shelf', -13.66, 1.0, -11.8, { parent: yard });
+    item('shelf jars', 'on', 0.974); for (const [z, c] of [[-12.12, 0x8a6a48], [-12.0, 0x5a6a4a], [-11.88, 0x6a4a3a]]) { cyl(-13.68, 0.974, z, 0.045, 0.11, c, { mat: 'satin' }); cyl(-13.68, 1.084, z, 0.046, 0.012, 0x9a9a94, { mat: 'metal' }); }
+    model('d_cement', { x: -10.2, z: -13.06, parent: yard }); foot('cement', -10.44, -9.96, -13.43, -12.69, 0.18);
+    model('d_ladder', { x: -13.36, z: -10.66, parent: yard }); foot('ladder', -13.88, -12.85, -10.99, -10.33, 1.72);
+    model('d_mower', { x: -9.7, z: -12.65, s: 0.0032, parent: yard }); foot('mower', -9.95, -9.45, -13.43, -11.87, 1.0);
+    model('d_bike', { x: -11.8, z: -7.5, s: 0.286, rot: PI / 2, rz: 0.0, parent: yard }); foot('bike', -12.74, -10.86, -7.8, -7.21, 1.15);
+    model('d_jerrycan', { x: -13.7, z: -12.5, rot: 0.3, parent: yard }); foot('gas can', -13.88, -13.5, -12.7, -12.3, 0.32);
+    model('d_dartboard', { x: -12.08, y: 1.5, z: -7.142, rot: PI, kind: 'wall', parent: yard });
+    cluster('garage walls', -13.87, 2.0, -11.2, { parent: yard, far: 0 });
+    item('tin sign', 'wall'); picture('z', -13.88, 1, -11.8, 2.2, 0.5, 0.31, 'tinsign', { frame: 0x5a4a30, depth: 0.004, fw: 0.004, mat: 'satin' });
+    item('old plate', 'wall'); picture('z', -13.88, 1, -10.66, 2.0, 0.3, 0.15, 'plate', { frame: 0x9a9a94, depth: 0.003, fw: 0.002, mat: 'satin', tilt: 0.05 });
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
