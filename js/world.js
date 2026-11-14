@@ -1885,15 +1885,16 @@ export function buildWorld(scene) {
     { const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 2 * W2 - 0.1, 14), M.steel); roll.rotation.z = Math.PI / 2; roll.position.set(TRUCK.x, 3.34 * s - 0.17 - TRUCK.drop, TRUCK.z - 0.22); roll.castShadow = true; yard.add(roll); }
     {
       const RL = TRUCK.ramp, L = Math.hypot(RL, TRUCK.bed), ramp = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, L), M.metal);
-      ramp.position.set(TRUCK.x, TRUCK.bed / 2 - 0.01, TRUCK.z + RL / 2); ramp.rotation.x = Math.atan2(TRUCK.bed, RL); ramp.castShadow = ramp.receiveShadow = true; yard.add(ramp);
-      for (const x of [-0.5, 0.5]) { const lip = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, L), M.steel); lip.position.set(TRUCK.x + x, TRUCK.bed / 2 + 0.02, TRUCK.z + RL / 2); lip.rotation.x = ramp.rotation.x; yard.add(lip); }
+      ramp.position.set(TRUCK.x, TRUCK.bed / 2 - 0.01, TRUCK.z + RL / 2); ramp.rotation.x = Math.atan2(TRUCK.bed, RL); ramp.castShadow = ramp.receiveShadow = true; yard.add(ramp); TRUCK.rampParts = [ramp];
+      for (const x of [-0.5, 0.5]) { const lip = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, L), M.steel); lip.position.set(TRUCK.x + x, TRUCK.bed / 2 + 0.02, TRUCK.z + RL / 2); lip.rotation.x = ramp.rotation.x; yard.add(lip); TRUCK.rampParts.push(lip); }
     }
-    {   // what is still in the back: a stack of boxes, a rolled mattress and a lamp, all of it where the family reaches in
-      const y0 = TRUCK.bed + 0.012;
-      const stack = [[1.7, y0, -15.8, 0.62, 0.5, 0.5, 0, 0.1], [2.4, y0, -15.8, 0.6, 0.46, 0.5, 1, -0.05], [3.1, y0, -15.7, 0.55, 0.5, 0.5, 2, 0.12], [2.0, y0 + 0.5, -15.8, 0.55, 0.46, 0.5, 3, 0.2], [2.7, y0 + 0.46, -15.8, 0.58, 0.5, 0.5, 0, -0.1],
+    {   // what is still in the back: a stack of boxes and a rolled mattress, where the family reaches in. The box is 1.89 wide inside
+      // (x 1.36 to 3.25) and ends at z -18.2: every one stands on the floor or on two of a height, clear of the walls and of its neighbours
+      const y0 = TRUCK.bed + 0.016;   // (the model's own floor, 4 mm over the plywood)
+      const stack = [[1.7, y0, -15.8, 0.56, 0.5, 0.5, 0, 0.08], [2.31, y0, -15.8, 0.56, 0.5, 0.5, 1, -0.05], [2.91, y0, -15.8, 0.52, 0.5, 0.5, 2, 0.1], [2.0, y0 + 0.5, -15.8, 0.55, 0.46, 0.5, 3, 0.2], [2.63, y0 + 0.5, -15.8, 0.5, 0.46, 0.5, 0, -0.1],
         [1.8, y0, -16.9, 0.6, 0.5, 0.55, 2, 0], [2.5, y0, -16.9, 0.6, 0.5, 0.55, 1, 0.1], [2.3, y0 + 0.5, -16.9, 0.6, 0.5, 0.55, 0, 0.05]];
-      for (const [x, y, z, w, h, d, mi, r] of stack) cardboardBox(x, y, z, w, h, d, mi, r, yard);
-      const mat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.7, 16), std({ color: 0xc9c2a8, roughness: 1 })); mat.rotation.z = Math.PI / 2; mat.position.set(2.5, y0 + 0.3, -18.0); yard.add(mat);
+      TRUCK.load = stack.map(([x, y, z, w, h, d, mi, r]) => cardboardBox(x, y, z, w, h, d, mi, r, yard));
+      const mat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.7, 16), std({ color: 0xc9c2a8, roughness: 1 })); mat.rotation.z = Math.PI / 2; mat.position.set(2.3, y0 + 0.28, -17.8); yard.add(mat); TRUCK.load.push(mat);
     }
     const truckCol = solid(TRUCK.x - 1.4, TRUCK.x + 1.4, zc - 3.3 * s, TRUCK.z + 0.1, { maxY: 3.5, id: 'truck' });
     // the ramp is a floor: the family and the player walk up it to the sill (where the truck's own box stops the player); it fades out at
@@ -1902,11 +1903,12 @@ export function buildWorld(scene) {
     rampAt = (x, z) => (truckCol.on && z < TRUCK.z + TRUCK.ramp + 0.3 && z > TRUCK.z - 0.5 && Math.abs(x - TRUCK.x) < 0.8 ? TRUCK.rampY(x, z) : 0);
     collide.headClear.add({ minX: TRUCK.x - W2, maxX: TRUCK.x + W2, minZ: TRUCK.z - 0.35, maxZ: TRUCK.z - 0.1, y0: 3.34 * s - 0.17 - TRUCK.drop - 0.11, y1: 3.6, id: 'truckRoll', when: () => truckCol.on });   // the rolled-up door at the sill
   }
-  // pickup boxes: something to walk round while they wait in the yard, and again once they are set down on a floor
+  // pickup boxes: something to walk round while they wait in the yard, and again once they are set down on a floor (a third of a metre
+  // clear of the ramp's edges, so none of them looks to stand in it from the lawn)
   const pickups = [
-    cardboardBox(1.3, 0, -12.3, 0.5, 0.44, 0.5, 3, 0.15, yard),
-    cardboardBox(3.45, 0, -12.7, 0.5, 0.44, 0.5, 3, -0.3, yard),
-    cardboardBox(3.3, 0, -11.7, 0.5, 0.44, 0.5, 3, 0.4, yard),
+    cardboardBox(1.15, 0, -12.3, 0.5, 0.44, 0.5, 3, 0.15, yard),
+    cardboardBox(3.6, 0, -12.7, 0.5, 0.44, 0.5, 3, -0.3, yard),
+    cardboardBox(3.5, 0, -11.7, 0.5, 0.44, 0.5, 3, 0.4, yard),
   ];
   for (const b of pickups) follow(b, 0.28, 0.28, { maxY: 0.46, id: 'pickup' });
   const dropSpots = [new THREE.Vector3(5.98, 0.575, 3.0), new THREE.Vector3(6.52, 0.575, 3.0), new THREE.Vector3(6.3, 0, 1.95)];

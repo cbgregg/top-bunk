@@ -22,7 +22,7 @@ export function bind(game) {
     wait, waitFor, later, tween, ease, lerp, lerpAngle, say, speak, setPhase, sleepers, nlMult, walkTo, knobOf, atKnob, panFor, surfaceAt, roomAt, saveRun, lock, unlock } = game);
   // Dad stands on the truck bed (W.TRUCK.bed up); the next box sits on top of the stack in front of him
   TBED = W.TRUCK ? W.TRUCK.bed : 0.843;
-  TRUCK_PICK = new V3(2.35, TBED, -15.25), TRUCK_BOX = new V3(2.35, TBED + 1.16, -15.8), RAMP_FOOT = new V3(2.3, 0, -10.1), PORCH = new V3(3.1, 0, -6.5), DOOR_IN = new V3(3.1, 0, -3.6), DOOR_OUT = new V3(3.1, 0, -5.4);
+  TRUCK_PICK = new V3(2.35, TBED, -15.25), TRUCK_BOX = new V3(2.35, TBED + 1.18, -15.8), RAMP_FOOT = new V3(2.3, 0, -10.1), PORCH = new V3(3.1, 0, -6.5), DOOR_IN = new V3(3.1, 0, -3.6), DOOR_OUT = new V3(3.1, 0, -5.4);
   LIVING_SPOTS = [new V3(1.92, 0, -3.66), new V3(0.75, 0, -3.77), new V3(1.36, 0, -2.48)];
   KITCHEN_BOX = new V3(2.32, 0, 2.78), DAD_HOME = new V3(2.35, 0, 1.15),   // clear of the table and its chairs
     EVE_MOM = new V3(3.57, 0, 3.16), ARCH = new V3(2.88, 0, -0.54), ARCH_IN = new V3(2.88, 0, 0.97);

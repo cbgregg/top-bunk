@@ -103,11 +103,25 @@ const SUNK = {};
       nodes: nav.NODES, edges: [...Object.entries(nav.ADJ).flatMap(([a, l]) => l.filter((e) => a < e.to).map((e) => [a, e.to])), ...(nav.outsideJoined() ? [] : nav.OUTSIDE_EDGE_LIST.map((e) => [e[0], e[1]]))],   // (the ways about the yard too, joined or not)
       pods: g.nights && g.nights.PODS ? Object.values(g.nights.PODS).filter((p) => p.stand).map((p) => p.stand) : [],
     } : null;
-    return { items, decor, walls: walls.map((c) => [c.minX, c.maxX, c.minZ, c.maxZ, c.minY ?? -0.3, c.maxY ?? 3]), furn: furn.map((c) => [c.minX, c.maxX, c.minZ, c.maxZ]), ground: items.map((i) => Wm.groundAt(i.x, i.z, i.min[1])) };
+    // what is in the back of the moving truck and what waits round it: each box as its eight corners, whether a line from its middle to
+    // a corner meets the truck's body or the ramp on the way, and the truck's floor
+    const truck = W.TRUCK && W.TRUCK.load ? (() => {
+      let model = null; g.scene.traverse((o) => { if (o.userData && o.userData.prop === 'truck') model = o; });
+      const body = []; if (model) model.traverse((o) => { if (o.isMesh) body.push(o); }); const hard = [...body, ...(W.TRUCK.rampParts || [])];
+      const one = (m, name) => {
+        m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox, c = bb.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld), pts = [], through = [];
+        for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) pts.push(new THREE.Vector3(x, y, z).applyMatrix4(m.matrixWorld));
+        for (const p of pts) { const d = p.clone().sub(c), len = d.length() - 0.02; rc.set(c, d.normalize()); rc.far = len; const h = rc.intersectObjects(hard, false); if (h.length) through.push(r3(len - h[0].distance)); }
+        return { name, pts: pts.map((p) => p.toArray().map(r3)), through };
+      };
+      rc.set(new THREE.Vector3(W.TRUCK.x, W.TRUCK.bed + 0.4, W.TRUCK.z - 1), new THREE.Vector3(0, -1, 0)); rc.far = 2; const fl = rc.intersectObjects(body, false);
+      return { floor: fl.length ? r3(fl[0].point.y) : null, load: W.TRUCK.load.map((m, i) => one(m, `truck load ${i}`)), yard: (W.pickups || []).filter((m) => m.parent && m.visible).map((m, i) => one(m, `box by the truck ${i}`)) };
+    })() : null;
+    return { items, decor, truck, walls: walls.map((c) => [c.minX, c.maxX, c.minZ, c.maxZ, c.minY ?? -0.3, c.maxY ?? 3]), furn: furn.map((c) => [c.minX, c.maxX, c.minZ, c.maxZ]), ground: items.map((i) => Wm.groundAt(i.x, i.z, i.min[1])) };
   }, [FRONT, [...IN_WALL], TOL]);
   await browser.close(); server.close();
 
-  const { items, walls, furn, ground, decor } = data, findings = [];
+  const { items, walls, furn, ground, decor, truck } = data, findings = [];
   const add = (sev, room, obj, issue, nums) => findings.push({ sev, room, obj, issue, nums });
   const ov = (a, b, k) => Math.min(a.max[k], b.max[k]) - Math.max(a.min[k], b.min[k]);
   const tucked = (a, b) => TUCKED.some(([p, q]) => (a.name === p && b.name === q) || (a.name === q && b.name === p));
@@ -207,6 +221,24 @@ const SUNK = {};
       for (const p of decor.pods) { const dist = Math.hypot(Math.max(s.b[0] - p[0], 0, p[0] - s.b[1]), Math.max(s.b[2] - p[1], 0, p[1] - s.b[3])); if (dist < 0.4) add('high', 'decor', s.id, 'too near a place to hide', `${dist.toFixed(2)} m`); }
     }
     console.log(`${decor.items.length} things about the house, ${decor.solids.length} footprints`);
+  }
+
+  // f: the moving truck's load. Nothing through the truck's walls, roof, floor or ramp; every box on the floor or on other boxes; no two
+  // of them in the same place
+  if (truck) {
+    const plan = (b) => { const ys = b.pts.map((p) => p[1]), y0 = Math.min(...ys), y1 = Math.max(...ys); return { y0, y1, q: b.pts.filter((p) => Math.abs(p[1] - y0) < 0.01 || b.pts.length === 4).map((p) => [p[0], p[2]]) }; };
+    const hull = (q) => { const c = [q.reduce((s, p) => s + p[0], 0) / q.length, q.reduce((s, p) => s + p[1], 0) / q.length]; return [...q].sort((a, b) => Math.atan2(a[1] - c[1], a[0] - c[0]) - Math.atan2(b[1] - c[1], b[0] - c[0])); };
+    // how far two convex shapes on the floor plan reach into each other (0 when they are apart)
+    const into = (A, B) => { let least = Infinity; for (const P of [A, B]) for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], n = [b[1] - a[1], a[0] - b[0]], l = Math.hypot(...n) || 1, pr = (S) => S.map((p) => (p[0] * n[0] + p[1] * n[1]) / l), pa = pr(A), pb = pr(B); least = Math.min(least, Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb))); } return Math.max(0, least); };
+    const all = [...truck.load, ...truck.yard].map((b) => ({ ...b, ...plan(b) })); for (const b of all) b.q = hull(b.q.length >= 3 ? b.q : b.pts.map((p) => [p[0], p[2]]));
+    for (const b of all) {
+      const inTruck = truck.load.some((l) => l.name === b.name), at = `(${(b.q.reduce((s, p) => s + p[0], 0) / b.q.length).toFixed(2)}, ${(b.q.reduce((s, p) => s + p[1], 0) / b.q.length).toFixed(2)})`;
+      if (b.through.length) add('high', 'yard', `${b.name} ${at}`, 'goes through the truck or its ramp', `${b.through.length} corners, by up to ${Math.max(...b.through).toFixed(3)} m`);
+      const floor = inTruck ? truck.floor : 0, on = Math.abs(b.y0 - floor) < 0.02 || all.some((o) => o !== b && Math.abs(o.y1 - b.y0) < 0.02 && into(o.q, b.q) > 0.1);
+      if (floor === null || !on) add('high', 'yard', `${b.name} ${at}`, 'stands on nothing', `base ${b.y0.toFixed(3)}, floor ${floor}`);
+    }
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) { const a = all[i], b = all[j], oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0), o = into(a.q, b.q); if (oy > 0.01 && o > 0.005) add('high', 'yard', `${a.name} x ${b.name}`, 'boxes cut into each other', `${o.toFixed(3)} m across, ${oy.toFixed(3)} m up`); }
+    console.log(`${truck.load.length} things in the truck, ${truck.yard.length} boxes by it, the truck's floor at ${truck.floor}`);
   }
 
   const order = { high: 0, low: 1 };
