@@ -11,6 +11,11 @@
 // reflection and any other camera see everything. A mesh is hidden just for the scene's own pass through the scene graph and shown again
 // before the shadow maps and the draws, so nothing that reads `visible` (the game, the raycasts, the gaze checks) ever sees it hidden.
 // What a mesh is (outside or not) is worked out again whenever it moves, so a thing carried in from the yard is drawn at once.
+//
+// The things about the house (js/decor.js: books, towels, what stands on the shelves) say which room they are in, and stand still, so
+// they are held to the same test from the other side: one in another room is drawn only inside the part of the view that room's doorway
+// (and the doorways before it) covers, and one in a room no open way leads to is not drawn. The furniture, the walls and everything
+// that moves are never left out this way.
 import * as THREE from 'three';
 import { ROOMS, H, SX, SZ, roomAt } from './world.js';
 import { GAPS } from './lights.js';
@@ -22,7 +27,7 @@ const ROOF_Y = H + 0.25;  // above the ceilings: the roof and chimney, seen only
 export function createCull({ renderer, scene, camera, W }) {
   const self = { enabled: true, stats: { hidden: 0, outside: false, at: null } };
   const rooms = Object.entries(ROOMS);
-  let ways = null, list = [], frame = 0, hidden = [];
+  let ways = null, list = [], frame = 0, hidden = [], roomsSeen = null;
   const pm = new THREE.Matrix4(), tmp = new THREE.Box3();
 
   // the ways between the rooms and out of them: [roomA, roomB, box, open()] with 'out' for anything that is not a room
@@ -73,11 +78,8 @@ export function createCull({ renderer, scene, camera, W }) {
   }
   const cut = (a, b) => { const r = [Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.min(a[3], b[3])]; return r[0] < r[1] && r[2] < r[3] ? r : null; };
   const inside = (a, b) => a[0] >= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] <= b[3];
-  function outsideRects(cam) {
-    const p = cam.position, k = room(p.x, p.y, p.z);
-    if (k === 'out' || p.y < 0.02 || p.y > H - 0.05) return null;
-    const r = ROOMS[k];
-    if (p.x - r[0] < NEAR_WALL || r[1] - p.x < NEAR_WALL || p.z - r[2] < NEAR_WALL || r[3] - p.z < NEAR_WALL) return null;
+  // from room k (or from outside), through every open way in view: the rectangles each room shows in, and the ones the outside does
+  function reach(k, cam) {
     pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); view.setFromProjectionMatrix(pm);
     const rect = ways.map((w) => w[3]() ? rectOf(w[2], cam) : null), seen = { [k]: [FULL] }, out = [], q = [[k, FULL]];
     for (let n = 0; q.length; n++) {
@@ -86,13 +88,27 @@ export function createCull({ renderer, scene, camera, W }) {
       ways.forEach(([a, b], i) => {
         const nx = a === cur ? b : b === cur ? a : null; if (!nx || !rect[i]) return;
         const nr = cut(cr, rect[i]); if (!nr) return;
-        if (nx === 'out') { if (!out.some((o) => inside(nr, o))) out.push(nr); return; }
+        if (nx === 'out') { if (k !== 'out' && !out.some((o) => inside(nr, o))) out.push(nr); return; }
         const list = seen[nx] || (seen[nx] = []);
         if (list.some((o) => inside(nr, o))) return;   // seen through a wider way already
         list.push(nr); q.push([nx, nr]);
       });
     }
-    return out;
+    return { seen, out };
+  }
+  function outsideRects(cam) {
+    const p = cam.position, k = room(p.x, p.y, p.z);
+    roomsSeen = null;
+    if (p.y < 0.02 || p.y > H - 0.05) return null;
+    if (k === 'out') {   // out in the yard: the outside is all drawn, and the things in the rooms only where a window or a door shows them
+      if (roomAt(p.x, p.z, p.y) === 'out') { const r = reach('out', cam); roomsSeen = r && r.seen; }
+      return null;
+    }
+    const r = ROOMS[k];
+    if (p.x - r[0] < NEAR_WALL || r[1] - p.x < NEAR_WALL || p.z - r[2] < NEAR_WALL || r[3] - p.z < NEAR_WALL) return null;
+    const got = reach(k, cam); if (!got) return null;
+    roomsSeen = got.seen;
+    return got.out;
   }
   // the view narrowed to a rectangle of it, as a frustum
   const sm4 = new THREE.Matrix4(), frusta = [];
@@ -110,7 +126,7 @@ export function createCull({ renderer, scene, camera, W }) {
   const ok = (o) => o.isMesh && !o.isSkinnedMesh && o.children.length === 0 && o.frustumCulled !== false && (o.onBeforeRender === THREE.Object3D.prototype.onBeforeRender || o.userData.cullOk);
   function collect() {
     const old = new Map(list.map((e) => [e.o, e])); list = [];
-    scene.traverse((o) => { if (ok(o)) list.push(old.get(o) || { o, m: new Float64Array(16).fill(NaN), v: -1, out: false, box: new THREE.Box3() }); });
+    scene.traverse((o) => { if (ok(o)) list.push(old.get(o) || { o, m: new Float64Array(16).fill(NaN), v: -1, out: false, box: new THREE.Box3(), room: o.userData.decorRoom || null }); });
   }
   // is it wholly outside the house (clear of every room by MARGIN, or above the ceilings)? Its box in the world is kept in e.box
   function classify(e) {
@@ -140,9 +156,23 @@ export function createCull({ renderer, scene, camera, W }) {
     if (!ways) ways = build();
     if (frame++ % 120 === 0) collect();
     const rects = outsideRects(cam); self.stats.outside = rects ? rects.length : -1;
-    if (!rects) { self.stats.hidden = 0; return; }
+    // the things in the rooms first (the frusta are made again below for the outside)
+    if (roomsSeen) {
+      const byRoom = new Map();
+      for (const e of list) { if (!e.room) continue; if (changed(e)) e.out = classify(e); (byRoom.get(e.room) || byRoom.set(e.room, []).get(e.room)).push(e); }
+      for (const [room, es] of byRoom) {
+        const rs = roomsSeen[room], n = rs ? frustaFor(rs, cam) : 0;
+        for (const e of es) {
+          if (!e.o.visible) continue;
+          let seen = false; for (let i = 0; i < n && !seen; i++) seen = frusta[i].intersectsBox(e.box);
+          if (!seen) { e.o.visible = false; hidden.push(e.o); }
+        }
+      }
+    }
+    if (!rects) { self.stats.hidden = hidden.length; return; }
     const n = frustaFor(rects, cam);
     for (const e of list) {
+      if (e.room) continue;
       if (changed(e)) e.out = classify(e);
       if (!e.out || !e.o.visible) continue;
       let seen = false; for (let i = 0; i < n && !seen; i++) seen = frusta[i].intersectsBox(e.box);
