@@ -341,6 +341,25 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     foot('leaning frames', 11.05, 11.243, -2.26, -1.66, 0.45);
   }
 
+  // ---------- the laundry ----------
+  {
+    cluster('laundry shelf', -4.35, B + 1.6, 0.5);
+    model('d_gallon', { x: -4.55, y: B + 1.525, z: 0.49, rot: 0.3, kind: 'on' }); model('d_bleach', { x: -4.33, y: B + 1.525, z: 0.5, rot: -0.2, kind: 'on' });
+    item('soap powder', 'on', B + 1.525); box(-4.1, B + 1.525, 0.5, 0.16, 0.22, 0.07, 0x2f5a9a, { ry: 0.1, faces: [null, null, null, null, 'suds', null], cast: true });
+    model('d_cleaner', { x: -7.55, y: B + 0.9, z: 1.45, rot: 1.2, kind: 'on' });
+    model('d_laundry', { x: -7.62, y: B, z: 3.45, s: 0.0025, rot: 2.0 }); foot('laundry basket', -7.92, -7.32, 3.15, 3.75, 0, cellar);
+    // a folding rack with the things that do not go in the dryer
+    cluster('drying rack', -7.5, B + 0.5, 0.66, { far: 0 });
+    item('drying rack', 'floor', B);
+    { const x0 = -7.8, x1 = -7.22, zc = 0.66, st = 0xd8d8d2, top = B + 0.98;
+      for (const x of [x0, x1]) { rod([x, B, zc - 0.26], [x, top, zc + 0.2], 0.009, st, { mat: 'satin', cast: true }); rod([x, B, zc + 0.26], [x, top, zc - 0.2], 0.009, st, { mat: 'satin', cast: true }); }
+      const rails = [[zc - 0.2, top], [zc - 0.07, top], [zc + 0.07, top], [zc + 0.2, top], [zc - 0.13, B + 0.6], [zc + 0.13, B + 0.6]]; for (const [z, y] of rails) rod([x0, y, z], [x1, y, z], 0.006, st, { mat: 'satin' });
+      cloth('x', -7.72, -7.5, [[zc - 0.212, B + 0.62], [zc - 0.208, top - 0.01], [zc - 0.2, top + 0.008], [zc - 0.192, top - 0.01], [zc - 0.188, B + 0.55]], 0x4f7f86, { cast: true, n: 5 });
+      cloth('x', -7.46, -7.28, [[zc + 0.058, B + 0.7], [zc + 0.062, top - 0.01], [zc + 0.07, top + 0.008], [zc + 0.078, top - 0.01], [zc + 0.082, B + 0.66]], 0xe2dccb, { cast: true, n: 5 });
+      cloth('x', -7.7, -7.52, [[zc + 0.188, B + 0.74], [zc + 0.192, top - 0.01], [zc + 0.2, top + 0.008], [zc + 0.208, top - 0.01], [zc + 0.212, B + 0.7]], 0x8e4a5c, { n: 4 }); }
+    foot('drying rack', -7.85, -7.17, 0.37, 0.95, 0, cellar);
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
