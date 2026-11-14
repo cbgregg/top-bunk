@@ -176,6 +176,47 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('sampler', 'wall'); picture('x', 0.204, -1, 1.93, 1.56, 0.25, 0.32, 'pr_sampler', { frame: 0x4a3524 });
   }
 
+  // ---------- the kitchen and the dining end ----------
+  {
+    const cy = 0.95;
+    cluster('kitchen counter', 1.2, cy, 4.3);
+    item('canisters', 'on', cy);
+    for (const [x, z, r, h] of [[0.64, 4.4, 0.075, 0.2], [0.815, 4.41, 0.065, 0.17], [0.97, 4.42, 0.055, 0.14]]) { cyl(x, cy, z, r, h, 0xd8d0bc, { mat: 'satin', seg: 18, cast: true }); cyl(x, cy + h * 0.45, z, r + 0.001, h * 0.16, 0x6d7f8c, { mat: 'satin', seg: 18 }); cyl(x, cy + h, z, r * 0.96, 0.018, 0x8a6a48, { seg: 18 }); cyl(x, cy + h + 0.018, z, 0.014, 0.016, 0x8a6a48); }
+    item('cereal', 'on', cy); box(1.22, cy, 4.445, 0.19, 0.27, 0.06, 0xd9a426, { ry: 0.12, faces: [null, null, null, null, null, 'cer_corn'], cast: true }); box(1.41, cy, 4.44, 0.19, 0.27, 0.06, 0x31507a, { ry: -0.16, faces: [null, null, null, null, null, 'cer_wheat'], cast: true });
+    item('paper towels', 'on', cy); cyl(1.66, cy, 4.42, 0.075, 0.014, 0x8a6a48, { seg: 16 }); cyl(1.66, cy + 0.014, 4.42, 0.062, 0.275, 0xf0eee6, { seg: 16, cell: 'nap', cast: true }); cyl(1.66, cy + 0.289, 4.42, 0.009, 0.03, 0x8a6a48);
+    model('d_bowl', { x: 0.93, y: cy, z: 4.1, s: 0.9, kind: 'on' });
+    for (const [dx, dz, r] of [[-0.05, 0.02, 0.4], [0.05, -0.03, 2.1], [0.0, 0.07, 4.0]]) model('d_lemon', { x: 0.93 + dx, y: cy + 0.03, z: 4.1 + dz, rot: r, rx: 1.4, kind: 'in' });
+    item('apples', 'in', cy); ball(0.88, cy + 0.075, 4.06, 0.036, 0x8e2a22, { mat: 'satin', scale: [1, 0.9, 1] }); ball(0.99, cy + 0.072, 4.13, 0.034, 0x9aa23c, { mat: 'satin', scale: [1, 0.9, 1] });
+    item('cookbook', 'on', cy); book(1.37, cy, 4.07, 0.2, 0.024, 0.26, 'cv_cook', 0xe6dcc0, 0.28);
+    item('mail', 'on', cy); box(1.76, cy, 4.03, 0.23, 0.003, 0.11, 0xece8dc, { ry: 0.3, faces: [null, null, 'env', null, null, null] }); box(1.79, cy + 0.003, 4.05, 0.23, 0.003, 0.11, 0xc9ab72, { ry: -0.1, faces: [null, null, 'env2', null, null, null] }); box(1.74, cy + 0.006, 4.0, 0.1, 0.002, 0.135, 0xc2452f, { ry: 0.9, faces: [null, null, 'flyer', null, null, null] });
+    item('keys', 'on', cy); { const g = new THREE.TorusGeometry(0.014, 0.0025, 5, 12); g.rotateX(PI / 2); add(g, 0xb9b6ae, { mat: 'metal', m: M4(1.95, cy + 0.003, 4.12) }); box(1.975, cy, 4.13, 0.05, 0.003, 0.012, 0xb9a36a, { mat: 'metal', ry: 0.5 }); box(1.97, cy + 0.003, 4.105, 0.05, 0.003, 0.012, 0xb9b6ae, { mat: 'metal', ry: -0.3 }); box(1.925, cy, 4.14, 0.03, 0.008, 0.02, 0x7a2a26, { mat: 'satin', ry: 0.8 }); }
+    item('dish soap', 'on', cy); cyl(3.16, cy, 4.45, 0.03, 0.14, 0x4f9a58, { mat: 'satin', r2: 0.026 }); cyl(3.16, cy + 0.14, 4.45, 0.012, 0.03, 0xe8e6de, { mat: 'satin' }); box(3.17, cy, 4.33, 0.11, 0.03, 0.07, 0xd6b23c, { round: 0.008, cell: 'nap', ry: 0.2 }); box(3.17, cy + 0.03, 4.33, 0.11, 0.008, 0.07, 0x3f6a40, { cell: 'nap', ry: 0.2 });
+    cluster('kitchen floor', 2.6, 0, 3.55, { far: 0 });
+    item('sink mat', 'flat'); box(2.57, 0, 3.56, 0.9, 0.01, 0.5, 0x6b7478, { faces: [null, null, 'ragrug', null, null, null], tint: 0xc0b8a8 });
+    // the towel over the oven door's handle
+    cluster('stove towel', 3.82, 0.6, 2.13);
+    item('dish towel', 'wall'); cloth('z', 2.02, 2.24, [[3.84, 0.52], [3.838, 0.69], [3.826, 0.722], [3.812, 0.69], [3.809, 0.42]], 0xe6dfcc, { wobble: 0.002 });
+    for (const y of [0.45, 0.475]) box(3.8075, y, 2.13, 0.002, 0.012, 0.22, 0x9a3a32, { cell: 'nap' });
+    // on the refrigerator's door
+    cluster('fridge door', 3.8, 1.4, 1.15);
+    item('fridge papers', 'wall'); picture('z', 3.802, -1, 1.02, 1.5, 0.2, 0.15, 'draw_dog', { tape: true, tilt: 0.05 }); picture('z', 3.802, -1, 1.36, 1.42, 0.085, 0.136, 'list', { tape: true, tilt: -0.04 }); picture('z', 3.802, -1, 1.33, 1.16, 0.1, 0.133, 'flyer', { tape: true, tilt: 0.03 });
+    // the wall by the table: the calendar, the clock
+    cluster('kitchen wall', 1.2, 1.7, 0.4);
+    item('calendar', 'wall'); picture('x', 0.39, 1, 1.5, 1.6, 0.3, 0.45, 'calendar', { tape: false, frame: 0xf1ede2, depth: 0.004, fw: 0.001 }); cyl(1.5, 1.815, 0.396, 0.004, 0.012, 0x3a3a3a, { rx: PI / 2 });
+    model('clock_wall', { x: 0.55, y: 1.86, z: 0.39 + 0.0235, kind: 'wall' });
+    // the cork board by the phone
+    cluster('cork board', -0.7, 1.5, 0.95);
+    item('cork board', 'wall'); picture('z', -0.686, -1, 0.95, 1.52, 0.56, 0.42, 'cork', { frame: 0x8a6a48, depth: 0.02, fw: 0.03 });
+    // the sideboard's top, a small view over the plant
+    cluster('sideboard', -2.38, 0.705, 2.9);
+    const sy = 0.705;
+    model('d_frame', { x: -2.39, y: sy, z: 2.52, s: 0.9, rot: 0.25, kind: 'on', after: (h) => photoIn(h, 'boy') });
+    model('d_jug', { x: -2.37, y: sy, z: 3.3, rot: PI / 2 + 0.3, s: 0.8, kind: 'on' });
+    item('sideboard mail', 'on', sy); box(-2.37, sy, 2.92, 0.11, 0.003, 0.23, 0xece8dc, { ry: 0.15, faces: [null, null, ['env', null], null, null, null] }); box(-2.365, sy + 0.003, 2.9, 0.11, 0.003, 0.23, 0xe6dcc0, { ry: -0.2 });
+    cluster('dining wall', -0.88, 1.75, 4.57);
+    item('dining print', 'wall'); picture('x', 4.578, -1, -0.88, 1.76, 0.32, 0.25, 'pr_field', { frame: 0x4a3524 });
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
