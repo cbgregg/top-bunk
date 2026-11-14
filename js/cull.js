@@ -14,8 +14,8 @@
 //
 // The things about the house (js/decor.js: books, towels, what stands on the shelves) say which room they are in, and stand still, so
 // they are held to the same test from the other side: one in another room is drawn only inside the part of the view that room's doorway
-// (and the doorways before it) covers, and one in a room no open way leads to is not drawn. The furniture, the walls and everything
-// that moves are never left out this way.
+// (and the doorways before it) covers, and one in a room no way leads to is not drawn (a shut door is a way 4 cm high along the floor).
+// The furniture, the walls and everything that moves are never left out this way.
 import * as THREE from 'three';
 import { ROOMS, H, SX, SZ, roomAt } from './world.js';
 import { GAPS } from './lights.js';
@@ -40,7 +40,9 @@ export function createCull({ renderer, scene, camera, W }) {
       const [a, b] = sides(d.mid.x, y0 + 1, d.mid.z, alongX);
       if (a === b) continue;
       const always = a === 'out' || b === 'out' || d.slide;   // a way out (the back door's glass, the gap round a shut leaf) and the barn door, which hangs off its wall: always open
-      w.push([a, b, new THREE.Box3(new THREE.Vector3(c.minX - 0.15, y0 - 0.05, c.minZ - 0.15), new THREE.Vector3(c.maxX + 0.15, y0 + 2.3, c.maxZ + 0.15)), always ? () => true : () => d.a > 0.002 || d.target > 0]);
+      // (a shut leaf still clears its threshold by 2 cm: the way is then that slot along the floor, through which a rug in the hall shows from a room)
+      w.push([a, b, new THREE.Box3(new THREE.Vector3(c.minX - 0.15, y0 - 0.05, c.minZ - 0.15), new THREE.Vector3(c.maxX + 0.15, y0 + 2.3, c.maxZ + 0.15)), always ? () => true : () => d.a > 0.002 || d.target > 0,
+        new THREE.Box3(new THREE.Vector3(c.minX - 0.15, y0 - 0.05, c.minZ - 0.15), new THREE.Vector3(c.maxX + 0.15, y0 + 0.04, c.maxZ + 0.15))]);
     }
     for (const g of GAPS) {   // the openings that are always there
       if (g.door) continue;
@@ -81,7 +83,7 @@ export function createCull({ renderer, scene, camera, W }) {
   // from room k (or from outside), through every open way in view: the rectangles each room shows in, and the ones the outside does
   function reach(k, cam) {
     pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); view.setFromProjectionMatrix(pm);
-    const rect = ways.map((w) => w[3]() ? rectOf(w[2], cam) : null), seen = { [k]: [FULL] }, out = [], q = [[k, FULL]];
+    const rect = ways.map((w) => w[3]() ? rectOf(w[2], cam) : w[4] ? rectOf(w[4], cam) : null), seen = { [k]: [FULL] }, out = [], q = [[k, FULL]];
     for (let n = 0; q.length; n++) {
       if (n > 400) return null;   // (a guard: never more than a few dozen steps in this house)
       const [cur, cr] = q.pop();
