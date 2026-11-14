@@ -11,9 +11,9 @@ export const ease = {
   inOut: (k) => k * k * (3 - 2 * k), out: (k) => 1 - (1 - k) * (1 - k), in: (k) => k * k,
   outCubic: (k) => 1 - Math.pow(1 - k, 3),
 };
-export const mix3 = (a, b, k, out = new V3()) => out.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k));
 // a point as [x, y, z], whether it came as an array or a Vector3
 export const xyz = (p) => (p.isVector3 ? [p.x, p.y, p.z] : p);
+export const mix3 = (a, b, k, out = new V3()) => { a = xyz(a); b = xyz(b); return out.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)); };
 // game yaw/pitch for a camera at `from` looking at `to` (the game: forward = (-sin yaw, -cos yaw), pitch up is positive)
 export function aim(from, to) {
   from = xyz(from); to = xyz(to);
@@ -40,6 +40,10 @@ const CSS = `
 #hud, #card, #flash, #loading, #title, #pause, #death, #end, #touch { display: none !important; }
 #blanket, #pod, #fade, #vignette { transition: none !important; }
 #grain { animation: none !important; }
+/* the closet's slats and the breath meter are drawn in pixels for a full-size screen: here they keep that size against any frame */
+body:not(.tr-portrait) #pod.louvers { background: repeating-linear-gradient(180deg, rgba(7,7,9,0.985) 0 2.45vh, rgba(7,7,9,0) 2.45vh 3.7vh) !important; box-shadow: inset 0 0 14vh 3vh #000 !important; }
+body:not(.tr-portrait) #breath span { font-size: max(8px, 1.1vh) !important; letter-spacing: 0.4vh !important; margin-bottom: 0.6vh !important; }
+body:not(.tr-portrait) #breath div { width: 20vh !important; height: max(2px, 0.4vh) !important; }
 #fade { opacity: 0 !important; }
 .tr { position: fixed; inset: 0; pointer-events: none; }
 #tr-black { z-index: 58; background: #000; opacity: 0; }
@@ -316,11 +320,40 @@ function overlayApi(portrait) {
   return api;
 }
 
+// the night drawing with one more of them in it: the game's own sheet (textures.js drawing(1)) and a second tall one in the same black
+// crayon, standing where the first stood by day
+function drawingMore(tex) {
+  const src = tex.image, cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height; const g = cv.getContext('2d'), r = rng(4242);
+  g.drawImage(src, 0, 0); g.lineCap = 'round'; g.strokeStyle = '#111';
+  const row = (x0, x1, y) => { g.lineWidth = 3.5 + r() * 3.5; g.globalAlpha = 0.55 + r() * 0.35; g.beginPath(); g.moveTo(x0 + (r() - 0.5) * 4, y + (r() - 0.5) * 3); g.lineTo(x1 + (r() - 0.5) * 4, y + (r() - 0.5) * 5); g.stroke(); };
+  const fx = 92, top = 46;
+  for (let y = top + 70; y < 262; y += 4) { const w = 26 + Math.sin((y - top) / 60) * 6; row(fx - w, fx + w, y); }
+  for (let y = 262; y < 342; y += 4) { row(fx - 25, fx - 12, y); row(fx + 12, fx + 25, y); }
+  for (const s of [-1, 1]) for (let i = 0; i < 3; i++) { g.lineWidth = 6 + r() * 3; g.globalAlpha = 0.6 + r() * 0.3; g.beginPath(); g.moveTo(fx + s * 29, top + 86); g.lineTo(fx + s * 42, top + 176); g.lineTo(fx + s * 44, top + 252); g.stroke(); }
+  g.globalAlpha = 1; g.fillStyle = '#111'; g.beginPath(); g.ellipse(fx, top + 42, 30, 34, 0, 0, 7); g.fill();
+  g.fillStyle = '#f4f0e4'; for (const s of [-1, 1]) { g.beginPath(); g.ellipse(fx + s * 11, top + 36, 6, 9, 0, 0, 7); g.fill(); }
+  g.strokeStyle = '#f4f0e4'; g.lineWidth = 3; g.beginPath(); g.arc(fx, top + 46, 17, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = tex.colorSpace; t.anisotropy = tex.anisotropy; return t;
+}
+
 // ---------- the game: what a shot can ask for ----------
 export function gameHelpers(game) {
   const { F, P, W, E, UI, camera, scene, mom, dad, WF, nights } = game;
   const flash = camera.children.find((c) => c.isSpotLight) || null;
   let vigilOn = false;
+  const { hands, lights } = game, bulb = hands.flashLight, hud = document.getElementById('hud');
+  // the hands are put away while a scene plays (main.js tells hands.js so each frame). A shot that shows them hands over what the game would
+  // be telling them in play: { flashOn, aim, film, mode: 'hide', pod, holding ... } over the game's own state
+  const stage = hands.__stage || (hands.__stage = { v: null });
+  if (!hands.__staged) { hands.__staged = true; const up = hands.update.bind(hands); hands.update = (dt, cam, st) => up(dt, cam, stage.v ? { ...st, hidden: false, cutscene: false, dead: false, mode: 'walk', pod: null, holding: false, hasCamera: true, hasTorch: true, ...stage.v } : st); }
+  const handRig = hands.scene.children[0];   // the group that rides on the camera (hands.js makes it first)
+  const chairs0 = W.chairs.map((c) => [c.holder.position.x, c.holder.position.z, c.holder.rotation.y]);
+  const tv0 = W.tvFx.base;
+  // the top bunk's comforter: the one made beside the bottom bunk's, of the same cloth
+  const lq = W.lowerBunk && W.lowerBunk.quilt, topQuilt = lq ? lq.parent.children.find((m) => m !== lq && m.isMesh && m.material === lq.material && m.geometry.attributes.position.count === lq.geometry.attributes.position.count) || lq.parent.children.find((m) => m !== lq && m.isMesh && m.material === lq.material) : null;
+  const quilt0 = topQuilt ? Float32Array.from(topQuilt.geometry.attributes.position.array) : null;
+  const steadied = new Set();
+  let quiltMoved = false, drawing2 = null, hudOn = false, air0 = null;
   // what a shot may borrow and must give back: the hall spot (the day shot uses it as sun through the window), the eyes' glow, the smile
   const bs = W.bathSpot, bath0 = { pos: bs.position.clone(), target: bs.target.position.clone(), color: bs.color.clone(), angle: bs.angle, penumbra: bs.penumbra };
   const eyeMat = (E.head.children.find((m) => m.isMesh && m !== E.smile && m.material && m.material.toneMapped === false) || {}).material || null, eye0 = eyeMat ? eyeMat.color.clone() : null;
@@ -330,6 +363,13 @@ export function gameHelpers(game) {
       F.cutscene = true; P.mode = 'cine'; F.dead = false; F.chase = false; F.flicker = false; F.fear = 0; F.breathCheck = false; F.scare = false;
       if (vigilOn) H.vigil(false);
       F.blackout = false;
+      if (air0) { if (scene.fog === air0.obj) scene.fog.density = air0.fog; W.sun.intensity = air0.moon; W.hemi.intensity = air0.sky; air0 = null; }
+      stage.v = null; hands.lowerCamera(); if (bulb) { bulb.intensity = 0; bulb.distance = 7; }
+      for (const n of [...steadied]) H.steady(n, false);
+      if (F.phase === 'night') H.lightsOff();
+      W.chairs.forEach((c, i) => { const [x, z, r] = chairs0[i]; if (c.holder.position.x !== x || c.holder.position.z !== z || c.holder.rotation.y !== r) W.moveChair(i, x, z, r); });
+      W.tvFx.base = tv0; H.hud(false); H.lump(null);
+      if (W.garage) { W.garage.panel.open(0); W.garage.light.set(false); }
       bs.position.copy(bath0.pos); bs.target.position.copy(bath0.target); bs.target.updateMatrixWorld(); bs.color.copy(bath0.color); bs.angle = bath0.angle; bs.penumbra = bath0.penumbra;
       if (eyeMat) eyeMat.color.copy(eye0); E.smile.visible = true; E.root.rotation.set(0, E.root.rotation.y, 0);
       E.visible = false; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0; E.smileScale = 1; E.speed = 1; E.lookTarget = camera.position; E.root.scale.setScalar(1);
@@ -359,7 +399,8 @@ export function gameHelpers(game) {
       game.lights.roof = o.roof ?? 1;   // (how much of the sky the roof keeps out of the rooms: all of its share unless the shot says)
       W.bathSpot.intensity = o.spot || 0; F.flicker = !!o.flicker;
     },
-    flashlight(on) { if (flash) flash.intensity = on ? 26 : 0; F.flashOn = !!on; },
+    // (26 is the game's own; a shot with a pale wall an arm's length away asks for less, or the bloom takes the picture)
+    flashlight(on, i = 26) { if (flash) flash.intensity = on ? i : 0; F.flashOn = !!on; },
     // the thing: {x, z, face:[x, z] | yaw, mode, speed, tilt, lean, reach, smile}
     thing(o) {
       E.visible = true; E.mode = o.mode || 'idle'; E.speed = o.speed ?? 1;
@@ -389,6 +430,44 @@ export function gameHelpers(game) {
     fear(v) { F.fear = Math.max(F.fear, v); },
     shake(v) { nights.D.shake(v); },
     door: (name, open) => W.setDoor(name, open, true),
+    // a door where it is told to be, at once (a shot that opens on it shut or open)
+    doorNow(name, open) { const d = W.doors[name]; if (!d) return; W.setDoor(name, open, true); if (d.apply) { d.a = open ? d.max ?? 1 : 0; d.apply(); } },
+    // the night outside, for a shot of the house from the lawn: how thick the fog is, how bright the moon and the sky (given back at the next shot)
+    air({ fog, moon, sky }) {
+      air0 ||= { obj: scene.fog, fog: scene.fog.density, moon: W.sun.intensity, sky: W.hemi.intensity };
+      if (fog !== undefined) scene.fog.density = fog; if (moon !== undefined) W.sun.intensity = moon; if (sky !== undefined) W.hemi.intensity = sky;
+    },
+    // a room's ceiling light by its switch (lights.js), without the click; snap: at its level at once, for a shot that opens on it
+    light(name, on, snap = false) { const r = lights.rooms[name]; if (!r) return; r.dead = false; lights.set(name, on, { silent: true }); r.delay = 0; if (snap) r.lvl = on ? 1 : 0; },
+    // a lit room browns out and stutters while the thing stands under its bulb; a shot that has to be read through the slats holds it steady
+    steady(name, on = true) {
+      const r = lights.rooms[name]; if (!r || on === steadied.has(name)) return;
+      if (on) { steadied.add(name); Object.defineProperty(r, 'flk', { configurable: true, get: () => 1, set() {} }); Object.defineProperty(r, 'brown', { configurable: true, get: () => 0, set() {} }); }
+      else { steadied.delete(name); delete r.flk; delete r.brown; r.flk = 1; r.brown = 0; }
+    },
+    lightsOff() { for (const n in lights.rooms) H.light(n, false, true); },
+    // the hands in the picture, as the game shows them in play (null puts them away); camera(true) brings the disposable up to the eye
+    hands(o) { stage.v = o || null; },
+    camera(up) { if (up) hands.raiseCamera(); else hands.lowerCamera(); },
+    handSync() { camera.updateMatrixWorld(); handRig.matrix.copy(camera.matrixWorld); handRig.matrixWorld.copy(camera.matrixWorld); handRig.updateMatrixWorld(true); },
+    reach(p) { hands.reach(new THREE.Vector3(p[0], p[1], p[2]), camera); },
+    // the disposable's flash (main.js's bulb at the lens): lit for this frame at p; snap() works the shutter and the winder
+    bulb(i, p, reach = 7) { if (!bulb) return; bulb.intensity = i; bulb.distance = reach; if (p) bulb.position.set(p[0], p[1], p[2]); },
+    snap() { hands.snap(); },
+    get finder() { return hands.zoom; },
+    chair(i, x, z, rot) { W.moveChair(i, x, z, rot); },
+    // the HUD is hidden for the trailer; a shot that explains a mechanic brings the breath meter back (nothing else on the HUD is set)
+    hud(on) { if (!hud || on === hudOn) return; hudOn = on; if (on) { hud.style.setProperty('display', 'block', 'important'); const b = document.getElementById('breath'); if (b) b.style.transition = 'none'; } else { UI.breath(1, false); hud.style.removeProperty('display'); } },
+    // the drawing in the hall: 0 as it is by day, 1 as it is at night, 2 with one more of them in it
+    drawing(n) { const t = n === 2 ? (drawing2 ||= drawingMore(W.T.drawing1)) : n ? W.T.drawing1 : W.T.drawing0; if (W.drawingMat.map !== t) { W.drawingMat.map = t; W.drawingMat.needsUpdate = true; } },
+    // something under the top bunk's comforter: {x, z, h, rx, rz} a rise of h metres round (x, z) in the bunk's own frame; null lays it flat again
+    lump(o) {
+      if (!topQuilt || (!o && !quiltMoved)) return;
+      const pa = topQuilt.geometry.attributes.position; pa.array.set(quilt0); quiltMoved = !!o;
+      if (o) for (let i = 0; i < pa.count; i++) { const dx = (pa.getX(i) - o.x) / o.rx, dz = (pa.getZ(i) - o.z) / o.rz; pa.setY(i, pa.getY(i) + o.h * Math.exp(-(dx * dx + dz * dz))); }
+      pa.needsUpdate = true; topQuilt.geometry.computeVertexNormals();
+    },
+    topQuilt,
   };
   return H;
 }

@@ -59,7 +59,7 @@ const INIT = `(() => {
 })();`;
 
 function ensureMusic(file) {
-  if (fs.existsSync(file) && fs.existsSync(path.join(__dirname, 'music', 'box_note.wav'))) return file;   // the last file gen_music.js writes
+  if (fs.existsSync(file) && fs.existsSync(path.join(__dirname, 'music', 'shutter.wav'))) return file;   // the last file gen_music.js writes
   log('no placeholder music yet: generating it (trailer/gen_music.js)');
   execFileSync(process.execPath, [path.join(__dirname, 'gen_music.js')], { stdio: 'inherit' });
   return file;

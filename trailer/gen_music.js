@@ -403,6 +403,23 @@ function boxNote() {   // the last sound: one music-box note left ringing
   const b = new Buf(3); b.add(room(musicbox(midi(81), 0.7), 0.25, 1.4), 0, 1, 0.1); b.add(room(musicbox(midi(81) * 1.003, 0.25), 0.25, 1.4), 0.004, 1, -0.1);
   return normalize(b.L, b.R, 0.7);
 }
+function phoneRing(sec) {   // a wall telephone's bell in the next room: two gongs struck twenty times a second, two seconds on and the rest off
+  const n = Math.ceil(sec * SR), out = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR, on = (t % 3) < 2 ? 1 : 0, edge = Math.min(1, (t % 3) / 0.01, Math.max(0, (2 - (t % 3)) / 0.25 + 0.15)), hit = Math.exp(-((t * 20) % 1) * 2.2);
+    out[i] = on * edge * hit * (Math.sin(2 * Math.PI * 1335 * t) * 0.5 + Math.sin(2 * Math.PI * 1614 * t) * 0.4 + Math.sin(2 * Math.PI * 2790 * t) * 0.18 + Math.sin(2 * Math.PI * 4140 * t) * 0.08);
+  }
+  return normalize(out, Float64Array.from(out), 0.7);
+}
+function shutter() {   // a disposable camera: the shutter's snap, the flash going off, and its capacitor whining back up
+  const n = Math.ceil(0.9 * SR), out = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR, snap = (Math.sin(2 * Math.PI * 2100 * t) * 0.5 + Math.sin(2 * Math.PI * 3900 * t + 1) * 0.35) * Math.exp(-t * 190) + (t > 0.018 ? Math.sin(2 * Math.PI * 1500 * (t - 0.018)) * 0.4 * Math.exp(-(t - 0.018) * 240) : 0);
+    const pop = Math.sin(2 * Math.PI * 180 * t) * Math.exp(-t * 60) * 0.5, f = 2600 + 5200 * (1 - Math.exp(-t * 3.2)), whine = t > 0.06 ? Math.sin(2 * Math.PI * (2600 * t + 5200 * (t + Math.exp(-t * 3.2) / 3.2))) * 0.05 * Math.min(1, (t - 0.06) / 0.1) * Math.min(1, (0.9 - t) / 0.2) * (f > 0 ? 1 : 0) : 0;
+    out[i] = snap + pop + whine;
+  }
+  return normalize(out, Float64Array.from(out), 0.8);
+}
 
 const [L, Rr] = render(); writeWav(path.join(OUT, 'placeholder.wav'), L, Rr);
 writeWav(path.join(OUT, 'heavy_steps.wav'), ...steps(7, 1.05, true));
@@ -428,3 +445,5 @@ writeWav(path.join(OUT, 'cam_impact.wav'), ...camImpact());
 writeWav(path.join(OUT, 'cam_handling.wav'), ...handling());
 writeWav(path.join(OUT, 'piano_slam.wav'), ...pianoSlam());
 writeWav(path.join(OUT, 'box_note.wav'), ...boxNote());
+writeWav(path.join(OUT, 'phone_ring.wav'), ...phoneRing(6));
+writeWav(path.join(OUT, 'shutter.wav'), ...shutter());

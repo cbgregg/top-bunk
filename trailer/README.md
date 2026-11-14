@@ -68,17 +68,41 @@ mark re-times the whole cut and nothing overlaps:
 - `DROP` (107 s) is "yes I think to myself": the hard cut to black.
 - `LANDSCAPE_DURATION` (139 s) is the end.
 
-Act 1, up to the turn, is a sunny moving day with the song clean and nobody in it: the house from the road with the truck in the drive,
-the boxes on the walk, the empty kitchen, the bunk, the drawing (the one wrong note), the sun through the curtains. The cut has no
-dialogue and no captions, and Mom and Dad are never on screen. On the turn it hard-cuts to the same angle at night with the porch light on, then one continuous move in at the front door,
-across the living room past the TV and down the hall toward your door, while the song stays sweet for a bar and then starts to warp. The
-second act is shorter and shorter shots as the song degrades: the TV, the door drifting shut, the thing at the end of the hall taking one
-step, the face at the window, the closet, grandpa turning in his chair, the shadow in the corner of the living room, the washer's lid
-banging open, the thing at the foot of the bunk, under the covers with the breath meter, the sprint down the hall. At the drop: black and
-silence for 0.7 s, the face at the lens with the piano slam, then the cards with the song back faint under them.
+The cut is counted in beats: `BEAT` is `TURN / 40` (0.86 s), forty of them fill the day and eighty-four of nearly the same length fill
+the night up to the drop. A shot's `w` is the beats it holds, so every cut before the drop lands on one, and the shots get shorter all
+the way down, from five beats to one.
+
+It has no dialogue and no captions, and nobody is on screen but the thing: Mom and Dad are never in a shot. It opens cold: black, a
+breath, the disposable camera's click, and for six frames of its flash the thing is leaning over your bunk. Then the hard cut to the
+sunny lawn.
+
+Act 1, up to the turn, is the moving day with the song clean: the house from the lawn with the truck in the drive, the boxes on the
+walk, the living room from the couch, the kitchen table, the bunk, your window and its curtains, the hall of photographs, and the
+drawing taped to its wall (the one wrong note). Six of those frames are kept in `CAM`, because the night shows each of them again from
+the same place with the same lens and the same slow move: the lawn with the porch light on and a room's light going out by itself,
+the living room lit by the television's snow with somebody standing in front of it, the kitchen by flashlight with every chair pulled
+out, the hall where the drawing has changed, the bunk with it standing at the foot of the bed, the window with the face at the glass.
+
+Act 2, from the turn to the drop, is what you do about it, seen from the kid's eye height with the game's own hands and, where it
+explains something, its own HUD: the flashlight across the kitchen and down the hall (a frame lets go of the wall), the telephone
+ringing in the dark, the hall's light switch (on: nothing; off; on: it is at the far end; off; on: it is nearer; the bulb goes), your
+door shutting by itself, the disposable camera up at the eye and three exposures with it nearer in each (the finder and the count of
+what is left on the roll), the lights dying down the hall and the breaker box in the garage, the crawl down the hall, the run for the
+closet, the slats and the breath meter, the covers and the breath meter. Then a beat each (the washer's lid, the crawl again in the
+laundry, the face in the snow, the drawing, the end of the hall, one more exposure), two beats of black, and the sprint down the hall
+cut a beat to a look, ahead and back, until it is on you. Each night shot has one light to read it by: the flashlight, a ceiling
+light, the television, the moon, the flash.
+
+At the drop: black and silence for 0.7 s, the face at the lens with the piano slam, then the cards (TOP BUNK, "Ten nights.", "Nobody
+believed you.", "Wishlist on Steam", the warning) with the song back faint under them, and between the cards a second each of the bunk
+at dawn with nobody in it, the drawing with one more of them in it, and something moving under the top bunk's blanket.
+
+What a shot borrows from the game it asks `lib.js` for (`gameHelpers`): the hands as the game shows them in play, the camera's flash,
+a room's light by its switch, the breath meter, the night's fog and moon for the shot from the lawn. Each is given back when the shot
+ends, so the order of the shots never changes what one shows.
 
 The cue sheet and the music plan follow the marks: a time can be a number, a string in the marks (`"TURN+2.5"`, `"TURN+0.4*ACT2"`,
-where `ACT2` is `DROP-TURN`), or for a cue a shot and a point in it (`{"shot": "door", "k": 0.3}` a fraction of it, `{"shot": "closet",
+where `ACT2` is `DROP-TURN`), or for a cue a shot and a point in it (`{"shot": "door", "k": 0.3}` a fraction of it, `{"shot": "closet_in",
 "at": 0.4}` seconds in). `render.js` and `boot.js` resolve them the same way.
 
 ## The music
@@ -89,8 +113,8 @@ cuts to silence at the drop, and comes back faint under the title cards. Pass a 
 format ffmpeg reads), and set `TURN` and `DROP` to where those words fall in it.
 
 Without it the trailer uses `trailer/music/placeholder.wav`, an original lullaby of the same length that `gen_music.js` synthesizes. The
-same script writes the small effects the cue sheets use; the other effects and the voice lines come from the game's own assets
-(`assets/sfx`, `assets/audio/vo`; see `CREDITS.md`).
+same script writes the small effects the cue sheets use (the telephone's bell and the camera's shutter among them); the other effects
+come from the game's own assets (`assets/sfx`; see `CREDITS.md`). The landscape cut plays no voice lines.
 
 ## Robot voice
 
