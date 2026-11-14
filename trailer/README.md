@@ -15,7 +15,7 @@ a frozen clock, so every run comes out the same.
 | `lib.js` | Camera, overlays, game-state helpers |
 | `boot.js` | The live preview in a browser |
 | `render.js` | The headless renderer and the ffmpeg mix |
-| `cues.json`, `cues_portrait.json` | Sound effects and voice lines, `[{t, file, src, gain, pan, lp, hp, room, drive, dur, fadeIn, fadeOut}]`: `src` starts part way into the file, `room` puts it in a small room, `drive` saturates it |
+| `cues.json`, `cues_portrait.json` | Sound effects (and, in the portrait cut, voice lines), `[{t, file, src, gain, pan, lp, hp, room, drive, dur, fadeIn, fadeOut}]`: `src` starts part way into the file, `room` puts it in a small room, `drive` saturates it |
 | `music_plan.json` | How the song is laid under each cut and warped. In the landscape cut `duck` lowers it under every voice line; `mute` windows silence the whole mix, and `muteFloor` leaves tape hiss under them at that level. Landscape times can be written in the cut's marks (below) |
 | `gen_music.js` | The placeholder music, and the small effects the cue sheets use |
 
@@ -69,33 +69,47 @@ mark re-times the whole cut and nothing overlaps:
 - `LANDSCAPE_DURATION` (139 s) is the end.
 
 The cut is counted in beats: `BEAT` is `TURN / 40` (0.86 s), forty of them fill the day and eighty-four of nearly the same length fill
-the night up to the drop. A shot's `w` is the beats it holds, so every cut before the drop lands on one, and the shots get shorter all
-the way down, from five beats to one.
+the night up to the drop. A shot's `w` is the beats it holds, so every cut before the drop lands on one, and the shots get shorter on
+the way down, from four beats to one. No shot after the turn is longer than five beats (4.3 s).
 
-It has no dialogue and no captions, and nobody is on screen but the thing: Mom and Dad are never in a shot. It opens cold: black, a
-breath, the disposable camera's click, and for six frames of its flash the thing is leaning over your bunk. Then the hard cut to the
-sunny lawn.
+It has no dialogue and no captions, and nobody is on screen but the thing: Mom and Dad are never in a shot. The thing itself is hardly
+in it. Before the drop it is seen four times, for under a second each and never whole: two eyes over the rail of your bunk, two eyes at
+the far end of the hall under the ceiling light, two eyes at your window, the face through the closet's slats. Its arms are in none of
+them (`reach` stays 0 in every shot). The one time the face is plain is the last frame before the title. Every other night shot is the
+house doing something, or you doing something about it.
+
+It opens cold: a second of black, a breath, the disposable camera's click, and for a third of a second of its flash the eyes are over
+the rail. Then the hard cut to the sunny lawn.
 
 Act 1, up to the turn, is the moving day with the song clean: the house from the lawn with the truck in the drive, the boxes on the
-walk, the living room from the couch, the kitchen table, the bunk, your window and its curtains, the hall of photographs, and the
-drawing taped to its wall (the one wrong note). Six of those frames are kept in `CAM`, because the night shows each of them again from
-the same place with the same lens and the same slow move: the lawn with the porch light on and a room's light going out by itself,
-the living room lit by the television's snow with somebody standing in front of it, the kitchen by flashlight with every chair pulled
-out, the hall where the drawing has changed, the bunk with it standing at the foot of the bed, the window with the face at the glass.
+walk, the living room and its television, the kitchen table, the telephone on the dining wall, the bunk, your window and its curtains,
+the photographs in the hall, the hall with the drawing in the foreground, and the drawing itself (the one wrong note). Those frames
+are kept in `CAM`, because the night shows most of them again from the same place with the same lens and the same slow move: the lawn
+where the rooms' lights and then the porch lamp go out, the living room where the television comes on by itself, the kitchen by
+flashlight with the chairs out from the table in a row and one of them sliding, the telephone ringing, the drawing changed, the
+photographs where a frame lets go of the wall, the hall under its ceiling light, the window, the bunk where the light comes on and the
+bear has moved.
 
-Act 2, from the turn to the drop, is what you do about it, seen from the kid's eye height with the game's own hands and, where it
-explains something, its own HUD: the flashlight across the kitchen and down the hall (a frame lets go of the wall), the telephone
-ringing in the dark, the hall's light switch (on: nothing; off; on: it is at the far end; off; on: it is nearer; the bulb goes), your
-door shutting by itself, the disposable camera up at the eye and three exposures with it nearer in each (the finder and the count of
-what is left on the roll), the lights dying down the hall and the breaker box in the garage, the crawl down the hall, the run for the
-closet, the slats and the breath meter, the covers and the breath meter. Then a beat each (the washer's lid, the crawl again in the
-laundry, the face in the snow, the drawing, the end of the hall, one more exposure), two beats of black, and the sprint down the hall
-cut a beat to a look, ahead and back, until it is on you. Each night shot has one light to read it by: the flashlight, a ceiling
-light, the television, the moon, the flash.
+Act 2, from the turn to the drop, is seen from the kid's eye height with the game's own hands and, where it explains something, its
+own HUD: the flashlight across the kitchen and down the hall, your hand on the hall's light switch (off; on: nothing; off; on: two eyes
+at the far end; off; on: nothing, and the bulb goes), your door shutting by itself on the lit hall, the window, the disposable camera
+at the eye and three exposures with the count of film going down (nothing; a chair in the hall; the chair, nearer), the washer's lid,
+the bathroom door coming open on its light, the lights dying down the hall, the run across the yard to the garage, the breaker box
+and the bulb coming back, the run for the louvred closet, the slats and the breath meter, up the ladder, the covers and the breath
+meter. Then a beat each (the receiver off its hook, the snow, the front door, the chair, the last of the breath, the house going
+dark), two beats of black, and the sprint down the hall cut a beat to a look, ahead and back. Each night shot has one light to read it
+by: the flashlight, a ceiling light, the television, the moon, the flash. The plug-in night lights keep their glow and throw next to
+no light in these shots (`nl`), and the flashlight is turned down where a pale wall is close, so the bloom does not take the picture.
 
-At the drop: black and silence for 0.7 s, the face at the lens with the piano slam, then the cards (TOP BUNK, "Ten nights.", "Nobody
-believed you.", "Wishlist on Steam", the warning) with the song back faint under them, and between the cards a second each of the bunk
-at dawn with nobody in it, the drawing with one more of them in it, and something moving under the top bunk's blanket.
+At the drop: black and silence for 0.7 s, then the face and nothing else, straight on, with the piano slam and the violin (the only
+time the strings play: before it the cue sheet is clicks, boards, breath, the bell and one low piano note on the drawing). Then the
+cards (TOP BUNK, "Ten nights.", "Nobody believed you.", "Wishlist on Steam", the warning) with the song back faint under them, and
+between the cards a second each of the bunk at dawn with nobody in it, the drawing with one more of them in it, something sitting up
+under the top bunk's blanket, and the hall's light going out.
+
+The player waits for the game's own loading to finish before the first shot (it ends by putting the thing out on the lawn for the
+title), a shot with the hands in it runs half a second of the game unseen before its first frame so they are already held, and the
+landscape cut draws every frame whole (`cull.enabled` off).
 
 What a shot borrows from the game it asks `lib.js` for (`gameHelpers`): the hands as the game shows them in play, the camera's flash,
 a room's light by its switch, the breath meter, the night's fog and moon for the shot from the lawn. Each is given back when the shot

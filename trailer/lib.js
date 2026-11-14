@@ -41,9 +41,11 @@ const CSS = `
 #blanket, #pod, #fade, #vignette { transition: none !important; }
 #grain { animation: none !important; }
 /* the closet's slats and the breath meter are drawn in pixels for a full-size screen: here they keep that size against any frame */
-body:not(.tr-portrait) #pod.louvers { background: repeating-linear-gradient(180deg, rgba(7,7,9,0.985) 0 2.45vh, rgba(7,7,9,0) 2.45vh 3.7vh) !important; box-shadow: inset 0 0 14vh 3vh #000 !important; }
-body:not(.tr-portrait) #breath span { font-size: max(8px, 1.1vh) !important; letter-spacing: 0.4vh !important; margin-bottom: 0.6vh !important; }
-body:not(.tr-portrait) #breath div { width: 20vh !important; height: max(2px, 0.4vh) !important; }
+body:not(.tr-portrait) #pod.louvers { background: repeating-linear-gradient(180deg, rgba(7,7,9,0.985) 0 2.1vh, rgba(7,7,9,0) 2.1vh 4vh) !important; box-shadow: inset 0 0 12vh 2vh #000 !important; }
+body:not(.tr-portrait) #breath span { font-size: max(12px, 3.6vh) !important; letter-spacing: 1vh !important; margin-bottom: 1.4vh !important; }
+body:not(.tr-portrait) #breath div { width: 70vh !important; height: max(5px, 1.8vh) !important; background: rgba(255,255,255,0.28) !important; }
+/* the same for the count of film in the finder's corner */
+body:not(.tr-portrait) #finder > div > div:last-child { font-size: max(15px, 4.6vh) !important; left: 2.6vh !important; bottom: 2vh !important; color: rgba(255,250,235,0.85) !important; }
 #fade { opacity: 0 !important; }
 .tr { position: fixed; inset: 0; pointer-events: none; }
 #tr-black { z-index: 58; background: #000; opacity: 0; }
@@ -354,6 +356,8 @@ export function gameHelpers(game) {
   const quilt0 = topQuilt ? Float32Array.from(topQuilt.geometry.attributes.position.array) : null;
   const steadied = new Set();
   let quiltMoved = false, drawing2 = null, hudOn = false, air0 = null;
+  const nl0 = W.nightLights.map((n) => n.base);
+  const flash0 = flash ? { angle: flash.angle, penumbra: flash.penumbra } : null, porch0 = { d: W.porchLight.distance, i: W.porchLight.intensity, e: W.porchBulb.material.emissiveIntensity };
   // what a shot may borrow and must give back: the hall spot (the day shot uses it as sun through the window), the eyes' glow, the smile
   const bs = W.bathSpot, bath0 = { pos: bs.position.clone(), target: bs.target.position.clone(), color: bs.color.clone(), angle: bs.angle, penumbra: bs.penumbra };
   const eyeMat = (E.head.children.find((m) => m.isMesh && m !== E.smile && m.material && m.material.toneMapped === false) || {}).material || null, eye0 = eyeMat ? eyeMat.color.clone() : null;
@@ -362,9 +366,13 @@ export function gameHelpers(game) {
     reset() {
       F.cutscene = true; P.mode = 'cine'; F.dead = false; F.chase = false; F.flicker = false; F.fear = 0; F.breathCheck = false; F.scare = false;
       if (vigilOn) H.vigil(false);
-      F.blackout = false;
+      F.blackout = false; W.nightLights.forEach((n, i) => { n.base = nl0[i]; });
       if (air0) { if (scene.fog === air0.obj) scene.fog.density = air0.fog; W.sun.intensity = air0.moon; W.hemi.intensity = air0.sky; air0 = null; }
       stage.v = null; hands.lowerCamera(); if (bulb) { bulb.intensity = 0; bulb.distance = 7; }
+      if (flash) { flash.angle = flash0.angle; flash.penumbra = flash0.penumbra; }
+      if (F.phase === 'night') { W.porchLight.distance = porch0.d; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; }
+      if (W.phone.off) W.phone.hangUp();
+      if (W.laundry) { W.laundry.bulb.set(false); W.laundry.bulb.swing = 0.08; W.laundry.washer.open(0); }
       for (const n of [...steadied]) H.steady(n, false);
       if (F.phase === 'night') H.lightsOff();
       W.chairs.forEach((c, i) => { const [x, z, r] = chairs0[i]; if (c.holder.position.x !== x || c.holder.position.z !== z || c.holder.rotation.y !== r) W.moveChair(i, x, z, r); });
@@ -396,11 +404,17 @@ export function gameHelpers(game) {
     night(o = {}) {
       H.phase('night');
       if (o.lights !== undefined) game.nlMult(o.lights, false);
+      // nl: how much light the plug-in night lights throw (the game sets their level every frame, so it is their own strength that is
+      // turned down, and the little lamps themselves glow as they did)
+      W.nightLights.forEach((n, i) => { n.base = nl0[i] * (o.nl ?? 1); });
       game.lights.roof = o.roof ?? 1;   // (how much of the sky the roof keeps out of the rooms: all of its share unless the shot says)
       W.bathSpot.intensity = o.spot || 0; F.flicker = !!o.flicker;
     },
     // (26 is the game's own; a shot with a pale wall an arm's length away asks for less, or the bloom takes the picture)
-    flashlight(on, i = 26) { if (flash) flash.intensity = on ? i : 0; F.flashOn = !!on; },
+    // wide: the cone opened out, for a shot that has to show a whole table by it
+    flashlight(on, i = 26, wide = 0) { if (flash) { flash.intensity = on ? i : 0; flash.angle = wide || flash0.angle; } F.flashOn = !!on; },
+    // the porch lamp, for the shots from the lawn (i: 0 puts it out)
+    porch(i) { W.porchLight.distance = 16; W.porchLight.intensity = i; W.porchBulb.material.emissiveIntensity = i ? 6 : 0; },
     // the thing: {x, z, face:[x, z] | yaw, mode, speed, tilt, lean, reach, smile}
     thing(o) {
       E.visible = true; E.mode = o.mode || 'idle'; E.speed = o.speed ?? 1;
@@ -427,6 +441,8 @@ export function gameHelpers(game) {
     eyes(k) { if (eyeMat) eyeMat.color.copy(eye0).multiplyScalar(k); },
     // daylight through the kid's window: the hall spot, moved outside the glass and warmed
     sunPatch(i, at = [8.75, 0.3, 3.28]) { bs.position.set(11.14, 2.15, 3.83); bs.target.position.set(...at); bs.target.updateMatrixWorld(); bs.color.set(0xffd9a0); bs.angle = 0.5; bs.penumbra = 0.6; bs.intensity = i; },
+    // the same spot anywhere: the moon through another window, the sun across the living room (given back at the next shot)
+    spot({ from, at, color = 0x9db6ff, i = 20, angle = 0.5, penumbra = 0.6 }) { bs.position.set(...from); bs.target.position.set(...at); bs.target.updateMatrixWorld(); bs.color.set(color); bs.angle = angle; bs.penumbra = penumbra; bs.intensity = i; },
     fear(v) { F.fear = Math.max(F.fear, v); },
     shake(v) { nights.D.shake(v); },
     door: (name, open) => W.setDoor(name, open, true),
@@ -448,6 +464,7 @@ export function gameHelpers(game) {
     lightsOff() { for (const n in lights.rooms) H.light(n, false, true); },
     // the hands in the picture, as the game shows them in play (null puts them away); camera(true) brings the disposable up to the eye
     hands(o) { stage.v = o || null; },
+    get staged() { return !!stage.v; },
     camera(up) { if (up) hands.raiseCamera(); else hands.lowerCamera(); },
     handSync() { camera.updateMatrixWorld(); handRig.matrix.copy(camera.matrixWorld); handRig.matrixWorld.copy(camera.matrixWorld); handRig.updateMatrixWorld(true); },
     reach(p) { hands.reach(new THREE.Vector3(p[0], p[1], p[2]), camera); },
