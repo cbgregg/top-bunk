@@ -316,6 +316,31 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('slippers', 'flat'); for (const [x, z, a] of [[-7.2, 1.5, 1.5], [-7.19, 1.6, 1.62]]) { box(x, 0, z, 0.095, 0.022, 0.25, 0x5a2a2e, { round: 0.01, ry: a, cell: 'nap' }); box(x - 0.055 * Math.sin(a), 0.02, z - 0.055 * Math.cos(a), 0.1, 0.045, 0.13, 0x6a3236, { round: 0.02, ry: a, cell: 'nap' }); }
   }
 
+  // ---------- the office and the room nobody unpacked ----------
+  {
+    cluster('office walls', 4.78, 1.55, -3.0);
+    item('map', 'wall'); picture('z', 4.768, 1, -2.66, 1.56, 0.56, 0.42, 'pr_map', { frame: 0x2a2018 });
+    item('certificate', 'wall'); picture('z', 4.768, 1, -3.36, 1.62, 0.34, 0.265, 'pr_cert', { frame: 0x8a7340, fw: 0.025 });
+    cluster('office desk', 5.4, 1.0, -4.0);
+    item('desk mug', 'on', 0.775); mug(5.66, 0.775, -3.9, 0x7a2a26, 1.0);
+    model('d_clipboard', { x: 5.07, y: 1.404, z: -4.08, rot: 0.35, kind: 'on' });
+    // a box of files he has started on
+    cluster('office box', 7.42, 0, -4.03, { far: 0 });
+    item('office box', 'floor'); openBox(7.42, 0, -4.03, 0.46, 0.36, 0.4, 0.06, (L, top) => {
+      for (let i = 0; i < 7; i++) { const [x, y, z] = L(-0.15 + i * 0.04, top, 0.0); box(x, y, z, 0.03, 0.24 + (i % 3) * 0.02, 0.28, [0x27324a, 0x7a2a26, 0x2f4634, 0x1e1c1c][i % 4], { ry: 0.12, rz: (i % 2 ? 0.05 : -0.04), mat: 'satin' }); }
+      for (let i = 0; i < 3; i++) { const [x, y, z] = L(0.16, top, -0.1 + i * 0.1); box(x, y, z, 0.08, 0.2, 0.012, 0xc9ab72, { ry: 0.06 + 0.2 * i }); } });
+    foot('office box', 7.04, 7.79, -4.41, -3.66, 0.62);
+    // the spare room: a suitcase, two more taped boxes on the stacks, pictures not hung yet
+    model('d_suitcase', { x: 11.116, z: -3.2, rot: -PI / 2 }); foot('suitcase', 10.98, 11.243, -3.57, -2.83, 0.57);
+    model('d_cardbox', { x: 9.2, y: 0.42, z: -1.5, rot: PI / 2 + 0.06, kind: 'on' }); model('d_cardbox', { x: 9.32, y: 0.45, z: -4.165, rot: PI / 2 - 0.1, kind: 'on' });
+    cluster('spare frames', 11.18, 0.25, -1.95, { far: 0 });
+    item('leaning frames', 'floor');
+    { const lean = (z, w, h, cell, tip, off) => { const m = new THREE.Matrix4().compose(new THREE.Vector3(11.243 - off, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -PI / 2, 0)).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-tip, 0, 0))), new THREE.Vector3(1, 1, 1));
+        const f = new THREE.BoxGeometry(w + 0.07, h + 0.07, 0.022); f.translate(0, (h + 0.07) / 2, 0.011); add(f, 0x3a2a1c, { mat: 'satin', cast: true, m }); const p = new THREE.PlaneGeometry(w, h); p.translate(0, (h + 0.07) / 2, 0.0235); add(p, 0xffffff, { cell, m }); };
+      lean(-1.98, 0.44, 0.33, 'pr_barn', 0.2, 0.105); lean(-1.9, 0.3, 0.38, 'pr_sampler', 0.27, 0.16); }
+    foot('leaning frames', 11.05, 11.243, -2.26, -1.66, 0.45);
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
