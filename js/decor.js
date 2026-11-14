@@ -288,6 +288,34 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('shampoo', 'on', 0.585); cyl(6.4, 0.585, 4.46, 0.03, 0.17, 0xd9c9a0, { mat: 'satin', r2: 0.024 }); cyl(6.4, 0.755, 4.46, 0.015, 0.025, 0x3a3a3a, { mat: 'satin' }); cyl(6.3, 0.585, 4.47, 0.027, 0.2, 0x4f6a8a, { mat: 'satin' }); cyl(6.3, 0.785, 4.47, 0.012, 0.02, 0xe8e6de, { mat: 'satin' });
   }
 
+  // ---------- Mom and Dad's room ----------
+  {
+    cluster('night stand', -7.76, 0.6, -0.23);
+    model('d_alarm', { x: -7.8, y: 0.6, z: -0.37, rot: PI / 2 - 0.25, kind: 'on' });
+    item('bedside book', 'on', 0.6); book(-7.72, 0.6, -0.12, 0.13, 0.03, 0.195, 'cv_novel', 0xd8d0b8, 0.25); mug(-7.9, 0.6, -0.1, 0xe8e2d2, 2.4);
+    cluster('dresser top', -5.4, 0.655, -3.52);
+    const ty = 0.655;
+    model('d_frame', { x: -5.72, y: ty, z: -3.55, rot: -PI / 2 + 0.25, kind: 'on', after: (h) => photoIn(h, 'grandma') }); model('d_frame', { x: -5.46, y: ty, z: -3.58, rot: -PI / 2 - 0.2, s: 0.8, kind: 'on', after: (h) => photoIn(h, 'porch') });
+    item('jewellery box', 'on', ty); box(-5.08, ty, -3.53, 0.2, 0.075, 0.13, 0x4a2c1c, { round: 0.008, mat: 'satin', ry: 0.1, cast: true }); box(-5.08, ty + 0.035, -3.462, 0.03, 0.012, 0.006, 0xb9a36a, { mat: 'metal', ry: 0.1 });
+    cyl(-4.94, ty, -3.6, 0.022, 0.07, 0x9a6a3a, { mat: 'satin', r2: 0.016 }); cyl(-4.94, ty + 0.07, -3.6, 0.009, 0.02, 0xb9a36a, { mat: 'metal' }); cyl(-5.26, ty, -3.45, 0.03, 0.045, 0xd9b8c4, { mat: 'satin' });
+    model('d_vase', { x: -5.9, y: ty, z: -3.6, s: 0.75, kind: 'on' });
+    // the mirror over the dresser
+    cluster('parents walls', -5.4, 1.4, -3.73, { far: 0 });
+    item('mirror', 'wall'); box(-5.4, 0.98, -3.726, 0.78, 0.86, 0.024, 0x6b4a2c, { mat: 'satin', cast: true });
+    { const g = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.76), M.mirror); g.position.set(-5.4, 1.41, -3.712); house.add(g); }
+    cluster('parents art', -8.0, 1.7, 0.75);
+    item('lake print', 'wall'); picture('z', -8.01, 1, 0.75, 1.74, 0.72, 0.463, 'pr_lake', { frame: 0x6b4a2c, fw: 0.045 });
+    cluster('parents east wall', -2.82, 1.6, 3.3);
+    item('barn print', 'wall'); picture('z', -2.814, -1, 3.3, 1.62, 0.48, 0.36, 'pr_barn', { frame: 0x3a2a1c });
+    // the chair in the corner with the day's clothes on it, the hamper, slippers by the bed
+    model('chair', { x: -7.52, z: 4.12, rot: 2.5 }); foot('bedroom chair', -7.86, -7.2, 3.82, 4.44, 0.96);
+    cluster('chair clothes', -7.52, 0.47, 4.12);
+    item('folded clothes', 'on', 0.447); box(-7.52, 0.447, 4.1, 0.3, 0.035, 0.24, 0x3d4f6a, { round: 0.014, cell: 'nap', ry: 2.5 }); box(-7.52, 0.482, 4.1, 0.28, 0.03, 0.23, 0xc9bfa8, { round: 0.012, cell: 'nap', ry: 2.62 }); rumple(-7.5, 0.51, 4.08, 0.3, 0.24, 0x7a3a2a, { ry: 2.4, seed: 3, h: 0.04 });
+    model('d_laundry', { x: -6.72, z: 4.2, s: 0.0025, rot: 0.6 }); foot('hamper', -7.03, -6.41, 3.89, 4.51, 0.62);
+    cluster('slippers', -7.14, 0, 1.5);
+    item('slippers', 'flat'); for (const [x, z, a] of [[-7.2, 1.5, 1.5], [-7.19, 1.6, 1.62]]) { box(x, 0, z, 0.095, 0.022, 0.25, 0x5a2a2e, { round: 0.01, ry: a, cell: 'nap' }); box(x - 0.055 * Math.sin(a), 0.02, z - 0.055 * Math.cos(a), 0.1, 0.045, 0.13, 0x6a3236, { round: 0.02, ry: a, cell: 'nap' }); }
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
