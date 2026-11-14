@@ -4,6 +4,7 @@ import * as TX from './textures.js';
 import { applyPBR } from './pbr.js';
 import { PHONE } from './gfx.js';
 import { place, scatter } from './props.js';
+import { buildDecor } from './decor.js';
 import { flicker } from './settings.js';
 import * as collide from './collide.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -999,7 +1000,6 @@ export function buildWorld(scene) {
     rbox(2.3, 3.22, 1.5, 2.3, 3.2, 3.52, M.cabW, 0.012);                                            // the upper cabinets in the corner (nothing hangs in front of the window)
     solid(-1.4, 3.25, 2.85, 3.55); solid(2.4, 3.25, -0.2, 2.9);
     box(-1.35, 0.3, 0.95, 1.5, 3.5, 3.51, M.lino, { uv: true });   // backsplash
-    knick(0.6, 0.95, 3.3, 2, 0.2); knick(2.6, 0.95, 3.3, 2, 0.2);
   }
   tagStart('dining');
   box(-0.36, 0.74, 0.7, 0.75, 0.74, 1.84, M.oak, { uv: false });
@@ -1013,14 +1013,13 @@ export function buildWorld(scene) {
   rbox(-6.2, -5.2, 0, 0.655, -3.82, -3.42, M.oak, 0.015); for (let i = 0; i < 3; i++) rbox(-6.15 + i * 0.32, -5.87 + i * 0.32, 0.1, 0.57, -3.42, -3.405, M.oak, 0.006);
   for (let i = 0; i < 3; i++) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), M.brass); kn.position.set(-6.01 + i * 0.32, 0.34, -3.39); house.add(kn); tagged.pdresser.push(kn); }
   tagEnd();
-  knick(-5.7, 0.655, -3.62, 3, 0.4); solid(-6.25, -5.15, -3.9, -3.37);
+  solid(-6.25, -5.15, -3.9, -3.37);
   for (const z0 of [-0.95, 0.75]) { rbox(-8.0, -7.58, 0, 0.6, z0, z0 + 0.42, M.oak, 0.012); rbox(-7.6, -7.585, 0.12, 0.5, z0 + 0.04, z0 + 0.38, M.oak, 0.006); solid(-8.05, -7.55, z0 - 0.03, z0 + 0.45); }   // nightstands
   tagStart('plamp');
   { const lampM = new THREE.MeshStandardMaterial({ color: 0xf2e6c8, emissive: 0xffd9a0, emissiveIntensity: 0.0, roughness: 0.7 });
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 14), M.brass); base.position.set(-7.8, 0.7, 0.96); house.add(base); tagged.plamp.push(base);
     const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.2, 18, 1, true), lampM); shade.material.side = THREE.DoubleSide; shade.position.set(-7.8, 0.92, 0.96); house.add(shade); tagged.plamp.push(shade); }
   tagEnd();
-  knick(-7.8, 0.6, -0.74, 2, 0.2, 'z');
   // the closet: brown sliding doors on the dining-room wall, south of the barn door
   rbox(-3.95, -3.38, 0, 2.1, -3.5, -1.6, M.oak, 0.01); box(-3.4, -3.38, 0.05, 2.05, -2.565, -2.535, M.black, { uv: false });
   rbox(-3.95, -3.38, 2.1, 2.4, -3.5, -1.6, M.white, 0.01);
@@ -1278,7 +1277,7 @@ export function buildWorld(scene) {
       return { stream, on: false, pos, set(on) { this.on = on; stream.visible = on; } };
     })();
     bsolid(-6.05, -5.25, -0.4, 0.43);
-    shelf(-5.1, -4.4, B + 1.5, -0.24, -0.02); knick(-4.75, B + 1.525, -0.13, 3, 0.5);
+    shelf(-5.1, -4.4, B + 1.5, -0.24, -0.02);
     // the sump in the far corner: a square pit with black water in it, the discharge pipe up into the joists, and a drip that never stops
     for (const [a, b, c, d] of [[-4.25, -4.15, -0.24, 0.5], [-3.6, -3.5, -0.24, 0.5], [-4.15, -3.6, -0.24, -0.14], [-4.15, -3.6, 0.4, 0.5]]) box(a, b, B - 0.5, B + 0.08, c, d, M.block, { uv: true });
     box(-4.15, -3.6, B - 0.52, B - 0.5, -0.14, 0.4, M.black, { uv: false, cast: false });
@@ -1971,7 +1970,7 @@ export function buildWorld(scene) {
     // a workbench with a pegboard, a stack of tires, boxes, an oil stain
     rbox(-13.5, -10.5, 0.82, 0.88, GZ0 + GT + 0.09, GZ0 + GT + 0.69, M.furn, 0.01);
     for (const x of [-13.45, -10.55]) for (const z of [GZ0 + GT + 0.14, GZ0 + GT + 0.64]) box(x - 0.03, x + 0.03, 0, 0.82, z - 0.03, z + 0.03, M.furn, { uv: false });
-    box(-13.5, -10.5, 1.1, 1.9, GZ0 + GT + 0.09, GZ0 + GT + 0.11, M.ply, { uv: true }); knick(-12.0, 0.88, GZ0 + GT + 0.4, 5, 2.2);
+    box(-13.5, -10.5, 1.1, 1.9, GZ0 + GT + 0.09, GZ0 + GT + 0.11, M.ply, { uv: true });
     solid(-13.55, -10.45, GZ0, GZ0 + GT + 0.75);
     for (let i = 0; i < 3; i++) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.2, 20), M.tire); t.position.set(-13.3, 0.1 + i * 0.2, -8.0); t.castShadow = true; yard.add(t); }
     solid(-13.7, -12.9, -8.4, -7.6);
@@ -2653,5 +2652,7 @@ export function buildWorld(scene) {
   // (the barn, the gate) the two are the same.
   const ctx = { solid, removeSolid, box, rbox, lbox, place, prop, std, M, T, TX, house, yard, doors, mkDoor, setDoor, colliders, rainDiscard, headClear: collide.headClear, SX, SZ, groundAt, PLAN, W };
   W.plugin = (fn) => fn(ctx);
+  // what the family has about the place (js/decor.js), set down once everything else stands
+  W.decor = buildDecor({ house, yard, solid, M, PHONE });
   return W;
 }
