@@ -223,6 +223,49 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('hall runner', 'flat'); for (let i = 0; i < 4; i++) box(5.92 + i * 1.44, 0, -0.42, 1.44, 0.004, 0.7, 0x4a2422, { faces: [null, null, ['runner', null, 1], null, null, null], tint: 0xb0a090 });
   }
 
+  // ---------- your room ----------
+  {
+    model('d_kidtable', { x: 10.99, z: 1.72, s: 1.1, rot: -PI / 2 }); foot('desk', 10.74, 11.243, 1.2, 2.24, 0.6);
+    model('d_stool', { x: 10.45, z: 1.75, s: 0.62, rot: 0.3 }); foot('stool', 10.32, 10.58, 1.62, 1.88, 0.37);
+    model('d_kidshelf', { x: 9.95, z: 4.385, rot: PI }); foot('shelf', 9.69, 10.21, 4.19, 4.578, 1.13);
+    model('d_crate', { x: 7.25, z: 2.9, rot: PI / 2 }); foot('toy crate', 7.03, 7.47, 2.63, 3.17, 0.26);
+    const dy = 0.579;
+    cluster('your desk', 10.99, dy, 1.72);
+    model('d_notepads', { x: 10.98, y: dy, z: 1.6, s: 0.5, rot: -PI / 2 + 0.1, kind: 'on' });
+    model('d_stationery', { x: 11.08, y: dy, z: 2.05, rot: PI / 2, kind: 'on' });
+    item('crayons', 'on', dy); box(10.9, dy, 2.0, 0.075, 0.022, 0.115, 0xe0b23c, { ry: 0.4, faces: [null, null, 'crayons', null, null, null] });
+    [[0xc2452f, 10.86, 1.82, 0.3], [0x3c76a8, 10.9, 1.86, 1.2], [0x4f9a58, 10.83, 1.9, 2.0], [0xe0b23c, 10.94, 1.8, 0.8], [0x7a4f9a, 10.88, 1.76, 2.6]].forEach(([c, x, z, a]) => rod([x - Math.cos(a) * 0.04, dy + 0.005, z - Math.sin(a) * 0.04], [x + Math.cos(a) * 0.04, dy + 0.005, z + Math.sin(a) * 0.04], 0.005, c, { seg: 6 }));
+    item('drawing', 'on', dy); box(10.95, dy, 1.88, 0.2, 0.002, 0.15, 0xefe9d6, { ry: PI / 2 + 0.15, faces: [null, null, 'draw_house', null, null, null] });
+    cluster('your walls', 11.2, 1.5, 1.7);
+    item('posters', 'wall'); picture('z', 11.243, -1, 1.42, 1.52, 0.42, 0.588, 'p_dino', { tape: true, tilt: 0.012 }); picture('z', 11.243, -1, 1.98, 1.56, 0.42, 0.588, 'p_rocket', { tape: true, tilt: -0.02 });
+    cluster('your west wall', 6.92, 1.55, 2.85);
+    item('car poster', 'wall'); picture('z', 6.905, 1, 2.85, 1.58, 0.62, 0.443, 'p_car', { tape: true, tilt: 0.015 });
+    cluster('your north wall', 9.95, 1.7, 4.57);
+    item('pennant', 'wall'); { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0.3, 0.11, 0, 0.3, -0.11, 0, -0.3, 0, 0], 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0.5], 2)); g.computeVertexNormals(); add(g, 0xffffff, { cell: 'pennant', m: M4(9.98, 1.72, 4.578 - 0.004, 0, 0, 0.06) }); }
+    // tapes by your television, clothes where they fell
+    cluster('your tapes', 7.3, 0.55, 2.13);
+    item('your tapes', 'on', 0.55); for (let i = 0; i < 3; i++) tape(7.3 + (i % 2) * 0.01, 0.55 + i * 0.0252, 2.135, [1, 7, 4][i], 1, (i - 1) * 0.07);
+    cluster('your floor', 10.7, 0, 2.85);
+    item('clothes', 'flat'); rumple(10.72, 0, 2.8, 0.5, 0.42, 0x8a3a32, { ry: 0.5, seed: 1, h: 0.05 }); rumple(10.84, 0.003, 3.05, 0.6, 0.34, 0x3d4a5e, { ry: -0.6, seed: 4, h: 0.045 }); rumple(10.58, 0, 3.08, 0.2, 0.12, 0xd8d2c2, { seed: 7, h: 0.03, ry: 1.0 });
+    for (const [x, z, a] of [[10.5, 2.56, 0.3], [10.61, 2.5, -0.5]]) { box(x, 0, z, 0.08, 0.02, 0.2, 0x2a2a2a, { ry: a }); box(x, 0.02, z, 0.075, 0.035, 0.19, 0xbdb8a8, { round: 0.015, ry: a, cell: 'nap' }); box(x - 0.045 * Math.sin(a), 0.045, z - 0.045 * Math.cos(a), 0.07, 0.03, 0.09, 0xbdb8a8, { round: 0.012, ry: a, cell: 'nap' }); }
+    // your school bag against the wall by the desk, the bat in the corner
+    cluster('school bag', 11.1, 0.2, 1.02);
+    item('school bag', 'floor'); box(11.13, 0, 1.03, 0.15, 0.38, 0.29, 0x2c3f66, { round: 0.05, cell: 'nap', cast: true, rz: 0.12 }); box(11.045, 0.04, 1.03, 0.04, 0.17, 0.2, 0x26365a, { round: 0.018, cell: 'nap', rz: 0.12 }); box(11.14, 0.37, 1.03, 0.02, 0.05, 0.07, 0x1e2a44, { cell: 'nap' });
+    foot('school bag', 10.98, 11.243, 0.86, 1.2, 0.4);
+    model('d_bat', { x: 10.34, z: 4.49, rz: 0.13, rot: 0.4 }); foot('bat', 10.21, 10.46, 4.36, 4.578, 0.9);
+    // on your shelves: games, books, a ball, blocks
+    cluster('your shelves', 9.95, 0.5, 4.4);
+    item('games', 'on', 0.005); for (let i = 0; i < 3; i++) box(9.93 + (i - 1) * 0.012, 0.005 + i * 0.046, 4.41, 0.38, 0.045, 0.26, [0xa8322a, 0x2f6f7a, 0xe0b23c][i], { ry: (i - 1) * 0.05, faces: [null, null, null, null, null, ['games', [0, 1 - (i + 1) / 3, 1, 1 - i / 3]]] });
+    item('your books', 'on', 0.462); books('x', 9.74, 10.02, 4.36, -1, 0.462, { depth: 0.13, hMin: 0.15, hMax: 0.21, kid: true });
+    model('d_ball', { x: 10.11, y: 0.462, z: 4.43, rot: 1, kind: 'on' });
+    item('blocks', 'on', 0.738); [[9.8, 4.47, 0.2, 0], [9.86, 4.475, -0.3, 1], [9.83, 4.47, 0.5, 2]].forEach(([x, z, a, k], i) => box(x, 0.738 + (i === 2 ? 0.045 : 0), z, 0.045, 0.045, 0.045, 0xd9c08a, { ry: a, faces: [null, null, ['blocks', [((k + 1) % 4) / 4, 0, ((k + 1) % 4 + 1) / 4, 1]], null, null, ['blocks', [k / 4, 0, (k + 1) / 4, 1]]] }));
+    book(10.05, 0.738, 4.47, 0.13, 0.014, 0.1, 'cv_kid', 0xe8e2d0, 0.2);
+    // the toy crate
+    model('d_football', { x: 7.25, y: 0.012, z: 2.86, s: 0.8, rot: 1.9, kind: 'in' });
+    cluster('toy crate', 7.25, 0.1, 2.9);
+    item('crate blocks', 'in', 0.008); box(7.2, 0.01, 3.05, 0.045, 0.045, 0.045, 0xd9c08a, { ry: 0.4, faces: [null, null, ['blocks', [0.75, 0, 1, 1]], null, null, null] }); box(7.3, 0.01, 3.07, 0.045, 0.045, 0.045, 0xd9c08a, { ry: 1.0, faces: [null, null, ['blocks', [0.5, 0, 0.75, 1]], null, null, null] });
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
