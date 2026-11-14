@@ -217,6 +217,12 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('dining print', 'wall'); picture('x', 4.578, -1, -0.88, 1.76, 0.32, 0.25, 'pr_field', { frame: 0x4a3524 });
   }
 
+  // ---------- the hall ----------
+  {
+    cluster('hall runner', 8.1, 0, -0.42, { far: 0 });
+    item('hall runner', 'flat'); for (let i = 0; i < 4; i++) box(5.92 + i * 1.44, 0, -0.42, 1.44, 0.004, 0.7, 0x4a2422, { faces: [null, null, ['runner', null, 1], null, null, null], tint: 0xb0a090 });
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
