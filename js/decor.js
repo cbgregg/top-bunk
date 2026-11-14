@@ -393,6 +393,22 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
     item('old plate', 'wall'); picture('z', -13.88, 1, -10.66, 2.0, 0.3, 0.15, 'plate', { frame: 0x9a9a94, depth: 0.003, fw: 0.002, mat: 'satin', tilt: 0.05 });
   }
 
+  // ---------- outside ----------
+  {
+    model('d_hose', { x: 4.55, y: 0.62, z: -4.708, rot: PI, kind: 'wall', parent: yard });
+    model('d_wateringcan', { x: 4.44, z: -4.96, rot: 0.8, parent: yard }); foot('watering can', 4.2, 4.68, -5.18, -4.74, 0.2);
+    model('d_porchchair', { x: 5.75, z: -5.15, rot: PI, parent: yard }); foot('porch chair', 5.42, 6.08, -5.48, -4.82, 0.88);
+    model('d_bmx', { x: 8.9, z: -4.95, s: 0.145, rx: 0.14, parent: yard }); foot('your bike', 8.22, 9.58, -5.3, -4.62, 0.92);
+    for (const x of [2.27, 3.93]) { model('d_claypot', { x, y: 0.14, z: -4.82, rot: x, parent: yard }); foot('flower pot', x - 0.14, x + 0.14, -4.96, -4.68, 0.55); }
+    scatter(yard, 'shrub', [2.27, 3.93].map((x, i) => new THREE.Matrix4().compose(new THREE.Vector3(x, 0.14 + 0.19, -4.82), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2), new THREE.Vector3(0.62, 0.7, 0.62))), { cast: false });
+    cluster('front step', 3.1, 0.14, -5.0, { parent: yard, far: 0 });
+    item('door mat', 'flat', 0.14); box(3.1, 0.14, -5.06, 0.76, 0.012, 0.46, 0x6b5234, { faces: [null, null, 'doormat', null, null, null] });
+    item('pot soil', 'in', 0.14); for (const x of [2.27, 3.93]) cyl(x, 0.14 + 0.17, -4.82, 0.1, 0.03, 0x3a2c20, {});
+    model('d_handtruck', { x: 4.5, y: 0.004, z: -14.9, rot: -2.2, parent: yard }); foot('hand truck', 4.1, 4.9, -15.3, -14.5, 1.4);
+    model('d_bin', { x: -0.76, z: 5.55, rot: 1.0, parent: yard }); foot('dustbin', -1.08, -0.44, 5.23, 5.87, 0.92);
+    model('d_boots', { x: -0.97, z: 4.95, rot: PI + 0.3, parent: yard }); foot('boots', -1.14, -0.8, 4.79, 5.11, 0.38);
+  }
+
   // ---------- one mesh per material for each place ----------
   for (const c of clusters) {
     if (!c.parts.size) continue;
