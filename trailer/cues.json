@@ -1,7 +1,4 @@
 [
-  { "shot": "truck", "at": 1.2, "file": "assets/audio/vo/dad/welcome.mp3", "gain": 0.85, "pan": 0.15 },
-  { "shot": "bunk", "at": 0.6, "file": "assets/audio/vo/mom/landlord.mp3", "gain": 0.85, "pan": -0.1 },
-  { "shot": "drawing", "at": 2.0, "file": "assets/audio/vo/dad/cheap.mp3", "gain": 0.85, "pan": 0.1 },
 
   { "shot": "road_night", "at": 0, "file": "assets/sfx/night_brown_noise.mp3", "gain": 0.22, "pan": 0, "dur": 30, "fadeIn": 0.6, "fadeOut": 3 },
   { "shot": "road_night", "at": 0.1, "file": "assets/sfx/car_pass.mp3", "gain": 0.28, "pan": -0.5 },
@@ -22,14 +19,10 @@
   { "shot": "vigil", "at": 0, "file": "assets/sfx/waterphone.mp3", "gain": 0.3, "pan": 0, "dur": 30, "fadeIn": 2, "fadeOut": 2 },
   { "shot": "vigil", "at": 2.6, "file": "assets/sfx/ceiling_thump.mp3", "gain": 0.5, "pan": 0 },
   { "shot": "vigil", "at": 3.8, "file": "assets/sfx/violin_swell.mp3", "gain": 0.6, "pan": 0 },
-  { "shot": "shadow", "at": 0.2, "file": "assets/audio/vo/dad/n2_a.mp3", "gain": 1.4, "pan": -0.5, "lp": 700 },
   { "shot": "shadow", "at": 0.5, "file": "assets/sfx/whispers.mp3", "gain": 0.45, "pan": 0.4, "dur": 4.5, "fadeIn": 0.6, "fadeOut": 0.5 },
-  { "shot": "shadow", "at": 3.1, "file": "assets/audio/vo/mom/n2_a.mp3", "gain": 3.5, "pan": -0.5, "lp": 700 },
   { "shot": "washer", "at": 2.7, "file": "assets/sfx/door_slam_far.mp3", "gain": 1.0, "pan": -0.3 },
   { "shot": "washer", "at": 2.7, "file": "trailer/music/cam_impact.wav", "gain": 0.9, "pan": -0.3 },
   { "shot": "bunk_foot", "at": 0, "file": "assets/sfx/violin_swell.mp3", "gain": 0.55, "pan": 0 },
-  { "shot": "bunk_foot", "at": 0.4, "file": "assets/audio/vo/mom/n3_a.mp3", "gain": 1.4, "pan": -0.3, "lp": 800 },
-  { "shot": "bunk_foot", "at": 3.5, "file": "assets/audio/vo/dad/n3_a.mp3", "gain": 3.5, "pan": -0.3, "lp": 800 },
   { "shot": "covers", "at": 0, "file": "trailer/music/heartbeat.wav", "gain": 0.5, "pan": 0, "dur": 4.4, "fadeIn": 0.3, "fadeOut": 0.3 },
   { "shot": "covers", "at": 0.2, "file": "trailer/music/breath_panic.wav", "gain": 0.5, "pan": 0, "dur": 4.2, "fadeOut": 0.3 },
   { "shot": "covers", "at": 2.4, "file": "trailer/music/floor_creak.wav", "gain": 0.6, "pan": 0.3 },
@@ -43,6 +36,5 @@
   { "shot": "scare", "at": 0, "file": "assets/sfx/scare_bang.mp3", "gain": 1.0, "pan": 0 },
   { "shot": "scare", "at": 0, "file": "assets/sfx/violin_stab.mp3", "gain": 1.0, "pan": 0 },
   { "shot": "scare", "at": 0.05, "file": "assets/sfx/scare_synth.mp3", "gain": 0.8, "pan": 0 },
-  { "shot": "tagline", "at": 2.9, "file": "assets/audio/vo/mom/m1_a.mp3", "gain": 0.8, "pan": 0 },
   { "shot": "warning", "at": 1.5, "file": "assets/sfx/ceiling_thump.mp3", "gain": 0.5, "pan": 0 }
 ]

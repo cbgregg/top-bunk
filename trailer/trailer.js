@@ -40,29 +40,15 @@ const ACT1 = [
   { id: 'road', w: 6, fadeIn: 1.6,
     setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); },
     update(c, k) { c.cam.pos = mix3(ROAD.from, ROAD.to, ease.inOut(k)); c.cam.look = ROAD.look; c.cam.fov = 58; } },
-  // the boxes on the walk, Dad at the truck (the family only animates while one of them is on screen)
+  // the boxes on the walk and the truck in the drive, nobody in sight
   { id: 'truck', w: 5,
-    setup(c) { c.g.phase('day'); c.g.person('mom', { x: 1.64, z: 2.43, yaw: -Math.PI / 2 }); c.g.person('dad', { x: 2.55, z: -13.6, yaw: Math.PI }); },
+    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); },
     update(c, k) { c.cam.pos = mix3([5.2, 0.85, -9.3], [4.7, 0.8, -9.9], ease.inOut(k)); c.cam.look = [3.55, 0.45, -12.6]; c.cam.fov = 46; } },
-  // Dad brings a box up the walk and in at the front door, past you on the stoop
-  { id: 'dad_box', w: 4.5,
-    setup(c) {
-      c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { x: 3.8, z: -10.5, yaw: 0 });
-      c.box = c.W.cardboardBox(0, 0, 0, 0.5, 0.44, 0.5, 2, 0, c.dad.group); c.box.position.set(0, 1.05, 0.315); c.box.castShadow = false;
-      if (c.dad.rig) c.dad.rig.play('walk', { fade: 0.2, speed: 0.85 });
-      c.from = [3.8, -10.5]; c.to = [3.15, -5.2];
-    },
-    update(c, k) {
-      const w = clamp(k * 1.12, 0, 1); c.dad.group.position.set(lerp(c.from[0], c.to[0], w), 0, lerp(c.from[1], c.to[1], w)); c.dad.pose = { hold: c.box, holdW: 0.5 };
-      c.cam.pos = mix3([1.75, 1.22, -5.9], [1.95, 1.2, -5.95], ease.inOut(k)); c.cam.look = [c.dad.group.position.x, 1.35, c.dad.group.position.z + 0.2]; c.cam.fov = 50;
-    },
-    end(c) { if (c.box) { c.box.parent.remove(c.box); c.box = null; } c.dad.pose = null; } },
-  // Mom at the stove; half way in she looks up at you (the game turns them to you once you are near)
+  // the empty kitchen in the sun, the chairs pushed in
   { id: 'kitchen', w: 5,
-    setup(c) { c.g.phase('day'); c.P.pos.set(-5.2, 0, 3.2); c.g.person('mom', { x: 3.21, z: 2.13, yaw: Math.PI / 2, busy: true }); c.g.person('dad', { visible: false }); },
+    setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.P.pos.set(0.9, 0, 0.55); },
     update(c, k) {
-      c.P.pos.set(k > 0.5 ? 0.9 : -8, 0, 0.55); if (k > 0.5) c.mom.busy = false;
-      c.cam.pos = mix3([0.9, EYE_KID, 0.55], [1.0, EYE_KID - 0.02, 0.7], ease.inOut(k)); c.cam.look = [3.21, 1.52, 2.13]; c.cam.fov = lerp(52, 46, ease.inOut(k));
+      c.cam.pos = mix3([0.9, EYE_KID, 0.55], [1.0, EYE_KID - 0.02, 0.7], ease.inOut(k)); c.cam.look = [3.21, 1.2, 2.13]; c.cam.fov = lerp(52, 46, ease.inOut(k));
     } },
   { id: 'bunk', w: 5,
     setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); },
@@ -70,12 +56,11 @@ const ACT1 = [
   { id: 'drawing', w: 4.5,
     setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.W.drawingMat.map = c.W.T.drawing0; c.W.drawingMat.needsUpdate = true; },
     update(c, k) { c.cam.pos = mix3([7.56, 1.18, -0.9], [7.63, 1.1, -0.42], ease.inOut(k)); c.cam.look = [7.63, 1.06, 0.2]; c.cam.fov = lerp(44, 36, ease.inOut(k)); } },
-  // the sun through the curtains of your window, from the top bunk; the one caption of the cut
+  // the sun through the curtains of your window, from the top bunk
   { id: 'curtains', w: 4.5,
     setup(c) { c.g.phase('day'); c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); c.g.sunPatch(14, [8.75, 0.3, 3.28]); c.P.pos.set(8.28, 0, 4); },
     update(c, k) {
       c.cam.pos = mix3([8.55, 1.98, 3.68], [8.7, 1.96, 3.78], ease.inOut(k)); c.cam.look = [11.36, 1.7, 3.83]; c.cam.fov = lerp(50, 46, ease.inOut(k));
-      c.ui.caption('The rent was cheap.', c.ramp(c.st, 0.7, 1.3, c.shot.dur - 0.55, c.shot.dur - 0.15));
     } },
 ];
 // ACT 2, TURN to DROP: the same road at night, one pan through the house while the song is still sweet, then shorter and shorter shots as it warps

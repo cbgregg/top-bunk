@@ -68,9 +68,9 @@ mark re-times the whole cut and nothing overlaps:
 - `DROP` (107 s) is "yes I think to myself": the hard cut to black.
 - `LANDSCAPE_DURATION` (139 s) is the end.
 
-Act 1, up to the turn, is a sunny moving day with the song clean: the house from the road with the truck in the drive, the boxes on the
-walk, Dad carrying one in, Mom at the stove, the bunk, the drawing (the one wrong note), the sun through the curtains with the cut's one
-caption. On the turn it hard-cuts to the same angle at night with the porch light on, then one continuous move in at the front door,
+Act 1, up to the turn, is a sunny moving day with the song clean and nobody in it: the house from the road with the truck in the drive,
+the boxes on the walk, the empty kitchen, the bunk, the drawing (the one wrong note), the sun through the curtains. The cut has no
+dialogue and no captions, and Mom and Dad are never on screen. On the turn it hard-cuts to the same angle at night with the porch light on, then one continuous move in at the front door,
 across the living room past the TV and down the hall toward your door, while the song stays sweet for a bar and then starts to warp. The
 second act is shorter and shorter shots as the song degrades: the TV, the door drifting shut, the thing at the end of the hall taking one
 step, the face at the window, the closet, grandpa turning in his chair, the shadow in the corner of the living room, the washer's lid
