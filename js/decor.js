@@ -21,6 +21,9 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
   };
   mats.satin.envMapIntensity = 0.5; mats.metal.envMapIntensity = 0.5;
   const items = [], clusters = [], pending = [];
+  // drawn before the rooms they stand in: the wall or the floor behind a thing is then never shaded where the thing hides it, and what
+  // the house has about it costs a frame little more than its own pixels
+  const FIRST = -1;
   let cl = null, it = null;
   // a place's worth of small things: one mesh per material. far: a phone stops drawing it this far away (0: always drawn)
   const cluster = (name, x, y, z, { far = 9, parent = house } = {}) => { cl = { name, pos: new THREE.Vector3(x, y, z), far, parent, parts: new Map() }; clusters.push(cl); };
@@ -50,7 +53,8 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
   };
   const M4 = (x, y, z, ry = 0, rx = 0, rz = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ')), new THREE.Vector3(1, 1, 1));
   // a box by its centre on the floor plan and its base: w along x, h up, d along z, turned ry about its middle (rx, rz tip it about its base)
-  const box = (x, y, z, w, h, d, color, o = {}) => { const g = o.round ? new RoundedBoxGeometry(w, h, d, 2, Math.min(o.round, w / 2.01, h / 2.01, d / 2.01)) : new THREE.BoxGeometry(w, h, d); g.translate(0, h / 2, 0); add(g, color, { ...o, m: M4(x, y, z, o.ry || 0, o.rx || 0, o.rz || 0) }); };
+  // (round: its edges eased by that much, in one step for a small thing and on a phone, in two otherwise)
+  const box = (x, y, z, w, h, d, color, o = {}) => { const g = o.round ? new RoundedBoxGeometry(w, h, d, PHONE || Math.max(w, h, d) < 0.3 ? 1 : 2, Math.min(o.round, w / 2.01, h / 2.01, d / 2.01)) : new THREE.BoxGeometry(w, h, d); g.translate(0, h / 2, 0); add(g, color, { ...o, m: M4(x, y, z, o.ry || 0, o.rx || 0, o.rz || 0) }); };
   const cyl = (x, y, z, r, h, color, o = {}) => { const g = new THREE.CylinderGeometry(o.r2 ?? r, r, h, o.seg || 14, 1, !!o.open); g.translate(0, h / 2, 0); add(g, color, { ...o, m: M4(x, y, z, o.ry || 0, o.rx || 0, o.rz || 0) }); };
   // a tube from a to b
   const rod = (a, b, r, color, o = {}) => { const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length(), g = new THREE.CylinderGeometry(r, r, L, o.seg || 8); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); add(g, color, { ...o, m: new THREE.Matrix4().compose(new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), q, new THREE.Vector3(1, 1, 1)) }); };
@@ -138,6 +142,7 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
       holder.updateMatrixWorld(true); const wb = new THREE.Box3().setFromObject(holder, true); rec.box = [wb.min.x, wb.max.x, wb.min.y, wb.max.y, wb.min.z, wb.max.z];
       holder.traverse((o) => { if (o.isMesh && /glass/i.test(o.material.name)) o.visible = false; });   // (a pane with nothing to mirror reads as a black card)
       if (cast !== null) holder.traverse((o) => { if (o.isMesh) o.castShadow = cast; });
+      holder.traverse((o) => { if (o.isMesh && !o.material.transparent) o.renderOrder = FIRST; });
       if (PHONE) {   // a phone: the small ones go from across the house and hold their pictures at 128 px (the rest at 256), and only what stands out in the yard is in the sun's shadow pass
         const small = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z) < 0.6, G = PLACES.garage, sunlit = parent === yard && !(x > G[0] && x < G[1] && z > G[2] && z < G[3]);
         if (small) holder.userData.farCull = 9;
@@ -487,7 +492,7 @@ export function buildDecor({ house, yard, solid, M, PHONE }) {
   for (const c of clusters) {
     if (!c.parts.size) continue;
     const g = new THREE.Group(); g.name = 'decor:' + c.name; g.position.copy(c.pos); if (PHONE && c.far) g.userData.farCull = c.far; c.parent.add(g);
-    for (const [key, list] of c.parts) { const [mat, cast] = key.split('|'); const mesh = new THREE.Mesh(mergeGeometries(list, false), mats[mat]); mesh.castShadow = cast === 'c' && !PHONE; mesh.receiveShadow = true; if (c.parent === house) mesh.userData.decorRoom = roomAt(c.pos.x, c.pos.z, c.pos.y); g.add(mesh); list.forEach((x) => x.dispose()); }
+    for (const [key, list] of c.parts) { const [mat, cast] = key.split('|'); const mesh = new THREE.Mesh(mergeGeometries(list, false), mats[mat]); mesh.castShadow = cast === 'c' && !PHONE; mesh.receiveShadow = true; mesh.renderOrder = FIRST; if (c.parent === house) mesh.userData.decorRoom = roomAt(c.pos.x, c.pos.z, c.pos.y); g.add(mesh); list.forEach((x) => x.dispose()); }
   }
   return { items, ready: Promise.all(pending), mats };
 }
