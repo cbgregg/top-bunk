@@ -2553,6 +2553,46 @@ export function buildWorld(scene) {
     for (const n of nightLights) n.light.getWorldPosition(n.pos);
   }
 
+  // ---------- nothing is drawn in triangles longer than a section ----------
+  // The road, its shoulders and its painted lines are half a kilometre long and a metre or less wide. As two triangles each, one of them
+  // runs from far behind the eye to far ahead of it whichever way the eye is turned, and along the edges of a triangle like that the depth
+  // a rasteriser works out is wrong by more than the house is deep: a dotted hairline of the road's white paint shows across the walls of
+  // a lit room at the height of the eye, and a second one slanting up from it. Cut across into sections, no triangle reaches from behind
+  // the eye to the horizon, and the lines are gone. Returns the geometry in sections, or null where it has nothing that long.
+  const SECTION = 24;
+  function inSections(geo, S = SECTION) {
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    const bb = geo.boundingBox, ax = bb.max.x - bb.min.x >= bb.max.z - bb.min.z ? 0 : 2;
+    if ((ax ? bb.max.z - bb.min.z : bb.max.x - bb.min.x) <= S || geo.morphAttributes.position) return null;
+    const src = geo.index ? geo.toNonIndexed() : geo, names = Object.keys(src.attributes), A = names.map((n) => src.attributes[n]), pi = names.indexOf('position');
+    if (A.some((a) => a.isInterleavedBufferAttribute)) return null;
+    const vert = (i) => A.map((a) => Array.from(a.array.subarray(i * a.itemSize, (i + 1) * a.itemSize)));
+    const mix = (p, q, t) => p.map((v, j) => v.map((x, c) => x + (q[j][c] - x) * t)), same = (p, q) => p[pi].every((x, c) => x === q[pi][c]);
+    const out = [], groups = [], ranges = src.groups.length ? src.groups : [{ start: 0, count: A[pi].count, materialIndex: 0 }];
+    let cuts = 0;
+    for (const r of ranges) {
+      const start = out.length;
+      for (let i = r.start; i < r.start + r.count; i += 3) {
+        const stack = [[vert(i), vert(i + 1), vert(i + 2)]];
+        while (stack.length) {
+          const t = stack.pop(), c = t.map((v) => v[pi][ax]), lo = Math.min(...c), hi = Math.max(...c);
+          if (hi - lo <= S) { out.push(...t); continue; }
+          let at = Math.round((lo + hi) / 2 / S) * S; if (!(at > lo + 1e-3 && at < hi - 1e-3)) at = (lo + hi) / 2;   // (on the same lines for every triangle, so neighbours are cut at the same points)
+          const side = c.map((x) => x < at), k = side[0] !== side[1] && side[0] !== side[2] ? 0 : side[1] !== side[2] && side[1] !== side[0] ? 1 : 2;
+          const a = t[k], b = t[(k + 1) % 3], d = t[(k + 2) % 3], pa = a[pi][ax], p = mix(a, b, (at - pa) / (b[pi][ax] - pa)), q = mix(a, d, (at - pa) / (d[pi][ax] - pa));
+          stack.push([a, p, q]); if (!same(p, b)) stack.push([p, b, d]); if (!same(q, d)) stack.push([p, d, q]); cuts++;
+        }
+      }
+      groups.push({ start, count: out.length - start, materialIndex: r.materialIndex });
+    }
+    if (!cuts) return null;
+    const ng = new THREE.BufferGeometry();
+    names.forEach((n, j) => { const a = A[j], arr = new a.array.constructor(out.length * a.itemSize); out.forEach((v, i) => arr.set(v[j], i * a.itemSize)); ng.setAttribute(n, new THREE.BufferAttribute(arr, a.itemSize, a.normalized)); });
+    if (src.groups.length) for (const g of groups) ng.addGroup(g.start, g.count, g.materialIndex);
+    Object.assign(ng.userData, geo.userData); ng.computeBoundingBox(); ng.computeBoundingSphere();
+    return ng;
+  }
+
   // ---------- merge the static geometry: hundreds of little boxes become a few dozen meshes (one per material and 6 m cell) ----------
   {
     const mergeable = new Set(Object.values(M).filter((m) => !m.transparent && m !== M.lamp));
@@ -2565,7 +2605,8 @@ export function buildWorld(scene) {
         if (!mats.every((x) => mergeable.has(x))) continue;
         m.updateMatrix();
         let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
-        g.applyMatrix4(m.matrix);
+        g.applyMatrix4(m.matrix); g.boundingBox = null;
+        { const cut = root === yard && inSections(g); if (cut) { g.dispose(); g = cut; } }
         for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
         if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
         g.computeBoundingBox(); g.boundingBox.getCenter(v);
@@ -2589,6 +2630,11 @@ export function buildWorld(scene) {
       }
     };
     mergeInto(house); mergeInto(yard);
+    // and what was not merged (the road's own strips, the ditch, the wires), where it lies as it was built
+    yard.traverse((m) => {
+      if (!m.isMesh || m.isInstancedMesh || m.isSkinnedMesh || m.geometry.attributes.position.count > 600 || m.scale.x !== 1 || m.scale.y !== 1 || m.scale.z !== 1 || m.rotation.x || m.rotation.z) return;
+      const cut = inSections(m.geometry); if (cut) { m.geometry.dispose(); m.geometry = cut; }
+    });
     // a phone also merges each door's leaf and frame into a mesh per material: the panels, casings, hinges and knobs were two hundred draws
     if (PHONE) for (const k in doors) { const d = doors[k]; if (d.g) mergeInto(d.g); if (d.fr) mergeInto(d.fr); }
   }
