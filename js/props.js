@@ -35,8 +35,14 @@ function prepare(g, name) {
   if (PHONE) { const s = new THREE.Vector3(); g.box.getSize(s); const big = Math.max(s.x, s.z) > 1.2 || s.y > 1.5; g.scene.traverse((o) => { if (o.isMesh) o.castShadow = big; }); }
   return g;
 }
+// at most eight models are on the wire at once (a hundred and ten asked for together can leave a browser short of sockets or of memory
+// and some of them come back failed), and one that does fail is asked for a second time before its stand-in is kept
+let flying = 0; const waiting = [];
+const slot = () => new Promise((go) => { if (flying < 8) { flying++; go(); } else waiting.push(go); });
+const land = () => { const next = waiting.shift(); if (next) next(); else flying--; };
+const fetchProp = (name) => slot().then(() => new Promise((res, rej) => loader.load(`assets/props/${name}.glb`, res, undefined, rej))).then((g) => { land(); return g; }, (e) => { land(); throw e; });
 export const loadProp = (name) => {
-  if (!cache.has(name)) cache.set(name, new Promise((res, rej) => loader.load(`assets/props/${name}.glb`, res, undefined, rej)).then((g) => prepare(g, name)));
+  if (!cache.has(name)) cache.set(name, fetchProp(name).catch(() => fetchProp(name)).then((g) => prepare(g, name)));
   return cache.get(name);
 };
 
