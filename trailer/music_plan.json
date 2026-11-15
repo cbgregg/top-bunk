@@ -1,94 +1,18 @@
 {
   "_comment": "How the song is laid under each cut. Times are seconds in the trailer (out) and in the song (src). rate < 1 slows the record and drops its pitch (asetrate), lp / hp are a low-pass / high-pass in Hz, vib is tape wow depth (0..1), mono folds it to one channel, room is a small room around it (wet, 0..1), gain is linear. mute windows silence the whole mix (the hard cut before the scare); muteFloor (dBFS) leaves the tape's own hiss under them at that level instead of digital silence. duck lowers the song to gain under every voice line (a cue from assets/audio/vo), ramping over ramp seconds, so a line reads over it; the landscape cut has no voice lines, so there it does nothing. Times may be numbers or strings in the landscape cut's marks (TURN, DROP, DURATION, ACT2 = DROP-TURN; trailer.js) so the plan moves with them.",
   "landscape": {
-    "_comment": "Clean to the turn and a bar past it (the house at night from the lawn starts on the sweet song), then warped harder with every band of the second act, out at the drop, back faint under the cards.",
+    "_comment": "The song plays straight from the first frame to the last, at its own speed and pitch, with nothing done to it. The only break is the hard cut to silence at the drop, before the face.",
     "segments": [
       {
         "out": [
           0,
-          "TURN"
+          "DURATION"
         ],
         "src": 0,
         "rate": 1,
         "gain": 1,
-        "fadeIn": 0.02
-      },
-      {
-        "out": [
-          "TURN",
-          "TURN+2.5"
-        ],
-        "src": "TURN",
-        "rate": 1,
-        "gain": 1
-      },
-      {
-        "out": [
-          "TURN+2.5",
-          "TURN+0.19*ACT2"
-        ],
-        "src": "TURN+2.5",
-        "rate": 1,
-        "lp": 6000,
-        "vib": 0.08,
-        "gain": 1
-      },
-      {
-        "out": [
-          "TURN+0.19*ACT2",
-          "TURN+0.4*ACT2"
-        ],
-        "src": "TURN+0.19*ACT2",
-        "rate": 0.97,
-        "lp": 2800,
-        "vib": 0.15,
-        "gain": 0.95
-      },
-      {
-        "out": [
-          "TURN+0.4*ACT2",
-          "TURN+0.63*ACT2"
-        ],
-        "src": "TURN+0.4*ACT2",
-        "rate": 0.93,
-        "lp": 1500,
-        "vib": 0.25,
-        "gain": 0.9
-      },
-      {
-        "out": [
-          "TURN+0.63*ACT2",
-          "TURN+0.855*ACT2"
-        ],
-        "src": "TURN+0.63*ACT2",
-        "rate": 0.86,
-        "lp": 800,
-        "vib": 0.35,
-        "gain": 0.85
-      },
-      {
-        "out": [
-          "TURN+0.855*ACT2",
-          "DROP"
-        ],
-        "src": "TURN+0.855*ACT2",
-        "rate": 0.8,
-        "lp": 500,
-        "vib": 0.4,
-        "gain": 0.8
-      },
-      {
-        "out": [
-          "DROP+2",
-          "DURATION"
-        ],
-        "src": "DROP+2",
-        "rate": 1,
-        "lp": 500,
-        "vib": 0.1,
-        "gain": 0.16,
-        "fadeIn": 1.5,
-        "fadeOut": 9
+        "fadeIn": 0.02,
+        "fadeOut": 3
       }
     ],
     "mute": [

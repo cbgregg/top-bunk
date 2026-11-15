@@ -14,6 +14,7 @@
 //   --ss N              pixels drawn per output pixel, each way (default 2 for the full-size presets with --gpu, else off)
 //   --contact           capture only the middle frame of every shot (a fast check of the shot list; no video is encoded)
 //   --every N           capture every Nth frame   --range A-B   capture frames A..B only   --resume   skip frames whose PNG already exists
+//   --marks D,T,X       the cut's length, turn and drop in seconds, for a recording timed differently (e.g. --marks 112,34.69,87.83)
 //   --no-audio          video only   --no-warp   lay the song under straight (no low-pass, no slowing)   --letterbox   2.39:1 bars (landscape)
 //   --bio               the portrait end card says "link in bio"   --keep-frames   do not delete the PNGs   --gpu   use the machine's GPU (needs one)
 //   --frames jpg        write quality-95 JPEG frames instead of PNG (about a quarter of the disk; use it for the full-resolution presets)
@@ -227,7 +228,7 @@ async function main() {
   };
   await page.addInitScript(INIT);
   const t0 = Date.now();
-  await page.goto(`http://127.0.0.1:${port}/index.html#shot`, { waitUntil: 'load', timeout: 180000 });   // #shot: the game keeps its drawing buffer, so a screenshot never catches a cleared canvas
+  await page.goto(`http://127.0.0.1:${port}/index.html${opt('--marks') ? '?marks=' + opt('--marks') : ''}#shot`, { waitUntil: 'load', timeout: 180000 });   // #shot: the game keeps its drawing buffer, so a screenshot never catches a cleared canvas
   await page.waitForFunction(() => window.__game && window.__game.E, null, { polling: 200, timeout: 180000 });
   await page.waitForLoadState('networkidle', { timeout: 180000 });
   await page.waitForFunction(() => window.__game.E.rig && window.__game.mom.rig && window.__game.dad.rig, null, { polling: 200, timeout: 180000 });

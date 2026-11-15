@@ -6,15 +6,18 @@ import * as THREE from 'three';
 import { V3, EYE_KID, BATH_I, clamp, lerp, ease, mix3, xyz, aim, lerpAngle, wobble, rng, path, makeOverlays, gameHelpers, plainTv } from './lib.js';
 import { PORTRAIT_SHOTS, PORTRAIT_DURATION } from './shots_portrait.js';
 
-export const LANDSCAPE_DURATION = 139;   // 2:19, the length of the recording the cut is timed to
+// ?marks=DURATION,TURN,DROP in the page's address (render.js --marks) re-times the cut to another recording without editing this file
+const MARKS = ((typeof location !== 'undefined' && new URLSearchParams(location.search).get('marks')) || '').split(',').map(Number);
+const mark = (i, d) => (MARKS[i] > 0 ? MARKS[i] : d);
+export const LANDSCAPE_DURATION = mark(0, 139);   // 2:19, the length of the recording the cut is timed to
 // The three marks the landscape cut hangs on, in seconds of the recording. Everything else is a fraction of the act between two marks,
 // so moving a mark re-times the whole cut and nothing overlaps.
 //   TURN  the first beat of the song's bridge: the day ends on it. In the recording this cut is made for, the song goes from the end of
 //         its first verse straight into the bridge, so it lands near 0:34. The common single has a second verse first and its bridge
 //         nearer 56.5. Nudge it to the recording.
 //   DROP  the start of the last line before the final refrain: the hard cut to black and silence, then the face.
-export const TURN = 34.5;
-export const DROP = 107;
+export const TURN = mark(1, 34.5);
+export const DROP = mark(2, 107);
 // The cut is laid out in beats. Forty of them fill the day (BEAT = TURN / 40, 0.86 s, a slow ballad's pulse), and eighty-four of nearly
 // the same length fill the night up to the drop, so a shot's `w` is the beats it holds and every cut before the drop lands on one.
 export const BEAT = TURN / 40;
@@ -224,7 +227,7 @@ const ACT2 = [
   { id: 'barn', w: 3, shutter: 2,
     setup(c) { night(c, { nl: 0 }); torch(c, { i: 20, sprint: true }); c.P.pos.set(-50, 0, -11.4); },
     update(c, k) {
-      const st = c.st, d = c.W.barn.door, lamp = c.W.barn.lamp; c.g.air({ fog: 0.014, moon: 1.3, sky: 1.0 });
+      const st = c.st, d = c.W.barn.door, lamp = c.W.barn.lamp; c.g.air({ fog: 0.012, moon: 2.4, sky: 1.7 });
       d.a = ease.inOut(clamp((st - 0.2) / 1.5, 0, 1)); d.apply(); lamp.set(st > 1.0 && (st > 1.5 || stutter(st, 29)));
       c.cam.pos = mix3([-50.5, 1.2 + Math.sin(st * 9) * 0.03, -11.2], [-54.2, 1.2 + Math.sin(st * 9) * 0.03, -11.7], k); c.cam.look = [-59.1, 1.25, -12.4]; c.cam.fov = lerp(60, 54, k); c.cam.roll = Math.sin(st * 4.5) * 0.012; c.cam.sway = 0.5; c.g.fear(0.5);
     },
@@ -238,12 +241,13 @@ const ACT2 = [
     } },
   // the photographs, in the frame the day showed them in: the flashlight is on one of them when it lets go of the wall, and goes down with it
   { id: 'frame_fall', w: 2,
-    setup(c) { night(c); torch(c, { i: 5 }); c.P.pos.set(8.2, 0, -0.1); c.s.at = new V3(); },
+    setup(c) { night(c); torch(c, { i: 7 }); c.P.pos.set(8.2, 0, -0.1); c.s.at = new V3(); },
     update(c, k) {
       const st = c.st, T0 = B2 * 0.5, fall = clamp((st - T0) / 0.42, 0, 1), b = clamp((st - T0 - 0.42) / 0.2, 0, 1), F = c.W.hallFrame;
       F.pose(fall < 1 ? fall : 1 - 0.035 * Math.sin(Math.PI * b)); F.g.getWorldPosition(c.s.at);
       const down = ease.inOut(clamp((st - T0 - 0.08) / 0.5, 0, 1));
-      frame(c, CAM.photos, 0.2 * k); c.cam.look = [c.s.at.x, lerp(c.s.at.y, Math.max(c.s.at.y, 0.42), down), c.s.at.z]; c.cam.fov = lerp(58, 50, down); c.cam.sway = 0.5;
+      frame(c, CAM.photos, 0.2 * k); c.cam.pos.y -= 0.3 * down; c.cam.look = [c.s.at.x + 0.12 * down, c.s.at.y - 0.12 * down, c.s.at.z + 0.1 * down]; c.cam.fov = lerp(58, 50, down); c.cam.sway = 0.5;   // (down on one knee after it, the beam a little past it so the frame is in its middle)
+      c.g.bulb(0.6 * down, [c.s.at.x + 0.4, 0.8, c.s.at.z + 0.5], 2.4);   // (the flashlight's spill off the wall)
       if (fall >= 1 && b < 0.4) c.g.shake(0.35); c.g.fear(0.4);
     } },
   // your door, shutting by itself on the lit hall
@@ -392,7 +396,7 @@ const ACT2 = [
     } },
   // the night light by your door, and its relay lets go
   { id: 'night_light', w: 1,
-    setup(c) { night(c, { nl: 2.2, roof: 0.2 }); c.g.hands({}); c.g.doorNow('kid', false); c.P.pos.set(10.3, 0, 1.6); },
+    setup(c) { night(c, { nl: 1.1, roof: 0.3 }); c.g.hands({}); c.g.doorNow('kid', false); c.P.pos.set(10.3, 0, 1.6); },
     update(c, k) {
       const n = c.W.nightLights[3], st = c.st; n.dead = st > 0.5 || (st > 0.32 && st < 0.4);
       c.cam.pos = mix3([10.25, 0.62, 1.75], [10.4, 0.55, 1.5], k); c.cam.look = [n.pos.x, n.pos.y + 0.05, n.pos.z]; c.cam.fov = 44; c.cam.sway = 0.7; c.g.fear(0.8);
