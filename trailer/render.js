@@ -59,8 +59,10 @@ const INIT = `(() => {
 })();`;
 
 function ensureMusic(file) {
-  if (fs.existsSync(file) && fs.existsSync(path.join(__dirname, 'music', 'shutter.wav'))) return file;   // the last file gen_music.js writes
-  log('no placeholder music yet: generating it (trailer/gen_music.js)');
+  // (the last file gen_music.js writes; and written again when the generator has changed since, so no old sound outlives its recipe)
+  const last = path.join(__dirname, 'music', 'shutter.wav'), gen = path.join(__dirname, 'gen_music.js');
+  if (fs.existsSync(file) && fs.existsSync(last) && fs.statSync(last).mtimeMs >= fs.statSync(gen).mtimeMs) return file;
+  log('generating the placeholder music and the small sounds (trailer/gen_music.js)');
   execFileSync(process.execPath, [path.join(__dirname, 'gen_music.js')], { stdio: 'inherit' });
   return file;
 }
@@ -207,20 +209,19 @@ async function main() {
   const browser = await chromium.launch({ headless: !has('--headed'), args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--autoplay-policy=no-user-gesture-required'] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const pageLog = fs.createWriteStream(path.join(scratch, 'page.log'));
-  // what went wrong in the page: an error, a model that kept its stand-in, a file that did not load (and did not load when it was asked
-  // for again: the game asks twice for a model). A render with any of these has pictures missing from its walls, so it says so at the
-  // end and exits 1
-  const faults = [], lost = new Map(), fault = (line) => { faults.push(line); log('page:', line.slice(0, 300)); };
+  // what went wrong in the page: an error, or a model that kept its stand-in (the game says so itself: "prop failed"). A render with
+  // either has something missing from its picture, so it says so at the end and exits 1. What the network did is only written down:
+  // Chromium reports a request as aborted after it has answered 200, and the game asks a second time for a model that did not come
+  const faults = [], fault = (line) => { faults.push(line); log('page:', line.slice(0, 300)); };
   page.on('console', (m) => {
     const line = `[${m.type()}] ${m.text()}`; pageLog.write(line + '\n');
-    if (/^\[error\] Failed to load resource/.test(line)) return;   // (counted below, by its address, if it never does load)
+    if (/^\[error\] Failed to load resource/.test(line)) return;   // (the network's: a file the picture needs and has not got is the game's to report)
     if (m.type() === 'error' || /prop failed/.test(line)) fault(line);
   });
   page.on('pageerror', (e) => { pageLog.write('[pageerror] ' + e.stack + '\n'); fault('[pageerror] ' + e.message); });
-  page.on('requestfailed', (r) => { const why = r.failure() ? r.failure().errorText : 'failed'; pageLog.write(`[requestfailed] ${r.url()} ${why}\n`); lost.set(r.url(), why); });
-  page.on('response', (r) => { if (r.status() >= 400) { pageLog.write(`[http ${r.status()}] ${r.url()}\n`); lost.set(r.url(), 'HTTP ' + r.status()); } else lost.delete(r.url()); });
+  page.on('requestfailed', (r) => { pageLog.write(`[requestfailed] ${r.url()} ${r.failure() ? r.failure().errorText : 'failed'}\n`); });
+  page.on('response', (r) => { if (r.status() >= 400) pageLog.write(`[http ${r.status()}] ${r.url()}\n`); });
   const verdict = () => {
-    for (const [url, why] of lost) faults.push(`[not loaded] ${url} ${why}`);
     if (!faults.length) return;
     log(`THE PAGE REPORTED ${faults.length} FAULT(S): THIS RENDER IS NOT TO BE USED (see ${path.join(scratch, 'page.log')})`); for (const f of faults.slice(0, 12)) log('  ' + f.slice(0, 200)); process.exitCode = 1;
   };
@@ -286,5 +287,5 @@ async function main() {
   log('done:', path.relative(ROOT, outFile), fs.existsSync(teaser) ? 'and ' + path.relative(ROOT, teaser) : '');
   verdict();
 }
-module.exports = { buildMix, duckExpr, PRESETS, serve, INIT };
+module.exports = { buildMix, duckExpr, resolveTimes, PRESETS, serve, INIT };
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });

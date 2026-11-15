@@ -220,12 +220,19 @@ function thump(f0, f1, dur, gain) {   // a heavy footfall: a pitch-dropping sine
   const nz = onePoleLP(noise(n), 420); for (let i = 0; i < n; i++) out[i] += nz[i] * Math.exp(-i / n * 14) * gain * 0.9;
   return out;
 }
+// a dry click or tick (a sole, a bolt, a switch, cooling glass): a few milliseconds of noise in one band, dying away. Nothing in it has a
+// pitch, and nothing in it glides: a tone that falls or rises in a few milliseconds is a toy ray gun, whatever it was meant to be
+function tick(f, dur, gain, q = 1.2) {
+  const n = Math.ceil(dur * SR), s = biquadBP(noise(n), f, q);
+  for (let i = 0; i < n; i++) s[i] *= Math.exp(-i / n * 7) * gain * 2;
+  return s;
+}
 function steps(count, gap, heavy) {
   const b = new Buf(count * gap + 2);
   for (let i = 0; i < count; i++) {
     const t = i * gap + (R() - 0.5) * 0.04, g = heavy ? 0.9 : 0.55;
     b.add(room(thump(heavy ? 72 : 95, heavy ? 28 : 45, heavy ? 0.32 : 0.16, g), 0.22, heavy ? 1.3 : 0.8), t, 1, Math.sin(i * 1.3) * 0.5);
-    if (!heavy) b.add(onePoleHP(thump(2600, 1200, 0.025, 0.3), 1500), t + 0.055, 1, 0);   // the toe after the heel
+    if (!heavy) b.add(tick(1900, 0.025, 0.3), t + 0.055, 1, 0);   // the toe after the heel
   }
   return normalize(b.L, b.R, 0.8);
 }
@@ -255,7 +262,7 @@ function heartbeat(sec, period) {   // lub-dub, fast: a scared kid's, felt more 
 function latch() {   // a door pulled shut close by: the leaf hitting the stop, the bolt clicking into the strike
   const b = new Buf(1.5);
   b.add(room(thump(110, 55, 0.22, 0.9), 0.2, 0.9), 0, 1, 0);
-  b.add(onePoleHP(thump(3200, 1800, 0.018, 0.5), 1400), 0.012, 1, 0); b.add(onePoleHP(thump(2600, 1500, 0.02, 0.35), 1200), 0.06, 1, 0);
+  b.add(tick(2500, 0.018, 0.5), 0.012, 1, 0); b.add(tick(2000, 0.02, 0.35), 0.06, 1, 0);
   return normalize(b.L, b.R, 0.85);
 }
 
@@ -295,23 +302,19 @@ function relay() {   // a night light's relay dropping out: a hard double click 
   b.add(onePoleLP(thump(140, 70, 0.04, 0.5), 600), 0, 1, 0);
   return normalize(b.L, b.R, 0.85);
 }
-function zoomMotor(sec) {   // the camcorder's zoom motor, picked up by its own mic: a thin whine and the gears under it
-  const n = Math.ceil(sec * SR), out = new Float64Array(n), gears = biquadBP(noise(n), 2900, 3);
-  let ph = 0;
+function zoomMotor(sec) {   // the camcorder's zoom motor, picked up by its own mic: the gears, and the mains hum of the motor under them
+  const n = Math.ceil(sec * SR), out = new Float64Array(n), gears = biquadBP(noise(n), 2900, 3), low = biquadBP(noise(n), 1150, 2);
   for (let i = 0; i < n; i++) {
-    const t = i / SR, f = 1150 + 30 * Math.sin(2 * Math.PI * 7 * t); ph += 2 * Math.PI * f / SR;
-    const e = Math.min(1, t / 0.03, (sec - t) / 0.03);
-    out[i] = (Math.sin(ph) * 0.35 + Math.sin(2 * ph) * 0.2 + Math.sin(3 * ph) * 0.08 + gears[i] * 0.9 * (0.6 + 0.4 * Math.sin(2 * Math.PI * 58 * t))) * e;
+    const t = i / SR, e = Math.min(1, t / 0.03, (sec - t) / 0.03);
+    out[i] = (low[i] * 0.5 + gears[i] * 0.9) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 58 * t)) * e;
   }
   return monoNorm(out, 0.6);
 }
-function rewind(sec) {   // the tape winding back: a clunk, a rising whine with hiss on it, a clunk as it stops
-  const n = Math.ceil(sec * SR), out = new Float64Array(n), hiss = onePoleHP(noise(n), 2500);
-  let ph = 0;
+function rewind(sec) {   // the tape winding back: a clunk, the reels' hiss fluttering, a clunk as it stops
+  const n = Math.ceil(sec * SR), out = new Float64Array(n), hiss = onePoleHP(noise(n), 2500), reel = biquadBP(noise(n), 1400, 1.5);
   for (let i = 0; i < n; i++) {
-    const k = i / n, f = 500 * Math.pow(5, Math.min(1, k * 1.3)); ph += 2 * Math.PI * f / SR;
-    const saw = (ph / (2 * Math.PI)) % 1 * 2 - 1, e = Math.min(1, k / 0.06, (1 - k) / 0.05);
-    out[i] = (saw * 0.22 + Math.sin(ph * 0.5) * 0.15 + hiss[i] * 0.25) * e;
+    const k = i / n, t = i / SR, e = Math.min(1, k / 0.06, (1 - k) / 0.05);
+    out[i] = (hiss[i] * 0.3 + reel[i] * 0.5) * (0.65 + 0.35 * Math.sin(2 * Math.PI * 31 * t)) * e;
   }
   const lp = onePoleLP(out, 6000), b = new Buf(sec + 0.3); b.add(lp, 0, 1, 0);
   b.add(onePoleLP(thump(160, 60, 0.07, 0.8), 1500), 0, 1, 0); b.add(onePoleLP(thump(180, 70, 0.06, 0.6), 1500), sec - 0.05, 1, 0);
@@ -349,7 +352,7 @@ function syncedSteps(sec, period, seed) {
   const b = new Buf(sec + 1); let t = 0, k = 0;
   while (t < sec) {
     b.add(room(thump(100, 48, 0.15, 0.6), 0.18, 0.8), t, 1, k % 2 ? 0.15 : -0.15);
-    b.add(onePoleHP(thump(2400, 1100, 0.03, 0.35), 1300), t + 0.012, 1, 0);   // the sole slapping the boards: what a phone speaker plays
+    b.add(tick(1700, 0.03, 0.35), t + 0.012, 1, 0);   // the sole slapping the boards: what a phone speaker plays
     const n = Math.round(0.05 * SR), sl = biquadBP(noise(n), 1900, 1.4); for (let i = 0; i < n; i++) sl[i] *= Math.exp(-i / n * 6) * 0.35; b.add(sl, t, 1, 0);
     t += period * (0.85 + shash(k * 3.7 + seed) * 0.3); k++;
   }
@@ -360,7 +363,7 @@ function closingSteps(sec) {   // something much heavier behind you, faster than
   while (t < sec) {
     const g = 0.35 + 0.65 * (t / sec);
     b.add(room(thump(70, 30, 0.26, 0.9), 0.25, 1.2), t, g, 0.1);
-    b.add(onePoleHP(thump(700, 300, 0.05, 0.4), 350), t + 0.008, g, 0.1);   // the knock in the boards
+    b.add(tick(480, 0.05, 0.4, 0.9), t + 0.008, g, 0.1);   // the knock in the boards
     t += 0.3 - 0.1 * (t / sec) + (R() - 0.5) * 0.03;
   }
   return normalize(b.L, b.R, 0.8);
@@ -375,13 +378,10 @@ function heartTicks(sec, period) {   // under the covers with the heartbeat: the
   }
   return normalize(b.L, b.R, 0.6);
 }
-function crtOff() {   // the set switching off: the relay thunk, the picture collapsing with a falling whine, the glass ticking as it cools
+function crtOff() {   // the set switching off: the soft thunk of its relay, and the glass ticking twice as it cools
   const b = new Buf(1.0);
-  b.add(onePoleLP(thump(90, 40, 0.12, 0.9), 900), 0, 1, 0);
-  const n = Math.round(0.2 * SR), w = new Float64Array(n); let ph = 0;
-  for (let i = 0; i < n; i++) { const k = i / n; ph += 2 * Math.PI * (3200 * Math.pow(0.06, k)) / SR; w[i] = Math.sin(ph) * (1 - k) * 0.4; }
-  b.add(w, 0.01, 1, 0);
-  for (let i = 0; i < 4; i++) b.add(onePoleHP(thump(4000, 2000, 0.006, 0.25), 2000), 0.25 + i * 0.13 + R() * 0.05, 1, (R() - 0.5) * 0.6);
+  b.add(onePoleLP(thump(90, 40, 0.12, 0.9), 700), 0, 1, 0);
+  for (let i = 0; i < 2; i++) b.add(tick(3000, 0.006, 0.12), 0.25 + i * 0.2 + R() * 0.05, 1, (R() - 0.5) * 0.6);
   return normalize(b.L, b.R, 0.8);
 }
 function camImpact() {   // a camcorder hitting the floor: the body's thud, the plastic clatter, a rattle settling
@@ -411,12 +411,11 @@ function phoneRing(sec) {   // a wall telephone's bell in the next room: two gon
   }
   return normalize(out, Float64Array.from(out), 0.7);
 }
-function shutter() {   // a disposable camera: the shutter's snap, the flash going off, and its capacitor whining back up
-  const n = Math.ceil(0.9 * SR), out = new Float64Array(n);
+function shutter() {   // a disposable camera: the shutter's snap, and the short dry pop of the flash tube
+  const n = Math.ceil(0.3 * SR), out = new Float64Array(n), pop = onePoleLP(noise(n), 2400), snap = biquadBP(noise(n), 2600, 0.8);
   for (let i = 0; i < n; i++) {
-    const t = i / SR, snap = (Math.sin(2 * Math.PI * 2100 * t) * 0.5 + Math.sin(2 * Math.PI * 3900 * t + 1) * 0.35) * Math.exp(-t * 190) + (t > 0.018 ? Math.sin(2 * Math.PI * 1500 * (t - 0.018)) * 0.4 * Math.exp(-(t - 0.018) * 240) : 0);
-    const pop = Math.sin(2 * Math.PI * 180 * t) * Math.exp(-t * 60) * 0.5, f = 2600 + 5200 * (1 - Math.exp(-t * 3.2)), whine = t > 0.06 ? Math.sin(2 * Math.PI * (2600 * t + 5200 * (t + Math.exp(-t * 3.2) / 3.2))) * 0.05 * Math.min(1, (t - 0.06) / 0.1) * Math.min(1, (0.9 - t) / 0.2) * (f > 0 ? 1 : 0) : 0;
-    out[i] = snap + pop + whine;
+    const t = i / SR, t2 = t - 0.018;
+    out[i] = snap[i] * 1.6 * Math.exp(-t * 190) + (t2 > 0 ? snap[i] * 1.1 * Math.exp(-t2 * 240) : 0) + pop[i] * 0.9 * Math.exp(-t * 55) + Math.sin(2 * Math.PI * 180 * t) * Math.exp(-t * 60) * 0.4;
   }
   return normalize(out, Float64Array.from(out), 0.8);
 }
