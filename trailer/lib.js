@@ -356,6 +356,7 @@ export function gameHelpers(game) {
   const quilt0 = topQuilt ? Float32Array.from(topQuilt.geometry.attributes.position.array) : null;
   const steadied = new Set();
   let quiltMoved = false, drawing2 = null, hudOn = false, air0 = null;
+  let wet = false, swept = false;
   const nl0 = W.nightLights.map((n) => n.base);
   const flash0 = flash ? { angle: flash.angle, penumbra: flash.penumbra } : null, porch0 = { d: W.porchLight.distance, i: W.porchLight.intensity, e: W.porchBulb.material.emissiveIntensity };
   // what a shot may borrow and must give back: the hall spot (the day shot uses it as sun through the window), the eyes' glow, the smile
@@ -366,7 +367,7 @@ export function gameHelpers(game) {
     reset() {
       F.cutscene = true; P.mode = 'cine'; F.dead = false; F.chase = false; F.flicker = false; F.fear = 0; F.breathCheck = false; F.scare = false;
       if (vigilOn) H.vigil(false);
-      F.blackout = false; W.nightLights.forEach((n, i) => { n.base = nl0[i]; });
+      F.blackout = false; W.nightLights.forEach((n, i) => { n.base = nl0[i]; n.dead = false; });
       if (air0) { if (scene.fog === air0.obj) scene.fog.density = air0.fog; W.sun.intensity = air0.moon; W.hemi.intensity = air0.sky; air0 = null; }
       stage.v = null; hands.lowerCamera(); if (bulb) { bulb.intensity = 0; bulb.distance = 7; }
       if (flash) { flash.angle = flash0.angle; flash.penumbra = flash0.penumbra; }
@@ -383,6 +384,10 @@ export function gameHelpers(game) {
       E.visible = false; E.mode = 'idle'; E.lean = 0; E.reach = 0; E.tilt = 0; E.smileScale = 1; E.speed = 1; E.lookTarget = camera.position; E.root.scale.setScalar(1);
       UI.blanket(false); UI.pod(null); W.tvFx.set(false); W.tvFx.figure = 0; W.mirrorFx.hide(); W.phone.setRinging(false);
       if (W.hallFrame) W.hallFrame.reset();
+      W.drawingMat.color.setScalar(1);
+      if (wet) { wet = false; game.weather.lock('clear'); game.weather.jump(); game.weather.unlock(); }
+      if (swept) { swept = false; WF.stop(); }
+      if (game.weather.bolt) game.weather.bolt.intensity = 0;
       WF.t = -1; WF.root.visible = false; W.faceLight.intensity = 0;
       H.flashlight(false); W.bathSpot.intensity = 0;
       W.setDoor('kid', true, true); W.setDoor('bath', true, true); W.setDoor('parents', false, true); W.setDoor('room2', false, true);
@@ -406,7 +411,7 @@ export function gameHelpers(game) {
       if (o.lights !== undefined) game.nlMult(o.lights, false);
       // nl: how much light the plug-in night lights throw (the game sets their level every frame, so it is their own strength that is
       // turned down, and the little lamps themselves glow as they did)
-      W.nightLights.forEach((n, i) => { n.base = nl0[i] * (o.nl ?? 1); });
+      W.nightLights.forEach((n, i) => { n.base = nl0[i] * (o.nl ?? 1); n.dead = o.nl === 0; });   // (nl 0: the little lamps themselves are out as well)
       game.lights.roof = o.roof ?? 1;   // (how much of the sky the roof keeps out of the rooms: all of its share unless the shot says)
       W.bathSpot.intensity = o.spot || 0; F.flicker = !!o.flicker;
     },
@@ -477,6 +482,14 @@ export function gameHelpers(game) {
     hud(on) { if (!hud || on === hudOn) return; hudOn = on; if (on) { hud.style.setProperty('display', 'block', 'important'); const b = document.getElementById('breath'); if (b) b.style.transition = 'none'; } else { UI.breath(1, false); hud.style.removeProperty('display'); } },
     // the drawing in the hall: 0 as it is by day, 1 as it is at night, 2 with one more of them in it
     drawing(n) { const t = n === 2 ? (drawing2 ||= drawingMore(W.T.drawing1)) : n ? W.T.drawing1 : W.T.drawing0; if (W.drawingMat.map !== t) { W.drawingMat.map = t; W.drawingMat.needsUpdate = true; } },
+    // the sheet of the drawing, darker or as it is (1): white paper under a ceiling light a few feet off burns out
+    paper(k) { W.drawingMat.color.setScalar(k); },
+    // the weather for this shot, at once: 'rain' or 'storm' (weather.js); the next shot has a clear night again
+    rain(kind) { wet = true; game.weather.lock(kind); game.weather.jump(); },
+    // lightning, for this frame (v: 7 is a full flash of the game's own)
+    lightning(v) { if (game.weather.bolt) game.weather.bolt.intensity = v; },
+    // the car on the road and its headlights through the windows (windowface.js): k is how far along its pass it is, 0..1
+    carSweep(k) { swept = true; WF.ct = clamp(k, 0, 0.999); WF.car.shadow.autoUpdate = true; },
     // something under the top bunk's comforter: {x, z, h, rx, rz} a rise of h metres round (x, z) in the bunk's own frame; null lays it flat again
     lump(o) {
       if (!topQuilt || (!o && !quiltMoved)) return;

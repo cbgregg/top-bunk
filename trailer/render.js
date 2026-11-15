@@ -207,8 +207,23 @@ async function main() {
   const browser = await chromium.launch({ headless: !has('--headed'), args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--autoplay-policy=no-user-gesture-required'] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const pageLog = fs.createWriteStream(path.join(scratch, 'page.log'));
-  page.on('console', (m) => { const line = `[${m.type()}] ${m.text()}`; pageLog.write(line + '\n'); if (m.type() === 'error') log('page:', line.slice(0, 300)); });
-  page.on('pageerror', (e) => { pageLog.write('[pageerror] ' + e.stack + '\n'); log('page error:', e.message); });
+  // what went wrong in the page: an error, a model that kept its stand-in, a file that did not load (and did not load when it was asked
+  // for again: the game asks twice for a model). A render with any of these has pictures missing from its walls, so it says so at the
+  // end and exits 1
+  const faults = [], lost = new Map(), fault = (line) => { faults.push(line); log('page:', line.slice(0, 300)); };
+  page.on('console', (m) => {
+    const line = `[${m.type()}] ${m.text()}`; pageLog.write(line + '\n');
+    if (/^\[error\] Failed to load resource/.test(line)) return;   // (counted below, by its address, if it never does load)
+    if (m.type() === 'error' || /prop failed/.test(line)) fault(line);
+  });
+  page.on('pageerror', (e) => { pageLog.write('[pageerror] ' + e.stack + '\n'); fault('[pageerror] ' + e.message); });
+  page.on('requestfailed', (r) => { const why = r.failure() ? r.failure().errorText : 'failed'; pageLog.write(`[requestfailed] ${r.url()} ${why}\n`); lost.set(r.url(), why); });
+  page.on('response', (r) => { if (r.status() >= 400) { pageLog.write(`[http ${r.status()}] ${r.url()}\n`); lost.set(r.url(), 'HTTP ' + r.status()); } else lost.delete(r.url()); });
+  const verdict = () => {
+    for (const [url, why] of lost) faults.push(`[not loaded] ${url} ${why}`);
+    if (!faults.length) return;
+    log(`THE PAGE REPORTED ${faults.length} FAULT(S): THIS RENDER IS NOT TO BE USED (see ${path.join(scratch, 'page.log')})`); for (const f of faults.slice(0, 12)) log('  ' + f.slice(0, 200)); process.exitCode = 1;
+  };
   await page.addInitScript(INIT);
   const t0 = Date.now();
   await page.goto(`http://127.0.0.1:${port}/index.html#shot`, { waitUntil: 'load', timeout: 180000 });   // #shot: the game keeps its drawing buffer, so a screenshot never catches a cleared canvas
@@ -251,9 +266,9 @@ async function main() {
     // the contact sheet: every shot's middle frame, named by shot
     const dir = path.join(outDir, preset.name + '-contact'); fs.mkdirSync(dir, { recursive: true });
     for (const s of info.shots) { const n = Math.min(total - 1, Math.floor((s.t + s.dur / 2) * fps)), src = path.join(framesDir, String(n).padStart(6, '0') + '.' + FX); if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, `${String(s.t).padStart(6, '0')}-${s.id}.${FX}`)); }
-    log('contact frames in', path.relative(ROOT, dir)); return;
+    log('contact frames in', path.relative(ROOT, dir)); verdict(); return;
   }
-  if (wanted.size !== total) { log('partial render (frames kept in ' + framesDir + '); no video encoded'); return; }
+  if (wanted.size !== total) { log('partial render (frames kept in ' + framesDir + '); no video encoded'); verdict(); return; }
   // sound, then picture + sound
   const outFile = path.join(outDir, preset.name + '.mp4');
   let mix = null;
@@ -269,6 +284,7 @@ async function main() {
   spawnSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-ss', String(ts), '-t', '10', '-i', outFile, '-vf', portrait ? 'scale=270:-2' : 'scale=480:-2', '-c:v', 'libx264', '-crf', '24', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', teaser], { stdio: 'inherit' });
   if (!has('--keep-frames')) fs.rmSync(framesDir, { recursive: true, force: true });
   log('done:', path.relative(ROOT, outFile), fs.existsSync(teaser) ? 'and ' + path.relative(ROOT, teaser) : '');
+  verdict();
 }
 module.exports = { buildMix, duckExpr, PRESETS, serve, INIT };
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
