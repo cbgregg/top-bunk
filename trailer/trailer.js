@@ -9,10 +9,10 @@ import { PORTRAIT_SHOTS, PORTRAIT_DURATION } from './shots_portrait.js';
 export const LANDSCAPE_DURATION = 139;   // 2:19, the length of the recording the cut is timed to
 // The three marks the landscape cut hangs on, in seconds of the recording. Everything else is a fraction of the act between two marks,
 // so moving a mark re-times the whole cut and nothing overlaps.
-//   TURN  the first beat of "the colors of the rainbow": the day ends on it. In the recording this cut is made for, the song goes from the
-//         first "what a wonderful world" straight into that bridge, so it lands near 0:34. The common single has a "skies of blue" verse
-//         first and its bridge nearer 56.5. Nudge it to the recording.
-//   DROP  "yes I think to myself": the hard cut to black and silence, then the face.
+//   TURN  the first beat of the song's bridge: the day ends on it. In the recording this cut is made for, the song goes from the end of
+//         its first verse straight into the bridge, so it lands near 0:34. The common single has a second verse first and its bridge
+//         nearer 56.5. Nudge it to the recording.
+//   DROP  the start of the last line before the final refrain: the hard cut to black and silence, then the face.
 export const TURN = 34.5;
 export const DROP = 107;
 // The cut is laid out in beats. Forty of them fill the day (BEAT = TURN / 40, 0.86 s, a slow ballad's pulse), and eighty-four of nearly
@@ -32,16 +32,18 @@ const CAM = {
   road: { from: [14.4, 1.5, -19.7], to: [13.7, 1.55, -18.7], look: [2.9, 2.6, -5.0], fov: 55 },      // the house from the front lawn, the truck in the drive
   living: { from: [0.5, 1.25, -1.1], to: [1.0, 1.2, -1.42], look: [3.4, 1.0, -3.5], fov: 66 },       // the front window, the clock, the door and the television, from across the carpet
   kitchen: { from: [-0.45, 1.3, 0.6], to: [-0.2, 1.28, 0.8], look: [1.6, 0.8, 2.6], fov: 58 },       // the table and its four chairs
-  phone: { from: [-2.3, 1.2, 1.0], to: [-1.8, 1.24, 1.32], look: [-0.78, 1.3, 1.64], fov: 46 },      // the telephone on the dining wall
+  phone: { from: [-2.6, 1.25, 3.5], to: [-2.45, 1.25, 3.0], look: [-0.8, 1.25, 1.3], fov: 56 },      // the telephone and the cork board on the end of the dining wall, the living room past it and the kitchen table beside it
   bunk: { from: [10.95, 1.2, 0.7], to: [10.75, 1.22, 0.95], look: [9.0, 1.62, 3.9], fov: 60 },       // the bunk from inside your door
-  window: { from: [8.5, 1.98, 3.68], to: [8.72, 1.96, 3.78], look: [11.36, 1.7, 3.83], fov: 50 },    // your window, from the top bunk
+  window: { from: [8.5, 1.98, 3.68], to: [9.0, 1.93, 3.78], look: [11.36, 1.68, 3.83], fov: 50, fov2: 44 },   // your window, from the top bunk, and in toward it
   photos: { from: [8.4, 1.25, -0.05], to: [7.85, 1.25, -0.05], look: [6.3, 1.45, -1.1], fov: 58 },   // along the photographs on the hall wall, level
   hall: { from: [8.95, 1.2, -0.75], to: [8.7, 1.2, -0.75], look: [5.0, 1.1, -0.3], fov: 56 },        // down the hall, the drawing on the left
   drawing: { from: [7.56, 1.18, -0.9], to: [7.63, 1.1, -0.5], look: [7.63, 1.06, 0.2], fov: 42 },    // what the last kid left taped to the wall
 };
-const frame = (c, p, k) => { c.cam.pos = mix3(p.from, p.to, ease.inOut(k)); c.cam.look = p.look; c.cam.fov = p.fov; };
+const frame = (c, p, k) => { const e = ease.inOut(k); c.cam.pos = mix3(p.from, p.to, e); c.cam.look = p.look; c.cam.fov = lerp(p.fov, p.fov2 ?? p.fov, e); };
 const alone = (c) => { c.g.person('mom', { visible: false }); c.g.person('dad', { visible: false }); };
-const day = (c) => { c.g.phase('day'); alone(c); c.g.drawing(0); };
+const day = (c, warm = 0) => { c.g.phase('day'); alone(c); c.g.drawing(0); if (warm) c.g.daylight(warm); };
+// the afternoon sun in at a window: the hall's spot, borrowed, outside the glass (so the sash and the curtains are in its patch)
+const sun = (c, from, at, i, angle = 0.36) => c.g.spot({ from, at, color: 0xffd9a0, i, angle, penumbra: 0.4 });
 // (nl: the plug-in night lights. They are green, and a shot has one light and it is not that one: they are out unless a shot asks)
 const night = (c, o = {}) => { c.g.night({ nl: 0, ...o }); alone(c); c.g.drawing(1); };
 // Grandpa's flashlight in the right hand, lit (aim: brought up, the beam narrowed; i: how bright, for a shot close to a pale wall, or the
@@ -82,21 +84,28 @@ const ACT1 = [
   { id: 'boxes', w: 4, setup(c) { day(c); },
     update(c, k) { c.cam.pos = mix3([5.6, 1.0, -9.6], [4.9, 0.95, -10.3], ease.inOut(k)); c.cam.look = [3.0, 0.75, -13.4]; c.cam.fov = 46; } },
   // the living room with the front door standing open and the sun across the carpet: the truck in the window, the clock, the television
-  { id: 'living', w: 3,
-    setup(c) { day(c); c.W.frontDoor.setOpen(true); c.g.spot({ from: [1.2, 2.6, -6.2], at: [1.6, 0, -2.6], color: 0xffd9a0, i: 60, angle: 0.45 }); c.P.pos.set(0.7, 0, -1.2); },
+  { id: 'living', w: 4,
+    setup(c) { day(c, 0.5); c.W.frontDoor.setOpen(true); sun(c, [1.2, 2.6, -6.2], [1.6, 0, -2.6], 90, 0.45); c.P.pos.set(0.7, 0, -1.2); },
     update(c, k) { frame(c, CAM.living, k); } },
-  { id: 'kitchen', w: 4, setup(c) { day(c); c.W.frontDoor.setOpen(false); c.P.pos.set(-0.45, 0, 0.6); }, update(c, k) { frame(c, CAM.kitchen, k); } },
-  { id: 'phone_day', w: 3, setup(c) { day(c); c.P.pos.set(-2.3, 0, 1.0); }, update(c, k) { frame(c, CAM.phone, k); } },
-  { id: 'bunk', w: 4, setup(c) { day(c); c.g.sunPatch(22, [9.4, 0.3, 3.0]); }, update(c, k) { frame(c, CAM.bunk, k); } },
-  { id: 'window', w: 3, setup(c) { day(c); c.g.sunPatch(14, [8.75, 0.3, 3.28]); c.P.pos.set(8.28, 0, 4); }, update(c, k) { frame(c, CAM.window, k); } },
+  // the kitchen table in the sun from the window over the sink
+  { id: 'kitchen', w: 4,
+    setup(c) { day(c, 0.8); c.W.frontDoor.setOpen(false); sun(c, [2.6, 2.5, 7.4], [1.5, 0.3, 2.4], 420, 0.42); c.P.pos.set(-0.45, 0, 0.6); },
+    update(c, k) { frame(c, CAM.kitchen, k); } },
+  // the telephone on the end of the dining wall, the living room and its window past it
+  { id: 'phone_day', w: 2,
+    setup(c) { day(c, 0.7); c.W.frontDoor.setOpen(true); sun(c, [2.6, 2.5, 7.4], [1.5, 0.3, 2.4], 420, 0.42); c.P.pos.set(-2.6, 0, 3.4); },
+    update(c, k) { frame(c, CAM.phone, k); } },
+  { id: 'bunk', w: 4, setup(c) { day(c, 1); sun(c, [13.6, 3.6, 4.3], [9.1, 0.3, 2.8], 520, 0.32); }, update(c, k) { frame(c, CAM.bunk, k); } },
+  { id: 'window', w: 3, setup(c) { day(c, 1); sun(c, [13.4, 3.3, 4.6], [9.6, 1.0, 3.5], 380, 0.3); c.P.pos.set(8.28, 0, 4); }, update(c, k) { frame(c, CAM.window, k); } },
   // along the family's photographs, the hall's light on
-  { id: 'photos', w: 4, setup(c) { day(c); c.g.light('hall', true, true); c.P.pos.set(8.2, 0, -0.1); }, update(c, k) { frame(c, CAM.photos, k); } },
-  { id: 'hall', w: 4, setup(c) { day(c); c.P.pos.set(8.9, 0, -0.75); }, update(c, k) { frame(c, CAM.hall, k); } },
-  { id: 'drawing', w: 4, setup(c) { day(c); c.P.pos.set(7.6, 0, -0.8); }, update(c, k) { frame(c, CAM.drawing, k); } },
+  { id: 'photos', w: 4, setup(c) { day(c, 0.6); c.g.light('hall', true, true); c.P.pos.set(8.2, 0, -0.1); }, update(c, k) { frame(c, CAM.photos, k); } },
+  { id: 'hall', w: 4, setup(c) { day(c, 0.6); c.P.pos.set(8.9, 0, -0.75); }, update(c, k) { frame(c, CAM.hall, k); } },
+  { id: 'drawing', w: 4, setup(c) { day(c, 0.6); c.P.pos.set(7.6, 0, -0.8); }, update(c, k) { frame(c, CAM.drawing, k); } },
 ];
 const SWITCH = [11.24, 1.2, -0.08];   // the plate at your end of the hall
 // ACT 2, TURN to DROP: the same frames in the dark, and what you do about it. The thing itself is in four of these shots and for under
-// a second in each (two eyes in the cold open, two eyes past the end of the hall, the window, the slats): the rest is the house.
+// a second in each (two eyes in the cold open, two eyes past the end of the hall, the face that goes by your window, the slats): the
+// rest is the house.
 // The shots get shorter all the way: fours, threes, twos, a run of single beats, two beats of black and the sprint a beat to a look.
 const CHAIRS_OUT = [[0.18, 2.14, -2.34], [0.53, 1.78, -2.34], [0.88, 1.42, -2.34], [1.23, 1.06, -2.34]];   // the four chairs, out from the table in a row and turned to the door
 const SNAPS = [1, 2, 3], CHAIR_AT = [null, [5.2, -0.42], [7.6, -0.5]];   // the camera shot's three exposures (beats), and where the chair stands in each
@@ -105,21 +114,25 @@ const stutter = (s, hz = 17) => Math.sin(s * hz) + Math.sin(s * hz * 2.7 + 1.3) 
 // the sprint down the hall, a beat to a look and a cut on each: ahead, ahead, back at the lights going out behind you, ahead, and back at
 // the door you came through. The cut comes before there is anything in it. (u: beats since the first of them)
 const SPRINT = 5;
-const sprintSetup = (c) => {
-  night(c, { nl: 0 }); c.g.doorNow('kid', true); torch(c, { i: 16, sprint: true });
+const sprintSetup = (c, i = 0) => {   // (i: which of the five; the doors behind you are shut by the fourth)
+  night(c, { nl: 0 }); c.g.doorNow('kid', true); for (const d of ['room2', 'bath', 'spare']) c.g.doorNow(d, i < 3); torch(c, { i: 16, sprint: true }); c.W.tvFx.base = 14;
   // the route: out of the living room, down the hall, through your door and up to the foot of the bunk
   c.route = path([[3.2, EYE_KID, -0.9], [4.4, EYE_KID, -0.8], [5.4, EYE_KID, -0.7], [6.6, EYE_KID, -0.6], [8.8, EYE_KID, -0.45], [9.55, EYE_KID, 0.15], [9.6, EYE_KID, 1.3], [9.5, EYE_KID, 2.4]]);
 };
+// The hall's light dies on the first beat and the rest is by flashlight. On the look back the living room at the far end is lit, and goes out,
+// and the doors down the hall go shut one after another, toward you
 const sprintAt = (c, u) => {
   const st = u * B2, k = u / SPRINT, look = Math.floor(u), back = look === 2 || look >= 4, rk = lerp(0.06, 1, ease.out(k) * 0.3 + k * 0.7);
-  const p = c.route.at(rk), tg = c.route.tangent(Math.min(1, rk + 0.02)), ahead = Math.atan2(-tg.x, -tg.z), bob = Math.sin(st * 13) * 0.04;
+  const p = c.route.at(rk), tg = c.route.tangent(Math.min(1, rk + 0.02)), ahead = Math.atan2(-tg.x, -tg.z), bob = Math.sin(st * 13) * 0.06;
   c.cam.pos = [p.x, p.y + bob, p.z];
-  c.g.light('living', u <= 2.25, true); c.g.light('hall', u <= 2.6, true);
-  if (!back) { c.cam.yaw = ahead; c.cam.pitch = -0.05 + Math.sin(st * 13) * 0.012; }
-  else { const a = aim(c.cam.pos, look === 2 ? [3.6, 1.15, -0.8] : [9.79, 1.1, 0.3]); c.cam.yaw = a.yaw; c.cam.pitch = a.pitch; }
+  c.g.light('hall', u < 0.55 || (u < 1 && stutter(st, 23)), true);
+  const tv = u < 2.55; if (tv !== c.W.tvFx.on) c.W.tvFx.set(tv); c.g.light('living', u < 2.5, true);
+  if (u > 2.15 && u < 3) c.g.door('room2', false); if (u > 2.4 && u < 3) c.g.door('bath', false); if (u > 2.65 && u < 3) c.g.door('spare', false);
+  if (!back) { c.cam.yaw = ahead; c.cam.pitch = -0.05 + Math.sin(st * 13) * 0.02; }
+  else { const a = aim(c.cam.pos, look === 2 ? [3.6, 1.1, -0.7] : [9.79, 1.1, 0.3]); c.cam.yaw = a.yaw; c.cam.pitch = a.pitch; }
   if (u > 4.2) c.g.door('kid', false);
-  c.g.flashlight(true, back ? (look === 2 ? 0 : 5) : 16);
-  c.cam.roll = Math.sin(st * 6.5) * 0.02; c.cam.fov = back ? 62 : lerp(74, 82, k); c.cam.sway = 0.6; c.g.fear(1); if (u > 4.72) c.black = 1;
+  c.g.flashlight(true, back ? (look === 2 ? 9 : 5) : 16);
+  c.cam.roll = Math.sin(st * 6.5) * 0.03; c.cam.fov = back ? 62 : lerp(74, 82, k); c.cam.sway = 0.6; c.g.fear(1); if (u > 4.72) c.black = 1;
 };
 const ACT2 = [
   // the hard cut: the same lawn at night. The lights of the house go out by themselves, one room and then another, and then the porch lamp
@@ -177,24 +190,15 @@ const ACT2 = [
       if (g > 0) { c.g.bulb(60 * g, [9.5, 1.3, -0.45], 12); c.ui.flash(f < 0.05 ? 0.6 : 0); }
       c.g.fear(0.5);
     } },
-  // a wet night, and a car on the road: its headlights come in at the windows and go round your room
-  { id: 'car_lights', w: 3,
-    setup(c) { night(c, { nl: 0, roof: 0.3 }); c.g.rain('rain'); c.W.frontDoor.setOpen(false); c.P.pos.set(2.6, 0, -3.5); },
-    update(c, k) {
-      // (the game's own beam comes in thin at this angle: the same spot the day borrows for the sun goes round the room with it)
-      const x = lerp(3.4, -2.6, k), on = Math.min(1, k * 6, (1 - k) * 6); c.g.carSweep(lerp(0.36, 0.66, k));
-      c.g.spot({ from: [1.2 - x * 2.2, 1.0, -9], at: [x, 1.25, -0.6], color: 0xdfe8ff, i: 70 * on, angle: 0.3, penumbra: 0.5 });
-      c.cam.pos = mix3([2.7, 1.2, -3.75], [2.45, 1.2, -3.5], k); c.cam.look = [0.4, 1.1, -0.9]; c.cam.fov = 66; c.cam.sway = 0.4; c.g.fear(0.3);
-    } },
   // the power goes: the lights die one after another down the hall, and all there is left is the flashlight
-  { id: 'blackout', w: 3,
+  { id: 'blackout', w: 2,
     setup(c) { night(c, { nl: 0 }); c.g.hands({}); c.g.doorNow('kid', false); c.g.light('living', true, true); c.g.light('hall', true, true); c.P.pos.set(10.6, 0, -0.42); },
     update(c, k) {
       const st = c.st;
-      if (st > 0.3) c.g.light('living', false, true);
-      if (st > 0.6) c.g.light('hall', false, true);
-      if (st > 0.85) c.F.blackout = true;
-      if (st > 1.2 && !c.F.flashOn) torch(c, { i: 18 });
+      if (st > 0.25) c.g.light('living', false, true);
+      if (st > 0.5) c.g.light('hall', false, true);
+      if (st > 0.7) c.F.blackout = true;
+      if (st > 1.15 && !c.F.flashOn) torch(c, { i: 18 });
       c.cam.pos = mix3([10.7, 1.2, -0.42], [10.4, 1.2, -0.45], k); c.cam.look = [4.7, 1.1, -0.42]; c.cam.fov = 52; c.cam.sway = 0.5; c.g.fear(0.5);
     } },
   // out across the yard to the garage, with the flashlight
@@ -216,29 +220,31 @@ const ACT2 = [
       if (st > ON) { c.W.garage.light.set(true); c.W.garage.light.light.intensity = 34; c.g.flashlight(true, 2.5); }   // (the bulb is across the garage from the panel)
       c.cam.pos = mix3([-9.3, 1.32, -8.75], [-9.45, 1.36, -8.25], ease.inOut(k)); c.cam.look = [-9.72, 1.42, -7.1]; c.cam.fov = 54; c.cam.sway = 0.5; c.g.fear(0.4);
     } },
-  // the telephone on the dining wall, ringing in the dark: the flashlight comes round onto it, and your hand goes up
+  // the barn, out across the field: its door is sliding open, and the lamp inside comes on with nobody under it
+  { id: 'barn', w: 3, shutter: 2,
+    setup(c) { night(c, { nl: 0 }); torch(c, { i: 20, sprint: true }); c.P.pos.set(-50, 0, -11.4); },
+    update(c, k) {
+      const st = c.st, d = c.W.barn.door, lamp = c.W.barn.lamp; c.g.air({ fog: 0.014, moon: 1.3, sky: 1.0 });
+      d.a = ease.inOut(clamp((st - 0.2) / 1.5, 0, 1)); d.apply(); lamp.set(st > 1.0 && (st > 1.5 || stutter(st, 29)));
+      c.cam.pos = mix3([-50.5, 1.2 + Math.sin(st * 9) * 0.03, -11.2], [-54.2, 1.2 + Math.sin(st * 9) * 0.03, -11.7], k); c.cam.look = [-59.1, 1.25, -12.4]; c.cam.fov = lerp(60, 54, k); c.cam.roll = Math.sin(st * 4.5) * 0.012; c.cam.sway = 0.5; c.g.fear(0.5);
+    },
+    end(c) { const d = c.W.barn.door; d.a = 0; d.apply(); c.W.barn.lamp.set(false); } },
+  // the telephone on the dining wall, ringing in the dark: the flashlight comes round onto it
   { id: 'phone', w: 2,
-    setup(c) { night(c); torch(c, { i: 2.2 }); c.W.phone.setRinging(true); c.P.pos.set(-2.4, 0, 0.9); c.s.r = false; },
+    setup(c) { night(c); torch(c, { i: 5 }); c.W.frontDoor.setOpen(false); c.W.phone.setRinging(true); c.P.pos.set(-2.6, 0, 3.4); },
     update(c, k) {
-      if (c.st > 1.0 && !c.s.r) { c.s.r = true; c.g.reach([c.W.phone.pos.x, 1.42, c.W.phone.pos.z]); }
-      frame(c, CAM.phone, k); c.cam.look = mix3([-2.6, 1.05, 2.9], CAM.phone.look, ease.out(clamp(c.st / 0.33, 0, 1)));   // (from the dark of the dining end)
-      c.cam.pos = mix3(c.cam.pos, [c.W.phone.pos.x, 1.3, c.W.phone.pos.z], 0.3 * ease.inOut(k)); c.cam.sway = 0.9; c.g.fear(0.4);
+      frame(c, CAM.phone, k); c.cam.look = mix3([-2.2, 1.0, 0.2], [c.W.phone.pos.x, 1.25, c.W.phone.pos.z], ease.out(clamp(c.st / 0.33, 0, 1)));   // (from the dark of the living room)
+      c.cam.pos = mix3(c.cam.pos, [c.W.phone.pos.x, 1.3, c.W.phone.pos.z], 0.35 * ease.inOut(k)); c.cam.fov = lerp(56, 50, k); c.cam.sway = 0.9; c.g.fear(0.4);
     } },
-  // the flashlight down the hall, across the photographs to the far end, and you go after it
-  { id: 'hall_sweep', w: 2,
-    setup(c) { night(c); torch(c, { i: 18 }); c.g.doorNow('kid', false); c.P.pos.set(9.9, 0, -0.42); },
-    update(c, k) {
-      const sweep = ease.inOut(clamp(k / 0.45, 0, 1));
-      c.cam.pos = mix3([10.0, 1.2, -0.42], [8.9, 1.2, -0.34], k); c.cam.look = mix3([8.2, 1.3, -1.1], [5.0, 1.1, -1.0], sweep); c.cam.fov = 54; c.cam.sway = 0.6; c.g.fear(0.5);
-    } },
-  // the photographs, in the frame the day showed them in: one of them lets go of the wall
+  // the photographs, in the frame the day showed them in: the flashlight is on one of them when it lets go of the wall, and goes down with it
   { id: 'frame_fall', w: 2,
-    setup(c) { night(c); torch(c, { i: 4 }); c.P.pos.set(8.0, 0, -0.1); },
+    setup(c) { night(c); torch(c, { i: 5 }); c.P.pos.set(8.2, 0, -0.1); c.s.at = new V3(); },
     update(c, k) {
-      const fall = clamp((c.st - 0.3) / 0.5, 0, 1), W = c.W; if (W.hallFrame) W.hallFrame.pose(fall);
-      const down = ease.inOut(clamp((c.st - 0.5) / 0.45, 0, 1));
-      frame(c, CAM.photos, 0.6 + 0.4 * k); c.cam.look = mix3([6.48, 1.6, -1.1], [6.5, 0.2, -0.85], down); c.cam.sway = 0.5;
-      if (fall > 0.85 && fall < 1) c.g.shake(0.4); c.g.fear(0.4);
+      const st = c.st, T0 = B2 * 0.5, fall = clamp((st - T0) / 0.42, 0, 1), b = clamp((st - T0 - 0.42) / 0.2, 0, 1), F = c.W.hallFrame;
+      F.pose(fall < 1 ? fall : 1 - 0.035 * Math.sin(Math.PI * b)); F.g.getWorldPosition(c.s.at);
+      const down = ease.inOut(clamp((st - T0 - 0.08) / 0.5, 0, 1));
+      frame(c, CAM.photos, 0.2 * k); c.cam.look = [c.s.at.x, lerp(c.s.at.y, Math.max(c.s.at.y, 0.42), down), c.s.at.z]; c.cam.fov = lerp(58, 50, down); c.cam.sway = 0.5;
+      if (fall >= 1 && b < 0.4) c.g.shake(0.35); c.g.fear(0.4);
     } },
   // your door, shutting by itself on the lit hall
   { id: 'door', w: 2,
@@ -248,13 +254,14 @@ const ACT2 = [
       const d = c.W.doors.kid; if (!c.s.shut && d.a <= 0.001 && c.st > 0.8) { c.s.shut = true; c.g.shake(0.6); }
       c.cam.pos = mix3([9.5, 1.2, 2.9], [9.6, 1.18, 2.3], ease.inOut(k)); c.cam.look = [9.79, 1.05, 0.3]; c.cam.fov = 52; c.cam.sway = 0.5; c.g.fear(0.4);
     } },
-  // the same window and the same curtains by the moon, and for the last half second what comes up over the sill outside
+  // the same window and the same curtains by the moon, and in the last half second the face that goes by the windows at night comes past
+  // this one (the game's own: windowface.js)
   { id: 'window_face', w: 2,
-    setup(c) { night(c, { nl: 0.2, roof: 0.5 }); moon(c, 12, [8.9, 1.2, 3.6]); c.P.pos.set(8.28, 0, 4); },
+    setup(c) { night(c, { nl: 0, roof: 0.65 }); moon(c, 34, [9.3, 0.9, 3.7]); c.P.pos.set(8.28, 0, 4); },
     update(c, k) {
-      const u = beats(c), up = ease.out(clamp((u - 1.3) / 0.3, 0, 1)); c.g.air({ fog: 0.012, moon: 1.8, sky: 1.5 });
-      if (u > 1.28) { c.g.thing({ x: 11.95, z: 3.78, face: [8.5, 3.7], tilt: 0.45, smile: 1.15 }); c.E.root.position.y = lerp(-1.75, -0.86, up); } else c.E.visible = false;
-      frame(c, CAM.window, k); c.g.fear(0.5);
+      const u = beats(c), by = clamp((u - 1.3) / 0.7, 0, 1); c.g.air({ fog: 0.012, moon: 2.2, sky: 1.8 });
+      if (u > 1.2) { c.g.windowFace(lerp(0.262, 0.29, by)); c.WF.root.visible = u > 1.3; c.WF.root.position.y -= 0.4; c.W.faceLight.intensity *= 0.3; }   // (its own light is for a whole dark room: here the wall is a metre off)
+      frame(c, CAM.window, clamp(c.st / 1.0, 0, 1)); c.g.fear(0.5);
     } },
   // the laundry by flashlight from its door: the washer's lid is coming up, and it comes down
   { id: 'washer', w: 2,
@@ -265,13 +272,12 @@ const ACT2 = [
       if (shut > 0 && shut < 1) c.g.shake(0.5);
       c.cam.pos = mix3([-5.7, B + 1.14, 0.95], [-6.2, B + 1.1, 1.12], ease.inOut(k)); c.cam.look = [-7.7, B + 0.85, 1.62]; c.cam.fov = 50; c.cam.sway = 0.5; c.g.fear(0.6);
     } },
-  // the bathroom's light is on, and its door comes open on nobody
+  // the bathroom's light is on behind its door, and the door comes open on nobody
   { id: 'bath_door', w: 2,
     setup(c) { night(c, { nl: 0 }); c.g.hands({}); c.g.doorNow('bath', false); c.g.light('bath', true, true); c.g.steady('bath'); c.P.pos.set(6.6, 0, -0.9); },
     update(c, k) {
-      const u = beats(c); if (c.st > 0.1) c.g.door('bath', true);
-      if (u > 1.4) c.g.light('bath', stutter(c.st) && u < 1.8, true);
-      c.cam.pos = mix3([6.9, 1.2, -0.95], [6.35, 1.2, -0.85], ease.inOut(k)); c.cam.look = [5.72, 1.1, 0.9]; c.cam.fov = 56; c.cam.sway = 0.5; c.g.fear(0.6);
+      const d = c.W.doors.bath; d.a = d.target = lerp(0.1, 0.92, ease.inOut(clamp(c.st / (c.shot.dur - 0.2), 0, 1))) * (d.max ?? 1); d.apply();
+      c.cam.pos = mix3([6.75, 1.2, -0.98], [6.5, 1.2, -0.9], ease.inOut(k)); c.cam.look = [5.74, 1.05, 0.32]; c.cam.fov = 50; c.cam.sway = 0.5; c.g.fear(0.6);
     } },
   // the storm at the front window: the yard for the length of a flash of lightning, and nobody in it
   { id: 'storm', w: 2,
@@ -280,15 +286,27 @@ const ACT2 = [
       const st = c.st; c.g.lightning(st > 0.3 && st < 0.42 ? 4 : st > 0.58 && st < 0.82 ? 8 : st > 0.95 && st < 1.02 ? 3 : 0); c.g.air({ fog: 0.012, moon: 1.0, sky: 0.8 });
       c.cam.pos = mix3([1.75, 1.2, -1.9], [1.55, 1.2, -2.6], ease.inOut(k)); c.cam.look = [1.0, 1.25, -4.5]; c.cam.fov = 56; c.cam.sway = 0.5; c.g.fear(0.4);
     } },
-  // run for the closet: the louvred doors, and your hand on them
-  { id: 'closet_run', w: 3, shutter: 2,
-    setup(c) { night(c); torch(c, { i: 6, sprint: true }); c.P.pos.set(9.9, 0, 1.0); c.route = path([[9.95, 1.2, 0.95], [9.75, 1.2, 1.8], [9.25, 1.2, 2.15], [8.75, 1.18, 1.85]]); c.s.r = false; },
+  // run for the closet: the louvred doors, and your hand out for them
+  { id: 'closet_run', w: 2, shutter: 2,
+    setup(c) { night(c); torch(c, { i: 6, sprint: true }); c.P.pos.set(9.9, 0, 1.0); c.route = path([[9.95, 1.2, 0.95], [9.75, 1.2, 1.8], [9.25, 1.2, 2.15], [8.62, 1.18, 1.78]]); c.s.r = false; },
     update(c, k) {
-      const e = ease.out(k), p = c.route.at(e), st = c.st; c.cam.pos = [p.x, p.y + Math.sin(st * 13) * 0.035 * (1 - e), p.z];
-      c.cam.look = mix3([8.6, 1.1, 1.9], [7.95, 1.1, 1.05], ease.inOut(clamp(k / 0.45, 0, 1))); c.cam.fov = lerp(68, 58, e); c.cam.roll = Math.sin(st * 6.5) * 0.02 * (1 - e); c.cam.sway = 0.4;
-      c.g.flashlight(true, lerp(6, 0.9, ease.inOut(clamp(k / 0.7, 0, 1))));   // (the doors are white and an arm's length away at the end)
-      if (k > 0.55 && !c.s.r) { c.s.r = true; c.g.hands({ flashOn: true }); c.g.reach([7.99, 1.05, 1.12]); }
+      const e = lerp(0.12, 1, ease.out(k) * 0.5 + k * 0.5), p = c.route.at(e), st = c.st; c.cam.pos = [p.x, p.y + Math.sin(st * 13) * 0.04, p.z];
+      c.cam.look = mix3([8.6, 1.1, 1.9], [7.95, 1.1, 1.05], ease.inOut(clamp(k / 0.4, 0, 1))); c.cam.fov = lerp(70, 60, e); c.cam.roll = Math.sin(st * 6.5) * 0.025; c.cam.sway = 0.4;
+      c.g.flashlight(true, lerp(6, 0.9, ease.inOut(clamp(k / 0.8, 0, 1))));   // (the doors are white and an arm's length away at the end)
+      if (k > 0.5 && !c.s.r) { c.s.r = true; c.g.hands({ flashOn: true }); c.g.reach([7.99, 1.05, 1.12]); }
       c.g.fear(0.8);
+    } },
+  // inside, and the two leaves pulled shut after you: the room through the slats, by the hall's light in at your door
+  { id: 'closet_shut', w: 2,
+    setup(c) { night(c, { nl: 0, roof: 0.3 }); c.g.light('hall', true, true); c.g.steady('hall'); c.g.hands({}); c.g.doorNow('kid', true); c.P.pos.set(8.05, 0, 1.2); c.s.r = false; c.s.shut = false; },
+    update(c, k) {
+      const st = c.st, shut = ease.in(clamp((st - 0.25) / 0.5, 0, 1)); c.ui.leaves({ shut });
+      c.g.spot({ from: [9.79, 2.25, -0.4], at: [9.7, 0, 1.9], color: 0xffc98a, i: 34, angle: 0.42, penumbra: 0.35 });
+      c.cam.pos = mix3([8.36, 1.3, 1.46], [8.05, 1.3 + Math.sin(st * 2.2) * 0.005, 1.36], ease.out(clamp(st / 0.6, 0, 1))); c.cam.look = [9.7, 0.85, 1.75]; c.cam.fov = 58;
+      if (st > 0.08 && !c.s.r) { c.s.r = true; c.g.reach([8.62, 1.12, 1.78]); }
+      if (shut >= 1 && !c.s.shut) { c.s.shut = true; c.g.shake(0.3); c.g.hands({ mode: 'hide', pod: 'closet_kid', holding: true }); c.g.hud(true); }
+      if (c.s.shut) c.UI.breath(1 - 0.1 * clamp((st - 0.75) / (c.shot.dur - 0.75), 0, 1), true, false);
+      c.g.fear(0.6);
     } },
   // through the slats, holding your breath. One light: the hall's, in at your open door and across the carpet. It stutters and browns as
   // it does when the thing is under it, and goes; and then what is level with the slats, and nothing of it but the face. (The game's
@@ -299,7 +317,7 @@ const ACT2 = [
       night(c, { nl: 0, roof: 0.25 }); c.g.light('hall', true, true); c.g.steady('hall'); c.UI.pod('louvers'); c.g.hands({ mode: 'hide', pod: 'closet_kid', holding: true }); c.g.hud(true); c.g.doorNow('kid', true); c.P.pos.set(8.05, 0, 1.2); c.head = new V3();
     },
     update(c, k) {
-      const u = beats(c), br = 1 - 0.9 * k, FACE = 2.2, face = ease.out(clamp((u - FACE) / 0.2, 0, 1)); c.UI.breath(br, true, br < 0.35);
+      const u = beats(c), br = 0.9 - 0.82 * k, FACE = 2.2, face = ease.out(clamp((u - FACE) / 0.2, 0, 1)); c.UI.breath(br, true, br < 0.35);
       const lit = u < 1.0 || (u < 1.9 && stutter(c.st)); c.g.light('hall', lit, true);
       c.g.spot({ from: [9.79, 2.25, -0.4], at: [9.7, 0, 1.9], color: 0xffc98a, i: lit ? 34 : 0, angle: 0.42, penumbra: 0.35 });   // (the hall's light, as far in at the door as it falls)
       c.cam.pos = [8.05, 1.3 + Math.sin(c.st * 2.2) * 0.005, 1.36]; c.cam.look = [9.7 + wobble(c.st * 0.6, 2) * 0.05, 0.85, 1.75]; c.cam.fov = 58;
@@ -321,10 +339,12 @@ const ACT2 = [
   { id: 'covers', w: 2,
     setup(c) { night(c, { nl: 0, roof: 0.3 }); c.g.hud(true); c.g.hands({ mode: 'hide', holding: true }); c.g.doorNow('kid', true); c.g.light('hall', true, true); c.g.steady('hall'); c.P.pos.set(8.28, 0, 4); },
     update(c, k) {
-      const t = c.st, u = beats(c), br = 0.55 - 0.5 * k, shut = ease.inOut(clamp((u - 1.5) / 0.4, 0, 1)); c.UI.breath(br, true, br < 0.35);
-      c.g.light('hall', u < 0.7 || (u < 1.35 && stutter(t, 21)), true);
-      c.ui.quilt({ lift: 0.012 * Math.sin(t * 2.2) - 0.16 * shut, glow: 0.9 - 0.5 * shut });
-      c.cam.pos = [8.38, 1.9 + Math.sin(t * 2.2) * 0.006, 4.0]; c.cam.look = [9.6 + wobble(t * 0.4, 1) * 0.04, 1.2, 0.3]; c.cam.fov = 50; c.g.fear(0.9);
+      const t = c.st, u = beats(c), br = 0.55 - 0.5 * k, on = u < 0.9 || (u < 1.45 && stutter(t, 21)); c.UI.breath(br, true, br < 0.35);
+      c.g.light('hall', on, true);
+      // (the quilt: lifted open with a hand in the first third of a second, trembling with your breath, and let fall when the light goes)
+      const open = lerp(-0.2, 0.17, ease.out(clamp(t / 0.3, 0, 1))) + 0.012 * Math.sin(t * 9) - 0.42 * ease.in(clamp((u - 1.5) / 0.4, 0, 1));
+      c.ui.quilt({ open, lift: 0.01 * Math.sin(t * 2.2), glow: on ? 1 : 0.35, bright: 2.1, tint: [1.25, 1.0, 0.72], soft: 0.45 });
+      c.cam.pos = [8.38, 1.9 + Math.sin(t * 2.2) * 0.006, 4.0]; c.cam.look = [9.6 + wobble(t * 0.4, 1) * 0.04, 1.25, 0.3]; c.cam.fov = 50; c.g.fear(0.9);
     } },
   // the bunk, from inside your door: the light comes on by itself, and the bear is not where it was
   { id: 'bunk_night', w: 2,
@@ -346,26 +366,45 @@ const ACT2 = [
     setup(c) { night(c, { nl: 0 }); c.W.frontDoor.setOpen(false); c.P.pos.set(1.6, 0, -1.6); },
     update(c, k) { c.g.porch(30); c.W.doors.front.a = ease.out(clamp(c.st / 0.6, 0, 1)) * 0.9; c.W.doors.front.apply(); c.cam.pos = mix3([1.5, 1.2, -1.3], [1.65, 1.2, -1.6], k); c.cam.look = [3.0, 1.05, -4.5]; c.cam.fov = 50; c.cam.sway = 0.5; c.g.fear(0.7); },
     end(c) { c.W.frontDoor.setOpen(false); } },
-  // the hatch to the attic, over the hall
-  { id: 'attic', w: 1,
-    setup(c) { night(c); torch(c, { i: 6 }); c.g.doorNow('kid', false); c.P.pos.set(8.0, 0, -0.45); },
-    update(c, k) { c.cam.pos = mix3([9.1, 1.2, -0.45], [8.8, 1.2, -0.45], k); c.cam.look = mix3([6.0, 1.3, -0.5], [5.8, 2.25, -0.45], ease.out(clamp(c.st / 0.35, 0, 1))); c.cam.fov = 56; c.cam.sway = 0.8; c.g.fear(0.7); } },
-  { id: 'chair_hall', w: 1,
-    setup(c) { night(c); torch(c, { i: 9 }); c.g.doorNow('kid', false); c.g.chair(2, 8.75, -0.45, -Math.PI / 2); c.P.pos.set(10.2, 0, -0.42); },
-    update(c, k) { c.cam.pos = mix3([10.3, 1.2, -0.42], [10.05, 1.2, -0.44], k); c.cam.look = [8.75, 0.75, -0.45]; c.cam.fov = 50; c.cam.sway = 0.7; c.g.fear(0.8); } },
-  // the last frame on the roll: the camera at your eye, the flash, the hall
+  // the bare bulb over the washer, swinging on its cord with nobody down there
+  { id: 'cellar_bulb', w: 1,
+    setup(c) { night(c, { nl: 0 }); c.g.hands({}); c.W.laundry.bulb.set(true); c.W.laundry.bulb.swing = 0.75; c.W.laundry.bulb.t = 0.5; c.P.pos.set(-5.6, c.W.laundry.floor, 1.0); },
+    update(c, k) { const B = c.W.laundry.floor, b = c.W.laundry.bulb.pos; c.W.laundry.bulb.light.intensity *= 2.2; c.cam.pos = mix3([-4.4, B + 1.15, 0.7], [-4.6, B + 1.15, 0.85], k); c.cam.look = [b.x - 1.0, b.y - 0.55, b.z + 0.1]; c.cam.fov = 60; c.cam.sway = 0.6; c.g.fear(0.7); } },
+  // what a night leaves behind, to be photographed and shown to them in the morning: claw marks down the doors of your closet
+  { id: 'claws', w: 1,
+    setup(c) { night(c, { nl: 0 }); torch(c, { i: 2.4 }); c.W.proof.SCRATCHES.show(true); c.s.at = c.W.proof.SCRATCHES.g.children[0].getWorldPosition(new V3()); c.P.pos.set(c.s.at.x + 0.4, 0, c.s.at.z + 1.3); },
+    update(c, k) {
+      const a = c.s.at; c.cam.pos = mix3([a.x + 0.5, 1.22, a.z + 1.45], [a.x + 0.3, 1.25, a.z + 1.05], ease.out(k)); c.cam.look = mix3([a.x + 0.5, 0.9, a.z], [a.x, a.y - 0.05, a.z], ease.out(clamp(c.st / 0.3, 0, 1))); c.cam.fov = 52; c.cam.sway = 0.8; c.g.fear(0.8);
+    },
+    end(c) { c.W.proof.SCRATCHES.show(false); } },
+  // the chair from the kitchen, in your room, at the foot of the bunk
+  { id: 'chair_room', w: 1,
+    setup(c) { night(c, { nl: 0 }); torch(c, { i: 8 }); c.g.chair(2, 9.35, 2.3, 0.75); c.P.pos.set(10.7, 0, 0.9); },
+    update(c, k) { c.cam.pos = mix3([10.75, 1.2, 0.85], [10.55, 1.2, 1.1], k); c.cam.look = mix3([9.0, 1.5, 3.6], [9.35, 0.6, 2.3], ease.out(clamp(c.st / 0.3, 0, 1))); c.cam.fov = 54; c.cam.sway = 0.8; c.g.fear(0.8); } },
+  // the last frame on the roll: the camera at your eye in the dark of the living room, and in the flash the four chairs in a row
   { id: 'last_film', w: 1,
-    setup(c) { night(c, { nl: 0 }); c.g.hands({ film: 1 }); c.g.camera(true); c.g.doorNow('kid', false); c.P.pos.set(5.2, 0, -0.45); c.s.n = 0; },
+    setup(c) { night(c, { nl: 0 }); c.g.hands({ film: 1 }); c.g.camera(true); c.W.frontDoor.setOpen(false); c.P.pos.set(2.6, 0, -1.6); c.s.n = 0; [[0.2, -1.05], [0.55, -1.55], [0.55, -2.15], [0.2, -2.65]].forEach(([x, z], i) => c.g.chair(i, x, z, Math.atan2(2.6 - x, -1.85 - z))); },
     update(c, k) {
       const f = c.st - 0.3, g = glow(f); if (f >= 0 && !c.s.n) { c.s.n = 1; c.g.snap(); c.g.hands({ film: 0 }); }
-      c.cam.pos = [5.2, 1.2, -0.45]; c.cam.look = [9.6, 1.0, -0.45]; c.cam.fov = lerp(62, 58, c.g.finder); c.cam.sway = 0.7;
-      if (g > 0) { c.g.bulb(60 * g, [5.3, 1.3, -0.45], 12); c.ui.flash(f < 0.05 ? 0.6 : 0); }
+      c.cam.pos = [2.6, 1.2, -1.85]; c.cam.look = [0.4, 0.85, -1.85]; c.cam.fov = lerp(62, 58, c.g.finder); c.cam.sway = 0.7;
+      if (g > 0) { c.g.bulb(46 * g, [2.5, 1.3, -1.85], 9); c.ui.flash(f < 0.05 ? 0.6 : 0); }
       c.g.fear(0.8);
     } },
-  // the frame where it fell, face down on the hall carpet
-  { id: 'frame_floor', w: 1,
-    setup(c) { night(c); torch(c, { i: 3 }); c.W.hallFrame.pose(1); c.P.pos.set(7.3, 0, -0.4); },
-    update(c, k) { c.W.hallFrame.pose(1); c.cam.pos = mix3([7.45, 1.2, -0.3], [7.25, 1.15, -0.4], k); c.cam.look = [6.5, 0.1, -0.85]; c.cam.fov = 50; c.cam.sway = 0.8; c.g.fear(0.8); } },
+  // the night light by your door, and its relay lets go
+  { id: 'night_light', w: 1,
+    setup(c) { night(c, { nl: 2.2, roof: 0.2 }); c.g.hands({}); c.g.doorNow('kid', false); c.P.pos.set(10.3, 0, 1.6); },
+    update(c, k) {
+      const n = c.W.nightLights[3], st = c.st; n.dead = st > 0.5 || (st > 0.32 && st < 0.4);
+      c.cam.pos = mix3([10.25, 0.62, 1.75], [10.4, 0.55, 1.5], k); c.cam.look = [n.pos.x, n.pos.y + 0.05, n.pos.z]; c.cam.fov = 44; c.cam.sway = 0.7; c.g.fear(0.8);
+    } },
+  // the field gate, swinging on its post
+  { id: 'gate', w: 1, shutter: 2,
+    setup(c) { night(c, { nl: 0 }); torch(c, { i: 18 }); c.P.pos.set(-23.6, 0, -14.6); },
+    update(c, k) {
+      const d = c.W.barn.gate, st = c.st; c.g.air({ fog: 0.014, moon: 1.3, sky: 1.0 }); if (d) { d.a = d.target = 0.62 + 0.38 * Math.cos(st * 5.2 + 0.6); d.apply(); }
+      c.cam.pos = mix3([-23.4, 1.2, -14.2], [-23.9, 1.2, -14.6], k); c.cam.look = [-26.6, 0.85, -16.3]; c.cam.fov = 58; c.cam.sway = 0.8; c.g.fear(0.8);
+    },
+    end(c) { const d = c.W.barn.gate; if (d) { d.a = d.target = 1; d.apply(); } } },
   // your door from the hall, and it goes shut in your face
   { id: 'door_slam', w: 1,
     setup(c) { night(c); torch(c, { i: 5 }); c.g.doorNow('kid', true); c.P.pos.set(9.3, 0, -0.7); c.s.shut = false; },
@@ -374,12 +413,12 @@ const ACT2 = [
       const d = c.W.doors.kid; if (!c.s.shut && d.a <= 0.001 && c.st > 0.3) { c.s.shut = true; c.g.shake(0.7); }
       c.cam.pos = mix3([9.2, 1.2, -0.85], [9.4, 1.2, -0.6], k); c.cam.look = [9.79, 1.05, 0.3]; c.cam.fov = 54; c.cam.sway = 0.8; c.g.fear(0.9);
     } },
-  // the washer again, from over it: the lid comes down
+  // the washer again, from the laundry door: the lid comes down
   { id: 'washer_bang', w: 1,
-    setup(c) { night(c, { nl: 0 }); torch(c, { i: 5, wide: 0.6 }); c.W.laundry.washer.open(1); c.P.pos.set(-6.6, c.W.laundry.floor, 1.2); },
+    setup(c) { night(c, { nl: 0 }); torch(c, { i: 2.6, wide: 0.66 }); c.W.laundry.washer.open(1); c.P.pos.set(-5.6, c.W.laundry.floor, 1.0); },
     update(c, k) {
-      const B = c.W.laundry.floor, shut = clamp((c.st - 0.35) / 0.07, 0, 1); c.W.laundry.washer.open(1 - shut); if (shut > 0 && shut < 1) c.g.shake(0.6);
-      c.cam.pos = mix3([-6.7, B + 1.25, 1.2], [-6.85, B + 1.22, 1.28], k); c.cam.look = [-7.7, B + 0.9, 1.62]; c.cam.fov = 50; c.cam.sway = 0.7; c.g.fear(0.9);
+      const B = c.W.laundry.floor, shut = clamp((c.st - 0.1) / 0.08, 0, 1); c.W.laundry.washer.open(1.05 * (1 - shut)); if (shut > 0 && c.st < 0.4) c.g.shake(0.6);
+      c.cam.pos = mix3([-6.05, B + 1.12, 1.08], [-6.25, B + 1.1, 1.14], k); c.cam.look = [-7.55, B + 0.95, 1.5]; c.cam.fov = 50; c.cam.sway = 0.7; c.g.fear(0.9);
     } },
   // the bear, off the bunk and across the room
   { id: 'bear', w: 1,
@@ -394,7 +433,7 @@ const ACT2 = [
     update(c, k) { c.g.air({ fog: 0.012, moon: 1.2, sky: 0.9 }); const on = c.st < 0.45; c.g.porch(on ? 40 : 0); if (!on) c.g.lightsOff(); frame(c, CAM.road, 0.8 + 0.2 * k); } },
   // two beats of nothing
   { id: 'black2', w: 2, black: true, noRender: true, setup(c) { night(c, { nl: 0 }); }, update() {} },
-  ...Array.from({ length: SPRINT }, (_, i) => ({ id: i ? 'sprint_' + (i + 1) : 'sprint', w: 1, teaser: i ? undefined : 0, shutter: i === 2 || i === 4 ? 1 : 2, setup: sprintSetup, update(c) { sprintAt(c, i + beats(c)); } })),
+  ...Array.from({ length: SPRINT }, (_, i) => ({ id: i ? 'sprint_' + (i + 1) : 'sprint', w: 1, teaser: i ? undefined : 0, shutter: i === 2 || i === 4 ? 1 : 2, setup: (c) => sprintSetup(c, i), update(c) { sprintAt(c, i + beats(c)); } })),
 ];
 // DROP to the end: black and nothing, the face, the title; and between the cards, what is left in the house. The last thing on the
 // screen is where to find it, with the warning under it
@@ -467,7 +506,7 @@ export function attach(game, opts = {}) {
   function apply() {
     const shot = c.shot; if (!shot) return;
     c.cam.look = null; c.cam.roll = 0; c.cam.sway = portrait ? 1 : 0; c.black = 0;
-    ui.card(null); ui.caption(null); ui.flash(0); ui.quilt(null);   // a shot that wants them asks every frame
+    ui.card(null); ui.caption(null); ui.flash(0); ui.quilt(null); ui.leaves(null);   // a shot that wants them asks every frame
     shot.update(c, c.k);
     const cam = c.cam, P = game.P, F = game.F, pos = xyz(cam.pos);
     P.mode = 'cine'; F.cutscene = true;

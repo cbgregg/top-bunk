@@ -61,6 +61,7 @@ body:not(.tr-portrait) #finder > div > div:last-child { font-size: max(15px, 4.6
 #tr-cam { z-index: 57; display: none; }
 #tr-cards canvas.kid { display: none; }
 #tr-quilt { z-index: 4; display: none; }
+#tr-leaves { z-index: 4; display: none; }
 #tr-acc { z-index: 1; display: none; }
 /* the portrait cut: the camcorder's own text sits under the grain like the picture; captions and the end card stay crisp on top.
    the grain is overlaid, not laid over: it rides on the picture without lifting black to grey */
@@ -129,14 +130,15 @@ function quiltFabric(W, H) {
 }
 // the slit the kid holds open to film through: the blanket hangs in a wavy edge across the top, the ridge over the chest crosses below it,
 // and the two meet in a point on the left. Neither edge is smooth: cloth folds and bunches. lift raises the ridge (the chest breathing)
-const slitTop = (x, W, H) => H * (0.30 + 0.022 * Math.sin(x / W * 5.1 + 1.2) + 0.011 * Math.sin(x / W * 13 + 0.4) + 0.03 * Math.exp(-((((x / W) - 0.86) / 0.06) ** 2)));   // a fold hangs lower on the right
-const slitBot = (x, W, H, o) => H * (0.58 + 0.02 * Math.sin(x / W * 6.3 + 0.5) + 0.01 * Math.sin(x / W * 15 + 1.7) - (o.lift || 0));
+// (o.open: the slit held wider by that share of the height, half up and half down; less than nothing lets it fall shut)
+const slitTop = (x, W, H, o = {}) => H * (0.30 - (o.open || 0) / 2 + 0.022 * Math.sin(x / W * 5.1 + 1.2) + 0.011 * Math.sin(x / W * 13 + 0.4) + 0.03 * Math.exp(-((((x / W) - 0.86) / 0.06) ** 2)));   // a fold hangs lower on the right
+const slitBot = (x, W, H, o) => H * (0.58 + (o.open || 0) / 2 + 0.02 * Math.sin(x / W * 6.3 + 0.5) + 0.01 * Math.sin(x / W * 15 + 1.7) - (o.lift || 0));
 const SLIT_TIP = [0.12, 0.45];
 function quiltGap(g, W, H, o) {
   const x0 = W * SLIT_TIP[0], y0 = H * SLIT_TIP[1], x1 = W * 0.3, step = W * 0.015;
   g.beginPath(); g.moveTo(x0, y0);
-  g.quadraticCurveTo(W * 0.2, slitTop(x1, W, H) + H * 0.02, x1, slitTop(x1, W, H));
-  for (let x = x1; x <= W * 1.05; x += step) g.lineTo(x, slitTop(x, W, H));
+  g.quadraticCurveTo(W * 0.2, slitTop(x1, W, H, o) + H * 0.02, x1, slitTop(x1, W, H, o));
+  for (let x = x1; x <= W * 1.05; x += step) g.lineTo(x, slitTop(x, W, H, o));
   for (let x = W * 1.05; x >= x1; x -= step) g.lineTo(x, slitBot(x, W, H, o));
   g.quadraticCurveTo(W * 0.2, slitBot(x1, W, H, o) - H * 0.01, x0, y0);
   g.closePath();
@@ -146,7 +148,7 @@ function fringe(g, W, H, o, glow) {
   const r = rng(808), n = 24;
   g.save(); g.lineCap = 'round'; g.filter = `blur(${(W * 0.0018).toFixed(2)}px)`;
   for (let i = 0; i < n; i++) {
-    const top = i % 2 === 0, x = W * (0.16 + r() * 0.9), y = top ? slitTop(x, W, H) : slitBot(x, W, H, o);
+    const top = i % 2 === 0, x = W * (0.16 + r() * 0.9), y = top ? slitTop(x, W, H, o) : slitBot(x, W, H, o);
     if (x < W * 0.3 && (top ? y > H * 0.33 : y < H * 0.45)) continue;
     const len = W * (0.006 + r() * 0.022), a = (top ? 1 : -1) * (Math.PI / 2 + (r() - 0.5) * 1.3);
     g.strokeStyle = `rgba(${150 + r() * 60 | 0},${160 + r() * 55 | 0},${190 + r() * 50 | 0},${(0.25 + r() * 0.45) * glow})`; g.lineWidth = W * (0.0012 + r() * 0.002);
@@ -158,21 +160,39 @@ function drawQuilt(cv, o) {
   const W = cv.width, H = cv.height, g = cv.getContext('2d');
   cv._fab ??= quiltFabric(W, H);
   cv._tmp ??= Object.assign(document.createElement('canvas'), { width: W, height: H });
-  const t = cv._tmp.getContext('2d'), glow = o.glow ?? 1, v = (k) => Math.round(k * (0.55 + 0.45 * glow));
+  // (o.bright: how much of the light through the slit the cloth beside it takes, 1 as the portrait cut has it; o.tint: that light's colour;
+  // o.soft: how far out of focus the cloth is)
+  const t = cv._tmp.getContext('2d'), glow = o.glow ?? 1, tint = o.tint || [1, 1, 1], v = (k, ch = 0) => Math.round(Math.min(255, k * (0.55 + 0.45 * glow) * (o.bright ?? 1) * tint[ch]));
   t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, W, H); t.drawImage(cv._fab, 0, 0);
   // the cloth is right against the lens, so it is out of focus and nearly black: only the weave nearest the slit catches the glow
   const lg = t.createRadialGradient(W * 0.6, H * 0.46, W * 0.12, W * 0.6, H * 0.5, W * 0.85);
-  lg.addColorStop(0, `rgb(${v(120)},${v(124)},${v(140)})`); lg.addColorStop(0.35, `rgb(${v(52)},${v(54)},${v(64)})`); lg.addColorStop(1, `rgb(${v(16)},${v(24)},${v(21)})`);
+  lg.addColorStop(0, `rgb(${v(120, 0)},${v(124, 1)},${v(140, 2)})`); lg.addColorStop(0.35, `rgb(${v(52, 0)},${v(54, 1)},${v(64, 2)})`); lg.addColorStop(1, `rgb(${v(16, 0)},${v(24, 1)},${v(21, 2)})`);
   t.globalCompositeOperation = 'multiply'; t.fillStyle = lg; t.fillRect(0, 0, W, H);
   t.globalCompositeOperation = 'destination-out'; quiltGap(t, W, H, o); t.fill();
   t.globalCompositeOperation = 'source-over';
   g.clearRect(0, 0, W, H);
-  g.save(); g.filter = `blur(${(W * 0.013).toFixed(1)}px)`; g.drawImage(cv._tmp, 0, 0); g.restore();
+  g.save(); g.filter = `blur(${(W * 0.013 * (o.soft ?? 1)).toFixed(1)}px)`; g.drawImage(cv._tmp, 0, 0); g.restore();
   // the very edge of the cloth: a thin lit rim, then the fibres off it
   g.save(); g.beginPath(); g.rect(0, 0, W, H); quiltGap(g, W, H, o); g.clip('evenodd');
-  g.filter = `blur(${(W * 0.008).toFixed(1)}px)`; g.strokeStyle = `rgba(175,185,215,${0.26 * glow})`; g.lineWidth = W * 0.009; quiltGap(g, W, H, o); g.stroke();
+  g.filter = `blur(${(W * 0.008).toFixed(1)}px)`; g.strokeStyle = `rgba(${Math.round(175 * tint[0])},${Math.round(185 * tint[1])},${Math.round(215 * tint[2])},${0.26 * glow})`; g.lineWidth = W * 0.009; quiltGap(g, W, H, o); g.stroke();
   g.restore();
   fringe(g, W, H, o, glow);
+}
+
+// ---------- the closet's two louvred leaves, seen from inside as you pull them shut ----------
+// shut: 0 standing open (each leaf edge-on at its side of the frame), 1 shut and meeting in the middle. The slats are the pitch of the
+// game's own hiding overlay, so the cut to it matches; the stiles and rails are solid, and the edge you hold catches what light there is
+function drawLeaves(cv, o) {
+  const W = cv.width, H = cv.height, g = cv.getContext('2d'), vh = H / 100, w = W / 2 * Math.cos((1 - clamp(o.shut, 0, 1)) * 1.42);
+  g.clearRect(0, 0, W, H);
+  for (const side of [0, 1]) {
+    const x0 = side ? W - w : 0, stile = w * 0.085;
+    g.fillStyle = 'rgba(7,7,9,0.985)'; g.fillRect(x0, 0, w, H);
+    for (let y = 7 * vh; y < 93 * vh; y += 4 * vh) g.clearRect(x0 + stile, y + 2.1 * vh, w - 2 * stile, 1.9 * vh);
+    const edge = side ? x0 : x0 + w - W * 0.004, lit = g.createLinearGradient(0, 0, 0, H);
+    lit.addColorStop(0, 'rgba(58,50,40,0.2)'); lit.addColorStop(0.6, 'rgba(120,100,76,0.75)'); lit.addColorStop(1, 'rgba(58,50,40,0.3)');
+    g.fillStyle = lit; g.fillRect(edge, 0, W * 0.004, H);
+  }
 }
 
 // ---------- the title in the kid's own hand: the same red crayon lettering as the drawing on the wall ----------
@@ -235,6 +255,8 @@ export function plainTv(scene) {
 function overlayApi(portrait) {
   const $ = (id) => document.getElementById(id), W = () => innerWidth, H = () => innerHeight;
   const black = $('tr-black'), flash = $('tr-flash'), cards = $('tr-cards'), cap = $('tr-cap'), cam = $('tr-cam'), lb = $('tr-lb'), grain = $('grain'), quilt = $('tr-quilt'), acc = $('tr-acc');
+  let leaves = $('tr-leaves');
+  if (!leaves) { leaves = document.createElement('canvas'); leaves.id = 'tr-leaves'; leaves.className = 'tr'; leaves.width = innerWidth; leaves.height = innerHeight; leaves.style.width = '100%'; leaves.style.height = '100%'; quilt.after(leaves); }
   const big = cards.querySelector('.big'), small = cards.querySelector('.small'), line = cards.querySelector('.line'), kid = cards.querySelector('.kid'), capText = cap.firstElementChild;
   // sizes in px from the viewport (so a 360-wide preview and a 1080-wide render look the same)
   const px = (f) => Math.round((portrait ? W() : H()) * f) + 'px';
@@ -311,6 +333,8 @@ function overlayApi(portrait) {
     },
     // the quilt in front of the lens (p_bunk): {lift, glow} or null
     quilt: (o) => { if (!o) { quilt.style.display = 'none'; return; } quilt.style.display = 'block'; drawQuilt(quilt, o); },
+    // the closet's leaves in front of the lens: {shut} or null
+    leaves: (o) => { if (!o) { leaves.style.display = 'none'; return; } leaves.style.display = 'block'; drawLeaves(leaves, o); },
     // motion blur: the exposures of one frame averaged over the picture (overlays stay on top, sharp)
     acc: { clear() { acc.style.display = 'none'; acc._n = 0; },
       add(src, filter) { const g = acc.getContext('2d'); acc._n = (acc._n || 0) + 1; g.globalAlpha = 1 / acc._n; g.drawImage(src, 0, 0, acc.width, acc.height); g.globalAlpha = 1; acc.style.filter = filter || 'none'; },
@@ -356,7 +380,7 @@ export function gameHelpers(game) {
   const quilt0 = topQuilt ? Float32Array.from(topQuilt.geometry.attributes.position.array) : null;
   const steadied = new Set();
   let quiltMoved = false, drawing2 = null, hudOn = false, air0 = null;
-  let wet = false, swept = false;
+  let wet = false, day0 = null;
   const nl0 = W.nightLights.map((n) => n.base);
   const flash0 = flash ? { angle: flash.angle, penumbra: flash.penumbra } : null, porch0 = { d: W.porchLight.distance, i: W.porchLight.intensity, e: W.porchBulb.material.emissiveIntensity };
   // what a shot may borrow and must give back: the hall spot (the day shot uses it as sun through the window), the eyes' glow, the smile
@@ -369,6 +393,7 @@ export function gameHelpers(game) {
       if (vigilOn) H.vigil(false);
       F.blackout = false; W.nightLights.forEach((n, i) => { n.base = nl0[i]; n.dead = false; });
       if (air0) { if (scene.fog === air0.obj) scene.fog.density = air0.fog; W.sun.intensity = air0.moon; W.hemi.intensity = air0.sky; air0 = null; }
+      if (day0) { game.renderer.toneMappingExposure = day0.exp; W.hemi.color.copy(day0.sky); W.hemi.intensity = day0.i; day0 = null; }
       stage.v = null; hands.lowerCamera(); if (bulb) { bulb.intensity = 0; bulb.distance = 7; }
       if (flash) { flash.angle = flash0.angle; flash.penumbra = flash0.penumbra; }
       if (F.phase === 'night') { W.porchLight.distance = porch0.d; W.porchLight.intensity = 0; W.porchBulb.material.emissiveIntensity = 0; }
@@ -386,7 +411,6 @@ export function gameHelpers(game) {
       if (W.hallFrame) W.hallFrame.reset();
       W.drawingMat.color.setScalar(1);
       if (wet) { wet = false; game.weather.lock('clear'); game.weather.jump(); game.weather.unlock(); }
-      if (swept) { swept = false; WF.stop(); }
       if (game.weather.bolt) game.weather.bolt.intensity = 0;
       WF.t = -1; WF.root.visible = false; W.faceLight.intensity = 0;
       H.flashlight(false); W.bathSpot.intensity = 0;
@@ -448,6 +472,12 @@ export function gameHelpers(game) {
     sunPatch(i, at = [8.75, 0.3, 3.28]) { bs.position.set(11.14, 2.15, 3.83); bs.target.position.set(...at); bs.target.updateMatrixWorld(); bs.color.set(0xffd9a0); bs.angle = 0.5; bs.penumbra = 0.6; bs.intensity = i; },
     // the same spot anywhere: the moon through another window, the sun across the living room (given back at the next shot)
     spot({ from, at, color = 0x9db6ff, i = 20, angle = 0.5, penumbra = 0.6 }) { bs.position.set(...from); bs.target.position.set(...at); bs.target.updateMatrixWorld(); bs.color.set(color); bs.angle = angle; bs.penumbra = penumbra; bs.intensity = i; },
+    // a sunny afternoon indoors, for a shot by day: the exposure up, and the sky's light in the rooms warmer and stronger (k: how much,
+    // 1 is a warm room; given back at the next shot)
+    daylight(k = 1) {
+      day0 ||= { exp: game.renderer.toneMappingExposure, sky: W.hemi.color.clone(), i: W.hemi.intensity };
+      game.renderer.toneMappingExposure = day0.exp * (1 + 0.3 * k); W.hemi.color.copy(day0.sky).lerp(new THREE.Color(0xffdcae), Math.min(1, 0.8 * k)); W.hemi.intensity = day0.i * (1 + 0.5 * k);
+    },
     fear(v) { F.fear = Math.max(F.fear, v); },
     shake(v) { nights.D.shake(v); },
     door: (name, open) => W.setDoor(name, open, true),
@@ -488,8 +518,6 @@ export function gameHelpers(game) {
     rain(kind) { wet = true; game.weather.lock(kind); game.weather.jump(); },
     // lightning, for this frame (v: 7 is a full flash of the game's own)
     lightning(v) { if (game.weather.bolt) game.weather.bolt.intensity = v; },
-    // the car on the road and its headlights through the windows (windowface.js): k is how far along its pass it is, 0..1
-    carSweep(k) { swept = true; WF.ct = clamp(k, 0, 0.999); WF.car.shadow.autoUpdate = true; },
     // something under the top bunk's comforter: {x, z, h, rx, rz} a rise of h metres round (x, z) in the bunk's own frame; null lays it flat again
     lump(o) {
       if (!topQuilt || (!o && !quiltMoved)) return;

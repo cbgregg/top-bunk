@@ -47,8 +47,9 @@ landscape only), `--keep-frames`, `--frames jpg` (smaller frame files), `--scrat
 (motion blur: N exposures per frame over a thirtieth of a second, averaged under the overlays; by default each shot sets its own, and
 `--shutter 1` turns it off). Needs ffmpeg, and Playwright's Chromium (`npm install`, then `npx playwright install chromium`).
 
-If the page reports an error, a model that kept its stand-in or a file that never loaded, `render.js` lists them at the end and exits 1:
-that render has something missing from it. Everything the page said is in `page.log` in the `--scratch` folder.
+If the page reports an error, or the game says a model kept its stand-in, `render.js` lists them at the end and exits 1: that render
+has something missing from it. Everything the page said, and every request the network dropped, is in `page.log` in the `--scratch`
+folder (a dropped request alone is not a fault: Chromium reports some as aborted after they have answered, and the game asks twice).
 
 The live preview (`?trailer=1`; add `&aspect=portrait` in a tall window, `&music=...`, `&lb=1`, `&bio=1`, `&cta=web`) plays the same
 shot list in real time with the same cue sheet through WebAudio. It needs a click to start, because of the browser's audio policy.
@@ -66,66 +67,77 @@ are skipped).
 Three marks in `trailer.js` hold the cut to the recording, and everything else is a fraction of the act between two of them, so moving a
 mark re-times the whole cut and nothing overlaps:
 
-- `TURN` (34.5 s) is the first beat of "the colors of the rainbow". In the recording this cut is made for, the song goes from the first
-  "what a wonderful world" straight into that bridge; the common single has a "skies of blue" verse first and its bridge nearer 56.5 s.
-- `DROP` (107 s) is "yes I think to myself": the hard cut to black.
+- `TURN` (34.5 s) is the first beat of the song's bridge. In the recording this cut is made for, the song goes from the end of its
+  first verse straight into the bridge; the common single has a second verse first and its bridge nearer 56.5 s.
+- `DROP` (107 s) is the start of the last line before the final refrain: the hard cut to black.
 - `LANDSCAPE_DURATION` (139 s) is the end.
 
 The cut is counted in beats: `BEAT` is `TURN / 40` (0.86 s), forty of them fill the day and eighty-four of nearly the same length fill
 the night up to the drop. A shot's `w` is the beats it holds, so every cut before the drop lands on one, and the shots get shorter on
-the way down: fours, then threes, then twos, then nineteen beats in a row that are a shot each (twelve single images, two beats of
-black, the sprint cut a beat to a look). No shot after the turn is longer than four beats (3.5 s).
+the way down: fours, then threes, then twos, then twenty-one beats in a row that are a shot each or black (fourteen single images, two
+beats of black, the sprint cut a beat to a look). No shot after the turn is longer than four beats (3.5 s).
 
-It has no dialogue and no captions, and nobody is on screen but the thing: Mom and Dad are never in a shot. The thing itself is hardly
-in it. Before the drop it is seen four times, for under a second each and never whole: two eyes over the rail of your bunk, two eyes
-out in the dark past the far end of the hall, two eyes at your window, the face through the closet's slats. Its arms are in none of
-them (`reach` stays 0 in every shot). The one time the face is plain is the last frame before the title. Every other night shot is the
-house doing something, or you doing something about it.
+It has no dialogue and no captions, and nobody is on screen but what haunts the house: Mom and Dad are never in a shot. That is hardly
+in it either. Before the drop it is seen four times, for under a second each and never whole: two eyes over the rail of your bunk, two
+eyes out in the dark past the far end of the hall, the pale face that goes by the windows at night passing yours (the game's own,
+`windowface.js`), the face through the closet's slats. The thing's arms are in none of them (`reach` stays 0 in every shot). The one
+time its face is plain is the last frame before the title. Every other night shot is the house doing something, or you doing something
+about it.
 
 It opens cold: a second of black, a breath, the disposable camera's click, and for a third of a second of its flash the eyes are over
 the rail. Then the hard cut to the sunny lawn.
 
-Act 1, up to the turn, is the moving day with the song clean: the house from the lawn with the truck in the drive, the boxes on the
-walk, the living room with the front door open and the sun on the carpet (the truck in its window, the clock, the television), the
-kitchen table, the telephone on the dining wall, the bunk, your window and its curtains, along the photographs in the hall, the hall
-with the drawing in the foreground, and the drawing itself (the one wrong note). Those frames are kept in `CAM`, because the night
-shows most of them again from the same place with the same lens and the same slow move: the lawn where the rooms' lights and then
-the porch lamp go out, the living room where the television comes on by itself, the kitchen by flashlight with the chairs out from
-the table in a row and one of them sliding, the telephone ringing, the drawing changed, the photographs where a frame lets go of the
-wall, the hall under its ceiling light, the window, the bunk where the light comes on and the bear has moved.
+Act 1, up to the turn, is the moving day with the song clean, warm and in the sun (`daylight` in `lib.js` lifts the exposure and warms
+the sky's light in the rooms, and the hall's spot is borrowed as the sun in at a window): the house from the lawn with the truck in the
+drive, the boxes on the walk, the living room with the front door open and the sun on the carpet (the truck in its window, the clock,
+the television), the kitchen table in the sun from the window over the sink, the telephone and the cork board on the end of the dining
+wall with the living room past them, the bunk with the window's light on the rug, your window and its curtains, along the photographs
+in the hall, the hall with the drawing in the foreground, and the drawing itself (the one wrong note). Those frames are kept in `CAM`,
+because the night shows most of them again from the same place with the same lens and the same slow move: the lawn where the rooms'
+lights and then the porch lamp go out, the living room where the television comes on by itself, the kitchen by flashlight with the
+chairs out from the table in a row and one of them sliding, the telephone ringing, the drawing changed, the photographs where a frame
+lets go of the wall, the hall under its ceiling light, the window, the bunk where the light comes on and the bear has moved.
 
 Act 2, from the turn to the drop, is seen from the kid's eye height with the game's own hands and, where it explains something, its
 own HUD. In fours: the lawn, the television, the kitchen. Then the drawing, your hand on the hall's light switch and the hall under
 it (on: nothing; off; on: two eyes past the far end; off; on: nothing, and the bulb goes), the disposable camera at the eye and three
-exposures with the count of film going down (nothing; a chair in the hall; the chair, nearer). In threes: a car's headlights going
-round the living room on a wet night, the lights dying down the hall, the run across the yard to the garage, the breaker box and the
-bulb coming back. In twos: the telephone, the flashlight down the hall, the frame falling, your door shutting by itself on the lit
-hall, the window, the washer's lid coming up and down in the flashlight, the bathroom door coming open on its light, the front
-window in a flash of lightning, and then the run for the louvred closet, the slats and the breath meter (the hall's light across the
-carpet, which stutters and goes, and then the face), up the ladder, under the covers with the breath meter (your open door and the
-hall's light through the gap in the quilt, until the light goes and the gap is let fall), the bunk. Then a beat each: the receiver
-off its hook, the snow, the clock's pendulum, the front door, the hatch to the attic, the chair, the last frame of film, the frame on
-the carpet, your door going shut from the hall side, the washer's lid, the bear thrown off the bunk, the house going dark. Two beats
-of black, and the sprint down the hall, five shots of a beat each, ahead and back.
+exposures with the count of film going down (nothing; a chair in the hall; the chair, nearer). Then the lights dying down the hall,
+the run across the yard to the garage, the breaker box and the bulb coming back, and the barn across the field with its door sliding
+open and its lamp coming on over nobody. In twos: the telephone, the frame falling off the hall wall in the flashlight (which goes
+down with it), your door shutting by itself on the lit hall, the window and the face going by it, the washer's lid coming up and down
+in the flashlight, the bathroom door coming open on its light, the front window in a flash of lightning, and then the run for the
+louvred closet, the two leaves pulled shut after you from inside, the slats and the breath meter (the hall's light across the carpet,
+which stutters and goes, and then the face), up the ladder, under the covers with the breath meter (your open door and the hall's
+light through the gap you lift in the quilt, until the light goes and the gap is let fall), the bunk. Then a beat each: the receiver
+off its hook, the snow, the clock's pendulum, the front door, the bare bulb swinging in the laundry, claw marks down the closet's
+doors, the kitchen chair at the foot of the bunk, the last frame of film (in its flash, the four chairs in a row in the living room),
+a night light's relay letting go, the field gate swinging, your door going shut from the hall side, the washer's lid, the bear thrown
+off the bunk, the house going dark. Two beats of black, and the sprint down the hall, five shots of a beat each, ahead and back: the
+hall's light dies on the first of them and the rest is by flashlight, and on the look back the living room goes dark and the doors
+down the hall go shut one after another.
 
-Each night shot has one light to read it by: the flashlight, a ceiling light, the television, the moon, the flash, the headlights,
-the lightning. The plug-in night lights are out in these shots unless one asks for them (`nl`; they are green), and the flashlight is
+Each night shot has one light to read it by: the flashlight, a ceiling light, the television, the moon, the flash, a bare bulb, the
+lightning. The plug-in night lights are out in these shots unless one asks for them (`nl`; they are green), and the flashlight is
 turned down where a pale wall is close, so the bloom does not take the picture.
 
 At the drop: black and silence for 0.7 s, then the face and nothing else, straight on, with the piano slam and the violin (the only
-time the strings play: before it the cue sheet is clicks, boards, breath, the bell, rain, a car, and one low piano note on the
+time the strings play: before it the cue sheet is clicks, boards, hinges, breath, the bell, rain, and one low piano note on the
 drawing). Then the cards with the song back faint under them, and picture between them: TOP BUNK, the bunk at dawn with nobody in
 it, "Ten nights.", the drawing with one more of them in it, "Nobody believed you.", something sitting up under the top bunk's blanket,
 the television on by itself and off, the house from the lawn with one window lit and then none, and last "Wishlist on Steam" with the warning under it.
+
+Nothing in the cue sheet is a tone that slides in pitch. A light going out is a dry relay click, the television going off is a soft
+thunk, the camera is its shutter and the short pop of the flash, and a footstep's sole or a latch's bolt is a tick of noise
+(`tick` in `gen_music.js`): a pitch that falls or rises in a few milliseconds sounds like a toy ray gun whatever it was meant to be.
 
 The player waits for the game's own loading to finish before the first shot (it ends by putting the thing out on the lawn for the
 title), a shot with the hands in it runs half a second of the game unseen before its first frame so they are already held, and the
 landscape cut draws every frame whole (`cull.enabled` off).
 
 What a shot borrows from the game it asks `lib.js` for (`gameHelpers`): the hands as the game shows them in play, the camera's flash,
-a room's light by its switch, the breath meter, the night's fog and moon for the shot from the lawn, the rain, the car's headlights,
-the lightning. Each is given back when the shot
-ends, so the order of the shots never changes what one shows.
+a room's light by its switch, the breath meter, the night's fog and moon for the shots outside, the rain, the lightning, the face at
+the windows, a warm afternoon indoors. Each is given back when the shot ends, so the order of the shots never changes what one shows.
+The closet's leaves closing in front of the lens and the quilt held open are drawn over the picture (`leaves` and `quilt` in `lib.js`).
 
 The cue sheet and the music plan follow the marks: a time can be a number, a string in the marks (`"TURN+2.5"`, `"TURN+0.4*ACT2"`,
 where `ACT2` is `DROP-TURN`), or for a cue a shot and a point in it (`{"shot": "door", "k": 0.3}` a fraction of it, `{"shot": "breaker",
@@ -136,7 +148,7 @@ where `ACT2` is `DROP-TURN`), or for a cue a shot and a point in it (`{"shot": "
 The landscape cut is timed to a 2:19 song that is not in the repository (see the marks above). The song is clean to the turn and a bar past
 it, then warps harder with every band of the second act (low-pass, the record slowing and dropping in pitch, tape wow; `music_plan.json`),
 cuts to silence at the drop, and comes back faint under the title cards. Pass a licensed track with `--music path/to/track.wav` (any
-format ffmpeg reads), and set `TURN` and `DROP` to where those words fall in it.
+format ffmpeg reads), and set `TURN` and `DROP` to where its bridge and its last line fall.
 
 Without it the trailer uses `trailer/music/placeholder.wav`, an original lullaby of the same length that `gen_music.js` synthesizes. The
 same script writes the small effects the cue sheets use (the telephone's bell and the camera's shutter among them); the other effects
