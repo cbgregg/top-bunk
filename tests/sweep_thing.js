@@ -8,7 +8,8 @@
 //   edges    the thing on every nav edge both ways, at a walk (1.55 m/s) and at a hunt (3.6 m/s), doors open (on all fours through the
 //            laundry): no vertex under its floor, over 2.68 m above it, inside a wall, a door head, a fixture's dome, the laundry's joists
 //            or a piece of furniture by more than 2 cm; its crown 1.95 m or lower in every doorway (the duck)
-//   poses    the same tests for each pose it is put in by a scene: the crumple, standing, the peek (scale 0.72), lying on the bottom bunk,
+//   poses    the same tests for each pose it is put in by a scene: the crumple, standing, the peek (scale 0.72), the watcher at each door
+//            off the hall (hunter.js watch: bent forward, its head and a shoulder out in the opening), lying on the bottom bunk,
 //            sitting at the kitchen table (reported with collide.fits: the pose ships only if it fits), night one's bedside, the finale,
 //            the paralysis; the unfold's five keys; and what it does by itself on its feet, in the hall and in the living room: its head
 //            cocked too far to either side, the rise from the crumple's five keys, the jaw dropped, a hand over its face in the torch
@@ -202,6 +203,16 @@ const STEPS = {
       E.root.scale.setScalar(0.72); E.root.position.set(x, 0, z); E.faceTowards(x - nx * 3, z - nz * 3, 1);
       const ry = E.root.rotation.y, lx = Math.cos(ry), lz = -Math.sin(ry); E.leanSide = ((-ax) * lx + (-az) * lz > 0 ? -1 : 1) * 0.85; E.lean = 0.3;
     }, { fitsAs: window.__peekNoFits ? null : 'peek', fitsYaw: 0 });
+    // the watcher (hunter.js watch): further in behind the jamb and nearer the opening than the peek, bent well forward with its head
+    // and a shoulder out, a player down the hall; held where the hunter's own placement would put it (a door it would not use is skipped)
+    for (const [name, px, pz] of [['kid', 5.5, -0.42], ['bath', 9.9, -0.42], ['room2', 9.9, -0.42], ['spare', 6.0, -0.42]]) pose(`watch from the ${name} door`, () => {
+      const d = W.doors[name], m = d.mid; camera.position.set(px, 1.32, pz);
+      let ax = m.x - d.hx, az = m.z - d.hz; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al; if (ax * (px - m.x) + az * (pz - m.z) < 0) { ax = -ax; az = -az; }
+      let nx = -az, nz = ax; if (nx * (m.x - px) + nz * (m.z - pz) < 0) { nx = -nx; nz = -nz; }
+      const x = m.x + nx * 0.38 + ax * 0.31, z = m.z + nz * 0.38 + az * 0.31;
+      E.root.scale.setScalar(0.72); E.root.position.set(x, 0, z); E.faceTowards(x - nx * 3, z - nz * 3, 1);
+      const ry = E.root.rotation.y, lx = Math.cos(ry), lz = -Math.sin(ry); E.leanSide = ((-ax) * lx + (-az) * lz > 0 ? -1 : 1) * 0.85; E.lean = 1.25; E.tilt = 0.25;
+    });
     // lying on its back on the bottom bunk, knees up under the slats
     // (the bottom bunk's mattress: its top from the bedding the world keeps, its head end at the pillow; the top bunk's slats 1.42 m up)
     pose('lie', () => { camera.position.set(8.5, 1.32, 1.6); const lb = W.lowerBunk, top = lb ? lb.top : 0.527; E.root.position.set(8.66, top, 3.86); E.root.rotation.y = Math.PI / 2; E.mode = 'lie'; }, { skip: (c) => c.id === 'bottom mattress' });

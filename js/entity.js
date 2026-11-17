@@ -911,7 +911,12 @@ export class Entity {
       this.root.updateMatrixWorld(true);
       const drop = 0.4 * dk;
       r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 1, 0], -0.3 * tuck);   // the shoulders drawn in and forward
-      for (const sd of ['L', 'R']) { const left = sd === 'L' ? 1 : -1; r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], this.T(left * (this.hands ? 0.14 : 0.17), (this.hands ? 1.08 : 1.02) - drop, this.hands ? 0.22 : 0.3, _a), this.T(left * 0.4, 1.5 - drop, -0.8, _b), tuck); }
+      for (const sd of ['L', 'R']) {
+        // (leaning out from behind something, the hand that is not on the wall is held in at its side, not in front: in front, bent over,
+        // its long fingers went into the jamb it hides behind)
+        const left = sd === 'L' ? 1 : -1, held = this.leanSide && sd !== (this.leanSide > 0 ? 'R' : 'L');
+        r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], this.T(left * (this.hands ? 0.14 : 0.17), (this.hands ? 1.08 : 1.02) - drop, held ? 0.02 : this.hands ? 0.22 : 0.3, _a), this.T(left * 0.4, 1.5 - drop, -0.8, _b), tuck);
+      }
     }
     if (feet) this.setFeet(feet);   // (after every bend of the back: the legs hang from it)
     this.plantToes(); this.keepFeetOut(); this.soleGuard();   // (the toes turned up first: that swings them further out over the floor)
