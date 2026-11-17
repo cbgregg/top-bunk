@@ -10,7 +10,9 @@
 //            or a piece of furniture by more than 2 cm; its crown 1.95 m or lower in every doorway (the duck)
 //   poses    the same tests for each pose it is put in by a scene: the crumple, standing, the peek (scale 0.72), lying on the bottom bunk,
 //            sitting at the kitchen table (reported with collide.fits: the pose ships only if it fits), night one's bedside, the finale,
-//            the paralysis; and the unfold's five keys
+//            the paralysis; the unfold's five keys; and what it does by itself on its feet, in the hall and in the living room: its head
+//            cocked too far to either side, the rise from the crumple's five keys, the jaw dropped, a hand over its face in the torch
+//            and the flash, and twenty seconds of standing still (the twitches)
 //   player   the player driven into it (the crumple, the crawl, the peek, lying, the loom at a hiding place's door, the frozen stalk):
 //            the body stops outside the pose's extent and the eye's five rays never come within 2 cm of its skin
 //   catch    the catch's three frames from the player's eye: only the third brings its face through the near plane
@@ -92,7 +94,7 @@ function lib() {
     }
     const setDoors = (open) => { for (const k in W.doors) W.setDoor(k, open, true); for (let i = 0; i < 200; i++) W.tick(0.05); };
     const crownY = () => E.head.localToWorld(new V(0, 0.264, 0)).y;
-    const reset = () => { E.visible = true; E.root.scale.setScalar(1); E.mode = 'idle'; E.standUp(); E.lean = 0; E.reach = 0; E.tilt = 0; E.leanSide = 0; E.snap = 0; E.flinch = 0; E.stun = 0; E.catchPose = null; E.duckHold = null; E.post = null; E.crawlSpeed = 0; E.lungeOut = 0; E.gait = null; E.sneak = false; E.lookTarget = camera.position; E.ground = W.groundAt; E.cling = null; };
+    const reset = () => { E.visible = true; E.root.scale.setScalar(1); E.mode = 'idle'; E.standUp(); E.lean = 0; E.reach = 0; E.tilt = 0; E.leanSide = 0; E.snap = 0; E.flinch = 0; E.stun = 0; E.catchPose = null; E.duckHold = null; E.post = null; E.crawlSpeed = 0; E.lungeOut = 0; E.gait = null; E.sneak = false; E.lookTarget = camera.position; E.ground = W.groundAt; E.cling = null; E.gape = 0; E.cock = null; E.smileScale = 1; };
     window.__ST = { g, W, C, P, E, F, camera, nav, DT, V, findings, find, notes, verts, bodyCheck, setDoors, crownY, reset, ground };
   });
 }
@@ -111,7 +113,7 @@ const STEPS = {
     const g = E.gait, planted = (L) => !g.swing || g.swing !== L || ((g.t - g.k) < 0.72);
     const c = { hands: [y('L_Hand'), y('R_Hand')], knees: [y('L_Calf'), y('R_Calf')], feet: [y('L_Foot'), y('R_Foot')], crown: crownY() };
     out.crawl = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, Array.isArray(v) ? v.map((x) => +x.toFixed(3)) : +v.toFixed(3)]));
-    if (planted('LH') && planted('RH') && Math.max(...c.hands) > 0.07) find('dump', 'crawl', 'hands', `planted hands at ${c.hands.map((v) => v.toFixed(3))}`, null);
+    if (planted('LH') && planted('RH') && Math.max(...c.hands) > 0.085)   // (the wrist bone of a flat hand: the modelled wrist is 5 cm through) find('dump', 'crawl', 'hands', `planted hands at ${c.hands.map((v) => v.toFixed(3))}`, null);
     if (Math.max(...c.knees) > 0.2) find('dump', 'crawl', 'knees', `knees at ${c.knees.map((v) => v.toFixed(3))}`, null);
     if (Math.max(...c.feet) > 0.075) find('dump', 'crawl', 'feet', `feet at ${c.feet.map((v) => v.toFixed(3))}`, null);
     if (c.crown >= 0.95) find('dump', 'crawl', 'crown', `crown at ${c.crown.toFixed(3)}`, null);
@@ -228,6 +230,23 @@ const STEPS = {
     // the crawl, still, in the hall and in the living room
     pose('crawl in the hall', () => { camera.position.set(9.9, 1.32, -0.42); E.root.position.set(7.2, 0, -0.42); E.faceTowards(9.9, -0.42, 1); E.mode = 'crawl'; E.snap = 1; }, { fitsAs: 'crawl' });
     pose('crawl in the living room', () => { camera.position.set(3.4, 1.32, -1.6); E.root.position.set(0.6, 0, -1.6); E.faceTowards(3.4, -1.6, 1); E.mode = 'crawl'; E.snap = 1; }, { fitsAs: 'crawl' });
+    // what it does by itself on its feet, in the hall (the least room it stands in; checked whether or not a scene would stand it
+    // there) and in the living room: its head gone over too far to either side, the rise from the crumple a key at a time, the jaw dropped, a hand over its face in the torch and in the flash
+    const SPOTS = [['in the hall', 7.2, -0.42, 9.9], ['in the living room', 1.2, -1.6, 3.1]];
+    const put = (x, z, cx) => { camera.position.set(cx, 1.32, z); E.root.position.set(x, 0, z); E.faceTowards(cx, z, 1); };
+    for (const [where, x, z, cx] of SPOTS) {
+      for (const side of [1, -1]) pose(`head cocked too far to its ${side > 0 ? 'right' : 'left'} ${where}`, () => { put(x, z, cx); settle(4); E.headCock(side); settle(190); }, { held: true });
+      for (let k = 1; k <= 5; k++) pose(`rise key ${k} ${where}`, () => { put(x, z, cx); E.mode = 'crumple'; E.side = 1; settle(20); E.mode = 'idle'; for (let i = 0; i < Math.round((k * 0.1 - 0.012) * 60); i++) E.update(1 / 60); }, { held: true });
+      pose(`the jaw dropped ${where}`, () => { put(x, z, cx); E.gape = 1; E.smileScale = 1.6; }, {});
+      pose(`the torch in its face ${where}`, () => { put(x, z, cx); E.flinch = 1; }, {});
+      pose(`the flash ${where}`, () => { put(x, z, cx); E.stun = 1; }, {});
+    }
+    // and twenty seconds of standing where it was put, every third frame of it: whatever twitches, nothing clips
+    for (const [where, x, z, cx] of SPOTS) {
+      reset(); put(x, z, cx); let bad = false;
+      for (let i = 0; i < 1200 && !bad; i++) { E.update(1 / 60); if (i % 3 === 0) { const n = window.__ST.findings.length; bodyCheck('poses', `standing still ${where}`); bad = window.__ST.findings.length > n; } }
+      out[`standing still ${where}`] = { clean: !bad };
+    }
     reset(); E.visible = false;
     return out;
   }),

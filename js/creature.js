@@ -1,4 +1,4 @@
-// the thing's face, built in code: a signed-distance skull that runs down into the neck, ring eyes that sit in sockets, and a grin cut
+// the thing's face, built in code: a signed-distance skull that runs down into the neck, pale eyes that sit in sockets, and a grin cut
 // into the head with the teeth inside
 import * as THREE from 'three';
 import { lerp, smoothstep as ss } from './mathx.js';
@@ -17,8 +17,9 @@ const EYES = [
 // eye itself. where the skull faces the viewpoint less than EYE_EDGE (about 20 degrees short of its edge) the outline is cut, so no
 // ring crosses the head's outline from nearby angles either
 const VIEW_Y = -0.148, VIEW_Z = 1.8, PLANE_Z = 0.172, EYE_GROW = 1.08, EYE_EDGE = 0.32;
-const PUPIL_K = 1.075, PUPIL_NEAR = 0.08;   // pupil size over the eye's, and how much larger it looms up close
-const EYE_GLOW = 1.85, GRIN_GLOW = 1.18, WARM = new THREE.Color(1, 0.86, 0.7);   // warm: what the teeth light the mouth with
+const PUPIL_K = 1.075, PUPIL_NEAR = 0.08;   // the iris's size over the eye's, and how much larger it looms up close
+const PUPIL_PIN = 0.3;   // the pupil's share of the iris: a pinprick
+const EYE_GLOW = 1.25, GRIN_GLOW = 1.18, EYE_SELF = 0.62, GRIN_SELF = 0.2, WARM = new THREE.Color(1, 0.86, 0.7);   // warm: what the teeth light the mouth with
 // the neck: a capsule from low in the skull down into the chest, thin under the jaw and filling out toward the shoulders, joined to
 // the skull with a small fillet (k round the back, kChin under the chin)
 const NECK = { a: [-0.17, -0.03], b: [-0.50, -0.12], ra: 0.042, rb: 0.085, k: 0.03, kChin: 0.02, end: -0.46, sx: 1.0 };
@@ -98,7 +99,7 @@ function grinAt(a, s) {
   const [p0, p1] = t >= 0 && t <= 1 ? grinPx(t, s) : [4, 4];
   const yt = yOf(p0, s), yb = yOf(p1, s), past = t < 0 ? -t : t > 1 ? t - 1 : 0, lip = 1 - ss(0, 0.035, past);
   // f: how far the mouth opens; it stays a little open out to the corners and just past them, so each ends in a dark notch
-  return { yt, yb, h: yt - yb, f: Math.max(ss(0.002, 0.03, yt - yb), 0.45 * lip), lip, cheek: 1 - ss(0, 0.3, past) };
+  return { yt, yb, h: yt - yb, f: Math.max(ss(0.002, 0.03, yt - yb), 0.45 * lip), lip, cheek: 1 - ss(0, 0.3, past), past, corner: past > 0 ? 1 : ss(0.5, 1, Math.abs(t - 0.5) * 2) };
 }
 // how far to push the skull point b out, level from the axis, at smile s: the jaw comes out most of the way to where the grin cylinder
 // stood, easing off over a band above and below the lips and past the corners, and not round the eyes (eye: how far from the nearer
@@ -135,6 +136,22 @@ function spline(P, i, u) {
   }
   return out;
 }
+
+// ---------- the jaw ----------
+// the gape: everything under the upper teeth swung down and back about a hinge through the head just behind the grin's corners, a good
+// deal further than a jaw goes (k 0..1; w how much of the swing a point takes: all of it from the lower lip to the chin, none down the neck
+// or behind the corners)
+const JAW = { y: 0.04, z: -0.1, ang: 0.5 };
+function jawDrop(v, k, w) {
+  const t = JAW.ang * k * w; if (t === 0) return v;
+  const c = Math.cos(t), s = Math.sin(t), y = v.y - JAW.y, z = v.z - JAW.z;
+  v.y = JAW.y + y * c - z * s; v.z = JAW.z + y * s + z * c;
+  return v;
+}
+const jawSide = (g) => 1 - ss(0, 0.1, g.past), jawNeck = (y) => ss(-0.4, -0.27, y);
+// the corners of the mouth go half way down with it, and the cheek over each stretches: above the lips half the swing at the corner and
+// none in the middle or 8 cm up; below them all of it, less beside the corner
+const jawUp = (g, y) => 0.5 * g.corner * ss(g.yt + 0.08, g.yt, y), jawLo = (g, y) => lerp(1, 0.5, g.corner * ss(g.yb - 0.08, g.yb, y));
 
 // ---------- the eye outlines ----------
 // how far along the ray o + t d it first enters an ellipsoid (centre c, semi-axes r, turned by roll about z); Infinity if it misses
@@ -246,7 +263,7 @@ function sinkDir(p, n, out) { return out.set(p.x - VIEW_FROM[0], p.y - VIEW_FROM
 const sinkK = (p) => ss(0.12, 0.42, facing(p));
 
 // ---------- the head mesh ----------
-const NC = 192, N_UP = 84, N_LO = 50, N_LO_CAP = 40;
+const NC = 144, N_UP = 64, N_LO = 40, N_LO_CAP = 32, NW = NC + 1;
 // column azimuths: dense across the face and the widest grin, sparse round the back
 const COLS = (() => {
   const dens = (a) => 0.26 + 0.74 * (1 - ss(1.0, 1.25, Math.abs(a))) + 0.5 * (1 - ss(1.85, 2.15, Math.abs(a))) * ss(1.0, 1.25, Math.abs(a));
@@ -275,14 +292,17 @@ function resample(pts, n) {
 }
 // the skull at one smile: positions for every column and row with the mouth open and (if asked) shut, the glow attribute (how much of
 // the eyes' light the skin can take, the mouth's light) and where each point lies in the two eyes' frames
-function headState(s, neck, withShut) {
+function headState(s, neck, withShut, gape = 0) {
   const _n = new THREE.Vector3(), _d = new THREE.Vector3(), _p = new THREE.Vector3();
-  const nLo = neck ? N_LO : N_LO_CAP, rows = N_UP + 19 + nLo, count = 1 + rows * NC + (neck ? 0 : 1);
+  const nLo = neck ? N_LO : N_LO_CAP, rows = N_UP + 19 + nLo, count = (rows + 1) * NW + (neck ? 0 : 1);
   const pos = new Float32Array(count * 3), shut = withShut ? new Float32Array(count * 3) : null, glow = new Float32Array(count * 2);
-  const eyeq = new Float32Array(count * 4).fill(9);
-  for (const a of [pos, shut]) if (a) { a.set([0, RY, 0], 0); if (!neck) a.set([0, -RY, 0], a.length - 3); }
+  const eyeq = new Float32Array(count * 4).fill(9), uv = new Float32Array(count * 2);
+  // the top row is the crown, once for every column; the last column is the first again (the seam of the picture runs down the back)
+  for (const a of [pos, shut]) if (a) { for (let c = 0; c < NW; c++) a.set([0, RY, 0], c * 3); if (!neck) a.set([0, -RY, 0], a.length - 3); }
+  for (let r = -1; r < rows; r++) for (let c = 0; c < NW; c++) uv.set([c / NC, (r + 1) / rows], ((r + 1) * NW + c) * 2);
+  if (!neck) uv.set([0.5, 1], (count - 1) * 2);
   for (let c = 0; c < NC; c++) {
-    const a = COLS[c], sa = Math.sin(a), ca = Math.cos(a), g = grinAt(a, s), path = mouthPath(g, true);
+    const a = COLS[c], sa = Math.sin(a), ca = Math.cos(a), g = grinAt(a, s), path = mouthPath(g, true), jw = gape * jawSide(g);
     // crown to the top of the upper lip
     const up = [], y0 = path[0][0], f0 = Math.asin(Math.max(-1, Math.min(1, y0 / RY)));
     for (let i = 0; i <= 120; i++) { const f = lerp(Math.PI / 2, f0, i / 120); up.push(basePoint(a, i === 120 ? y0 : RY * Math.sin(f), neck, new THREE.Vector3())); }
@@ -291,52 +311,71 @@ function headState(s, neck, withShut) {
     if (neck) for (let i = 0; i <= 240; i++) lo.push(basePoint(a, lerp(y1, NECK.end, i / 240), neck, new THREE.Vector3()));
     else { const f1 = Math.asin(Math.max(-1, Math.min(1, y1 / RY))); for (let i = 0; i < 160; i++) lo.push(basePoint(a, i === 0 ? y1 : RY * Math.sin(lerp(f1, -Math.PI / 2, i / 160)), neck, new THREE.Vector3())); }
     // the bottom pole is its own vertex, so the cap stops one step short of it
-    const put = (arr, r, p, mouthDepth) => {
-      const [sd, front, eye, q] = sockets(p.x, p.y, p.z), i = 1 + r * NC + c;
+    const put = (arr, r, p, mouthDepth, jaw) => {
+      const [sd, front, eye, q] = sockets(p.x, p.y, p.z), i = (r + 1) * NW + c;
       if (sd) sinkDir(p, baseNormal(p, neck, _n), _n);
-      pushOut(_p.copy(p), muzzle(p, g, s, eye)).addScaledVector(_d.set(sa, 0, ca), -mouthDepth).addScaledVector(_n, sd).toArray(arr, i * 3);
+      pushOut(_p.copy(p), muzzle(p, g, s, eye)).addScaledVector(_d.set(sa, 0, ca), -mouthDepth).addScaledVector(_n, sd);
+      if (jaw > 0) jawDrop(_p, jw, jaw);
+      _p.toArray(arr, i * 3);
       if (arr === pos) { glow[i * 2] = front; eyeq.set(q, i * 4); }
     };
     let r = 0;
-    for (const p of resample(up, N_UP)) { put(pos, r, p, 0); if (shut) put(shut, r, p, 0); r++; }
-    // through the lips and the mouth (the shut mouth keeps the same rows, flat)
+    for (const p of resample(up, N_UP)) { put(pos, r, p, 0, gape ? jawUp(g, p.y) : 0); if (shut) put(shut, r, p, 0, 0); r++; }
+    // through the lips and the mouth (the shut mouth keeps the same rows, flat). The jaw takes the lower half of it: the back of the
+    // mouth is what stretches
     const shutPath = shut && mouthPath(g, false);
     for (let i = 0; i < SEG.length; i++) for (let k = 1; k <= SEG[i]; k++) {
-      const [y, depth, mg] = spline(path, i, k / SEG[i]);
-      put(pos, r, basePoint(a, y, neck, _p.clone()), depth); glow[(1 + r * NC + c) * 2 + 1] = mg;
-      if (shut) put(shut, r, basePoint(a, spline(shutPath, i, k / SEG[i])[0], neck, _p.clone()), 0);
+      const [y, depth, mg] = spline(path, i, k / SEG[i]), ju = jawUp(g, g.yt), jl = jawLo(g, g.yb), jaw = !gape ? 0 : i < 4 ? ju : i === 4 ? lerp(ju, jl, k / SEG[i]) : jl;
+      put(pos, r, basePoint(a, y, neck, _p.clone()), depth, jaw); glow[((r + 1) * NW + c) * 2 + 1] = mg * (1 + 0.6 * gape * jaw);
+      if (shut) put(shut, r, basePoint(a, spline(shutPath, i, k / SEG[i])[0], neck, _p.clone()), 0, 0);
       r++;
     }
-    for (const p of resample(lo, nLo)) { put(pos, r, p, 0); if (shut) put(shut, r, p, 0); r++; }
+    for (const p of resample(lo, nLo)) { const jaw = !gape ? 0 : jawLo(g, p.y) * (neck ? jawNeck(p.y) : 1); put(pos, r, p, 0, jaw); if (shut) put(shut, r, p, 0, 0); r++; }
   }
-  return { pos, shut, glow, eyeq, rows };
+  for (let r = 0; r < rows; r++) { const i = (r + 1) * NW, j = i + NC; for (const [a, n] of [[pos, 3], [shut, 3], [glow, 2], [eyeq, 4]]) if (a) for (let k = 0; k < n; k++) a[j * n + k] = a[i * n + k]; }
+  return { pos, shut, glow, eyeq, uv, rows };
 }
 function headIndex(rows, neck) {
-  const idx = [], v = (r, c) => 1 + r * NC + ((c + NC) % NC);
-  for (let c = 0; c < NC; c++) idx.push(0, v(0, c), v(0, c + 1));
+  const idx = [], v = (r, c) => (r + 1) * NW + c;
+  for (let c = 0; c < NC; c++) idx.push(v(-1, c), v(0, c), v(0, c + 1));
   for (let r = 0; r < rows - 1; r++) for (let c = 0; c < NC; c++) idx.push(v(r, c), v(r + 1, c), v(r, c + 1), v(r, c + 1), v(r + 1, c), v(r + 1, c + 1));
-  if (!neck) { const last = 1 + rows * NC; for (let c = 0; c < NC; c++) idx.push(last, v(rows - 1, c + 1), v(rows - 1, c)); }
+  if (!neck) { const last = (rows + 1) * NW; for (let c = 0; c < NC; c++) idx.push(last, v(rows - 1, c + 1), v(rows - 1, c)); }
   return idx;
 }
-function normalsOf(pos, index) {
+function normalsOf(pos, index, rows) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(index); g.computeVertexNormals();
-  const n = g.attributes.normal.array;
+  const n = g.attributes.normal.array, v = new THREE.Vector3();
+  // the two sides of the seam share a normal, and so does the whole of the crown
+  for (let r = 0; r < rows; r++) { const i = (r + 1) * NW * 3, j = i + NC * 3; v.set(n[i] + n[j], n[i + 1] + n[j + 1], n[i + 2] + n[j + 2]).normalize(); v.toArray(n, i); v.toArray(n, j); }
+  for (let c = 0; c < NW; c++) { n[c * 3] = 0; n[c * 3 + 1] = 1; n[c * 3 + 2] = 0; }
   for (let i = 0; i < n.length; i += 3) if (!(n[i] * n[i] + n[i + 1] * n[i + 1] + n[i + 2] * n[i + 2] > 0.5)) { n[i] = 0; n[i + 1] = 1; n[i + 2] = 0; }
   return n;
 }
-// the skull (and with neck, the neck down to 0.46 m under the skull centre, open at the bottom), with two morph targets:
-// 0 the widest grin (smileScale 1.6), 1 the mouth shut
-export function headGeometry({ neck = false } = {}) {
-  const base = headState(1, neck, true), wide = headState(1.6, neck, false);
+// the rows and columns of the skull-and-neck mesh and the rows the lips and the mouth take, for whoever lays a modelled head over it
+// (tools/models/thing.cjs)
+export const HEAD_GRID = { cols: NW, rows: N_UP + 19 + N_LO + 1, mouth: [N_UP + 1, N_UP + 19] };
+// the skull (and with neck, the neck down to 0.46 m under the skull centre, open at the bottom), with three morph targets:
+// 0 the widest grin (smileScale 1.6), 1 the mouth shut, 2 the jaw dropped (the gape)
+// sculpt: the same vertices as they were modelled (assets/models/thing.glb's head, in this mesh's order); the grin, the shut mouth and
+// the gape then move it by as much as they move the plain skull
+export function headGeometry({ neck = false, sculpt = null } = {}) {
+  const base = headState(1, neck, true), wide = headState(1.6, neck, false), gape = headState(1, neck, false, 1);
   const index = headIndex(base.rows, neck);
+  const targets = [wide.pos, base.shut, gape.pos];
+  let pos = base.pos;
+  if (sculpt && sculpt.length === pos.length) {
+    for (const t of targets) for (let i = 0; i < t.length; i++) t[i] += sculpt[i] - pos[i];
+    pos = Float32Array.from(sculpt);
+  }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(base.pos, 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(normalsOf(base.pos, index), 3));
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(normalsOf(pos, index, base.rows), 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(base.uv, 2));
   geo.setAttribute('glow', new THREE.BufferAttribute(base.glow, 2));
   geo.setAttribute('eyeq', new THREE.BufferAttribute(base.eyeq, 4));
   geo.setIndex(index);
-  geo.morphAttributes.position = [wide.pos, base.shut].map((p) => new THREE.BufferAttribute(p, 3));
-  geo.morphAttributes.normal = [wide.pos, base.shut].map((p) => new THREE.BufferAttribute(normalsOf(p, index), 3));
+  geo.morphAttributes.position = targets.map((p) => new THREE.BufferAttribute(p, 3));
+  geo.morphAttributes.normal = targets.map((p) => new THREE.BufferAttribute(normalsOf(p, index, base.rows), 3));
   geo.morphTargetsRelative = false;
   geo.computeBoundingSphere();
   return geo;
@@ -378,112 +417,147 @@ function eyeGeometry() {
   return g;
 }
 // the glow is the material's colour (trailer/lib.js finds this material by toneMapped === false and scales its colour to switch the
-// eyes off and on). the white is even with a hard edge, the pupil a dead black disc. pulled a hair toward the camera in depth, so
-// where the socket runs out at the side of the head the skin does not break through the eye
+// eyes off and on). A dead eye: a pale white going bloodshot toward the lids, a clouded iris with a dark edge and a pinprick of a
+// pupil. It shows a little by itself in the dark, and a light shone into it comes back (shine 0..1): the whole eye brightens and the
+// pupil lights up like an animal's. pulled a hair toward the camera in depth, so where the socket runs out at the side of the head
+// the skin does not break through the eye
 function eyeMaterial() {
   const m = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   m.name = 'creatureEyes'; m.color.setRGB(EYE_GLOW, EYE_GLOW, EYE_GLOW);
-  const u = m.userData.uniforms = { pupils: { value: PUPIL_AT.map((p) => new THREE.Vector2(...p)) }, blink: { value: 0 } };
+  const u = m.userData.uniforms = { pupils: { value: PUPIL_AT.map((p) => new THREE.Vector2(...p)) }, blink: { value: 0 }, shine: { value: 0 }, pin: { value: PUPIL_PIN } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 exy, eq; attribute float eid; varying vec2 vExy, vEq; varying float vEid, vDist;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvExy = exy; vEq = eq; vEid = eid;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvDist = length( mvPosition.xyz ) / length( modelViewMatrix[ 0 ].xyz );');
-    // the pupils loom a little larger up close, in proportion to their size at 1.1 m; the white is a little darker toward its upper
-    // edge, under the lip of the socket
+    // the iris looms a little larger up close, in proportion to its size at 1.1 m; the white is darker toward its upper edge, under
+    // the lip of the socket
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform vec2 pupils[2]; uniform float blink; varying vec2 vExy, vEq; varying float vEid, vDist;`)
+      uniform vec2 pupils[2]; uniform float blink, shine, pin; varying vec2 vExy, vEq; varying float vEid, vDist;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       {
         float r = length( vEq ), ra = fwidth( r ) * 0.7;
+        if ( r > 1.06 ) discard;   // (past the socket's wall the dark margin would show through pale skin at the side of the head)
         float white = 1.0 - smoothstep( 1.0 - ra, 1.0 + ra, r );
         float near = ( 1.0 + ${PUPIL_NEAR} / max( vDist, 0.6 ) ) / ( 1.0 + ${PUPIL_NEAR} / 1.1 );
         vec2 pd = ( vExy - ( vEid < 0.5 ? pupils[ 0 ] : pupils[ 1 ] ) ) / ( vec2( ${PUPIL_R[0]}, ${PUPIL_R[1]} ) * near );
         float pr = length( pd ), pa = fwidth( pr ) * 1.2 + 0.015;
-        float pupil = 1.0 - smoothstep( 1.0 - pa, 1.0 + pa, pr );
-        float lid = 1.0 - 0.25 * smoothstep( 0.8, 0.99, r ) * smoothstep( 0.2, 0.9, vEq.y / max( r, 1e-4 ) );
+        float iris = 1.0 - smoothstep( 1.0 - pa, 1.0 + pa, pr ), pupil = 1.0 - smoothstep( pin - pa, pin + pa, pr );
+        float lid = 1.0 - 0.45 * smoothstep( 0.6, 0.99, r ) * smoothstep( 0.0, 0.9, vEq.y / max( r, 1e-4 ) );
         float fall = 1.05 - 2.2 * blink;   // the lid's edge coming down over the eye
         white *= 1.0 - smoothstep( fall - 0.04, fall + 0.04, vEq.y );
-        diffuseColor.rgb = white * lid * diffuse * ( 1.0 - pupil ) + ( 1.0 - white ) * vec3( 0.0025 );
+        // sunk: bright only toward the middle, the rest in the socket's shadow
+        float deep = 1.0 - 0.72 * smoothstep( 0.35, 1.0, r );
+        vec3 sclera = mix( vec3( 0.8, 0.84, 0.9 ), vec3( 0.46, 0.17, 0.15 ), 0.8 * smoothstep( 0.3, 1.0, r ) );
+        vec3 cloud = vec3( 0.55, 0.62, 0.68 ) * ( 1.0 - 0.7 * smoothstep( 0.7, 1.0, pr ) );
+        vec3 col = mix( sclera, cloud, iris ) * lid * deep * ( ${EYE_SELF} + 0.55 * shine );
+        col = mix( col, vec3( 1.0, 0.93, 0.7 ) * 3.2 * shine, pupil );
+        diffuseColor.rgb = white * diffuse * col + ( 1.0 - white ) * vec3( 0.0025 );
       }`);
   };
   return m;
 }
 
 // ---------- the teeth ----------
+const GAP = new THREE.Color(0.05, 0.012, 0.01);   // the inside of the mouth
 // a band across the opening, the top row 9 mm inside the lips and the bottom row 4 mm (so the lower lip does not hide it from a camera
-// looking up at it), less toward the corners, where the mouth is shallow
-function teethState(s, NTC, NTR) {
+// looking up at it), less toward the corners, where the mouth is shallow. gape: the lower half of the band goes down with the jaw
+function teethState(s, NTC, NTR, gape = 0) {
   const pos = [], v = new THREE.Vector3();
   for (let c = 0; c <= NTC; c++) {
     const t = c / NTC, th = -G.th + 2 * G.th * (18 + 988 * t) / 1024, a = azOf(th, s), [p0, p1] = grinPx(t, s), g = grinAt(a, s);
     for (let r = 0; r <= NTR; r++) {
       basePoint(a, yOf(lerp(p0, p1, r / NTR), s), false, v);
       pushOut(v, muzzle(v, g, s) - g.f * lerp(0.009, 0.004, ss(0.3, 0.8, r / NTR)));
+      if (gape > 0) jawDrop(v, gape, lerp(0.5 * g.corner, lerp(1, 0.5, g.corner), ss(0.42, 0.62, r / NTR)));
       pos.push(v.x, v.y, v.z);
     }
   }
   return pos;
 }
 function teethGeometry() {
-  const NTC = 160, NTR = 10, tuv = [], idx = [];
-  for (let c = 0; c <= NTC; c++) for (let r = 0; r <= NTR; r++) tuv.push(c / NTC, r / NTR);   // along the grin, top lip to bottom
+  const NTC = 160, NTR = 10, tuv = [], tk = [], idx = [];
+  const base = teethState(1, NTC, NTR), open = teethState(1, NTC, NTR, 1);
+  // tk: how much taller the gape makes the opening at this column, over its height shut (the shader keeps the teeth their own length)
+  const span = (p, c) => { const i = c * (NTR + 1) * 3, j = i + NTR * 3; return Math.hypot(p[j] - p[i], p[j + 1] - p[i + 1], p[j + 2] - p[i + 2]); };
+  for (let c = 0; c <= NTC; c++) for (let r = 0; r <= NTR; r++) { tuv.push(c / NTC, r / NTR); tk.push(span(open, c) / Math.max(1e-5, span(base, c)) - 1); }   // along the grin, top lip to bottom
   const v = (c, r) => c * (NTR + 1) + r;
   for (let c = 0; c < NTC; c++) for (let r = 0; r < NTR; r++) idx.push(v(c, r), v(c, r + 1), v(c + 1, r), v(c + 1, r), v(c, r + 1), v(c + 1, r + 1));
   const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(teethState(1, NTC, NTR), 3));
+  g.setAttribute('position', new THREE.Float32BufferAttribute(base, 3));
   g.setAttribute('tuv', new THREE.Float32BufferAttribute(tuv, 2));
+  g.setAttribute('tk', new THREE.Float32BufferAttribute(tk, 1));
   g.setIndex(idx); g.computeVertexNormals();
-  g.morphAttributes.position = [new THREE.Float32BufferAttribute(teethState(1.6, NTC, NTR), 3)];
+  g.morphAttributes.position = [new THREE.Float32BufferAttribute(teethState(1.6, NTC, NTR), 3), new THREE.Float32BufferAttribute(open, 3)];
   g.computeBoundingSphere();
   return g;
 }
-// two rows of narrow teeth drawn in the shader, 50 across the grin, the lower row half a tooth over from the upper. each tooth is a
-// little wider or longer than its neighbours, a few of the upper ones long; the tips meet a little past the middle of the mouth,
-// the upper row in front, so there is no line between the rows, only a shadow under the upper tips and the odd dark notch. between
-// the teeth and past their tips the inside of the mouth shows, lit warm by them. dimmer toward the corners and at the lips
-const GAP = WARM.clone().multiplyScalar(0.05);
+// two rows of narrow teeth drawn in the shader, 50 across the grin, the lower row half a tooth over from the upper. no two alike: each
+// is a little wider or longer than its neighbours, some of the upper ones long, one in sixteen gone; stained brown where they come out
+// of the gums. the tips meet a little past the middle of the mouth, the upper row in front, so there is no line between the rows, only
+// a shadow under the upper tips and the odd dark notch. when the jaw drops (gape) the rows part and two more rows show behind each,
+// further down the throat, dimmer and out of step. between the teeth and past their tips the inside of the mouth shows. it shows a little by itself in the
+// dark and takes a light shone on it (shine)
 const TEETH = `
   float toothHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
-  // the tooth of one row at u (0..1 across the mouth): coverage, shade, and where its tip is (v, 0 at the top lip)
-  vec3 tooth( float u, float v, float row, float dir, float base ) {
-    float c = u * 50.0 + 0.5 * row, i = floor( c ), x = ( c - i ) * 2.0 - 1.0;
-    float h1 = toothHash( vec2( i, row ) ), h2 = toothHash( vec2( i, row + 2.0 ) ), h3 = toothHash( vec2( i, row + 4.0 ) );
-    float tip = base + dir * ( 0.05 * ( h1 - 0.5 ) + 0.09 * step( 0.93, h2 ) * ( 1.0 - row ) ) - dir * 0.045 * x * x;
-    float from = row > 0.5 ? 1.0 : 0.0, along = clamp( ( v - from ) / ( tip - from ), 0.0, 1.0 );
-    float hw = 1.0 - mix( 0.34, 0.06, along ) * ( 0.75 + 0.5 * h3 );
+  // the tooth of one row at u (0..1 across the mouth): coverage, shade (0 at the gum), and where its tip is (v, 0 at the top lip)
+  vec3 tooth( float u, float v, float row, float dir, float base, float n ) {
+    float c = u * n + 0.5 * row, i = floor( c ), x = ( c - i ) * 2.0 - 1.0;
+    float h1 = toothHash( vec2( i, row ) ), h2 = toothHash( vec2( i, row + 2.0 ) ), h3 = toothHash( vec2( i, row + 4.0 ) ), h4 = toothHash( vec2( i, row + 6.0 ) );
+    float tip = base + dir * ( 0.11 * ( h1 - 0.5 ) + 0.1 * step( 0.9, h2 ) ) - dir * 0.045 * x * x;
+    float from = dir > 0.0 ? 0.0 : 1.0, along = clamp( ( v - from ) / ( tip - from ), 0.0, 1.0 );
+    float hw = 1.0 - mix( 0.3, 0.05, along ) * ( 0.7 + 0.6 * h3 );
+    x += 0.25 * ( h4 - 0.5 ) * along;   // a little crooked
     float ax = fwidth( x ) * 0.8, av = fwidth( v ) * 0.8, sv = smoothstep( tip - av, tip + av, v );
-    float cov = ( 1.0 - smoothstep( hw - ax, hw + ax, abs( x ) ) ) * ( dir > 0.0 ? 1.0 - sv : sv );
-    float shade = ( 0.78 + 0.22 * sqrt( max( 0.0, 1.0 - x * x / ( hw * hw ) ) ) ) * mix( 0.8, 1.0, smoothstep( 0.0, 0.3, along ) );
+    float cov = ( 1.0 - smoothstep( hw - ax, hw + ax, abs( x ) ) ) * ( dir > 0.0 ? 1.0 - sv : sv ) * step( 0.0625, h4 );
+    float shade = ( 0.7 + 0.3 * sqrt( max( 0.0, 1.0 - x * x / ( hw * hw ) ) ) ) * smoothstep( -0.1, 0.45, along );
     return vec3( cov, shade, tip );
   }`;
 function teethMaterial() {
   const m = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false, side: THREE.DoubleSide });
   m.name = 'creatureTeeth'; m.color.setRGB(GRIN_GLOW, GRIN_GLOW, GRIN_GLOW);
+  const u = m.userData.uniforms = { gape: { value: 0 }, shine: { value: 0 } };
   m.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 tuv; varying vec2 vTuv;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTuv = tuv;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\nvarying vec2 vTuv;${TEETH}`)
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 tuv; attribute float tk; varying vec2 vTuv; varying float vTk;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTuv = tuv; vTk = tk;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\nuniform float gape, shine; varying vec2 vTuv; varying float vTk;${TEETH}`)
       .replace('#include <map_fragment>', `#include <map_fragment>
       {
-        float u = vTuv.x, v = vTuv.y;
-        vec3 up = tooth( u, v, 0.0, 1.0, 0.565 ), lo = tooth( u, v, 1.0, -1.0, 0.535 );
-        float shadow = 1.0 - 0.45 * ( 1.0 - smoothstep( 0.0, 0.04, v - up.z ) );
-        vec3 inside = vec3( ${GAP.r.toFixed(3)}, ${GAP.g.toFixed(3)}, ${GAP.b.toFixed(3)} );
-        vec3 col = mix( mix( inside, vec3( lo.y * shadow ), lo.x ), vec3( up.y ), up.x );
-        col *= mix( 0.86, 1.0, 1.0 - smoothstep( 0.0, 0.5, abs( v - 0.55 ) ) ) * mix( 0.8, 1.0, smoothstep( 0.0, 0.14, min( v, 1.0 - v ) ) );
+        float u = vTuv.x, v = vTuv.y, k = 1.0 + gape * vTk, vu = v * k, vl = 1.0 - ( 1.0 - v ) * k, open = clamp( k - 1.0, 0.0, 1.0 );
+        vec3 up = tooth( u, vu, 0.0, 1.0, 0.565, 50.0 ), lo = tooth( u, vl, 1.0, -1.0, 0.535, 50.0 );
+        vec3 up2 = tooth( u + 0.013, vu, 2.0, 1.0, 0.78, 44.0 ), lo2 = tooth( u + 0.007, vl, 3.0, -1.0, 0.24, 44.0 );
+        vec3 up3 = tooth( u + 0.004, vu, 4.0, 1.0, 1.0, 38.0 ), lo3 = tooth( u + 0.017, vl, 5.0, -1.0, 0.0, 38.0 );
+        float shadow = 1.0 - 0.45 * ( 1.0 - smoothstep( 0.0, 0.04, vu - up.z ) );
+        // the inside: nearly black, the gums at the lips, the throat darker still as it opens
+        float gum = max( 1.0 - smoothstep( 0.04, 0.13, vu ), 1.0 - smoothstep( 0.04, 0.13, 1.0 - vl ) );
+        vec3 inside = mix( vec3( ${GAP.r.toFixed(3)}, ${GAP.g.toFixed(3)}, ${GAP.b.toFixed(3)} ) * ( 1.0 - 0.7 * open ), vec3( 0.2, 0.035, 0.04 ), gum );
+        vec3 ivory = vec3( 0.95, 0.9, 0.74 ), stain = vec3( 0.4, 0.26, 0.12 );
+        vec3 col = inside;
+        float far = smoothstep( 0.45, 1.0, open );
+        col = mix( col, mix( stain, ivory, lo3.y ) * 0.13, lo3.x * far );
+        col = mix( col, mix( stain, ivory, up3.y ) * 0.13, up3.x * far );
+        col = mix( col, mix( stain, ivory, lo2.y ) * 0.32, lo2.x * open );
+        col = mix( col, mix( stain, ivory, up2.y ) * 0.32, up2.x * open );
+        col = mix( col, mix( stain, ivory, lo.y ) * shadow, lo.x );
+        col = mix( col, mix( stain, ivory, up.y ), up.x );
+        col *= mix( 0.8, 1.0, smoothstep( 0.0, 0.14, min( vu, 1.0 - vl ) ) );
         col *= 1.0 - 0.3 * smoothstep( 0.78, 1.0, abs( u * 2.0 - 1.0 ) );
-        diffuseColor.rgb = diffuse * col;
+        diffuseColor.rgb = diffuse * col * ( ${GRIN_SELF} + 0.6 * shine );
       }`);
   };
   return m;
 }
 
 // ---------- the skin ----------
-// near black with a little form: grain and a broad mottling in the shading and roughness (from the rest position, so it stays put on
-// the moving body), less sheen at facing angles than three's default (on black that reads as grey plastic under the flashlight), and a
-// faint cold rim so the outline comes off a dark room, weaker on undersides. on the face the skin darkens into the eye sockets and
-// takes the light of the eyes round them and of the teeth inside the mouth. 'low' gets a plain lambert with the rim and the face light
-const SKIN = new THREE.Color(0x0d0c11);
+// the body is near black and matte, the folds of its clothes catching no light. the head and the hands are skin: ashen, thin and damp,
+// so in the dark they are as black as the rest and under a torch they are not. with maps (the modelled head's colour, relief and
+// roughness: veins, bruising round the sockets and the mouth, the wet of the lips) the picture carries it; without, grain and a broad
+// mottling in the shading and roughness (from the rest position, so it stays put on the moving body). tint: the mesh's own vertex
+// colours (the hands: dark nails, bruised knuckles). a faint cold rim so the outline comes off a dark room, weaker on undersides. on the
+// face the skin darkens into the eye sockets and takes the light of the eyes round them and of the teeth inside the mouth. 'low' gets a
+// plain lambert with the rim and the face light. self (the face's selfLight): the skin showing by itself, for the catch, when nothing
+// else may be lighting it
+const SKIN = new THREE.Color(0.2, 0.2, 0.225), WHITE = new THREE.Color(1, 1, 1);
 export const RIM_COL = new THREE.Color(0.05, 0.06, 0.09);
 const NOISE = `
   float skinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
@@ -500,15 +574,18 @@ const NOISE = `
   }`;
 // rimFade: [axis, from, to] in rest units; the rim is full where the rest position's coordinate along axis is at from and gone at to
 // the body fades it out going up into the collar, the face going down the jaw, so the join has none on either side
-// body: the rigged man's body keeps to near-black and matte, so the folds of his clothes do not catch a light; the head keeps its form
 const BODY = new THREE.Color(0x050407);
-export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null, body = false } = {}) {
-  const m = low ? new THREE.MeshLambertMaterial({ color: body ? BODY : SKIN }) : new THREE.MeshStandardMaterial({ color: body ? BODY : SKIN, roughness: body ? 0.92 : 0.6, metalness: 0, envMapIntensity: body ? 0.12 : 0.6 });
+export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL, rimFade = null, body = false, maps = null, tint = false, self = null } = {}) {
+  const color = body ? BODY : maps || tint ? WHITE : SKIN, map = maps ? maps.map : null;
+  const m = low ? new THREE.MeshLambertMaterial({ color, map, vertexColors: tint, side: face ? THREE.DoubleSide : THREE.FrontSide })
+    : new THREE.MeshStandardMaterial({ color, map, side: face ? THREE.DoubleSide : THREE.FrontSide, normalMap: maps ? maps.normalMap : null, roughnessMap: maps ? maps.roughnessMap : null, vertexColors: tint, roughness: body ? 0.92 : maps ? 1 : 0.5, metalness: 0, envMapIntensity: body ? 0.12 : 0.5 });
   m.name = 'creatureSkin';
+  if (!low && maps && maps.normalScale) m.normalScale.copy(maps.normalScale);
   const fade = new THREE.Vector4(0, 0, 0, 1);
   if (rimFade) { const [axis, from, to] = rimFade, k = -1 / (to - from); fade.set(axis.x * k, axis.y * k, axis.z * k, to / (to - from)); }
-  const u = { uUnit: { value: unit }, uRim: { value: rim }, uRimFade: { value: fade }, uEyeLight: { value: face ? face.eyes.material.color : new THREE.Color(0, 0, 0) }, uMouthLight: { value: face ? face.mouthLight : new THREE.Color(0, 0, 0) } };
-  m.customProgramCacheKey = () => 'creatureSkin' + (low ? 'L' : 'S') + (face ? 'F' : 'B') + (body ? 'Y' : '');
+  const u = { uUnit: { value: unit }, uRim: { value: rim }, uRimFade: { value: fade }, uEyeLight: { value: face ? face.eyes.material.color : new THREE.Color(0, 0, 0) }, uMouthLight: { value: face ? face.mouthLight : new THREE.Color(0, 0, 0) }, uSelf: face ? face.selfLight : self || { value: 0 } };
+  const soft = maps ? 0.5 : 1;   // the picture has its own mottling: the grain is laid on it lighter
+  m.customProgramCacheKey = () => 'creatureSkin' + (low ? 'L' : 'S') + (face ? 'F' : 'B') + (body ? 'Y' : '') + (maps ? 'M' : '') + (tint ? 'T' : '');
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
@@ -516,7 +593,7 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
       .replace('#include <begin_vertex>', `#include <begin_vertex>
       vRest = position * uUnit;${face ? '\nvGlow = glow; vEyeq = eyeq;' : ''}`);
     let f = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform vec3 uRim, uEyeLight, uMouthLight; uniform vec4 uRimFade; varying vec3 vRest;${face ? '\nvarying vec2 vGlow; varying vec4 vEyeq;' : ''}
+      uniform vec3 uRim, uEyeLight, uMouthLight; uniform vec4 uRimFade; uniform float uSelf; varying vec3 vRest;${face ? '\nvarying vec2 vGlow; varying vec4 vEyeq;' : ''}
       ${low ? '' : NOISE}`);
     // skinOcc: the eye sockets, dark against the white and opening out over a fifth of the eye's radius, further under the brow
     f = f.replace('#include <color_fragment>', `#include <color_fragment>
@@ -525,24 +602,25 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
         float r0 = length( vEyeq.xy ), r1 = length( vEyeq.zw ), up = max( ( r0 < r1 ? vEyeq.y : vEyeq.w ) / max( min( r0, r1 ), 1e-4 ), 0.0 );
         eyeR = min( r0, r1 ); skinOcc = mix( 1.0, smoothstep( 1.0, 1.22 + 0.14 * up, eyeR ), vGlow.x );
         diffuseColor.rgb *= mix( 0.3, 1.0, skinOcc );
+        if ( ! gl_FrontFacing ) diffuseColor.rgb = vec3( 0.03, 0.005, 0.005 );   // the inside of the head, for the one frame the lens is in its mouth
       }` : ''}`);
     if (!low) {
       f = f.replace('#include <color_fragment>', `#include <color_fragment>
         float grain = skinNoise( vRest * 38.0 ), fine = skinNoise( vRest * 150.0 ), broad = skinNoise( vRest * 7.0 + 3.1 );
         float fineK = 1.0 - smoothstep( 0.25, 0.6, length( fwidth( vRest * 150.0 ) ) );
-        diffuseColor.rgb *= ( 0.88 + 0.24 * grain ) * ( 0.88 + 0.24 * broad );`)
+        diffuseColor.rgb *= ( 1.0 + ${(0.24 * soft).toFixed(3)} * ( grain - 0.5 ) ) * ( 1.0 + ${(0.24 * soft).toFixed(3)} * ( broad - 0.5 ) );`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), ${body ? '0.8, 0.98' : '0.42, 0.9'} );`)
+        roughnessFactor = clamp( roughnessFactor * ( 0.88 + 0.24 * grain - 0.1 * ( fine - 0.5 ) * fineK ) * ( 0.9 + 0.2 * broad ), ${body ? '0.8, 0.98' : '0.2, 0.92'} );`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        normal = skinBump( - vViewPosition, normal, 0.0011 * grain + 0.00032 * fine * fineK + 0.0025 * broad );`)
-        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', body ? 'vec3( 0.006 )' : 'vec3( 0.022 * skinOcc )').replaceAll('material.specularF90 = 1.0;', body ? 'material.specularF90 = 0.3;' : 'material.specularF90 = 0.6;'));
+        normal = skinBump( - vViewPosition, normal, ${soft.toFixed(1)} * ( 0.0011 * grain + 0.00032 * fine * fineK + 0.0025 * broad ) );`)
+        .replace('#include <lights_physical_fragment>', THREE.ShaderChunk.lights_physical_fragment.replace('vec3( 0.04 )', body ? 'vec3( 0.006 )' : 'vec3( 0.045 * skinOcc )').replaceAll('material.specularF90 = 1.0;', body ? 'material.specularF90 = 0.3;' : 'material.specularF90 = 1.0;'));
     }
     // the rim: a fresnel, faded along uRimFade and weaker on surfaces that face down, since the light that would catch an edge comes
     // from above; the eyes light the skin out from the socket's edge
     f = f.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
         float rimK = smoothstep( 0.0, 1.0, dot( uRimFade.xyz, vRest ) + uRimFade.w ) * mix( 0.45, 1.0, smoothstep( -0.5, 0.4, normal.y ) ) * skinOcc;
-        totalEmissiveRadiance += uRim * rimK * pow( 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 );
+        totalEmissiveRadiance += uRim * rimK * pow( 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 ) * float( gl_FrontFacing ) + diffuseColor.rgb * uSelf;
       }${face ? `
       {
         float lit = vGlow.x * skinOcc * ( 0.45 * ( 1.0 - smoothstep( 1.1, 1.6, eyeR ) ) + 0.55 * ( 1.0 - smoothstep( 1.1, 2.3, eyeR ) ) );
@@ -553,6 +631,76 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
   return m;
 }
 
+// ---------- the modelled parts ----------
+// assets/models/thing.glb (tools/models/thing.cjs: the head and the hands, modelled over this file's skull and the body's finger
+// bones): `head`, the skull-and-neck mesh with its surface worked (brow, temples, jaw, the cords of the neck) and the skin's pictures
+// on its material; `hands`, both hands, bone thin, the fingers far too long and ending in nails, coloured by vertex.
+// the fingers: each joint past the knuckle moved further out along its bone (the hands are modelled on the bones as this leaves them)
+export const FINGER_STRETCH = 1.8, THUMB_STRETCH = 1.25;
+export function longFingers(bones) {
+  for (const s of ['L', 'R']) for (let f = 0; f < 5; f++) for (const j of ['1', '2']) {
+    const b = bones[`${s}_Finger${f}${j}`]; if (!b || b.userData.long) continue;
+    b.position.multiplyScalar(f ? FINGER_STRETCH : THUMB_STRETCH); b.userData.long = true;
+  }
+}
+// what the game takes from the file: sculpt (the head's vertices in headGeometry's order, found by their place in the picture; null
+// when the file's grid is not this one), maps (the skin's pictures) and hands (the geometry, in the rig's own centimetres)
+export function modelParts(gltf) {
+  const out = { sculpt: null, maps: null, hands: null };
+  let head = null, hands = null;
+  gltf.scene.traverse((o) => { if (!o.isMesh) return; if (/head/i.test(o.name)) head = o; else if (/hand/i.test(o.name)) hands = o; });
+  if (head && head.geometry.attributes.uv) {
+    const P = head.geometry.attributes.position, UV = head.geometry.attributes.uv, rows = HEAD_GRID.rows, n = rows * NW, sculpt = new Float32Array(n * 3), got = new Uint8Array(n);
+    let seen = 0;
+    for (let i = 0; i < P.count; i++) {
+      const c = Math.round(UV.getX(i) * NC), r = Math.round(UV.getY(i) * (rows - 1)), k = r * NW + c;
+      if (c < 0 || c > NC || r < 0 || r >= rows || Math.abs(UV.getX(i) * NC - c) > 0.2 || Math.abs(UV.getY(i) * (rows - 1) - r) > 0.2) continue;
+      if (!got[k]) { got[k] = 1; seen++; }
+      sculpt[k * 3] = P.getX(i); sculpt[k * 3 + 1] = P.getY(i); sculpt[k * 3 + 2] = P.getZ(i);
+    }
+    // (the crown is one point, there once for every column: whichever of them the file kept stands for the rest)
+    const top = got.indexOf(1);
+    if (top >= 0 && top < NW) for (let c = 0; c < NW; c++) if (!got[c]) { sculpt.copyWithin(c * 3, top * 3, top * 3 + 3); got[c] = 1; seen++; }
+    if (seen === n) out.sculpt = sculpt;
+    const m = head.material;
+    if (m && m.map) out.maps = { map: m.map, normalMap: m.normalMap || null, roughnessMap: m.roughnessMap || null, normalScale: m.normalScale ? m.normalScale.clone() : null };
+  }
+  if (hands) { out.hands = hands.geometry; if (!out.hands.attributes.normal) out.hands.computeVertexNormals(); }
+  return out;
+}
+// skin weights for the hands on the body's skeleton: each vertex goes with the bone it lies along (the wrist's stub with the forearm,
+// the palm with the hand, each finger's three bones), shared with the next bone over the quarter of a bone either side of a joint.
+// joints: for each bone's short name its place in the hands' space; index: the bone's number in the skeleton, by short name
+export function handWeights(geo, joints, index) {
+  const segs = [], V = (n) => joints[n];
+  for (const s of ['L', 'R']) {
+    const H = V(s + '_Hand'), Fo = V(s + '_Forearm'); if (!H || !Fo) continue;
+    const stub = { a: H.clone().lerp(Fo, 0.4), b: H, bone: s + '_Forearm', next: null, prev: null }; segs.push(stub);
+    for (let f = 0; f < 5; f++) {
+      const n = `${s}_Finger${f}`, j0 = V(n), j1 = V(n + '1'), j2 = V(n + '2'); if (!j0 || !j1 || !j2) continue;
+      const tip = j2.clone().add(j2.clone().sub(j1).multiplyScalar(1.8));
+      const m = { a: H, b: j0, bone: s + '_Hand', prev: null }, p0 = { a: j0, b: j1, bone: n, prev: m }, p1 = { a: j1, b: j2, bone: n + '1', prev: p0 }, p2 = { a: j2, b: tip, bone: n + '2', prev: p1 };
+      m.next = p0; p0.next = p1; p1.next = p2; p2.next = null; segs.push(m, p0, p1, p2);
+    }
+  }
+  const P = geo.attributes.position, n = P.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), v = new THREE.Vector3(), ab = new THREE.Vector3(), q = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    v.fromBufferAttribute(P, i);
+    let best = null, bd = Infinity, bt = 0;
+    for (const s of segs) {
+      ab.subVectors(s.b, s.a); const t = Math.max(0, Math.min(1, q.subVectors(v, s.a).dot(ab) / ab.lengthSq())), d = q.copy(s.a).addScaledVector(ab, t).distanceToSquared(v);
+      if (d < bd) { bd = d; best = s; bt = t; }
+    }
+    let w1 = 0, other = null;
+    if (bt < 0.25 && best.prev && best.prev.bone !== best.bone) { other = best.prev; w1 = 0.5 * (1 - bt / 0.25); }
+    else if (bt > 0.75 && best.next) { other = best.next; w1 = 0.5 * (bt - 0.75) / 0.25; }
+    si[i * 4] = index[best.bone]; sw[i * 4] = 1 - w1;
+    if (other) { si[i * 4 + 1] = index[other.bone]; sw[i * 4 + 1] = w1; }
+  }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+}
+
 // ---------- the face ----------
 // createFace({ skull = true, neck = false, quality = 'high' }) -> THREE.Group
 //   origin at the centre of the skull, +z out of the face, +y up, +x to the face's left, a unit a metre: the head 0.42 m across,
@@ -560,14 +708,16 @@ export function skinMaterial({ low = false, unit = 1, face = null, rim = RIM_COL
 //   for a human head (about 0.16 m across) scale by about 0.4. with neck it runs on down to 0.46 m below the origin.
 //   face.eyes: both eyes (scale face.eyes.material.color to dim them); face.smile: the teeth (hide it and the mouth closes over);
 //   face.skull: the head mesh (null without one; face.addSkull() builds it, face.setSkull swaps in another built from headGeometry).
-//   face.update(dt, { target, smile, blink, eyeLag }): pupils toward a world point (or stay put), late and in jumps; smile from 1 (rest)
-//   to 1.6 (widest); blink 0..1 the lid down; eyeLag seconds one eye trails the other
+//   face.update(dt, { target, smile, blink, eyeLag, gape, shine, pin }): pupils toward a world point (or stay put), late and in jumps;
+//   smile from 1 (rest) to 1.6 (widest); blink 0..1 the lid down; eyeLag seconds one eye trails the other; gape 0..1 the jaw dropped;
+//   shine 0..1 how much of a torch the eyes and the teeth give back (eyeShine: the eyes alone); pin the pupil's share of the iris
+//   face.setMaps({ map, normalMap, roughnessMap }): the modelled head's pictures for the skin
 //   face.setQuality(q): 'low' gives the skin the cheaper material
 export function createFace({ skull = true, neck = false, quality = 'high' } = {}) {
   const face = new THREE.Group();
   face.name = 'creatureFace';
   face.quality = quality === 'low' ? 'low' : 'high';
-  face.mouthLight = new THREE.Color();
+  face.mouthLight = new THREE.Color(); face.selfLight = { value: 0 };
   face.eyes = new THREE.Mesh(eyeGeometry(), eyeMaterial());
   face.eyes.name = 'eyes';
   face.smile = new THREE.Mesh(teethGeometry(), teethMaterial());
@@ -575,7 +725,9 @@ export function createFace({ skull = true, neck = false, quality = 'high' } = {}
   for (const o of [face.eyes, face.smile]) { o.castShadow = false; o.receiveShadow = false; face.add(o); }
   face.skull = null;
   face.skins = {};
-  face.skinFor = (low) => (face.skins[low ? 'low' : 'high'] ||= skinMaterial({ low, face, rimFade: [new THREE.Vector3(0, 1, 0), -0.1, -0.25] }));
+  face.maps = null;
+  face.skinFor = (low) => (face.skins[low ? 'low' : 'high'] ||= skinMaterial({ low, face, maps: face.maps, rimFade: [new THREE.Vector3(0, 1, 0), -0.1, -0.25] }));
+  face.setMaps = (maps) => { face.maps = maps; for (const k in face.skins) face.skins[k].dispose(); face.skins = {}; if (face.skull) face.skull.material = face.skinFor(face.quality === 'low'); };
   face.setSkull = (mesh) => {
     if (face.skull && face.skull !== mesh) { face.skull.removeFromParent(); face.skull.geometry.dispose(); }
     face.skull = mesh;
@@ -587,14 +739,14 @@ export function createFace({ skull = true, neck = false, quality = 'high' } = {}
     const low = q === 'low'; face.quality = low ? 'low' : 'high';
     if (face.skull) face.skull.material = face.skinFor(low);
   };
-  const v = new THREE.Vector3(), U = face.eyes.material.userData.uniforms, pupils = U.pupils.value;
+  const v = new THREE.Vector3(), U = face.eyes.material.userData.uniforms, TU = face.smile.material.userData.uniforms, pupils = U.pupils.value;
   // the eyes are the one live thing on it, and they are not quite right: each pupil follows where the target was 60-80 ms ago, not where
   // it is, and in jumps (two or three a second, held between), each jump landing a little off; for a beat one eye can fall behind the
   // other (eyeLag, seconds). blink 0..1 brings a lid down over both
   const E = { t: 0, hist: [], sacT: 0, lag: 0.07, at: PUPIL_AT.map((p) => [p[0], p[1]]), off: [0, 0] };
   const aimAt = (dir, i) => [PUPIL_AT[i][0] + THREE.MathUtils.clamp(dir[0], -1, 1) * PUPIL_MOVE[0], PUPIL_AT[i][1] + THREE.MathUtils.clamp(dir[1], -1, 1) * PUPIL_MOVE[1]];
   const past = (sec) => { for (let i = E.hist.length - 1; i >= 0; i--) if (E.t - E.hist[i][0] >= sec) return E.hist[i]; return E.hist[0]; };
-  face.update = (dt, { target = null, smile = 1, blink = 0, eyeLag = 0 } = {}) => {
+  face.update = (dt, { target = null, smile = 1, blink = 0, eyeLag = 0, gape = 0, shine = 0, eyeShine = shine, pin = PUPIL_PIN } = {}) => {
     E.t += dt;
     if (target) {
       face.updateMatrixWorld(true);
@@ -611,11 +763,11 @@ export function createFace({ skull = true, neck = false, quality = 'high' } = {}
       } else if (eyeLag > 0) { const late = past(E.lag + eyeLag), w1 = aimAt([late[1], late[2]], 1); E.at[1] = [w1[0] + E.off[0], w1[1] + E.off[1]]; }
       E.at.forEach((p, i) => pupils[i].set(p[0], p[1]));
     }
-    U.blink.value = blink;
-    const open = face.smile.visible, w = open ? THREE.MathUtils.clamp((smile - 1) / 0.6, 0, 1) : 0;
-    face.smile.morphTargetInfluences[0] = w;
-    if (face.skull) { face.skull.morphTargetInfluences[0] = w; face.skull.morphTargetInfluences[1] = open ? 0 : 1; }
-    face.mouthLight.copy(face.smile.material.color).multiply(WARM).multiplyScalar(open ? 1 : 0);
+    U.blink.value = blink; U.shine.value = eyeShine; U.pin.value = pin;
+    const open = face.smile.visible, w = open ? THREE.MathUtils.clamp((smile - 1) / 0.6, 0, 1) : 0, jaw = open ? THREE.MathUtils.clamp(gape, 0, 1) : 0;
+    face.smile.morphTargetInfluences[0] = w; face.smile.morphTargetInfluences[1] = jaw; TU.gape.value = jaw; TU.shine.value = shine;
+    if (face.skull) { face.skull.morphTargetInfluences[0] = w; face.skull.morphTargetInfluences[1] = open ? 0 : 1; face.skull.morphTargetInfluences[2] = jaw; }
+    face.mouthLight.copy(face.smile.material.color).multiply(WARM).multiplyScalar(open ? GRIN_SELF + 0.5 * shine : 0);
   };
   face.update(0);
   return face;

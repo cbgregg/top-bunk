@@ -1,7 +1,8 @@
-// the thing: a stretched black body with the face from creature.js on its head bone (one skull running down into the neck, white
-// ring eyes with black pupils that follow the player, the grin cut into the head)
+// the thing: a stretched black body with the face from creature.js on its head bone (one skull running down into the neck, pale
+// eyes with pinprick pupils that follow the player, the grin cut into the head) and, when assets/models/thing.glb is there, the
+// modelled head and hands: ashen skin over a worked skull, bone-thin hands with fingers far too long
 import * as THREE from 'three';
-import { createFace, headGeometry, skinMaterial, tuckIntoNeck, RIM_COL, RX, RY, RZ } from './creature.js';
+import { createFace, headGeometry, skinMaterial, tuckIntoNeck, modelParts, longFingers, handWeights, RIM_COL, RX, RY, RZ } from './creature.js';
 import { smoothstep as ss, lerp, hash } from './mathx.js';
 import { Rig, loadModel, loadAnims } from './rig.js';
 import { Shroud } from './shroud.js';
@@ -43,12 +44,19 @@ const ramp = (u) => Math.min(1, Math.max(0, (u - CRAWL.hold) / (1 - CRAWL.hold))
 // the shroud: how many wisps per graphics preset
 const WISPS = PHONE ? { ultra: 120, high: 120, medium: 120, low: 120, phone: 120 } : { ultra: 820, high: 640, medium: 340, low: 300 };
 // the hands: the clips come in with the wrists bent and turned in, so every frame the hand is brought back near the forearm's line
-// and the long fingers are set a little curled, more toward the little finger, the thumb out
+// and the long fingers are set a little curled, more toward the little finger, the thumb out (`more`: closed further, when its hands
+// are drawn in for want of room)
 const WRIST_FLEX = 0.12;
 const FINGERS = ['Finger1', 'Finger2', 'Finger3', 'Finger4', 'Finger0'];
 const CURL = [[0.22, 0.3, 0.2], [0.26, 0.34, 0.22], [0.3, 0.38, 0.24], [0.34, 0.42, 0.26], [0.12, 0.1, 0.08]];
 const FACE_POS = [11, 4, 0];   // skull centre in head-bone space (cm): up, forward, left
 const BODY_RIM = RIM_COL.clone().multiplyScalar(2.6);   // stronger on the body, so the arms come off the dark
+// up from the floor to its height: how far down it still is at each of five held keys (the head stays on its chest until the last)
+const RISE = [1, 0.82, 0.55, 0.25, 0], RISE_KEY = 0.1, RISE_TIME = RISE.length * RISE_KEY;
+// the hitch in its walk: where in the stride (0..1 of the clip) the legs all but stop, for how much of it, and how much they then run to catch up
+const HITCH = { at: 0.42, hold: 0.07, run: 0.1, slow: 0.4, fast: 1.42 };
+// the catch's three held frames: the grin, the jaw, the head's roll, the pupils (frame 0 is not one)
+const CATCH = { smile: [1, 1.6, 1.45, 1.3], gape: [0, 0.12, 0.55, 1], roll: [0, 0.45, -0.25, 0.8], pin: [0.3, 0.3, 0.2, 0.1] };
 
 // skin weights for the skull-and-neck mesh on the body's skeleton. the skull moves with the head bone alone. down the neck the
 // weights run from the body's own (copied from the nearest vertices of its shirt, so the neck's foot moves with the shoulders it
@@ -112,6 +120,7 @@ function clipAlong(pts, v, s) {
 
 export class Entity {
   constructor(scene) {
+    this.scene = scene;
     this.root = new THREE.Group();
     this.body = new THREE.Group();
     this.root.add(this.body);
@@ -164,17 +173,20 @@ export class Entity {
     this.duck = 0; this.duckHold = null; this.narrowK = 0; this.wallK = 0; this.ahead = Infinity; this.snap = 0; this.flinch = 0; this.stun = 0; this.catchPose = null; this.cling = null;
     this.level = 1; this.unfoldT = 0; this.onKey = null; this.onStep = null; this.sneak = false; this.crawlSpeed = 0; this.lungeOut = 0; this.gait = null; this.ground = null;
     this.blinkT = 18 + hash(7.3) * 22; this.blinkK = 0; this.eyeLagT = 0;
+    // gape 0..1 drops its jaw (the catch drops it by itself); shine is how much of your torch its eyes and teeth give back; riseT the
+    // clock of its rise from the floor; peekT how long it has been leaning out (leanSide); cock the head going over (headCock)
+    this.gape = 0; this.shine = 0; this.riseT = RISE_TIME; this.wasLow = false; this.lowPos = new V3(); this.peekT = 0; this.cock = null; this.cockN = 0; this.hitchK = 0; this.torch = undefined;
     // the room it takes up beyond its root while it is low: two more circles on the floor for the bodies (collide.js) to keep out of
     const extra = (id) => { const b = addBody({ id, kind: 'thing', pos: new V3(), r: 0.45, h: 1, active: () => this.root.visible && b.on }); b.on = false; return b; };
     this.extra = { fore: extra('thing:fore'), aft: extra('thing:aft') };
 
     // the rigged body: a black Rocketbox man stretched tall, animated with baked Mixamo clips (the cylinder body stays as the fallback)
     this.rig = null;
-    Promise.all([loadModel('spirit'), loadAnims()]).then(([gltf, clips]) => this.useRig(new Rig(gltf, clips)))
+    Promise.all([loadModel('spirit'), loadAnims(), loadModel('thing').then(modelParts).catch(() => null)]).then(([gltf, clips, parts]) => this.useRig(new Rig(gltf, clips), parts))
       .catch((e) => console.warn('spirit model failed, keeping the simple body:', e));
   }
 
-  useRig(rig) {
+  useRig(rig, parts = null) {
     const K = 1.43;                                   // a 1.82 m man -> about 2.6 m
     rig.setHeight(1.82 * K);
     // the man's own head and his hair cards are hidden as meshes, the rest of him takes the skin
@@ -187,6 +199,7 @@ export class Entity {
       const ix = o.geometry.index; for (let i = 0; i < ix.count; i++) refVerts.add(ix.getX(i));
     });
     this.rigMeshes = []; rig.root.traverse((o) => { if (o.isSkinnedMesh && o.visible) this.rigMeshes.push(o); });
+    if (parts && parts.hands && body) this.useHands(rig, body, parts.hands);   // (before the arms are stretched: the hands were modelled on the bones at rest)
     // long arms: stretch each arm along its bone; the forearm keeps scale 1 so it inherits the same stretch
     for (const s of ['L', 'R']) rig.bones[s + '_UpperArm'].scale.x = ARM_STRETCH;
     this.root.add(rig.root);
@@ -205,7 +218,8 @@ export class Entity {
     this.rigSkin = { unit: rig.scale, rim: BODY_RIM, rimFade: [new THREE.Vector3(0, 0, 1), zAt(-0.55), zAt(-0.4)], body: true };
     this.skins.rig = { high: skinMaterial(this.rigSkin) };
     for (const o of this.rigMeshes) o.material = this.skins.rig.high;
-    const geo = headGeometry({ neck: true });
+    const geo = headGeometry({ neck: true, sculpt: parts ? parts.sculpt : null });
+    if (parts && parts.maps) this.head.setMaps(parts.maps);
     skinWeights(geo, body, refVerts, bind, hi, skel.bones.indexOf(rig.bones.Neck));
     const P = body.geometry.attributes.position, N = body.geometry.attributes.normal, toFace = bind.clone().invert(), p = new THREE.Vector3(), n = new THREE.Vector3();
     for (const i of refVerts) {
@@ -236,8 +250,36 @@ export class Entity {
     this.setQuality(this.quality, true);
   }
 
-  // the hand correction, after the clip and the reach: wrist back toward the forearm's line, fingers long and a little curled
-  relaxHands(r) {
+  // the modelled hands in place of the man's own. His are drawn in to a point at each wrist and go with the forearm, so the sleeve
+  // closes there; the new ones are skinned to the same bones, the fingers' joints first moved out along their bones (longFingers), and
+  // bound in the rig's own space as the bones then stand
+  useHands(rig, body, geo) {
+    const skel = body.skeleton, bones = skel.bones, short = (b) => b.name.replace(/^Bip01_?/, '') || 'Root', index = {};
+    bones.forEach((b, i) => { index[short(b)] = i; });
+    const P = body.geometry.attributes.position, SI = body.geometry.attributes.skinIndex, SW = body.geometry.attributes.skinWeight, m = new THREE.Matrix4(), toGeo = body.bindMatrix.clone().invert(), w = new V3();
+    for (let i = 0; i < P.count; i++) {
+      let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
+      const k = /^([LR])_(Hand|Finger)/.exec(short(bones[bi])); if (!k) continue;
+      w.setFromMatrixPosition(m.copy(skel.boneInverses[index[k[1] + '_Hand']]).invert()).applyMatrix4(toGeo);
+      P.setXYZ(i, w.x, w.y, w.z); SI.setXYZW(i, index[k[1] + '_Forearm'], 0, 0, 0); SW.setXYZW(i, 1, 0, 0, 0);
+    }
+    P.needsUpdate = SI.needsUpdate = SW.needsUpdate = true;
+    longFingers(rig.bones); rig.root.updateMatrixWorld(true);
+    const rootInv = rig.root.matrixWorld.clone().invert(), joints = {};
+    const inverses = bones.map((b) => new THREE.Matrix4().multiplyMatrices(rootInv, b.matrixWorld).invert());
+    for (const b of bones) joints[short(b)] = new V3().setFromMatrixPosition(b.matrixWorld).applyMatrix4(rootInv);
+    handWeights(geo, joints, index);
+    this.handSkin = { unit: rig.scale, tint: true, self: this.head.selfLight };
+    this.skins.hand = { high: skinMaterial(this.handSkin) };
+    const hands = new THREE.SkinnedMesh(geo, this.skins.hand.high);
+    hands.name = 'creatureHands'; hands.frustumCulled = false; hands.castShadow = true; hands.receiveShadow = true;
+    rig.root.add(hands); hands.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
+    this.hands = hands; this.skinned = [...this.rigMeshes, hands];
+  }
+
+  // the hand correction, after the clip and the reach: wrist back toward the forearm's line, fingers long and a little curled (jerk:
+  // { sd, k }, one hand's fingers snatched shut by k for the frames of a twitch)
+  relaxHands(r, jerk = null, more = 0) {
     for (const side of ['L', 'R']) {
       const hand = r.bones[side + '_Hand'], fo = r.bones[side + '_Forearm'], th = r.bones[side + '_Finger0'], i1 = r.bones[side + '_Finger1'], i2 = r.bones[side + '_Finger2'], i4 = r.bones[side + '_Finger4'];
       if (!hand || !fo || !th || !i1 || !i2 || !i4) continue;
@@ -255,7 +297,7 @@ export class Entity {
       _cax.copy(_lat); if (_cr.crossVectors(_cax, mid).dot(_palm) < 0) _cax.negate();
       for (let f = 0; f < 5; f++) {
         const n = FINGERS[f], chain = [n, n + '1', n + '2'];
-        for (let i = 0; i < 3; i++) { const b = r.bones[side + '_' + chain[i]]; if (b) r.rotateWorld(b, _hq.setFromAxisAngle(_cax, CURL[f][i])); }
+        for (let i = 0; i < 3; i++) { const b = r.bones[side + '_' + chain[i]]; if (b) r.rotateWorld(b, _hq.setFromAxisAngle(_cax, CURL[f][i] + more * (f < 4 ? 1 : 1.3) + (jerk && jerk.sd === side ? jerk.k * (f < 4 ? 1 : 0.4) : 0))); }
       }
     }
   }
@@ -268,6 +310,7 @@ export class Entity {
     const cylSkin = pick(this.skins, {});
     for (const o of this.cyls) o.material = cylSkin;
     if (this.rig) { const m = pick(this.skins.rig, this.rigSkin); for (const o of this.rigMeshes) o.material = m; }
+    if (this.hands) this.hands.material = pick(this.skins.hand, this.handSkin);
     if (this.shroud) this.shroud.setCount(WISPS[this.gfxQuality] ?? WISPS.high);
     this.head.setQuality(q);
   }
@@ -319,9 +362,11 @@ export class Entity {
   nominal(L, lead, out) {
     const left = L[0] === 'L' ? 1 : -1, hand = L[1] === 'H', c = hand ? CRAWL.hand : CRAWL.knee, n = this.narrowK;
     this.T(left * c[0] * (1 - (hand ? 0.45 : 0.35) * n), 0, c[2] + lead, out);
-    this.contactOut(out, hand ? 0.38 : 0.14); out.y = this.floorAt(out.x, out.z) + c[1];
+    this.contactOut(out, hand ? this.fingerPad() : 0.14); out.y = this.floorAt(out.x, out.z) + (hand ? this.wristUp() : c[1]);
     return out;
   }
+  fingerPad() { return this.hands ? 0.53 : 0.38; }   // how far a planted hand's fingers reach past its wrist
+  wristUp() { return CRAWL.hand[1] + (this.hands ? 0.008 : 0); }   // the wrist over the floor with the palm flat on it (the modelled wrist is the thicker)
   // the colliders within 2.6 m of the root (all it reaches, crawling or on its feet), worked out once a frame for the tests below
   nearColliders() {
     const cs = this.colliders; if (!cs) return null;
@@ -408,14 +453,14 @@ export class Entity {
       if (L[1] === 'H') {   // never further than the arm reaches from where its shoulder will be
         const sh = this.T(L[0] === 'L' ? 0.3 : -0.3, CRAWL.pelvis - 0.1, 0.78 + (g.lunge ? stride : 0), _b), max = this.arm ? (this.arm[0] + this.arm[1]) * 0.92 : 1;
         const d = p.to.distanceTo(sh); if (d > max) { const y = p.to.y; p.to.sub(sh).multiplyScalar(max / d).add(sh); p.to.y = y; }
-        this.contactOut(p.to, 0.38); p.to.y = this.floorAt(p.to.x, p.to.z) + CRAWL.hand[1];
+        this.contactOut(p.to, this.fingerPad()); p.to.y = this.floorAt(p.to.x, p.to.z) + this.wristUp();
       }
     }
     // the trunk: the shoulders turned against the hips the other way each step, a lean to one side on each lunge; the head's look
-    // taken now and held, rolled to the other side every step
+    // taken now and held
     g.twistFrom = g.twistNow; g.twistTo = (k & 1 ? 1 : -1) * 0.35 * (stride > 0 ? 1 : 0.35);
     g.sideFrom = g.sideNow; if (g.lunge) g.sideTo = ((k >> 1) & 1 ? 1 : -1) * 0.25; else if (stride === 0) g.sideTo = 0;
-    g.rollFrom = g.rollNow; g.rollTo = (k & 1 ? 1 : -1) * 0.6;
+    g.rollFrom = g.rollNow; g.rollTo = 0;   // (its head is held level: only the body under it moves)
     g.lookFrom.copy(g.lookNow); if (this.lookTarget) g.lookTo.copy(this.lookTarget);
     if (this.onStep) this.onStep(k, g.swing || L, g.swing ? g.plants[g.swing].to : null, g.lunge);   // the hunter's sounds for the body on the boards
   }
@@ -553,8 +598,8 @@ export class Entity {
       const chain = [B[sd + '_' + f], B[sd + '_' + f + '1'], B[sd + '_' + f + '2']]; if (!chain[2]) continue;
       for (let i = 0; i < 3; i++) {
         const b = chain[i]; b.getWorldPosition(_a);
-        if (i < 2) chain[i + 1].getWorldPosition(_b); else { chain[1].getWorldPosition(_c); _b.copy(_a).addScaledVector(_a.clone().sub(_c), 0.8); }
-        const floor = this.floorAt(_b.x, _b.z) + 0.022, len = _a.distanceTo(_b);
+        if (i < 2) chain[i + 1].getWorldPosition(_b); else { chain[1].getWorldPosition(_c); _b.copy(_a).addScaledVector(_a.clone().sub(_c), this.hands ? 1.65 : 0.8); }   // (the modelled fingers end in nails)
+        const floor = this.floorAt(_b.x, _b.z) + (this.hands ? (i === 2 ? 0.034 : 0.027) : 0.022), len = _a.distanceTo(_b);   // (the modelled joints are knobs, and the nails hook down)
         if (_b.y >= floor || len < 1e-4) continue;
         _c.copy(_b).sub(_a).normalize(); _d.crossVectors(_c, _e.set(0, 1, 0)); if (_d.lengthSq() < 1e-8) continue;
         const ang = Math.asin(THREE.MathUtils.clamp((floor - _b.y) / len, 0, 1)) * 1.05;
@@ -563,7 +608,7 @@ export class Entity {
     }
   }
   // the crawl's head: face down to the boards (the back of the skull toward you) until the snap, then cranked up at you, the look held
-  // a step at a time and rolled over to one side and then the other
+  // a step at a time and the head level, however the shoulders under it turn and lean
   crawlHead(w, snap, g) {
     const r = this.rig, B = r.bones;
     if (snap < 1) r.bend(['Neck', 'Head'], [0.3, 0.7], [1, 0, 0], 0.35 * w * (1 - snap));
@@ -584,7 +629,7 @@ export class Entity {
     // and never so high that the crown would not pass under a door's rail at a crawl (0.95): tipped further back until it does
     this.head.updateWorldMatrix(true, false); const crown = this.head.localToWorld(_g.set(0, 0.264, 0)).y - this.floorAt(_g.x, _g.z);
     if (crown > 0.9 && _e.lengthSq() > 1e-6) r.rotateWorld(B.Head, _q1.setFromAxisAngle(_e, Math.min(0.6, (crown - 0.9) / 0.35)));
-    r.rotateWorld(B.Head, _q1.setFromAxisAngle(want, g.rollNow * up));
+    if (up > 0.5) this.headRoll(r, g.rollNow);
   }
   // the crawl's footprint and the crumple's, for the bodies: a circle ahead of the root and one behind it
   lowExtent(mode) {
@@ -602,6 +647,7 @@ export class Entity {
 
   updateLow(dt) {
     const crawl = this.mode === 'crawl', unfold = this.mode === 'unfold';
+    this.wasLow = this.cling === null || this.cling === undefined; this.lowPos.copy(this.root.position);
     let K;
     if (crawl) { this.gaitTick(dt); K = FULL; }
     else if (unfold) {
@@ -637,14 +683,81 @@ export class Entity {
     let blink = 0; if (this.blinkK > 0) { this.blinkK -= dt; blink = standing && !this.catchPose ? Math.sin(Math.PI * Math.max(0, Math.min(1, 1 - this.blinkK / 0.4))) : 0; }
     // from level 4 one eye now and then falls behind the other for a beat
     this.eyeLagT -= dt; if (this.eyeLagT < -2.5) this.eyeLagT = this.level >= 4 && Math.random() < 0.3 ? 1.2 : -0.0001;
-    this.head.update(dt, { target: this.lookTarget, smile: this.catchPose ? 1.6 : this.smileScale, blink, eyeLag: this.eyeLagT > 0 ? 0.1 + 0.1 * hash(this.level) : 0 });
+    // the torch on its face comes back from its eyes and its teeth (the flash too). At the catch nothing lights it but itself, and
+    // each of the three frames is another face: the grin, the jaw coming down, the jaw down past where a jaw goes and shaking
+    const cp = this.catchPose, f = cp ? Math.min(3, Math.max(1, cp.frame | 0)) : 0;
+    this.shine += ((cp ? 0.7 : Math.max(this.torchLit(), this.stun)) - this.shine) * (cp ? 1 : Math.min(1, dt * 18));
+    const gape = cp ? CATCH.gape[f] * (f === 3 ? 0.84 + 0.16 * hash(Math.floor(this.t * 60) + 0.5) : 1) : this.gape;
+    this.head.selfLight.value = cp ? 0.5 : 0;
+    this.head.update(dt, { target: this.lookTarget, smile: cp ? CATCH.smile[f] : this.smileScale, blink, eyeLag: this.eyeLagT > 0 ? 0.1 + 0.1 * hash(this.level) : 0, gape, shine: this.shine, eyeShine: cp ? 0 : this.shine, pin: CATCH.pin[f] });
     if (this.shroud) {
       const u = this.shroud.mat.uniforms; u.uSpread.value = 1.25 + this.stun * 1.6; if (this.stun > 0.01) u.uRise.value = 0.16 + this.stun * 0.7;
       this.root.updateMatrixWorld(true); this.shroud.update(dt, this.root.getWorldPosition(_v), { obj: this.head, r: 0.24 });
     }
   }
+  // how much of your torch is on its face, 0..1: the spot light carried on the camera (found once), by how squarely its beam is on the
+  // head and how far off it is
+  torchLit() {
+    if (this.torch === undefined) { this.torch = null; this.scene.traverse((o) => { if (o.isSpotLight && o.parent && o.parent.isCamera) this.torch = o; }); }
+    const L = this.torch; if (!L || !L.visible || L.intensity <= 0) return 0;
+    L.getWorldPosition(_a); L.target.getWorldPosition(_b).sub(_a).normalize(); this.head.getWorldPosition(_c).sub(_a);
+    const d = _c.length(), ang = _c.normalize().angleTo(_b);
+    return (1 - ss(L.angle * 0.7, L.angle * 1.1, ang)) / (1 + (d / 7) * (d / 7)) * Math.min(1, L.intensity / 20);
+  }
+  // the head held at one roll about the way it faces (0: level), whatever the body under it is doing
+  headRoll(r, roll) {
+    this.head.updateWorldMatrix(true, false);
+    const e = this.head.matrixWorld.elements; _a.set(e[8], e[9], e[10]).normalize(); _b.set(e[4], e[5], e[6]);
+    _c.set(0, 1, 0).addScaledVector(_a, -_a.y); if (_c.lengthSq() < 0.03) return;
+    _c.normalize().applyAxisAngle(_a, roll); _b.addScaledVector(_a, -_b.dot(_a)).normalize();
+    r.rotateWorld(r.bones.Head, _q1.setFromAxisAngle(_a, Math.atan2(_d.crossVectors(_b, _c).dot(_a), _b.dot(_c))));
+  }
+  // its head going over to one side while it stands and looks at you: slowly, as a person's might, then all at once much too far,
+  // held there, and back. side: +1 to its right, -1 to its left; it goes too far only to a side with the room for it
+  headCock(side = 1) {
+    this.root.updateMatrixWorld(true); this.head.getWorldPosition(_a);
+    const y0 = this.root.position.y, room = (sd) => { this.dirW(-sd, 0, 0, _b); return this.sideRoom(_a.x, _a.z, y0, _b.x, _b.z, 1.7, 2.75, 0.15); };
+    let far = 0.78; if (room(side) < 0.7) { if (room(-side) >= 0.7) side = -side; else far = 0; }
+    return (this.cock = { t0: this.t, side, far });
+  }
+  // now and then by itself (at most once in 14 s, off its own clock, so a replay matches); the roll it adds this frame
+  cockRoll() {
+    const t = this.t, idle = this.mode === 'idle' && !!this.lookTarget && this.reach < 0.2 && !this.leanSide;
+    if (!this.cock && idle) { const n = Math.floor(t / 14); if (n > 0 && n !== this.cockN && t - n * 14 > 1 + 7 * hash(n)) { this.cockN = n; this.headCock(hash(n + 0.5) < 0.5 ? -1 : 1); } }
+    const c = this.cock; if (!c) return 0;
+    const u = t - c.t0; if (u > 4.4 || !idle) { this.cock = null; return 0; }
+    return c.side * (0.3 * ss(0, 2.0, u) * (1 - ss(4.1, 4.3, u)) + c.far * (u < 3 ? ss(2.5, 2.56, u) : 1 - ss(4.1, 4.2, u)));
+  }
+  // it stands too still, and then something in it jumps: its head a few degrees and back, its chin, a shoulder, the fingers of one
+  // hand. Held four to ten frames, at times that come off its own clock. Null between them
+  twitchNow() {
+    const W = 1.4, n = Math.floor(this.t / W); if (hash(n * 1.37 + 0.3) > (this.mode === 'idle' ? 0.6 : 0.35)) return null;
+    const u = this.t - n * W - (0.1 + 1.0 * hash(n + 0.11)); if (u < 0 || u > 0.06 + 0.1 * hash(n + 0.7)) return null;
+    return { kind: Math.floor(hash(n + 0.23) * 4), sgn: hash(n + 0.41) < 0.5 ? -1 : 1 };
+  }
+  // the hitch in its walk: once a stride the clip all but stops and then runs to catch up (the rate to play it at), and hitchK is how
+  // far its body has dropped onto that side
+  hitch(r, name) {
+    const a = r.actions[name]; if (!a) { this.hitchK = 0; return 1; }
+    const u = ((a.time / a.getClip().duration - HITCH.at) % 1 + 1) % 1;
+    this.hitchK = u < HITCH.hold ? ss(0, HITCH.hold * 0.3, u) : 1 - ss(HITCH.hold, HITCH.hold + HITCH.run, u);
+    return u < HITCH.hold ? HITCH.slow : u < HITCH.hold + HITCH.run ? HITCH.fast : 1;
+  }
+  // leaning out from behind something, its fingers come round first: the hand on the side it leans to is put flat on whatever it
+  // stands behind, out past its shoulder, the fingers toward the opening (w 0..1 eases it there)
+  peekHand(r, w) {
+    const B = r.bones, sd = this.leanSide > 0 ? 'R' : 'L', left = sd === 'L' ? 1 : -1, sc = this.root.scale.y || 1;
+    this.root.updateMatrixWorld(true);
+    const p = this.T(left * 0.72, 1.42, 0.42, _a); this.contactOut(p, 0.07 * sc);   // (under your eye's height: you can walk up to it)
+    r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], p, this.T(left * 1.4, 1.1, -0.5, _b), w);
+    if (w > 0.5) this.layHand(sd, this.dirW(left, 0.08, 0.05, _e), this.dirW(0, 0, 1, _f));
+  }
+  // a hand that has come down near the floor on its feet (ducked under a door head, its arms hanging) is kept out of it
+  handsOffFloor(r) {
+    for (const sd of ['L', 'R']) { const h = r.bones[sd + '_Hand']; if (!h) continue; h.getWorldPosition(_c); if (_c.y - this.floorAt(_c.x, _c.z) < 0.42) this.handGuard(sd); }
+  }
   // back on its feet (the low modes moved the whole skeleton)
-  standUp() { if (!this.rig) return; const rr = this.rig.root; rr.position.set(0, 0, 0); rr.rotation.set(0, 0, 0); if (this.shroud) this.shroud.mat.uniforms.uRise.value = 0.16; this.snap = 0; this.gait = null; this.unfoldT = 0; }
+  standUp() { if (!this.rig) return; const rr = this.rig.root; rr.position.set(0, 0, 0); rr.rotation.set(0, 0, 0); if (this.shroud) this.shroud.mat.uniforms.uRise.value = 0.16; this.snap = 0; this.gait = null; this.unfoldT = 0; this.wasLow = false; }
 
   // how far down it has to come for what hangs over it: a door head (2.03), a fixture, the laundry's ceiling. Sampled along the way it
   // faces, all the way down within 0.7 m of the thing overhead and eased over the 0.5 m either side, so it is low before its crown gets there
@@ -725,18 +838,30 @@ export class Entity {
     this.duck = this.duckHold ?? this.autoDuck();
     this.lowExtent(this.catchPose ? 'catch' : this.mode);
     if (this.mode === 'crumple' || this.mode === 'crawl' || this.mode === 'unfold') { this.updateLow(dt); return; }
+    const fromLow = this.wasLow && this.lowPos.distanceTo(this.root.position) < 0.6;
     if (this.gait || this.rig.root.rotation.x || this.rig.root.rotation.z || this.rig.root.position.y) this.standUp();
-    const r = this.rig, rr = r.root, t = this.t, run = this.mode === 'run', walk = this.mode === 'walk';
+    this.wasLow = false;
+    const r = this.rig, rr = r.root, run = this.mode === 'run', walk = this.mode === 'walk';
     if (this.mode === 'lie' || this.mode === 'sit') { this.restPose(dt); this.face(dt); return; }
-    // the clip keeps pace with how fast it is actually moving (this.speed is metres per second over 3)
-    if (run) r.play('run', { fade: 0.25, speed: 0.8 + this.speed * 0.3 });
-    else if (walk && this.sneak && r.actions.sneak) r.play('sneak', { fade: 0.45, speed: 0.5 + this.speed * 0.5 });   // the stalk: its own creeping cycle
-    else if (walk) r.play('walk', { fade: 0.45, speed: 0.4 + this.speed * 0.45 });
-    else r.play('idle', { fade: 0.5, speed: 0.3 });
+    if (fromLow && !this.catchPose) this.riseT = 0;
+    // the clip keeps pace with how fast it is actually moving (this.speed is metres per second over 3). It goes from standing to moving
+    // with next to no easing in, its walk has a hitch in it, and standing it does not move at all: the idle clip is stopped
+    if (run) r.play('run', { fade: 0.12, speed: 0.8 + this.speed * 0.3 });
+    else if (walk && this.sneak && r.actions.sneak) r.play('sneak', { fade: 0.3, speed: (0.5 + this.speed * 0.5) * this.hitch(r, 'sneak') });   // the stalk: its own creeping cycle
+    else if (walk) r.play('walk', { fade: 0.15, speed: (0.4 + this.speed * 0.45) * this.hitch(r, 'walk') });
+    else r.play('idle', { fade: 0.35, speed: 0 });
+    if (!walk) this.hitchK = 0;
     r.update(dt);
+    // up from the floor: its height comes back a held key at a time, the head left hanging until the last
+    let rise = 0, hang = 0;
+    if (this.riseT < RISE_TIME) {
+      this.riseT += dt;
+      const kf = Math.min(RISE.length - 1e-6, this.riseT / RISE_KEY), i = Math.floor(kf), u = ramp(kf - i);
+      rise = lerp(i ? RISE[i - 1] : 1, RISE[i], u); hang = i < RISE.length - 1 ? 1 : 1 - u;
+    }
     // each foot on its own floor (a stair's tread, the front step) and, under a door head, down on bent knees, bent over, the head lifted
     // back so it still looks ahead: the hips come down as far as the lower foot needs, the feet stay where the clip put them over their floor
-    const dk = this.catchPose ? 1 : this.duck, B = r.bones;
+    const dk = this.catchPose ? 1 : Math.max(this.duck, rise), B = r.bones;
     rr.position.set(0, 0, 0); rr.updateMatrixWorld(true);
     // with a wall close ahead (out of a door across a hall, onto the cellar stairs' landing) the hips go back, so its head stops short of
     // the wall instead of going on into it (and its back straightens, below, if that is not enough)
@@ -750,8 +875,8 @@ export class Entity {
       r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.45 * dk);
       r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], -0.12 * dk);
     }
-    // posture on top of the clip: stooped when moving, plus the story's lean and head tilt, and a slow sway so it is never quite still
-    r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.12 : walk ? 0.12 : 0) - this.stun * 0.4);
+    // posture on top of the clip: stooped when moving, plus the story's lean
+    r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], this.lean + (run ? 0.2 : walk ? 0.12 : 0) - this.stun * 0.4);
     // and if the front of its face would still go on into that wall, its back straightens (or bends back) just enough that it does not
     if (back > 0.01) for (let pass = 0; pass < 3; pass++) {
       this.root.updateMatrixWorld(true); this.head.getWorldPosition(_a);
@@ -760,13 +885,14 @@ export class Entity {
       if (over <= 0.005) break;
       r.bend(['Spine', 'Spine1', 'Spine2'], [0.2, 0.4, 0.4], [1, 0, 0], -Math.min(0.4, over / 1.1));
     }
-    r.bend(['Spine1'], [1], [0, 0, 1], Math.sin(t * 0.6) * 0.035 + Math.sin(t * 1.7) * 0.012);
-    if (this.leanSide) r.bend(['Spine', 'Spine1', 'Spine2', 'Neck'], [0.2, 0.25, 0.35, 0.2], [0, 0, 1], this.leanSide);   // leaning out from behind something
-    r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt + Math.sin(t * 0.7) * 0.05);
-    // slow breathing: the chest opens and the shoulders lift a few millimetres
-    const br = 0.5 + 0.5 * Math.sin(t * 1.15);
-    r.bend(['Spine2'], [1], [1, 0, 0], -0.012 * br);
-    r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 0, 1], 0.02 * br);
+    // room only for its body (a hall, a doorway, beside a wardrobe): 1 when there is none to either side
+    const tuck = this.catchPose || this.reach > 0.2 || this.flinch > 0.3 ? 0 : this.armRoom();
+    this.tuckK = tuck;
+    // the hitch: the body dropped forward, and to one side where there is the room, for the moment the legs hold
+    if (this.hitchK > 0.001) { r.bend(['Spine1', 'Spine2'], [0.5, 0.5], [0, 0, 1], 0.15 * this.hitchK * (1 - tuck)); r.bend(['Spine2'], [1], [1, 0, 0], 0.09 * this.hitchK); }
+    // leaning out from behind something: its hand comes round first (peekHand, below), then its head and shoulder
+    if (this.leanSide) this.peekT += dt; else this.peekT = 0;
+    if (this.leanSide) r.bend(['Spine', 'Spine1', 'Spine2', 'Neck'], [0.2, 0.25, 0.35, 0.2], [0, 0, 1], this.leanSide * ss(0.2, 0.55, this.peekT));
     // arms out toward you
     if (this.reach > 0.01 && !this.catchPose) {
       const dir = r.axisWorld(0, 0.1, 1).normalize();
@@ -774,37 +900,40 @@ export class Entity {
         r.aim(r.bones[s + '_UpperArm'], r.bones[s + '_Forearm'], dir, this.reach);
         r.aim(r.bones[s + '_Forearm'], r.bones[s + '_Hand'], dir, this.reach);
       }
+    } else if ((walk || run) && !this.catchPose && dk < 0.6) {
+      // its arms do not swing with its legs: they hang from the shoulders, straight down (trailing a little at a run)
+      const down = r.axisWorld(0, -1, run ? -0.3 : 0.05).normalize(), k = 1 - dk / 0.6;
+      for (const s of ['L', 'R']) { r.aim(B[s + '_UpperArm'], B[s + '_Forearm'], down, 0.8 * k); r.aim(B[s + '_Forearm'], B[s + '_Hand'], down, 0.7 * k); }
     }
-    // room only for its body: the long arms drawn in, the hands held in front of its hips, the elbows back (a hall, a doorway, beside a
-    // wardrobe), so nothing of it goes into a wall
-    const tuck = this.catchPose || this.reach > 0.2 || this.flinch > 0.3 ? 0 : this.armRoom();
-    this.tuckK = tuck;
+    // no room: the long arms drawn in, the hands held in front of its hips with the fingers closed, the elbows back, so nothing of it
+    // goes into a wall
     if (tuck > 0.01) {
       this.root.updateMatrixWorld(true);
-      const B = r.bones, drop = 0.4 * dk;
+      const drop = 0.4 * dk;
       r.bend(['L_Clavicle', 'R_Clavicle'], [1, -1], [0, 1, 0], -0.3 * tuck);   // the shoulders drawn in and forward
-      for (const sd of ['L', 'R']) { const left = sd === 'L' ? 1 : -1; r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], this.T(left * 0.17, 1.02 - drop, 0.3, _a), this.T(left * 0.4, 1.5 - drop, -0.8, _b), tuck); }
+      for (const sd of ['L', 'R']) { const left = sd === 'L' ? 1 : -1; r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], this.T(left * (this.hands ? 0.14 : 0.17), (this.hands ? 1.08 : 1.02) - drop, this.hands ? 0.22 : 0.3, _a), this.T(left * 0.4, 1.5 - drop, -0.8, _b), tuck); }
     }
     if (feet) this.setFeet(feet);   // (after every bend of the back: the legs hang from it)
     this.plantToes(); this.keepFeetOut(); this.soleGuard();   // (the toes turned up first: that swings them further out over the floor)
-    this.relaxHands(r);
+    const tw = this.catchPose ? null : this.twitchNow();
+    this.relaxHands(r, tw && tw.kind === 2 ? { sd: tw.sgn > 0 ? 'L' : 'R', k: 0.75 } : null, this.hands ? 0.8 * tuck : 0);
+    if (this.leanSide && !this.catchPose) this.peekHand(r, ss(0, 0.22, this.peekT));
     if (this.post) this.post(r, dt);   // a scene's own pose on top (night one's bedside: an arm reaching a point, the head put somewhere)
     if (this.catchPose) { this.catchFrame(r); this.face(dt); return; }
-    r.lookAt(this.lookTarget, dt, { yaw: 1.2, pitch: 0.7, speed: 6 });
-    // now and then, while it stands, it cocks its head: quick over, held, eased back. at most once per 11 s, timed from the clock alone so
-    // a replay matches (after the look, which would straighten it out); the cock is held 0.4 s longer than a person would hold it
-    const n = Math.floor(t / 11), u = t - n * 11 - 3 - 6 * hash(n);
-    if (n > 0 && u > 0 && u < 1.3 && this.mode === 'idle' && this.reach < 0.2) {
-      const k = (u < 0.08 ? ss(0, 0.08, u) : 1 - ss(0.7, 1.3, u)) * (hash(n + 0.5) < 0.5 ? -1 : 1);
-      r.bend(['Head'], [1], [0, 0, 1], 0.08 * k);
-      r.bend(['Neck'], [1], [0, 1, 0], 0.03 * k);
+    // its head is on you and stays on you: it turns to you faster than a neck should once it is moving, and it is held at the roll it
+    // is given (the story's tilt, the cock of its head) whatever the body under it does
+    r.lookAt(this.lookTarget, dt, walk || run ? { yaw: 1.2, pitch: 0.7, speed: 30, rate: 9 } : { yaw: 1.2, pitch: 0.7, speed: 6 });
+    this.headRoll(r, this.tilt + this.cockRoll());
+    if (hang > 0.001) r.bend(['Neck', 'Head'], [0.45, 0.55], [1, 0, 0], 0.95 * hang);
+    if (tw) {
+      if (tw.kind === 0) { r.bend(['Head'], [1], [0, 1, 0], 0.17 * tw.sgn); r.bend(['Head'], [1], [0, 0, 1], 0.1 * tw.sgn); }
+      else if (tw.kind === 1) { r.bend([tw.sgn > 0 ? 'L_Clavicle' : 'R_Clavicle'], [1], [0, 0, 1], 0.2 * tw.sgn); r.bend(['Spine2'], [1], [0, 1, 0], 0.05 * tw.sgn); }
+      else if (tw.kind === 3) r.bend(['Neck', 'Head'], [0.5, 0.5], [1, 0, 0], -0.13);
     }
-    // the light in its face: both hands up over it, the head turned away and down. The flash: thrown back, arms out
-    if (this.flinch > 0.01) this.cover(r, this.flinch);
-    if (this.stun > 0.01) {
-      r.bend(['Neck', 'Head'], [0.4, 0.6], [1, 0, 0], -0.55 * this.stun);
-      r.bend(['L_UpperArm', 'R_UpperArm'], [1, -1], [0, 0, 1], 0.5 * this.stun);
-    }
+    // the light in its face: a hand up over it, the head turned away and down. The flash: thrown back, the same hand over its eyes
+    if (this.flinch > 0.01 || this.stun > 0.01) this.cover(r, Math.max(this.flinch, this.stun));
+    if (this.stun > 0.01) r.bend(['Neck', 'Head'], [0.4, 0.6], [1, 0, 0], -0.55 * this.stun);
+    this.handsOffFloor(r);
     this.face(dt);
   }
   // ---------- the feet on the floor ----------
@@ -924,7 +1053,7 @@ export class Entity {
   skinCells(re, keep = null) {
     const out = { L: [], R: [] }, seen = new Set(), C = 0.025;
     this.root.updateMatrixWorld(true);
-    for (const m of this.rigMeshes || []) {
+    for (const m of this.skinned || this.rigMeshes || []) {
       const P = m.geometry.attributes.position, SI = m.geometry.attributes.skinIndex, SW = m.geometry.attributes.skinWeight, bones = m.skeleton.bones;
       for (let i = 0; i < SI.count; i++) {
         let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
@@ -988,19 +1117,17 @@ export class Entity {
     const B = r.bones;
     r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 1, 0], 0.55 * w); r.bend(['Neck', 'Head'], [0.4, 0.6], [1, 0, 0], 0.35 * w);
     this.root.updateMatrixWorld(true); this.head.updateWorldMatrix(true, false);
-    for (const sd of ['L', 'R']) {
-      const left = sd === 'L' ? 1 : -1;
-      this.head.localToWorld(_a.set(left * 0.1, -0.06, 0.22));
-      r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], _a, this.T(left * 0.9, 0.9, 0.2, _b), w);
-    }
+    // (one hand over its face; the other stays down)
+    this.head.localToWorld(_a.set(-0.04, 0.0, 0.24));
+    r.ik2(B.R_UpperArm, B.R_Forearm, B.R_Hand, _a, this.T(-0.9, 0.9, 0.2, _b), w);
   }
-  // the catch, one held frame at a time (main.js caught): 1 its face at the lens 0.6 m off, the mouth wide; 2 both hands at the edges of
-  // the frame; 3 the face 0.2 m off, filling it. Its feet stay on the floor: the face comes down by the knees and the back
+  // the catch, one held frame at a time (main.js caught): 1 its face at the lens 0.6 m off, the mouth wide; 2 nearer, the jaw coming
+  // down, its hands up from under the frame; 3 the face 0.2 m off and the lens in its open mouth, the jaw dropped and the head cranked over the other way. Its feet stay on the floor: the face comes down by the knees and the back
   catchFrame(r) {
-    const c = this.catchPose, cam = c.cam, B = r.bones, dist = c.frame >= 3 ? 0.2 : c.frame === 2 ? 0.42 : 0.6;
+    const c = this.catchPose, cam = c.cam, B = r.bones, dist = c.frame >= 3 ? 0.21 : c.frame === 2 ? 0.42 : 0.6;
     cam.updateMatrixWorld(true);
     const eye = cam.getWorldPosition(_g), fwd = cam.getWorldDirection(_f); fwd.y = 0; fwd.normalize();
-    const want = _e.copy(eye).addScaledVector(fwd, dist);
+    const want = _e.copy(eye).addScaledVector(fwd, dist); want.y += c.frame >= 3 ? 0.14 : c.frame === 2 ? 0.05 : 0;   // (the lens level with its mouth as the mouth opens)
     this.faceTowards(eye.x, eye.z, 1);
     // bend over (or come up straight) until the face is at the lens's height
     for (let i = 0; i < 4; i++) {
@@ -1014,13 +1141,13 @@ export class Entity {
       this.head.updateWorldMatrix(true, false); this.head.getWorldDirection(_d); this.head.getWorldPosition(_a);
       r.rotateWorld(B[n], _q1.setFromUnitVectors(_d, _b.copy(eye).sub(_a).normalize()).slerp(ID_Q, 1 - share));
     }
-    this.head.getWorldDirection(_d); r.rotateWorld(B.Head, _q1.setFromAxisAngle(_d, 0.45));
+    this.head.getWorldDirection(_d); r.rotateWorld(B.Head, _q1.setFromAxisAngle(_d, CATCH.roll[Math.min(3, Math.max(1, c.frame | 0))]));
     // the whole of it moved over the floor so the face is where it belongs
     this.root.updateMatrixWorld(true); this.head.getWorldPosition(_a);
     this.root.position.x += want.x - _a.x; this.root.position.z += want.z - _a.z; this.root.updateMatrixWorld(true);
     if (c.frame >= 2) for (const sd of ['L', 'R']) {
       const left = sd === 'L' ? 1 : -1;
-      cam.localToWorld(_a.set(left * 0.25, -0.1, -0.35)); cam.localToWorld(_b.set(left * 0.9, -0.5, -0.1));
+      cam.localToWorld(_a.set(left * 0.24, -0.2, -0.34)); cam.localToWorld(_b.set(left * 0.9, -0.6, -0.1));
       r.ik2(B[sd + '_UpperArm'], B[sd + '_Forearm'], B[sd + '_Hand'], _a, _b);
     }
     this.lookTarget = cam.position;
