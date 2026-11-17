@@ -923,7 +923,9 @@ export class Entity {
     // its head is on you and stays on you: it turns to you faster than a neck should once it is moving, and it is held at the roll it
     // is given (the story's tilt, the cock of its head) whatever the body under it does
     r.lookAt(this.lookTarget, dt, walk || run ? { yaw: 1.2, pitch: 0.7, speed: 30, rate: 9 } : { yaw: 1.2, pitch: 0.7, speed: 6 });
-    this.headRoll(r, this.tilt + this.cockRoll());
+    // (leaning out from behind something the head goes over with the body: held level, it would come back behind what hides it)
+    if (this.leanSide) r.bend(['Neck', 'Head'], [0.4, 0.6], [0, 0, 1], this.tilt);
+    else this.headRoll(r, this.tilt + this.cockRoll());
     if (hang > 0.001) r.bend(['Neck', 'Head'], [0.45, 0.55], [1, 0, 0], 0.95 * hang);
     if (tw) {
       if (tw.kind === 0) { r.bend(['Head'], [1], [0, 1, 0], 0.17 * tw.sgn); r.bend(['Head'], [1], [0, 0, 1], 0.1 * tw.sgn); }
