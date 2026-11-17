@@ -17,6 +17,12 @@
 //   heard(p, within, sec)        a sound was placed near p inside `sec` seconds while the player stood within `within` metres of it
 //   homeLight()                  the house's light is in sight (the forest's rule): true until setHomeLight(fn) hands over the real test
 //   inBunkFor()                  seconds the player has lain in the bunk without getting up (law 8's bunk fallback reads it)
+// What the thing and the haunting ask (js/hunter.js, js/haunt.js):
+//   unseen(p, sec)               p is off screen now and was not in view in the last sec seconds: something may change there
+//   stared(p, minDot)            the player is looking straight at p with a clear line (a glance past it does not count)
+//   doorNoise()                  the last door the player worked, opened or shut: { name, x, z, px, pz, t } (the door's middle, where the
+//                                player stood, when), or null
+//   facingDir()                  the way the player faces on the plan, { x, z }      roomOf(p)   the room a point is in
 import * as THREE from 'three';
 import { active } from './collide.js';
 
@@ -84,7 +90,7 @@ export function createGaze({ camera, P, los, roomAt, colliders, F = null, W = nu
   // ---- the gates ----
   const rooms = { cur: null, pend: null, pendT: 0, left: {}, entered: {} };
   const opened = {}, doorWas = {}, flips = [], sounds = [];
-  let flashOffAt = 0, stillAt = 0, lastBusy = -99, lastEnd = -99, bunkT = 0, homeLightFn = () => true;
+  let flashOffAt = 0, stillAt = 0, lastBusy = -99, lastEnd = -99, bunkT = 0, homeLightFn = () => true, lastDoor = null;
   const still0 = { x: 0, z: 0, yaw: 0, pitch: 0 };
   const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
   const freeNow = () => !F || (!F.script && !F.cutscene && !F.dead && P.mode !== 'cine');
@@ -111,6 +117,8 @@ export function createGaze({ camera, P, los, roomAt, colliders, F = null, W = nu
     if (W && W.doors) for (const name in W.doors) {
       const d = W.doors[name], was = doorWas[name];
       if (was !== undefined && was === 0 && d.target === 1 && freeNow() && Math.hypot(P.pos.x - d.mid.x, P.pos.z - d.mid.z) < 1.8) opened[name] = t;
+      // a latch is heard either way: the last door the player's own hand opened or shut
+      if (was !== undefined && was !== d.target && freeNow() && Math.hypot(P.pos.x - d.mid.x, P.pos.z - d.mid.z) < 1.8) lastDoor = { name, x: d.mid.x, z: d.mid.z, px: P.pos.x, pz: P.pos.z, t };
       doorWas[name] = d.target;
     }
     while (flips.length && t - flips[0].t > 20) flips.shift();
@@ -144,6 +152,11 @@ export function createGaze({ camera, P, los, roomAt, colliders, F = null, W = nu
   const setHomeLight = (fn) => { homeLightFn = typeof fn === 'function' ? fn : () => true; };
   const inBunkFor = () => bunkT;
   const room = () => rooms.cur;
+  const unseen = (p, sec = 2) => !onScreen(p, 1.15) && !sawRecently(p, sec);
+  const stared = (p, minDot = 0.93) => facing(p) > minDot && onScreen(p, 0.8) && clear(p);
+  const doorNoise = () => lastDoor;
+  const facingDir = () => { const f = fwd(); return { x: f.x, z: f.z }; };
+  const roomOf = (p) => roomAt(p.x, p.z, p.y || 0);
 
   function update(dt) {
     t += dt; acc += dt;
@@ -162,6 +175,6 @@ export function createGaze({ camera, P, los, roomAt, colliders, F = null, W = nu
   return {
     update, behind, inView, onScreen, facing, looking, sawRecently, whenLookAt, whenLookAway, glanceTime, clearAll, free, eyeY,
     leftRoom, enteredRoom, openedDoor, openedAt, noteDoor, flipped, flippedAt, noteFlip, flashOff, still, settled, markEnd, markBusy,
-    heard, notePlaced, homeLight, setHomeLight, inBunkFor, room, get now() { return t; },
+    heard, notePlaced, homeLight, setHomeLight, inBunkFor, room, unseen, stared, doorNoise, facingDir, roomOf, get now() { return t; },
   };
 }
