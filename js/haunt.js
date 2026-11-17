@@ -46,7 +46,8 @@ export function createHaunt(ctx) {
   const hid = (p, min = 2.2) => dist(p) > min && gaze.unseen({ x: p.x, z: p.z, y: 0 }, 2.5);
   const watched = (p, lo = 1.8, hi = 7.5) => { const d = dist(p); return d > lo && d < hi && gaze.inView({ x: p.x, z: p.z, y: Math.max(0, (p.y || 0) - 0.6) }, 0.75) && gaze.facing(p) > 0.8; };
   const free = () => F.live && !F.dead && !F.script && !F.cutscene && !F.pause && P.mode !== 'cine' && !hunter.busy && !events.NIGHT.suspended;
-  const held = (name) => events.RES.isHeld(name) || events.RES.isHeld('n1');
+  // (a door off the hall is also held, all four at once, by the beat that is waiting behind one or about to shut one: js/scares.js)
+  const held = (name) => events.RES.isHeld(name) || events.RES.isHeld('n1') || (name.startsWith('door:') && events.RES.isHeld('hallDoors'));
   const snd = (key, at, gain = 0.35, o = {}) => {
     const muffle = !hunter.los(P.pos.x, P.pos.z, at.x, at.z, P.pos.y, 0);
     return sfx.pick(key, { gain, at: { x: at.x, y: at.y ?? 0.6, z: at.z }, wet: 0.3, muffle, ...o });

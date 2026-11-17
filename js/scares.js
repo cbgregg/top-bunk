@@ -560,12 +560,14 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
 
   // a kitchen chair pulled out from the table and still rocking on two legs when you get there; it comes to rest while you look at it
   const CHAIR = 1;
+  // (only from its own place at the table: one the house has already turned round or stood in your room is left as it was put, js/haunt.js)
+  const chairHome = () => { const c = W.chairs[CHAIR]; return !!c && Math.hypot(c.holder.position.x - c.x, c.holder.position.z - c.z) < 0.02 && Math.abs(c.holder.rotation.y - c.rot) < 0.02; };
   reg({
     id: 'chairRock', tier: 'wrong', minN: 2, w: 0.8, uses: ['table'], rooms: ['living', 'hall', 'dining', 'kitchen'],
     anchor: 'table',
-    pre: () => walking() && !!W.chairs[CHAIR] && !hunter.busy && pd(W.chairs[CHAIR].holder.position) > 2.6 && pd(W.chairs[CHAIR].holder.position) < 10,
+    pre: () => walking() && chairHome() && !hunter.busy && pd(W.chairs[CHAIR].holder.position) > 2.6 && pd(W.chairs[CHAIR].holder.position) < 10,
     arm: () => {
-      const c = W.chairs[CHAIR]; if (!c || P.mode !== 'walk' || pd(c.holder.position) < 2.2) return null;
+      const c = W.chairs[CHAIR]; if (!chairHome() || P.mode !== 'walk' || pd(c.holder.position) < 2.2) return null;
       const hp = c.holder.position, C = W.chairs; let mx = 0, mz = 0; for (const o of C) { mx += o.holder.position.x; mz += o.holder.position.z; } mx /= C.length; mz /= C.length;
       const dx = hp.x - mx, dz = hp.z - mz, l = Math.hypot(dx, dz) || 1, h = { alive: true, t: 0, amp: 0.1, ph: 0, x0: hp.x, z0: hp.z, y0: hp.y, r0: c.holder.rotation.y, rz: c.holder.rotation.z };
       sfx.scrape(D.pan(hp.x, hp.z, 0.2)); W.moveChair(CHAIR, hp.x + dx / l * 0.3, hp.z + dz / l * 0.3, h.r0 + 0.2);
