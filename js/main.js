@@ -1622,7 +1622,7 @@ nights = createNights({
   addI: (o) => { interacts.push(o); return o; }, removeI: (o) => { const i = interacts.indexOf(o); if (i >= 0) interacts.splice(i, 1); },
   holding: () => input.down('breath') || breathLatch,
   addShake: (v) => { shake = Math.max(shake, v); },
-  scene, photo: takePhoto, openPhotos, hands, FN, kidBoxes, faceTo: (who, x, z) => { who.group.rotation.set(0, Math.atan2(x - who.group.position.x, z - who.group.position.z), 0); },
+  scene, photo: takePhoto, openPhotos, hands, FN, kidBoxes, weather, faceTo: (who, x, z) => { who.group.rotation.set(0, Math.atan2(x - who.group.position.x, z - who.group.position.z), 0); },
   clockRate: 1 / 1.1, lightLabel: () => L('light'),
 });
 UI.makeGrain();

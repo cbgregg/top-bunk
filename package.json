@@ -19,6 +19,7 @@
     "test:flow": "node tests/smoke.js --only gamepad,death,dawn,breaker,doors,brightness,seed",
     "test:endings": "node tests/smoke.js --only endings",
     "test:scenes": "node tests/smoke.js --only vigil,nightmares",
+    "test:scares": "node tests/scares.js",
     "dist": "electron-builder --win --mac --linux",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",

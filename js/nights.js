@@ -10,6 +10,7 @@ import { achievements } from './achievements.js';
 import { createGaze } from './gaze.js';
 import { createHaunt } from './haunt.js';
 import { createWindowScares } from './windowscares.js';
+import { createScares } from './scares.js';
 import { makePerson } from './people.js';
 import * as events from './events.js';
 import * as log from './log.js';
@@ -402,6 +403,8 @@ export function createNights(env) {
     }
   }
   registerStageBridge();
+  // the jumps, the quiet ones and the night's dressing (scares.js): on the same table, under the same gaps
+  const sc = createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, events, log, later, stage: { freeE, hideE }, wins: () => (ws ? ws.wins : []), quiet: () => !F.plan || quietTypes.has(F.plan.type) });
   // the flash in its face: its head snaps up, it unfolds off its knees in five held jerks (the joints cracking on the second, fourth
   // and fifth, the floor taking its weight on the second), and it comes for you on all fours (the hunter's crawl), faster if you run
   async function crawlAt(st) {
@@ -439,7 +442,7 @@ export function createNights(env) {
   // the crawler's head: the face reaches well forward of the root on all fours
   const crawlHead = () => { const e = E.root.position, ry = E.root.rotation.y; return { x: e.x + Math.sin(ry) * 0.75, z: e.z + Math.cos(ry) * 0.75 }; };
   function stageTick(dt) {
-    gaze.update(dt); if (ws) ws.tick(dt);
+    gaze.update(dt); if (ws) ws.tick(dt); sc.tick(dt);
     if (env.lights && F.live && !F.dead) env.lights.house(dt, lightCtx());
     for (const k in doubles) { const d = doubles[k]; if (d.group.visible) d.update(env.time(), dt); }
     if (F.dead || !F.live) { if (ST.on) endStage(); return; }
@@ -776,7 +779,8 @@ export function createNights(env) {
     // the TV let go, the camera lowered
     events.start(plan, n);
     haunt.start(plan, n);
-    events.NIGHT.cleanup.push(() => { endStage(); for (const k in doubles) doubles[k].group.visible = false; tvHeld = false; F.photoHold = false; if (ws) ws.reset(); });
+    events.NIGHT.cleanup.push(() => { endStage(); for (const k in doubles) doubles[k].group.visible = false; tvHeld = false; F.photoHold = false; if (ws) ws.reset(); sc.reset(); });
+    sc.start(n);
     const dialClock = clockText(F.clock);
     UI.card(dialClock, `Night ${n}`, 4.5);
     await wait(2.5); UI.fade(0, 3); await wait(2.0);
@@ -1596,7 +1600,7 @@ export function createNights(env) {
   };
 
   const nights = { freeNight, dawn, tick, hunter, director, D, haunt, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor,
-    stage: { SCARES, gaze, ST, crawlAt, photoTaken, endStage, tick: stageTick, double, get ws() { return ws; } } };
+    stage: { SCARES, gaze, ST, crawlAt, photoTaken, endStage, tick: stageTick, double, get ws() { return ws; } }, scares: sc };
   // the night engine is a plain module, imported here rather than hooked (js/hooks.js): it is installed with the night's own context
   events.install({ F, P, W, E, RUN: env.RUN, sfx, UI, camera, lights: env.lights, hunter, gaze, hooks, nights });
   return nights;

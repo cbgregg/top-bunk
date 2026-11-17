@@ -206,7 +206,8 @@ async function headlessOne(page, d, night) {
   const r = { id: d.id, tier: d.tier, notes: [] };
   const fail = (m) => { r.fail = (r.fail ? r.fail + '; ' : '') + m; };
   // a clean table and a free player; then the house as the beat needs it (its test.setup: the door it wants shut, the prop it wants placed)
-  await ev(page, (events, g) => { events.suspend(true); for (const a of events.test.active()) events.test.undo(a.id); g.nights.stage.endStage(); g.F.script = false; g.F.cutscene = false; g.F.fear = 0; if (g.P.mode !== 'walk') g.P.mode = 'walk'; g.F.photoHold = false; if (g.nights.D.N1) g.nights.D.N1.hold = true; });
+  // (and the thing sent away: the covers pulled over in the last beat's test can have brought it to the bunk)
+  await ev(page, (events, g) => { events.suspend(true); for (const a of events.test.active()) events.test.undo(a.id); g.nights.stage.endStage(); if (g.nights.hunter.busy || g.E.visible) { g.nights.hunter.reset(); g.E.visible = false; } g.F.script = false; g.F.cutscene = false; g.F.fear = 0; if (g.P.mode !== 'walk') g.P.mode = 'walk'; g.F.photoHold = false; if (g.nights.D.N1) g.nights.D.N1.hold = true; });
   await ev(page, (events, g, id) => { const def = events.get(id); if (def && def.test && typeof def.test.setup === 'function') def.test.setup(g.nights.D); }, d.id);
   const pt = await ev(page, (events, g, id) => events.test.point(id), d.id);
   const watchBeat = d.reveal && d.reveal.by === 'watch';
@@ -225,6 +226,8 @@ async function headlessOne(page, d, night) {
     if (kind === 'away') { await standNear(page, s, 2.2, true); await playFor(page, 2.6); }
     else if (kind === 'bunk') { await page.evaluate(() => { const g = window.__game; g.P.mode = 'bunk'; g.P.pos.set(g.BUNK_SEAT.x, 0, g.BUNK_SEAT.z); g.P.cam.copy(g.BUNK_SEAT); g.P.yaw = 0.2; g.P.pitch = 0; }); await playFor(page, 2.6); }   // long enough that the bunk is out of the gaze's memory (the last test may have ended facing it)
     else { await stand(page, s[0], s[1], s[2], s[3]); await playFor(page, 1.0); await stand(page, s[0], s[1], s[4], s[5]); await playFor(page, 0.4); }
+    // (the thing gone first, if the covers of the beat before brought it to the bunk: that visit is the hunter's, and ends by itself)
+    await until(page, () => !window.__game.E.visible, null, 25e3).catch(() => {});
     r.snap = await snapshot(page); r.meshes = await houseMeshes(page);
     const a = await ev(page, (events, g, id) => events.test.arm(id), d.id);
     if (a === 'armed') { armed = kind; break; }
@@ -327,6 +330,9 @@ async function headlessOne(page, d, night) {
       if (nightN === 1) await until(page, () => Array.isArray(window.__n1log), null, 60e3);
       await climbDown(page);
       await ev(page, (events, g) => { g.nights.director.stop(); if (g.nights.D.N1) g.nights.D.N1.hold = true; });
+      // Mom and Dad sleep through it: a beat that makes a noise (a slammed door, the telephone) would wake them, and a parent walking the
+      // house with a torch is tests/parents.js's business, not one beat's sounds or another's
+      await page.evaluate(async () => { const par = await import('/js/parents.js'), { hooks } = await import('/js/hooks.js'); hooks.parents.noise = () => 0; setInterval(() => { par.test.set(0); for (const who of ['mom', 'dad']) if (par.test.PAR[who]) par.test.PAR[who].mult = 99; }, 100); });   // (and nothing is loud enough: one ring of the telephone is a mutter and a light)
       const defs = unmark(await pageDefs(page)).filter((d) => d.minN <= nightN && d.maxN >= nightN && (nightN === 1 ? d.maxN === 1 || d.id === 'breathUnder' : d.maxN > 1));
       for (const d of defs) {
         let r;

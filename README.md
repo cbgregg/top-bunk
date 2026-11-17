@@ -41,7 +41,7 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-`npm test` runs `tests/smoke.js`: the game in headless Chromium through the title, a day, a night and a phone-sized touch screen. It needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`). `node tests/contacts.js` poses Mom, Dad and grandpa the way the game does (at the table, the stove, the mug, a carried box, the camera, asleep, the vigil chair) and reports any body part more than 1.5 cm inside the furniture or what they hold; `--shots dir` saves a picture of each pose. `node tests/haunt.js` drives the haunting and the thing's mind a frame at a time: nothing changes in view, what is moved is set down clear of everything and blocks no way, the same seed makes the same changes, and what the thing has learned is in the run's save.
+`npm test` runs `tests/smoke.js`: the game in headless Chromium through the title, a day, a night and a phone-sized touch screen. It needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`). `node tests/contacts.js` poses Mom, Dad and grandpa the way the game does (at the table, the stove, the mug, a carried box, the camera, asleep, the vigil chair) and reports any body part more than 1.5 cm inside the furniture or what they hold; `--shots dir` saves a picture of each pose. `node tests/haunt.js` drives the haunting and the thing's mind a frame at a time: nothing changes in view, what is moved is set down clear of everything and blocks no way, the same seed makes the same changes, and what the thing has learned is in the run's save. `node tests/scares.js` goes through the jumps and the quiet beats of `js/scares.js` on night six (each armed out of view, revealed by what the player does, paid off once and undone) and checks what the house is dressed with on each night of a seed.
 
 ## Deploy to GitHub Pages
 
@@ -58,6 +58,7 @@ Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml
 | `js/collide.js` | Bodies, capsules and sweeps: what keeps the player, the camera, the thing, Mom and Dad, the door leaves and the props out of each other |
 | `js/nights.js` | The nights: clock, hiding places, proof and the camera, and what each kind of night does |
 | `js/events.js`, `js/events/`, `js/log.js` | The night engine (one event shape, one scheduler, the things each event needs free) and the events it runs; the night's ledger of what happened and who saw it |
+| `js/scares.js` | The jumps (a face at a door you open, a hand on the rail of the bunk, the thing in a camera flash, the telephone), the quiet beats (steps overhead, humming in a wall, a knock that answers) and what the house is dressed with as each night starts (scratched photographs, the drawing, wet footprints) |
 | `js/parents.js` | Mom and Dad at night: asleep, the noise that wakes them, who gets up and walks the house, and what they find |
 | `js/doors.js` | The doors out of the house at night: the front door's chain, which doors are locked on which nights, the pocket behind the house and the routes out |
 | `js/story.js` | What Mom and Dad make of it all, which sets how the mornings talk and how night ten ends; which nights each kind of night may fall on |

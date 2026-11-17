@@ -551,6 +551,42 @@ export class Sound {
     if (!this.pick('rattle', { ...o, gain: 0.95 * gain, wet: 0.12, jitter: 0.04, rate: 0.9, maxLen: 2.6 })) this.rattleSynth(gain);
     if (!this.pick('bone_crack', { ...o, gain: 0.85 * gain, wet: 0.1, delay: 0.14, maxLen: 1.6 })) this.noiseHit({ dur: 0.07, type: 'bandpass', f: 1500, q: 2.5, gain: 0.7 * gain, attack: 0.001, wet: 0.1, delay: 0.14 });
   }
+  // one hummed note in a child's voice, mouth shut: a soft tone and its octave under a low filter, a slow wobble in the pitch, heard from `at`
+  hummed({ at = null, f = 440, dur = 0.6, gain = 0.2, delay = 0 } = {}) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = this.now + delay, g = ctx.createGain(), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 950; lp.Q.value = 1.4;
+    const vib = ctx.createOscillator(), vg = ctx.createGain(); vib.frequency.value = 5.2; vg.gain.value = f * 0.012; vib.connect(vg);
+    for (const [k, type, v] of [[1, 'triangle', 1], [2, 'sine', 0.22]]) {
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f * k * 0.97, t); o.frequency.linearRampToValueAtTime(f * k, t + 0.09); og.gain.value = v;
+      vg.connect(o.frequency); o.connect(og).connect(lp); o.start(t); o.stop(t + dur + 0.3);
+    }
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.1); g.gain.setValueAtTime(gain, t + Math.max(0.12, dur - 0.12)); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.08);
+    lp.connect(g).connect(this.bus(1, 0, 0.4, dur + delay + 0.4, 'sfx', at ? { at, ref: 1.2, roll: 1.1 } : null)); vib.start(t); vib.stop(t + dur + 0.3);
+  }
+  // one tooth of a music box comb: the note, a thin partial well above it, a tick of the pin letting go
+  comb({ at = null, f = 880, gain = 0.25, delay = 0 } = {}) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = this.now + delay, out = this.bus(1, 0, 0.35, 1.8 + delay, 'sfx', at ? { at, ref: 1.2, roll: 1.1 } : null);
+    for (const [k, v, d] of [[1, 1, 1.5], [4.07, 0.16, 0.5], [6.3, 0.05, 0.2]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f * k;
+      this.env(g.gain, t, 0.002, gain * v, d); o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.1);
+    }
+  }
+  // down a telephone: a voice torn open, all of it inside the line's narrow band and far too loud for the earpiece
+  lineScream({ at = null, gain = 1, dur = 1.1 } = {}) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = this.now, band = ctx.createBiquadFilter(), sh = ctx.createWaveShaper(), g = ctx.createGain();
+    band.type = 'bandpass'; band.frequency.value = 1500; band.Q.value = 0.7;
+    const curve = new Float32Array(257); for (let i = 0; i < 257; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(x * 6); } sh.curve = curve;
+    for (const [f0, f1, f2, type] of [[640, 1180, 820, 'sawtooth'], [655, 1235, 790, 'sawtooth'], [1290, 2390, 1500, 'square']]) {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 0.12); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 31; lg.gain.value = f0 * 0.08; lfo.connect(lg).connect(o.frequency);
+      o.connect(sh); o.start(t); o.stop(t + dur + 0.05); lfo.start(t); lfo.stop(t + dur + 0.05);
+    }
+    const n = ctx.createBufferSource(), ng = ctx.createGain(); n.buffer = this.noise; ng.gain.value = 0.35; n.connect(ng).connect(sh); n.start(t, Math.random()); n.stop(t + dur + 0.05);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55 * gain, t + 0.02); g.gain.setValueAtTime(0.55 * gain, t + dur - 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    sh.connect(band).connect(g).connect(this.bus(1, 0, 0.12, dur, 'sfx', at ? { at, ref: 1.6, roll: 0.7 } : null));
+  }
   // a dry rattle in a throat, for when the recording is not loaded yet: a low pulse train, each pulse a short noise burst, slowing as it dies
   rattleSynth(gain = 1) {
     let t = 0;
