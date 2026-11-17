@@ -8,6 +8,7 @@ import { NODES, nearestNode } from './nav.js';
 import { pick } from './rng.js';
 import { achievements } from './achievements.js';
 import { createGaze } from './gaze.js';
+import { createHaunt } from './haunt.js';
 import { createWindowScares } from './windowscares.js';
 import { makePerson } from './people.js';
 import * as events from './events.js';
@@ -90,6 +91,9 @@ export function createNights(env) {
     run: () => env.RUN, loomOwned: () => !!F.script || !!F.loomOwned,
     openPod: (id, o) => openPod(id, o), twitchPod: (id) => twitchPod(id),
     crawlCaught: () => { const st = ST.on; if (st && st.kind === 'crumple' && st.crawl) crawlCatch(st); else env.caught(); },
+    // the mind (js/hunter.js): its memory is kept with the run, a look that finds it watching counts for the night's pacing, and a
+    // bait is the house's to make (js/haunt.js)
+    save: () => env.saveRun(), reveal: () => events.noteReveal(null, 'presence'), stir: (at) => haunt.stir(at),
   });
   let flashSeen = null;
   // the louvres (or the curtain) in front of you, as a page element: they are what moves when it opens the place
@@ -224,6 +228,9 @@ export function createNights(env) {
   // ---------- the blind spot: things put where you just were looking, shown by your own turn, gone when you look away ----------
   const gaze = createGaze({ camera, P, los: hunter.los, roomAt: env.roomAt, colliders: W.colliders, F, W });
   D.gaze = gaze;
+  // the house's own restlessness: things that are not where they were (js/haunt.js)
+  const haunt = createHaunt({ W, P, F, E, sfx, camera, gaze, hunter, hidden, lights: () => env.lights, run: () => env.RUN, panFor: env.panFor, addShake: env.addShake });
+  D.haunt = haunt;
   let LINES = {}; if (typeof fetch === 'function') fetch('assets/audio/lines.json').then((r) => r.json()).then((j) => { LINES = j; }).catch(() => {});
   const sub = (id, sec) => { const l = LINES[id]; if (l) UI.subtitle(l.html, sec); };
   // a voice somewhere in the house: placed, quieter with distance, through the walls when there are walls in the way, with its words
@@ -529,6 +536,7 @@ export function createNights(env) {
   // (with a line to you, so your turn finds it) and you reveal it by turning round
   function encounter(kind) {
     if (ST.on) return false;   // something is already staged in the blind spot
+    if (hunter.think(kind)) return true;   // it has its own idea of this one (js/hunter.js: it watches, it waits at your closet, it baits)
     if (kind === 'sight') {
       if (hidden()) return false;
       const c = visibleNodes(5, 15, 'behind').filter((k) => !gaze.onScreen({ x: NODES[k][0], z: NODES[k][1], y: NODES[k][2] || 0 }, 1.15) && !gaze.sawRecently({ x: NODES[k][0], z: NODES[k][1], y: NODES[k][2] || 0 }, 2));
@@ -561,7 +569,7 @@ export function createNights(env) {
     // the grandfather clock: it strikes the hour, and it stops dead while the thing hunts you
     const hr = Math.floor(F.clock / 60); if (hr !== lastHr) { if (lastHr >= 0 && F.live && !W.clock.silent) D.chime(hr % 12 || 12); lastHr = hr; }
     W.clock.silent = hunter.state === 'hunt';
-    director.update(); hunter.update(dt); proofTick(); stageTick(dt);
+    director.update(); hunter.update(dt); proofTick(); stageTick(dt); haunt.tick(dt);
     // the breath meter shows whenever something is near enough to hear you
     if (F.live) F.breathUI = F.breathUI || (P.mode === 'hide' && hunter.busy && hunter.gap() < 14 && hunter.state !== 'leave');
     if (F.live && P.mode === 'hide' && !(hunter.busy && hunter.gap() < 14)) F.breathUI = F.breathCheck;
@@ -767,6 +775,7 @@ export function createNights(env) {
     // the engine's table for tonight, and the night's own cleanup (run by a catch, a restart, dawn): the stage down, the doubles away,
     // the TV let go, the camera lowered
     events.start(plan, n);
+    haunt.start(plan, n);
     events.NIGHT.cleanup.push(() => { endStage(); for (const k in doubles) doubles[k].group.visible = false; tvHeld = false; F.photoHold = false; if (ws) ws.reset(); });
     const dialClock = clockText(F.clock);
     UI.card(dialClock, `Night ${n}`, 4.5);
@@ -1586,7 +1595,7 @@ export function createNights(env) {
     },
   };
 
-  const nights = { freeNight, dawn, tick, hunter, director, D, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor,
+  const nights = { freeNight, dawn, tick, hunter, director, D, haunt, PODS, hidden, enterPod, exitHide, canComeOut, TYPE_RUN, startHunt, proof, plan: planFor,
     stage: { SCARES, gaze, ST, crawlAt, photoTaken, endStage, tick: stageTick, double, get ws() { return ws; } } };
   // the night engine is a plain module, imported here rather than hooked (js/hooks.js): it is installed with the night's own context
   events.install({ F, P, W, E, RUN: env.RUN, sfx, UI, camera, lights: env.lights, hunter, gaze, hooks, nights });
