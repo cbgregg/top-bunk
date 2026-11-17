@@ -76,3 +76,22 @@ Two things to know before swapping it in for the procedural sit-up:
     node tests/contacts.js --only clips [--shots <dir>] [--port N]
 
 `tests/contacts/clips.js` plays every new clip on Dad and on Mom where the game will (the chair, a box in the arms, the phone, the table's edge, the open floor, the bed), seven or so frames each, and checks the skinned body against the chair, the table, the box, the wall, the floor, the bed and the other sleeper; the numbers above are its report. `tests/contacts.js` merges every `tests/contacts/<file>.js` (an object of scene functions) into its scenes, so `--only` takes them like any other.
+
+## The thing's head and hands (`assets/models/thing.glb`)
+
+The thing's body is `spirit.glb` painted black; its head is built in code (`js/creature.js`: the skull and neck, the eyes, the grin and its teeth). `thing.glb` lays a modelled head and a pair of modelled hands over that, made in Blender 4.2 by script. From the repo root:
+
+    node tools/models/thing.cjs --blender <path to blender 4.2> [out] [--port N] [--keep <dir>]
+
+(needs Playwright and Blender; Blender itself is not in the repo.) It does two things:
+
+1. `thing.html`, in headless Chromium, hands over what the model is built on: the skull-and-neck mesh of `js/creature.js` vertex for vertex (positions, normals, where each vertex lies in the two eyes' frames, which rows are the lips), and the hand joints of `spirit.glb` after `longFingers` has moved each finger joint out along its bone (fingers 1.8 times as long, thumbs 1.25).
+2. `thing.py`, in Blender (`blender -b --factory-startup --python tools/models/thing.py -- thing.json out.glb [dir]`), works the head's surface (temples and cheeks sunk, a brow over each socket, the back of the skull drawn out, the jaw narrowed to a chin, the cords of the neck, the larynx, the spine's knuckles; nothing is moved in the eye sockets or at the lips, and nothing is added to its height), paints the skin into three 1024 px pictures laid out on the mesh's own rows and columns (colour: ashen, mottled, veined, bruised round the sockets and the lips; relief: pores, creases, the veins; roughness: wet at the lips and the eyes), builds each hand on its joints (a Skin modifier over a skeleton of edges with a knob at every joint and a hooked nail past each tip, a thin palm, the lot fused by a voxel remesh, smoothed, thinned to about 3,800 triangles a hand and coloured by vertex) and exports the GLB (about 0.9 MB, pictures as JPEG). `--keep` leaves the handed-over JSON and the three pictures as PNG in a folder to look at.
+
+How the game uses it (`js/creature.js` `modelParts`, `js/entity.js` `useRig` and `useHands`):
+
+- **The head.** Each vertex of the file's `head` is matched to the game's own by its place in the picture (column and row), so the file's vertex order does not matter; the grin, the shut mouth and the dropped jaw are still morphs made in code, added to the modelled surface. The eyes and the teeth stay the game's own and still fit, since the sockets and the lips were not moved. If the file's grid is not the game's (`HEAD_GRID` in `creature.js` changed and the file was not rebuilt) the surface is left as built in code and only the pictures are used. Rebuild the file after changing the skull, the eyes, the grin or the grid.
+- **The hands.** The man's own hands are drawn in to a point at each wrist; the file's `hands` (in the rig's own centimetres) are skinned to the same finger bones by where each vertex lies along them (`handWeights`), after the same `longFingers`. Rebuild the file after changing `FINGER_STRETCH` or `THUMB_STRETCH`.
+- Without the file the thing keeps its code-built head (with the plain ashen skin) and the man's own hands.
+
+`tests/sweep_thing.js` puts every vertex of the body, the head and the hands through the house (no clipping, in every pose and on every edge it walks), and the `thing` check of `tests/smoke.js` covers the rest (the parts are there, it stands still, its twitches replay, the cock of its head, the rise, the catch's three faces, the torch in its eyes).
