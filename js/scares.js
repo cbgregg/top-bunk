@@ -311,11 +311,18 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#59616a'); gr.addColorStop(1, '#2a3036'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
     // tall enough that the frame cuts it at the shoulders: a long head bent to one side, close behind where your own would be
     g.fillStyle = '#030304'; g.beginPath(); g.moveTo(w * 0.42, h); g.lineTo(w * 0.47, h * 0.62); g.quadraticCurveTo(w * 0.7, h * 0.5, w * 0.95, h * 0.66); g.lineTo(w, h); g.fill();
-    g.save(); g.translate(w * 0.7, h * 0.36); g.rotate(0.22); g.beginPath(); g.ellipse(0, 0, w * 0.13, h * 0.27, 0, 0, 7); g.fill();
-    g.fillStyle = '#f4f4f0'; g.beginPath(); g.ellipse(-w * 0.055, -h * 0.05, 5, 8, 0.2, 0, 7); g.ellipse(w * 0.055, -h * 0.05, 5, 8, -0.2, 0, 7); g.fill();
-    g.fillStyle = '#000'; g.beginPath(); g.arc(-w * 0.05, -h * 0.04, 2.4, 0, 7); g.arc(w * 0.06, -h * 0.04, 2.4, 0, 7); g.fill();
-    g.strokeStyle = '#f4f4f0'; g.lineWidth = 2.4; g.beginPath(); g.arc(0, h * 0.05, w * 0.085, 0.12 * Math.PI, 0.88 * Math.PI); g.stroke();
-    g.lineWidth = 1; for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * 3.2, h * 0.095); g.lineTo(i * 3.2, h * 0.125); g.stroke(); }
+    // its face as the light on over the basin shows it (the thing's own: ashen, the sockets sunk and bruised, the eyes small and pale with
+    // a pinprick in each, a long crooked mouth with a few uneven teeth), not the rings and the even grin it shows in the dark
+    g.save(); g.translate(w * 0.7, h * 0.36); g.rotate(0.22);
+    const sk = g.createRadialGradient(-w * 0.02, -h * 0.07, 1, 0, 0, h * 0.28); sk.addColorStop(0, '#77716a'); sk.addColorStop(0.55, '#45413c'); sk.addColorStop(1, '#0c0b0b');
+    g.fillStyle = sk; g.beginPath(); g.ellipse(0, 0, w * 0.12, h * 0.27, 0, 0, 7); g.fill();
+    g.fillStyle = '#161314'; g.beginPath(); g.ellipse(-w * 0.05, -h * 0.05, 7, 6, 0.25, 0, 7); g.ellipse(w * 0.05, -h * 0.045, 7, 6, -0.25, 0, 7); g.fill();
+    g.fillStyle = '#cdc6b8'; g.beginPath(); g.arc(-w * 0.05, -h * 0.048, 2.5, 0, 7); g.arc(w * 0.051, -h * 0.043, 2.5, 0, 7); g.fill();
+    g.fillStyle = '#000'; g.fillRect(-w * 0.05 - 0.5, -h * 0.048 - 0.5, 1, 1); g.fillRect(w * 0.051 - 0.5, -h * 0.043 - 0.5, 1, 1);
+    const m0 = [-w * 0.08, h * 0.075], mc = [w * 0.01, h * 0.135], m1 = [w * 0.085, h * 0.06], at = (t) => [0, 1].map((k) => (1 - t) * (1 - t) * m0[k] + 2 * (1 - t) * t * mc[k] + t * t * m1[k]);
+    g.strokeStyle = '#1c1414'; g.lineWidth = 2.6; g.beginPath(); g.moveTo(...m0); g.quadraticCurveTo(...mc, ...m1); g.stroke();
+    const r = rng('mirror-teeth'); g.fillStyle = '#b9b09d';
+    for (let i = 1; i < 10; i++) { if (r() < 0.3) continue; const [x, y] = at(i / 10); g.fillRect(x - 0.6, y - 1.2, 1.3, 1.6 + r() * 2.2); }
     g.restore(); tex.needsUpdate = true;
   }
   reg({
