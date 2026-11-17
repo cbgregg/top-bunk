@@ -260,7 +260,7 @@ export function createHaunt(ctx) {
     { id: 'roll', find() {
       const ball = toys[0], L = lights(); if (!ball || !ball.ready || ball.g.visible) return null;
       for (const name of shuffle(H.r, DOORS)) {
-        const d = W.doors[name]; if (!d || d.a < 0.9 || d.target !== 1 || playerRoom() === DOOR_ROOM[name] || playerRoom() !== 'hall') continue;
+        const d = W.doors[name]; if (!d || d.a < 0.9 || d.target !== 1 || held('door:' + name) || playerRoom() === DOOR_ROOM[name] || playerRoom() !== 'hall') continue;
         // out of the room: across the wall line, away from the room's middle (and watched: the floor a step out from the doorway is)
         const m = d.mid, R = ROOMS[DOOR_ROOM[name]], nz = Math.sign(m.z - (R[2] + R[3]) / 2) || 1, sx = m.x, sz = m.z - nz * 0.9;
         if (!watched({ x: m.x, z: m.z + nz * 0.4, y: 0.3 }, 2.2, 8)) continue;

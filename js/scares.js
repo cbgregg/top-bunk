@@ -626,6 +626,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
         if (n !== name) return;
         const m = new THREE.Mesh(geo, scratchMat); m.position.set((u - 0.5) * w, (0.5 - v) * h, 0.003).applyMatrix4(o.matrixWorld); m.quaternion.copy(q); m.rotateZ(i * 1.3); m.scale.set(s * h, s * h, 1);
         m.visible = false; m.userData.noAO = true; m.renderOrder = 2; scratchGrp.add(m); scratches.push({ i, m, o });
+        if (W.frames && W.frames.includes(o.parent)) o.parent.attach(m);   // (a hall photograph hangs loose and the house can tip it: the scratch goes with it)
       });
     });
   }
