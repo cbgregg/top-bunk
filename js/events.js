@@ -26,9 +26,9 @@
 // the house is settled (gaze.settled(gap): the quiet curve, 70 - 5n +- 12 s on nights two to four, 45 - 3(n - 4) +- 10 from five, floor 22),
 // under the tier caps (whisper 4 + n/2, wrong 2 + n/2, presence 1 + n/3 and one more from night four, with a floor of one arm from night
 // two, loud 1 and 2 from night six with two quiet reveals between loud ones; presence and loud fifteen seconds after any reveal), with
-// every resource it uses free, and never with its anchor on screen or seen in the last two seconds (law 2). The director's seeded plan is a budget: an id it lists is not ready before its minute.
-// Law 8: an encounter needs a seen entry in the last ninety seconds of the ledger, or a player who has lain still in the bunk a minute with
-// the hall light off (chainSeen).
+// every resource it uses free, and never with its anchor on screen or seen in the last two seconds (law 2). The director's seeded plan is
+// a budget: an id it lists is not ready before its minute. Law 8: an encounter needs a seen entry in the last ninety seconds of the
+// ledger, or a player who has lain still in the bunk a minute with the hall light off (chainSeen).
 import { NODES } from './nav.js';
 import * as log from './log.js';
 

@@ -113,9 +113,11 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     payoff: (D, h) => { h.slam = true; slamming = h.door; jumped('doorSlam'); },
     tick: (D, h, dt) => {
       if (!h.slam || h.banged) return;
-      const d = door(h.door); d.target = 0;
-      const sw = sweepLeaf(d, -Math.min(d.a, dt * 9)); d.a = sw.a; d.apply();
-      if (d.a > 0.002 && !sw.hit) return;
+      const d = door(h.door), sw = sweepLeaf(d, -Math.min(d.a, dt * 9));
+      // somebody is standing in its swing (never you: you are on the hall side of it): it does not shut on them, and swings back
+      if (sw.hit) { h.banged = true; d.target = 1; if (slamming === h.door) slamming = null; h.done = true; return; }
+      d.target = 0; d.a = sw.a; d.apply();
+      if (d.a > 0.002) return;
       h.banged = true; const m = at3(d.mid.x, 1.2, d.mid.z);
       if (!sfx.pick('door_slam', { at: m, gain: 1.5, wet: 0.3, ref: 2 })) sfx.pick('door_close', { at: m, gain: 1.6, wet: 0.3, ref: 2 });
       sting(0.9, 0.9);
@@ -210,14 +212,15 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     payoff: (D, h) => { h.seen = now(); sting(1.2, 0.6); jumped('bunkHand'); sfx.pick('cloth', { at: h.p, gain: 0.7, wet: 0.08 }); },
     tick: (D, h, dt) => {
       // you lean out to look under: it lets go, and it is gone before your eye gets there
-      if (!h.gone && !h.seen && (F.leanK || 0) > 0.12) { hand.g.visible = false; h.gone = true; h.done = true; return; }
+      // (or start down the ladder: your head a foot from where it sat)
+      if (!h.gone && !h.seen && ((F.leanK || 0) > 0.12 || Math.hypot(camera.position.x - 8.33, camera.position.z - 4.0) > 0.4)) { hand.g.visible = false; h.gone = true; h.done = true; return; }
       if (!h.seen || h.gone) return;
       const t = now() - h.seen;
       if (t < 0.9) { h.k = Math.min(1, h.k + dt * 7); hand.pose(h.k); return; }
       const q = Math.min(1, (t - 0.9) / 0.3); hand.off(q);
       if (q >= 1) { hand.g.visible = false; h.gone = true; sfx.pick('bed_creak', { at: BED, gain: 0.6, wet: 0.1 }); h.done = true; }
     },
-    while: () => inBunk(), max: 30, linger: 4,
+    while: () => P.mode !== 'walk', max: 30, linger: 4,   // (the covers pulled over pass through a cut, and that is still the bunk)
     undo: (h) => { h.alive = false; hand.g.visible = false; },
     test: { mode: 'bunk' },
   });
@@ -238,7 +241,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
       h.heard = true; F.fear = Math.max(F.fear, 0.45);
       later(3.6, () => { if (h.alive && inBunk()) sfx.pick('wall_scratch', { at: at3(8.4, 1.5, 3.9), gain: 0.7, wet: 0.1, lp: 1500, rate: 0.6 }); h.done = true; });
     },
-    while: () => inBunk(), max: 45, linger: 6, test: { mode: 'bunk' },
+    while: () => P.mode !== 'walk', max: 45, linger: 6, test: { mode: 'bunk' },
   });
 
   // ---------------------------------------------------------------------------------------------------------------------------------------
@@ -345,7 +348,11 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     payoff: (D, h) => {
       // bent double a metre out from the wall, so that its face comes to the middle of the pane and stops a hand's width short of the glass
       const w = h.w, x = w.c.x - w.n.x * 1.1, z = w.c.z - w.n.z * 1.1;
-      jumped('lightningFace'); if (env.weather) env.weather.flash(0.35, 1.2);
+      jumped('lightningFace');
+      // the sky lit by the weather's own flash, and this flash's thunder heard through this window, not from everywhere
+      if (env.weather) { const th = sfx.thunder; sfx.thunder = () => {}; try { env.weather.flash(0.35, 1.2); } finally { sfx.thunder = th; } }
+      const out = at3(w.c.x - w.n.x * 7, 4, w.c.z - w.n.z * 7);
+      if (!sfx.pick('thunder', { at: out, gain: 1.2, wet: 0.2, delay: 0.35, lp: 5200, big: true, ref: 6 })) sfx.noiseHit({ dur: 2.4, type: 'lowpass', f: 520, f2: 60, q: 0.8, gain: 0.9, attack: 0.08, wet: 0.6, delay: 0.35, pan: D.pan(out.x, out.z, out.y) });
       if (idleE()) { h.shown = true; showE(x, z, w.c.x + w.n.x, w.c.z + w.n.z, { y: (W.groundAt ? W.groundAt(x, z, 0) : 0) || 0, lean: 0.2, duck: 1 }); }
       later(0.06, () => { if (h.alive) sting(1.2, 0.5); });
       later(0.62, () => { if (h.shown) { hideE(); h.shown = false; } h.done = true; });
@@ -397,7 +404,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   reg({
     id: 'tvRoom', tier: 'presence', minN: 5, w: 2.5, uses: ['E', 'stage', 'tv'], rooms: ['living'],
     anchor: () => tv.pt(),
-    pre: () => walking() && room() === 'living' && !W.tvFx.on && mayJump('tvRoom') && canE() && pd(tv.pt()) > 2 && pd(tv.pt()) < 6.5,
+    pre: () => walking() && F.plan.type !== 'static' && room() === 'living' && !W.tvFx.on && mayJump('tvRoom') && canE() && pd(tv.pt()) > 2 && pd(tv.pt()) < 6.5,   // (the night the set is Dad's has its own use for it)
     arm: () => {
       if (P.mode !== 'walk' || room() !== 'living' || W.tvFx.on || !E.rig) return null;
       const t = tv.pt(); W.tvFx.set(true); D.holdTv(true); sfx.staticBurst(D.pan(t.x, t.z, 0.8), 1.4);
