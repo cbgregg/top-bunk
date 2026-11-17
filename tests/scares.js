@@ -12,9 +12,12 @@
 //             While the door swings in front of the face its head stays clear of the leaf; the hand's joints are outside the rail
 //   spacing   after one jump no other may arm for seventy seconds, and the last one never again until another has been
 //   quiet     each quiet beat armed and revealed by the player's own action, paid off once, and undone
+//   together  the beats and the house's own changes (js/haunt.js) on the same night: while a beat holds the hall's doors the house
+//             neither stands one ajar nor shuts one; the chair rocks only from its own place at the table, never from where the house
+//             has put it, and the house leaves the table alone while it rocks; a scratched face stays on its photograph when it is tipped
 //   sounds    the three sounds made here (a hummed note, a music box tooth, the scream down the line) play without an error, and the
 //             night's own hum is still the library's (sfx.night set once the night has started)
-//   node tests/scares.js [--port N] [--only table,nightone,dressing,jumps,spacing,quiet,sounds]
+//   node tests/scares.js [--port N] [--only table,nightone,dressing,jumps,spacing,quiet,together,sounds]
 const http = require('http');
 const path = require('path');
 const { Readable } = require('stream');
@@ -300,6 +303,48 @@ const HASH = '#night6&seed=F3PC-0001&type=hunted';
     clean(w);
     return `${QUIET.length} quiet beats armed, revealed by the player and undone`;
   }, 900e3);
+
+  // the beats and the house's own changes (js/haunt.js) keep off each other's things
+  await section('together', async () => {
+    const { page, w } = await page6();
+    const r = await page.evaluate(async () => {
+      const g = window.__game, T = window.T, W = g.W, h = g.nights.haunt, ev = T.events, out = {}; T.clear();
+      const away = () => T.stand(-1.7, -3.2, -1.7, -6);   // the living room's far corner, facing the front wall: the hall out of view
+      const takeBack = () => { const d = h.H.done.pop(); if (d && d.undo) d.undo(); h.H.counts[d.id] = Math.max(0, (h.H.counts[d.id] || 1) - 1); return d && d.id; };
+      // a door shut in your face holds the hall's doors: the house neither stands one ajar nor shuts one while it waits
+      T.door('bath', true); T.door('room2', true); T.door('kid', false); T.door('spare', false); away(); await T.sleep(2.6);
+      out.slam = ev.test.arm('doorSlam', { force: true }); out.held = ev.RES.who('hallDoors');
+      out.ajarHeld = h.force('doorAjar'); out.shutHeld = h.force('doorShut');
+      ev.test.undo('doorSlam'); T.door('bath', true); T.door('room2', true); await T.sleep(0.3);
+      out.ajarFree = h.force('doorAjar'); if (out.ajarFree) takeBack();
+      // the rocking chair: only from its own place at the table, and the house leaves the table alone while it rocks
+      T.door('kid', true); T.stand(1.0, -2.2, -1.5, -2.2); await T.sleep(2.6);
+      // (the house picks which chair; it is asked until the one that rocks is among those it has turned, and every one goes back after)
+      let turned = 0; out.turns = [];
+      // (the one that rocks has no room to be turned where it stands: the house may still take it to your room)
+      while (turned < W.chairs.length) { const ok = h.force('chairTurn') || h.force('chairBunk'); out.turns.push(ok && h.H.done[h.H.done.length - 1].id); if (!ok) break; turned++; const c = W.chairs[1].holder.position; if (Math.hypot(c.x - W.chairs[1].x, c.z - W.chairs[1].z) > 0.02) { out.moved1 = true; break; } }
+      if (out.moved1) { out.rockMoved = ev.test.arm('chairRock', { pre: true }); out.rockMovedArm = ev.test.arm('chairRock'); }
+      while (turned-- > 0) takeBack();
+      out.rockHome = ev.test.arm('chairRock', { pre: true }); out.turnWhileRock = h.force('chairTurn'); ev.test.undo('chairRock');
+      // a scratched face in a hall photograph stays on the face when the house tips the photograph
+      const s = T.sc.scratches.find((x) => x.m.visible && W.frames.includes(x.m.parent));
+      if (s) {
+        const V = g.camera.position.constructor, loc = () => s.o.worldToLocal(s.m.getWorldPosition(new V())), a = loc(), w0 = s.m.getWorldPosition(new V());
+        away(); out.frames = h.force('frames'); s.m.parent.updateMatrixWorld(true); const b = loc(), w1 = s.m.getWorldPosition(new V());
+        out.tilt = +s.m.parent.rotation.z.toFixed(3); out.slid = +a.distanceTo(b).toFixed(5); out.moved = +w0.distanceTo(w1).toFixed(4);
+        if (out.frames) takeBack();
+      }
+      return out;
+    });
+    ok(r.slam === 'armed' && r.held === 'doorSlam', `doorSlam did not hold the hall's doors: ${JSON.stringify(r)}`);
+    ok(!r.ajarHeld && !r.shutHeld && r.ajarFree, `the house changed a hall door while a beat held them (ajar ${r.ajarHeld}, shut ${r.shutHeld}; free: ${r.ajarFree})`);
+    ok(r.moved1, `the house never moved the rocking chair from the table (${JSON.stringify(r.turns)})`);
+    ok(r.rockMoved === 'pre' && r.rockMovedArm === 'refused', `the chair rocks from where the house put it: ${r.rockMoved} / ${r.rockMovedArm}`);
+    ok(r.rockHome === 'armed' && !r.turnWhileRock, `with the chair rocking the house still moves chairs (${r.rockHome}, ${r.turnWhileRock})`);
+    ok(r.frames && Math.abs(r.tilt) > 0.05 && r.slid < 1e-4, `a scratched face is not on its photograph once tipped: ${JSON.stringify({ frames: r.frames, tilt: r.tilt, slid: r.slid })}`);
+    clean(w);
+    return `the hall's doors held by doorSlam, the rocking chair only from the table and the table left alone while it rocks, a scratch stays on its tipped photograph (tilt ${r.tilt}, moved ${r.moved} m with it)`;
+  }, 400e3);
 
   await section('sounds', async () => {
     const { page, w, ctx } = await page6();
