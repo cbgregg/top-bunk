@@ -196,8 +196,12 @@ export function createHunter(ctx) {
     if (p.length > 1) {
       const [ax, az] = NODES[p[0]], [bx, bz] = NODES[p[1]], dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
       const t = ((ep().x - ax) * dx + (ep().z - az) * dz) / l2, px = ax + dx * t - ep().x, pz = az + dz * t - ep().z;
-      if (t > 0.02 && t < 1 && Math.hypot(px, pz) < 0.5) S.pi = 1;
-      else if (Math.hypot(ax - ep().x, az - ep().z) < 0.2) S.pi = 1;
+      if (t > 0.02 && t < 1 && Math.hypot(px, pz) < 0.5) {
+        S.pi = 1;
+        // and already through the doorway on that edge: not back to its middle (on all fours, slow, a replan every 0.7 s sent it back and
+        // forth through the back door until dawn)
+        const d = edgeDoor(p[0], p[1]); if (d) { const m = W.doors[d].mid; if (t >= ((m.x - ax) * dx + (m.z - az) * dz) / l2 - 0.02) S.thru = 1; }
+      } else if (Math.hypot(ax - ep().x, az - ep().z) < 0.2) S.pi = 1;
     }
     return true;
   }
