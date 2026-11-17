@@ -95,7 +95,9 @@ async function nightPage(browser, hash) {
     };
   });
   await until(page, () => { const g = window.__game; return g.P.mode === 'bunk' && !g.F.cutscene && !g.F.script; }, null, 60e3);
-  await page.evaluate(() => { window.__game.nights.director.stop(); window.T.events.suspend(true); });
+  // the director's own events off, and Mom and Dad asleep whatever the noise (a slammed door or the telephone would have Dad up and
+  // walking the house, opening doors, through the beats that follow)
+  await page.evaluate(async () => { window.__game.nights.director.stop(); window.T.events.suspend(true); const par = await import('/js/parents.js'); setInterval(() => { par.test.set(0); for (const who of ['mom', 'dad']) if (par.test.PAR[who]) par.test.PAR[who].mult = 99; }, 100); });
   return { page, w, ctx };
 }
 const same = (r) => JSON.stringify(r.before) === JSON.stringify(r.after);

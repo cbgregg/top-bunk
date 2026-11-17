@@ -74,7 +74,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   const BEHIND = { room2: 'r2Alc' };   // far enough in that the leaf's corner passes clear of its head as it swings (the office: the spare room has no such spot in line with its door)
   const faceDoors = () => Object.keys(BEHIND).filter((k) => shut(k) && room() !== ROOM_OF[k]).sort((a, b) => pd(door(a).mid) - pd(door(b).mid));
   reg({
-    id: 'doorFace', tier: 'presence', minN: 5, w: 2.5, uses: ['E', 'stage', 'hallDoors'],
+    id: 'doorFace', tier: 'presence', minN: 5, w: 4, uses: ['E', 'stage', 'hallDoors'],
     anchor: (D, h) => nodePt(BEHIND[h ? h.door : faceDoors()[0] || 'room2']),
     pre: () => walking() && mayJump('doorFace') && canE() && faceDoors().some((k) => pd(door(k).mid) < 9),
     arm: () => {
@@ -101,7 +101,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // a door shut in your face: an open door off the hall, you a step and a half from it and walking at it
   const slamDoors = () => Object.keys(ROOM_OF).filter((k) => open(k) && room() !== ROOM_OF[k]).sort((a, b) => pd(door(a).mid) - pd(door(b).mid));
   reg({
-    id: 'doorSlam', tier: 'loud', minN: 2, w: 2.5, noise: 0.8, uses: ['hallDoors'],
+    id: 'doorSlam', tier: 'loud', minN: 2, w: 3.5, noise: 0.8, uses: ['hallDoors'],
     anchor: (D, h) => { const k = h ? h.door : slamDoors()[0]; return k ? midOf(k) : null; },   // (the nearest open one: the engine will not arm it in view)
     pre: () => walking() && mayJump('doorSlam') && !hunter.busy && slamDoors().some((k) => pd(door(k).mid) > 2.2 && pd(door(k).mid) < 8),
     arm: () => {
@@ -124,14 +124,14 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
       later(2.6, () => { if (h.alive) sfx.pick('doorknob', { at: m, gain: 0.7, wet: 0.2 }); });
       later(4.2, () => { if (slamming === h.door) slamming = null; h.done = true; });
     },
-    while: (D, h) => open(h.door) || h.slam, max: 50, linger: 8, after: { keep: true },
+    while: (D, h) => open(h.door) || h.slam, max: 30, linger: 8, after: { keep: true },
     undo: (h) => { h.alive = false; if (slamming === h.door) slamming = null; if (h.slam) { const d = door(h.door); d.a = d.target = 1; d.apply(); } },
   });
 
   // breathing behind a shut door while you stand near it; open it and there is nobody, and something whispers from the far corner
   const breathDoors = () => Object.keys(ROOM_OF).filter((k) => shut(k) && room() !== ROOM_OF[k]).sort((a, b) => pd(door(a).mid) - pd(door(b).mid));
   reg({
-    id: 'doorBreath', tier: 'whisper', minN: 4, w: 1.5, uses: ['hallDoors'],
+    id: 'doorBreath', tier: 'whisper', minN: 4, w: 0.8, uses: ['hallDoors'],
     anchor: (D, h) => { const k = h ? h.door : breathDoors()[0]; return k ? inside(k, 0.6, 0) : null; },
     pre: () => walking() && !hunter.busy && breathDoors().some((k) => pd(door(k).mid) < 4.5),
     arm: () => { const k = breathDoors()[0]; if (!k || P.mode !== 'walk' || pd(door(k).mid) > 9) return null; return { alive: true, door: k, g0: gaze.now, next: now() + 0.4, n: 0 }; },
@@ -149,16 +149,16 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
 
   // you shut a door, and something knocks twice on the other side of it
   reg({
-    id: 'knockBack', tier: 'whisper', minN: 2, w: 2,
-    pre: () => walking(),
-    arm: () => (P.mode === 'walk' ? { alive: true, t0: now() } : null),
+    id: 'knockBack', tier: 'whisper', minN: 2, w: 1, chain: true,   // it comes on the door you have just shut: no waiting for one
+    pre: () => walking() && !!shutBy && now() - shutBy.t < 1.2,
+    arm: () => (P.mode === 'walk' ? { alive: true, t0: shutBy && now() - shutBy.t < 1.2 ? shutBy.t - 0.01 : now() } : null),
     reveal: { by: 'hold', hold: 0.9, when: (D, h) => !!shutBy && shutBy.t > h.t0 && now() - shutBy.t < 6 && !!door(shutBy.k) },
     payoff: (D, h) => {
       const d = shutBy && door(shutBy.k) ? door(shutBy.k) : door('kid'), side = Math.sign(d.mid.z - P.pos.z) || 1, p = at3(d.mid.x, 1.15, d.mid.z + side * 0.3);
       for (const [t, g] of [[0, 0.9], [0.42, 0.8], [3.4, 0.45]]) later(t, () => { if (h.alive) sfx.pick('knock', { at: p, gain: g, wet: 0.25 }); });
       F.fear = Math.max(F.fear, 0.5); later(4.2, () => { h.done = true; });
     },
-    while: () => free(), max: 200, linger: 6,
+    while: () => free(), max: 20, linger: 6,
   });
 
   // ---------------------------------------------------------------------------------------------------------------------------------------
@@ -198,7 +198,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // on the screen at all (a point in space, not on the floor: the gaze's own test stands things on the plan)
   const onView = (p, m = 1) => { _a.set(p.x, p.y, p.z).project(camera); return _a.z < 1 && Math.abs(_a.x) < m && Math.abs(_a.y) < m; };
   reg({
-    id: 'bunkHand', tier: 'presence', minN: 4, w: 2.5, uses: ['bunk'], rooms: ['bed'],
+    id: 'bunkHand', tier: 'presence', minN: 4, w: 4, uses: ['bunk'], rooms: ['bed'],
     anchor: (D, h) => ({ x: h ? h.x : 8.56, z: RAIL.z0, y: 0.62 }),
     pre: () => free() && P.mode === 'bunk' && mayJump('bunkHand') && !hunter.busy && gaze.inBunkFor() > 8 && (F.leanK || 0) < 0.1,
     arm: () => {
@@ -228,7 +228,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // scratching inside the wall beside the pillow; it stops when you turn your head to it, and then it is under the mattress, once
   const PILLOW_WALL = at3(7.75, 1.95, 4.62);
   reg({
-    id: 'wallScratch', tier: 'whisper', minN: 2, w: 1.5, rooms: ['bed'],
+    id: 'wallScratch', tier: 'whisper', minN: 2, w: 0.8, rooms: ['bed'],
     anchor: () => ({ x: PILLOW_WALL.x, z: PILLOW_WALL.z, y: 0.62 }),
     pre: () => free() && inBunk() && gaze.still(3) && !hunter.busy,
     arm: () => (inBunk() ? { alive: true, next: now() + 0.5, n: 0 } : null),
@@ -253,9 +253,9 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     return bd > 0.8 ? best : null;
   }
   reg({
-    id: 'flashFigure', tier: 'presence', minN: 3, w: 2,
-    pre: () => walking() && RUN().hasCamera !== false && mayJump('flashFigure') && canE(),
-    arm: () => (P.mode === 'walk' && E.rig ? { alive: true, f0: flashStamp() } : null),
+    id: 'flashFigure', tier: 'presence', minN: 3, w: 4, chain: true,   // it comes on the photograph you have just taken: no waiting for one
+    pre: () => walking() && RUN().hasCamera !== false && mayJump('flashFigure') && canE() && flashStamp() > 0 && now() - flashStamp() < 0.35 && !!frontNode(),
+    arm: () => (P.mode === 'walk' && E.rig ? { alive: true, f0: flashStamp() > 0 && now() - flashStamp() < 0.35 ? flashStamp() - 0.01 : flashStamp() } : null),
     reveal: { by: 'photo', when: (D, h) => {
       if (flashStamp() <= h.f0) return false;
       h.f0 = flashStamp(); h.spot = P.mode === 'walk' && canE() ? frontNode() : null;   // a photograph with no room in front of the lens is only a photograph
@@ -267,7 +267,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
       sting(1.25, 0.55);
       later(0.4, () => { if (h.shown) { hideE(); h.shown = false; } h.done = true; });
     },
-    while: () => free(), max: 150, linger: 2,
+    while: () => free(), max: 20, linger: 2,
     undo: (h) => { h.alive = false; if (h.shown) hideE(); },
   });
 
@@ -275,7 +275,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // into the kitchen, in the time it takes to see that it was tall
   const RUN_PATH = ['livDoor', 'livE', 'archN', 'archS', 'kit2'].map(nodePt), CROSS = { x: 2.9, z: -0.42, y: 0 };
   reg({
-    id: 'hallSprint', tier: 'presence', minN: 3, w: 2.5, uses: ['E', 'stage'], rooms: ['hall'],
+    id: 'hallSprint', tier: 'presence', minN: 3, w: 4, uses: ['E', 'stage'], rooms: ['hall'],
     anchor: () => CROSS,
     pre: () => walking() && room() === 'hall' && P.pos.x > 6.6 && mayJump('hallSprint') && canE(),
     arm: () => {
@@ -319,10 +319,11 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     g.restore(); tex.needsUpdate = true;
   }
   reg({
-    id: 'mirrorLight', tier: 'presence', minN: 3, w: 2, uses: ['mirror'], rooms: ['bath', 'hall'],
+    id: 'mirrorLight', tier: 'presence', minN: 3, w: 4, uses: ['mirror'], rooms: ['bath', 'hall'],
     anchor: () => MIRROR,
-    pre: () => walking() && mayJump('mirrorLight') && !hunter.busy && env.lights && !env.lights.isOn('bath') && pd(MIRROR) < 8 && !W.mirrorFx.plane.visible,
-    arm: () => (P.mode === 'walk' && env.lights && !env.lights.isOn('bath') && !W.mirrorFx.plane.visible ? { alive: true, g0: gaze.now } : null),
+    chain: true,   // it comes on the switch you have just put on: no waiting for one
+    pre: () => walking() && mayJump('mirrorLight') && !hunter.busy && env.lights && env.lights.isOn('bath') && gaze.flipped('bath', true, 8) && pd(MIRROR) < 4.5 && !W.mirrorFx.plane.visible,
+    arm: () => (P.mode === 'walk' && env.lights && !W.mirrorFx.plane.visible ? { alive: true, g0: gaze.flipped('bath', true, 8) ? gaze.flippedAt('bath', true) - 0.01 : gaze.now } : null),
     tick: (D, h) => { if (!h.drawn && gaze.flippedAt('bath', true) > h.g0 && !gaze.onScreen(MIRROR, 0.75)) { h.drawn = true; mirrorFigure(); } },
     reveal: { by: 'look', when: (D, h) => h.drawn && pd(MIRROR) < 3.8 && gaze.inView(MIRROR, 0.8) && gaze.facing(MIRROR) > 0.82 },
     payoff: (D, h) => {
@@ -330,7 +331,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
       jumped('mirrorLight'); sting(1.15, 0.5);
       later(0.5, () => { W.mirrorFx.hide(); if (h.alive) D.flicker(0.4); h.done = true; });
     },
-    while: (D, h) => !h.drawn || env.lights.isOn('bath'), max: 90, linger: 2,
+    while: (D, h) => !h.drawn || env.lights.isOn('bath'), max: 25, linger: 2,
     undo: (h) => { h.alive = false; if (h.drawn) W.mirrorFx.hide(); },
   });
 
@@ -340,7 +341,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   const glassWin = () => (wins() || []).filter((w) => w.h > 0.8 && winIn(w) && pd(w.c) < 6 && pd(w.c) > 1.2).sort((a, b) => pd(a.c) - pd(b.c));
   const winPt = (w) => ({ x: w.c.x + w.n.x * 0.3, z: w.c.z + w.n.z * 0.3, y: 0 });
   reg({
-    id: 'lightningFace', tier: 'presence', minN: 4, w: 3, uses: ['E', 'stage'],
+    id: 'lightningFace', tier: 'presence', minN: 4, w: 4, uses: ['E', 'stage'],
     anchor: (D, h) => { const w = h ? h.w : glassWin()[0]; return w ? winPt(w) : null; },
     pre: () => walking() && !!env.weather && env.weather.kind !== 'clear' && mayJump('lightningFace') && canE() && glassWin().length > 0,
     arm: () => { const w = glassWin()[0]; return w && P.mode === 'walk' && E.rig ? { alive: true, w } : null; },
@@ -402,7 +403,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     return best;
   }
   reg({
-    id: 'tvRoom', tier: 'presence', minN: 5, w: 2.5, uses: ['E', 'stage', 'tv'], rooms: ['living'],
+    id: 'tvRoom', tier: 'presence', minN: 5, w: 4, uses: ['E', 'stage', 'tv'], rooms: ['living'],
     anchor: () => tv.pt(),
     pre: () => walking() && F.plan.type !== 'static' && room() === 'living' && !W.tvFx.on && mayJump('tvRoom') && canE() && pd(tv.pt()) > 2 && pd(tv.pt()) < 6.5,   // (the night the set is Dad's has its own use for it)
     arm: () => {
@@ -426,7 +427,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // the telephone rings in the dark, and what is on the line when you pick it up
   const PHONE = () => W.phone.pos;
   reg({
-    id: 'phoneScream', tier: 'loud', minN: 4, w: 2, noise: 0.7, uses: ['phone'],
+    id: 'phoneScream', tier: 'loud', minN: 4, w: 3, noise: 0.7, uses: ['phone'],
     anchor: () => ({ x: PHONE().x, z: PHONE().z, y: 0 }),
     pre: () => walking() && F.plan.type !== 'ring' && !W.phone.ringing && !W.phone.off && mayJump('phoneScream') && !hunter.busy && pd(PHONE()) < 14 && pd(PHONE()) > 2.5,
     arm: () => {
@@ -457,8 +458,8 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // the quiet ones
   // you hold your breath, and something an arm's length behind you goes on breathing
   reg({
-    id: 'breathHeld', tier: 'whisper', minN: 3, w: 1.5,
-    pre: () => free() && (P.mode === 'walk' || (P.mode === 'hide' && !!P.pod)) && !env.holding() && !hunter.busy,
+    id: 'breathHeld', tier: 'whisper', minN: 3, w: 1, chain: true,   // it comes on a breath you are holding: no waiting for one
+    pre: () => free() && (P.mode === 'walk' || (P.mode === 'hide' && !!P.pod)) && env.holding() && !hunter.busy,
     arm: () => (P.mode === 'walk' || P.mode === 'hide' ? { alive: true, n: 0, next: 0 } : null),
     reveal: { by: 'hold', hold: 1.3, when: () => env.holding() },
     payoff: (D, h) => { h.on = true; F.fear = Math.max(F.fear, 0.5); },
@@ -468,12 +469,12 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
       if (now() < h.next) return;
       h.next = now() + 1.5; h.n++; sfx.pick('breath', { at: behindEar(0.45), gain: 0.5 + night() * 0.02, wet: 0.04, rate: 0.82 + (h.n % 2) * 0.05 });
     },
-    while: () => free(), max: 120, linger: 8,
+    while: () => free(), max: 20, linger: 8,
   });
 
   // slow steps on the ceiling, coming across the room to stand over you; move, and after a moment they come over again
   reg({
-    id: 'stepsAbove', tier: 'whisper', minN: 2, w: 2,
+    id: 'stepsAbove', tier: 'whisper', minN: 2, w: 0.8,
     pre: () => walking() && !!room() && P.pos.y > -1 && !hunter.busy,
     arm: () => {
       if (P.mode !== 'walk' || P.pos.y < -1) return null;
@@ -500,7 +501,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   const TUNE = [440, 523.25, 440, 392, 329.63, 0, 392, 440, 523.25, 587.33, 523.25, 440, 0, 0];
   const ventFor = () => VENTS.filter((v) => pd(v) > 1.8 && pd(v) < 11).sort((a, b) => pd(a) - pd(b));   // the nearest that is not at your feet
   reg({
-    id: 'ventHum', tier: 'whisper', minN: 3, w: 1.5,
+    id: 'ventHum', tier: 'whisper', minN: 3, w: 0.7,
     anchor: (D, h) => { const v = h ? h.v : ventFor()[0]; return v ? { x: v.x, z: v.z, y: 0 } : null; },
     pre: () => walking() && !hunter.busy && ventFor().length > 0,
     arm: () => { const v = ventFor()[0]; return v && P.mode === 'walk' ? { alive: true, v, i: 0, next: now() + 0.3 } : null; },
@@ -521,7 +522,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
 
   // whispering a step behind you for as long as you walk; stand still and there is none; stand still long enough and there is one more
   reg({
-    id: 'whisperWalk', tier: 'whisper', minN: 2, w: 1.5,
+    id: 'whisperWalk', tier: 'whisper', minN: 2, w: 0.6,
     pre: () => walking() && !gaze.still(0.5) && !P.sprinting && !hunter.busy,
     arm: () => (P.mode === 'walk' ? { alive: true, walked: 0, next: 0 } : null),
     tick: (D, h, dt) => {
@@ -541,7 +542,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   const BOX = at3(10.0, 0.4, -2.95);
   const BOX_TUNE = [659.25, 783.99, 880, 783.99, 659.25, 587.33, 659.25, 0, 587.33, 659.25, 783.99, 659.25, 587.33, 493.88, 587.33, 0];
   reg({
-    id: 'musicBox', tier: 'wrong', minN: 4, w: 1.5, rooms: ['hall', 'bed', 'bath', 'room2'],
+    id: 'musicBox', tier: 'wrong', minN: 4, w: 0.8, rooms: ['hall', 'bed', 'bath', 'room2'],
     anchor: () => ({ x: BOX.x, z: BOX.z, y: 0 }),
     pre: () => walking() && ['hall', 'bed', 'bath', 'room2'].includes(room()) && pd(BOX) < 11 && !hunter.busy,
     arm: () => (P.mode === 'walk' && room() !== 'spare' && pd(BOX) < 16 ? { alive: true, i: 0, next: now() + 0.4 } : null),
@@ -560,7 +561,7 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
   // a kitchen chair pulled out from the table and still rocking on two legs when you get there; it comes to rest while you look at it
   const CHAIR = 1;
   reg({
-    id: 'chairRock', tier: 'wrong', minN: 2, w: 1.5, uses: ['table'], rooms: ['living', 'hall', 'dining', 'kitchen'],
+    id: 'chairRock', tier: 'wrong', minN: 2, w: 0.8, uses: ['table'], rooms: ['living', 'hall', 'dining', 'kitchen'],
     anchor: 'table',
     pre: () => walking() && !!W.chairs[CHAIR] && !hunter.busy && pd(W.chairs[CHAIR].holder.position) > 2.6 && pd(W.chairs[CHAIR].holder.position) < 10,
     arm: () => {

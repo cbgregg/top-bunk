@@ -332,7 +332,7 @@ async function headlessOne(page, d, night) {
       await ev(page, (events, g) => { g.nights.director.stop(); if (g.nights.D.N1) g.nights.D.N1.hold = true; });
       // Mom and Dad sleep through it: a beat that makes a noise (a slammed door, the telephone) would wake them, and a parent walking the
       // house with a torch is tests/parents.js's business, not one beat's sounds or another's
-      await page.evaluate(async () => { const par = await import('/js/parents.js'), { hooks } = await import('/js/hooks.js'); hooks.parents.noise = () => 0; setInterval(() => par.test.set(-10), 100); });   // (well under their lightest sleep: one ring of the telephone is a mutter and a light)
+      await page.evaluate(async () => { const par = await import('/js/parents.js'), { hooks } = await import('/js/hooks.js'); hooks.parents.noise = () => 0; setInterval(() => { par.test.set(0); for (const who of ['mom', 'dad']) if (par.test.PAR[who]) par.test.PAR[who].mult = 99; }, 100); });   // (and nothing is loud enough: one ring of the telephone is a mutter and a light)
       const defs = unmark(await pageDefs(page)).filter((d) => d.minN <= nightN && d.maxN >= nightN && (nightN === 1 ? d.maxN === 1 || d.id === 'breathUnder' : d.maxN > 1));
       for (const d of defs) {
         let r;
