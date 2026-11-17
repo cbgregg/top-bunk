@@ -12,7 +12,8 @@
 //            it stands at the closet that saved you twice (once a night); it watches from a doorway and is gone when stared at; the
 //            flash stops it for less each time; a door you work is heard; watched with a corner behind it, it steps back out of sight;
 //            eyes off it, it comes on quicker; a loom at a remembered place is still shorter than a held breath; from the outside stairs
-//            it comes in through the back door on all fours, not back and forth in the doorway
+//            or the yard it comes in through the back door on all fours, open or shut, not back and forth in the doorway or held by
+//            its own body against the leaf it has shoved
 //   node tests/haunt.js [--port N] [--only source,haunt,view,mind]
 const http = require('http');
 const fs = require('fs');
@@ -382,17 +383,22 @@ const T = (page, fn, arg) => page.evaluate(fn, arg);
     // ---- the first nights it only watches: no bait before night three
     const early = await T(page, () => { const { H, stand, g } = window.__T; g.RUN.mind.pods = {}; H.setLevel(2); stand(7.63, -0.42, 0, -0.42, 0.3); let b = false; for (let i = 0; i < 10; i++) b = b || H.think('stalk'); const lair = H.lair; H.setLevel(5); return { b, lair, state: H.state }; });
     ok(!early.b && early.state === 'away', `a bait on night two: ${JSON.stringify(early)}`);
-    // ---- started from the dark of the outside stairs (a night that has the back door open), it comes in through the doorway on all
-    // fours and on into the house: a replan halfway through does not send it back to the doorway's middle
+    // ---- started from the dark behind the house, it comes in through the back door on all fours and on into the house: with the door
+    // open (from the outside stairs) a replan halfway through does not send it back to the doorway's middle; with it shut (from the yard)
+    // it shoves it open and stays on its feet until the leaf is back, so its own body does not stop the leaf part way across its path
     const inside = await T(page, () => {
-      const { H, E, W, stand, run } = window.__T; H.vanish(false); H.S.cool = 0; W.setDoor('back', true, true); run(1, { haunt: false });
-      stand(8.75, 2.35, 11, 2.35); const ok = H.stalk('stairTop'); let t = 0;
-      while (t < 25 && H.state === 'stalk' && E.root.position.z > 2.9) { run(0.5, { haunt: false }); t += 0.5; }
-      const z = +E.root.position.z.toFixed(2), st = H.state; H.dismiss(); H.S.cool = 0; W.setDoor('back', false, true); window.__EV.cleanup();
-      return { ok, t, z, st };
+      const { H, E, W, stand, run } = window.__T, out = {};
+      for (const [from, open] of [['stairTop', true], ['stoopS', false]]) {
+        H.vanish(false); H.S.cool = 0; W.setDoor('back', open, true); run(1, { haunt: false });
+        stand(8.75, 2.35, 11, 2.35); const ok = H.stalk(from); let t = 0;
+        while (t < 25 && H.state === 'stalk' && E.root.position.z > 2.9) { run(0.5, { haunt: false }); t += 0.5; }
+        out[from] = { ok, t, z: +E.root.position.z.toFixed(2), st: H.state, leaf: +W.doors.back.a.toFixed(2) };
+        H.dismiss(); H.S.cool = 0; W.setDoor('back', false, true); window.__EV.cleanup();
+      }
+      return out;
     });
-    ok(inside.ok && inside.z <= 2.9, `it does not come in through the back door: ${JSON.stringify(inside)}`);
-    notes.push(`in through the back door in ${inside.t} s`);
+    ok(Object.values(inside).every((r) => r.ok && r.z <= 2.9), `it does not come in through the back door: ${JSON.stringify(inside)}`);
+    notes.push(`in through the back door in ${inside.stairTop.t} s (open) and ${inside.stoopS.t} s (shut, shoved open)`);
     clean(w);
     await ctx.close();
     return notes.join('; ');

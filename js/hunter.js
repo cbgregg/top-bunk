@@ -56,7 +56,7 @@ export function createHunter(ctx) {
   const { E, W, sfx, P, F, camera } = ctx;
   const S = {
     state: 'away', path: [], pi: 0, node: 'hallE', speed: 0, level: 1, cool: 0,
-    lastSeen: null, lostT: 0, replan: 0, doorWait: 0, doorName: null, doorHeldT: 0,
+    lastSeen: null, lostT: 0, replan: 0, doorWait: 0, doorName: null, doorHeldT: 0, doorOpening: null, doorOpenT: 0,
     sightT: 0, sightDur: 4, seenT: 0, sightOpts: {}, frozen: false, lookT: 0, frozenT: 0, frozenLogged: false,
     searchList: [], searchWait: 0, searchT: 0, forcePod: null, heard: 0, checks: {}, passed: false,
     lurkT: 0, loomT: 0, loomDur: 5, loomPod: null, loomOpen: false, loomTwitched: false, stepAcc: 0, hb: 0, leaveT: 0, startedAt: 0,
@@ -219,6 +219,13 @@ export function createHunter(ctx) {
   // a shut door in its way: it stops at the leaf (1.2-2 s, less the higher the level), then shoves it open (it never turns a knob): the
   // door slams back, placed at the door, and shakes you if you are within 6 m. Then it waits a moment outside the swing while the leaf opens
   function doorTick(dt) {
+    // (on its feet until the leaf is back: on all fours its body reaches a metre ahead, into the leaf's swing, and a leaf stopped part
+    // way against it was a leaf it could not get past, all night, at the back door)
+    if (S.doorOpening && S.doorWait <= 0) {
+      const d = W.doors[S.doorOpening]; S.doorOpenT += dt;
+      if (d && d.target === 1 && d.a < 0.9 && S.doorOpenT < 2.5) { E.mode = 'idle'; E.crawlSpeed = 0; return true; }
+      S.doorOpening = null;
+    }
     if (S.doorWait <= 0) return false;
     S.doorWait -= dt; S.doorHeldT += dt; E.mode = 'idle'; E.crawlSpeed = 0;
     if (S.doorWait <= 0 && S.doorName) {
@@ -227,7 +234,7 @@ export function createHunter(ctx) {
       if (!sfx.pick('door_slam', { gain: 1, at, wet: 0.35 })) sfx.slamFar(ctx.panFor(tmp.set(at.x, at.y, at.z)));
       if (Math.hypot(P.pos.x - at.x, P.pos.z - at.z) < 6) ctx.addShake(0.45);
       S.lastShove = { door: S.doorName, held: S.doorHeldT, at: ctx.now() };
-      S.doorName = null; S.doorWait = 0.45;
+      S.doorOpening = S.doorName; S.doorOpenT = 0; S.doorName = null; S.doorWait = 0.45;
     }
     return true;
   }
