@@ -41,7 +41,7 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-`npm test` runs `tests/smoke.js`: the game in headless Chromium through the title, a day, a night and a phone-sized touch screen. It needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`). `node tests/contacts.js` poses Mom, Dad and grandpa the way the game does (at the table, the stove, the mug, a carried box, the camera, asleep, the vigil chair) and reports any body part more than 1.5 cm inside the furniture or what they hold; `--shots dir` saves a picture of each pose.
+`npm test` runs `tests/smoke.js`: the game in headless Chromium through the title, a day, a night and a phone-sized touch screen. It needs Playwright's Chromium (`npm install`, then `npx playwright install chromium`). `node tests/contacts.js` poses Mom, Dad and grandpa the way the game does (at the table, the stove, the mug, a carried box, the camera, asleep, the vigil chair) and reports any body part more than 1.5 cm inside the furniture or what they hold; `--shots dir` saves a picture of each pose. `node tests/haunt.js` drives the haunting and the thing's mind a frame at a time: nothing changes in view, what is moved is set down clear of everything and blocks no way, the same seed makes the same changes, and what the thing has learned is in the run's save.
 
 ## Deploy to GitHub Pages
 
@@ -62,7 +62,8 @@ Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml
 | `js/doors.js` | The doors out of the house at night: the front door's chain, which doors are locked on which nights, the pocket behind the house and the routes out |
 | `js/story.js` | What Mom and Dad make of it all, which sets how the mornings talk and how night ten ends; which nights each kind of night may fall on |
 | `js/director.js` | Which night is which for a seed, and the small events that fill a night |
-| `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, and the graph of the house it walks on |
+| `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, what it knows of where you are looking and remembers of where you hid and ran, and the graph of the house it walks on |
+| `js/haunt.js` | The house's own restlessness: what changes while you are not looking (chairs, doors, toys, photographs, the pantry, the bear, a light) and the few things that move while you watch |
 | `js/entity.js`, `js/creature.js`, `js/mathx.js` | The thing itself: model, animation, head and eye tracking; its face, built in code; small shared math helpers |
 | `js/world.js` | The early-2000s farmhouse (brown carpet, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights, the road out front and the street light at the end of the drive |
 | `js/barn.js` | The barn as a place: its sliding door, the loft and its ladder, the Hollis family's things under sheets; the field gate |
