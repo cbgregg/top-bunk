@@ -715,8 +715,17 @@ export function buildWorld(scene) {
     p.position.set(xf + face * 0.032, y, zc); p.rotation.y = face > 0 ? Math.PI / 2 : -Math.PI / 2; house.add(p);
     return p;
   }
-  function frameX(xc, y, z, w, h, tex, face) {   // ...along x
+  // the hall's photographs hang loose, each on its own nail, so they can hang crooked (js/haunt.js): W.frames, tilted by rotation.z
+  const frames = [];
+  function frameX(xc, y, z, w, h, tex, face, loose = false) {   // ...along x
     const zf = z + face * (WT / 2);
+    if (loose) {
+      const g = new THREE.Group(); g.userData.noWarp = true; g.position.set(xc, y, zf + face * 0.015); if (face < 0) g.rotation.y = Math.PI;
+      const fr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.03), M.darkWood); g.add(fr);
+      const p = picture(w, h, tex); p.position.z = 0.017; g.add(p); house.add(g); frames.push(g);
+      fixup(() => g.position.set(SX(xc), y, SZ(zf) + face * 0.015));
+      return;
+    }
     box(xc - w / 2 - 0.05, xc + w / 2 + 0.05, y - h / 2 - 0.05, y + h / 2 + 0.05, Math.min(zf, zf + face * 0.03), Math.max(zf, zf + face * 0.03), M.darkWood, { uv: false });
     const p = picture(w, h, tex);
     p.position.set(xc, y, zf + face * 0.032); if (face < 0) p.rotation.y = Math.PI; house.add(p);
@@ -771,7 +780,7 @@ export function buildWorld(scene) {
     rbox(x0 + 0.04, 5.71, 1.35, 2.15, z1, z1 + 0.02, M.cabLine, 0.006);
     solid(x0 - 0.05, x1 + 0.05, z0 - 0.1, z1 + 0.05);
   }
-  let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null, lowerBunk = null; const chairs = [];
+  let teddy = null, parentsBed = null, bedSleepers = null, hallFrame = null, lowerBunk = null; const chairs = [], cupboards = [];
   {
     // your bear sits on the bottom bunk. the group's origin is under its seat, so it can be set down anywhere (setDown) and tipped over;
     // a ball-and-sphere bear stands in until the model loads. teddy.rest is where it belongs.
@@ -840,8 +849,8 @@ export function buildWorld(scene) {
         fall() { hallFrame.fallen = true; hallFrame.pose(1); },
         reset() { hallFrame.fallen = false; g.position.set(SX(xc), hallFrame.y0, SZ(zf + 0.03)); g.rotation.set(0, 0, 0); } };
     }
-    frameX(5.4, 1.5, -1.5, 0.34, 0.26, 'rainier', 1); frameX(6.0, 1.55, -1.5, 0.3, 0.24, 'sunset', 1); frameX(6.6, 1.5, -1.5, 0.26, 0.22, 'family1', 1);
-    frameX(4.95, 1.55, -0.3, 0.3, 0.24, 'family1', -1); frameX(6.25, 1.5, -0.3, 0.3, 0.24, 'moraine', -1); frameX(7.85, 1.55, -0.3, 0.2, 0.26, 'family2', -1);
+    frameX(5.4, 1.5, -1.5, 0.34, 0.26, 'rainier', 1, true); frameX(6.0, 1.55, -1.5, 0.3, 0.24, 'sunset', 1, true); frameX(6.6, 1.5, -1.5, 0.26, 0.22, 'family1', 1, true);
+    frameX(4.95, 1.55, -0.3, 0.3, 0.24, 'family1', -1, true); frameX(6.25, 1.5, -0.3, 0.3, 0.24, 'moraine', -1, true); frameX(7.85, 1.55, -0.3, 0.2, 0.26, 'family2', -1, true);
     shelf(7.6, 8.0, 1.95, -1.3, -0.5); knick(7.8, 1.975, -0.9, 4, 0.7, 'z');
   }
   // crayon drawing taped to the hall wall at kid height
@@ -995,7 +1004,29 @@ export function buildWorld(scene) {
     rbox(0.97, 1.88, 0.8, 0.9, 2.86, 2.9, M.steelSink, 0.01);                                       // the apron front
     rbox(0.3, 0.95, 0.0, 0.9, 2.9, 3.52, M.appW, 0.012); rbox(0.32, 0.93, 0.78, 0.82, 2.86, 2.9, M.steelSink, 0.005);   // dishwasher
     runN(-0.45, 0.3);
-    for (const x0 of [-1.35, -0.9]) { rbox(x0, x0 + 0.45, 0, 2.3, 2.9, 3.52, M.cabW, 0.012); rbox(x0 + 0.012, x0 + 0.438, 0.07, 2.26, 2.878, 2.9, M.cabW, 0.006); rbox(x0 + 0.36, x0 + 0.375, 0.9, 1.4, 2.858, 2.878, M.brass, 0.004); }   // tall pantry cabinets
+    // tall pantry cabinets. Their doors hang on their own hinges (W.cupboards: open(k) swings one out, 0 shut to 1 wide; js/haunt.js),
+    // each with the dark of the cupboard and its shelves behind it; built in finished metres once the house has its stretch
+    for (const x0 of [-1.35, -0.9]) {
+      rbox(x0, x0 + 0.45, 0, 2.3, 2.9, 3.52, M.cabW, 0.012);
+      fixup(() => {
+        const xa = SX(x0 + 0.012), xb = SX(x0 + 0.438), zf = SZ(2.878), zb = SZ(2.9), w = xb - xa, t = zb - zf, y0 = 0.07, y1 = 2.26;
+        const hinge = new THREE.Group(); hinge.userData.noWarp = true; hinge.position.set(xa, 0, zf); house.add(hinge);
+        const leaf = new THREE.Mesh(new RoundedBoxGeometry(w, y1 - y0, t, 1, 0.006), M.cabW); leaf.position.set(w / 2, (y0 + y1) / 2, t / 2); leaf.castShadow = true; hinge.add(leaf);
+        const pull = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.5, 0.02), M.brass); pull.position.set(w - 0.07, 1.15, -0.01); hinge.add(pull);
+        const dark = new THREE.Group(); dark.userData.noWarp = true; dark.position.set((xa + xb) / 2, (y0 + y1) / 2, zb - 0.002); dark.visible = false; house.add(dark);
+        const inside = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.01, y1 - y0 - 0.01), std({ color: 0x14110d, roughness: 1 })); inside.rotation.y = Math.PI; dark.add(inside);
+        for (const y of [-0.62, -0.18, 0.26, 0.7]) { const sh = new THREE.Mesh(new THREE.BoxGeometry(w - 0.01, 0.018, 0.004), M.cabLine); sh.position.set(0, y, -0.002); dark.add(sh); }
+        const c = solid(0, 0, 0, 0, { on: false, maxY: y1, id: 'cupboard' + cupboards.length });
+        const cup = { hinge, k: 0, at: new THREE.Vector3((xa + xb) / 2, 1.2, zf), open(k) {
+          cup.k = k; const a = k * 1.75; hinge.rotation.y = a; dark.visible = k > 0.002;
+          // the open leaf is in the way like anything else: its box on the plan, on once nobody stands in it
+          const ex = xa + Math.cos(a) * w, ez = zf - Math.sin(a) * w;
+          c.minX = Math.min(xa, ex) - 0.015; c.maxX = Math.max(xa, ex) + 0.015; c.minZ = Math.min(zf, ez) - 0.015; c.maxZ = Math.max(zf, ez) + 0.015;
+          if (k > 0.05) collide.armOrOn(c); else { c.on = false; c.armWhenClear = false; }
+        } };
+        cupboards.push(cup);
+      });
+    }
     { const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.28, 12), M.steelSink); tap.position.set(1.42, 1.1, 3.46); house.add(tap); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.18, 12), M.steelSink); sp.rotation.x = Math.PI / 2; sp.position.set(1.42, 1.23, 3.38); house.add(sp); }
     rbox(2.3, 3.22, 1.5, 2.3, 3.2, 3.52, M.cabW, 0.012);                                            // the upper cabinets in the corner (nothing hangs in front of the window)
     solid(-1.4, 3.25, 2.85, 3.55); solid(2.4, 3.25, -0.2, 2.9);
@@ -2683,6 +2714,7 @@ export function buildWorld(scene) {
     hemi, sun, stars, moon, frontDoor, pickups, dropSpots, drawingMesh, drawingMat, BUNK, bathSink, cardboardBox,
     doors, setDoor, tick, setDoorHook: (f) => { doorHook = f; }, setDoorBump: (f) => { bumpHook = f; }, parentsBed, bedSleepers, tvFx, phone, mirrorFx,
     get hallFrame() { return hallFrame; }, get lowerBunk() { return lowerBunk; }, chairs, moveChair: (i, x, z, rot) => { const c = chairs[i]; if (c) { c.holder.position.x = x; c.holder.position.z = z; if (rot !== undefined) c.holder.rotation.y = rot; fitProp(c.holder); } },
+    frames, cupboards,
     get teddy() { return teddy; }, moveTeddy: (x, y, z) => { if (teddy) teddy.setDown(x, y, z, { facing: teddy.rotation.y, settle: false }); },
     curtainSee: (on) => { M.showerCurtain.opacity = on ? 0.38 : 1; M.showerCurtain.depthWrite = !on; },
     proof,
