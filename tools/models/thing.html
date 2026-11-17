@@ -1,0 +1,37 @@
+<!doctype html><meta charset=utf-8>
+<!-- what the thing's modelled head and hands are built over: the skull-and-neck mesh of js/creature.js and the finger bones of
+     assets/models/spirit.glb with the fingers lengthened. See thing.cjs and README.md -->
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { headGeometry, longFingers, HEAD_GRID, FINGER_STRETCH } from '/js/creature.js';
+try {
+  const r4 = (a) => Array.from(a, (x) => +x.toFixed(5));
+  // the head: positions, normals, where each vertex lies in the two eyes' frames (their outlines the unit circle) and how much it is
+  // part of the mouth, row by row from the crown (the first row) down the neck, the last column the first again
+  const g = headGeometry({ neck: true }), A = g.attributes;
+  const head = { cols: HEAD_GRID.cols, rows: HEAD_GRID.rows, mouth: HEAD_GRID.mouth, pos: r4(A.position.array), nrm: r4(A.normal.array), eyeq: r4(A.eyeq.array), glow: r4(A.glow.array) };
+  // the hands: the joints of each (the forearm, the wrist, five fingers of three bones) in the rig's own space (centimetres, +y up),
+  // fingers lengthened as the game lengthens them, and how thick the body's own wrist is
+  const gltf = await new Promise((res, rej) => new GLTFLoader().load('/assets/models/spirit.glb', res, undefined, rej));
+  const bones = {}; let body = null;
+  gltf.scene.traverse((o) => { if (o.isBone) bones[o.name.replace(/^Bip01_?/, '') || 'Root'] = o; if (o.isSkinnedMesh && !body) body = o; });
+  longFingers(bones); gltf.scene.updateMatrixWorld(true);
+  const joints = {}, v = new THREE.Vector3();
+  for (const k in bones) if (/^[LR]_(Forearm|Hand|Finger)/.test(k)) joints[k] = r4(bones[k].getWorldPosition(v).toArray());
+  const P = body.geometry.attributes.position, SI = body.geometry.attributes.skinIndex, SW = body.geometry.attributes.skinWeight, wrist = {};
+  for (const s of ['L', 'R']) {
+    const H = new THREE.Vector3(...joints[s + '_Hand']), ax = H.clone().sub(new THREE.Vector3(...joints[s + '_Forearm'])).normalize(); let sum = 0, n = 0;
+    for (let i = 0; i < P.count; i++) {
+      let bi = 0, bw = -1; for (let c = 0; c < 4; c++) if (SW.getComponent(i, c) > bw) { bw = SW.getComponent(i, c); bi = SI.getComponent(i, c); }
+      if (body.skeleton.bones[bi] !== bones[s + '_Forearm']) continue;
+      v.fromBufferAttribute(P, i).applyMatrix4(body.bindMatrix).sub(H); const along = v.dot(ax); if (along < -4 || along > 0) continue;
+      sum += v.addScaledVector(ax, -along).length(); n++;
+    }
+    wrist[s] = n ? +(sum / n).toFixed(3) : 2.6;
+  }
+  window.out = { head, hands: { joints, wrist, stretch: FINGER_STRETCH } };
+} catch (e) { window.err = String(e && e.stack || e); }
+window.done = true;
+</script>

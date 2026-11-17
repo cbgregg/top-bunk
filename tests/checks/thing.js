@@ -6,6 +6,8 @@
 // rows, the crumple stage reaching hunter.crawl; and revision 4's running and hiding: it listens 4-7 s where it lost you, a door shut
 // behind you holds it at the leaf, it opens a place it saw you get into, one survived loom in twenty opens anyway (seeded, with its
 // guards, telegraphed), the aimed torch makes it flinch and the flash stuns it once a chase, and it hears a sprint but not a far walk.
+// And the body itself: the modelled head and hands, standing dead still between twitches that replay, the head cocked slowly and then
+// too far, the rise from the floor, the catch's three faces, the torch coming back from its eyes, no pose with both arms up and spread.
 // Loaded by tests/smoke.js as a numbered check ("--only thing").
 const fs = require('fs');
 const path = require('path');
@@ -351,6 +353,56 @@ module.exports = {
       ok(Math.hypot(ears.afterWalk.x - 5.48, ears.afterWalk.z + 0.42) < 0.01, `a walk 6 m off was heard: ${JSON.stringify(ears)}`);
       ok(ears.afterSprint.x > 10, `a sprint 6 m off was not heard: ${JSON.stringify(ears)}`);
       notes.push('hears a sprint, not a far walk');
+
+      // ---- the body (entity.js, creature.js): the modelled head and hands are on it; it stands still and what moves in it comes off
+      // its own clock; its head goes over slowly and then too far; it comes up from the floor in held steps, its head last; the catch's
+      // three frames are three faces; a torch on its face comes back from its eyes; it never has both arms up and spread
+      const body = await E(async () => {
+        const { reset, H, E: Ent, g, DT } = window.__T; reset(); H.dismiss && H.dismiss();
+        const cam = g.camera, V = cam.position.constructor, B = Ent.rig.bones, r = {};
+        const fresh = () => { Ent.visible = true; Ent.mode = 'idle'; Ent.standUp(); Ent.root.scale.setScalar(1); Ent.lean = 0; Ent.reach = 0; Ent.tilt = 0; Ent.leanSide = 0; Ent.flinch = 0; Ent.stun = 0; Ent.catchPose = null; Ent.duckHold = null; Ent.gape = 0; Ent.cock = null; Ent.sneak = false; Ent.root.position.set(1.2, 0, -1.6); Ent.faceTowards(3.1, -1.6, 1); Ent.lookTarget = cam.position; };
+        const run = (n) => { for (let i = 0; i < n; i++) Ent.update(DT); };
+        const wp = (b) => b.getWorldPosition(new V()), crown = () => Ent.head.localToWorld(new V(0, 0.264, 0)).y;
+        cam.position.set(3.1, 1.32, -1.6); cam.lookAt(1.2, 2.2, -1.6); cam.updateMatrixWorld(true);
+        r.parts = { hands: !!Ent.hands, maps: !!(Ent.head.maps && Ent.head.maps.map), morphs: Ent.head.skull.geometry.morphAttributes.position.length, fingers: +(wp(B.L_Finger2).distanceTo(wp(B.L_Finger22)) / Ent.rig.scale).toFixed(2) };
+        // standing: between its twitches nothing of it moves
+        fresh(); run(60); let still = 0, moved = 0; const p0 = wp(B.Spine2), h0 = wp(B.L_Hand);
+        for (let i = 0; i < 600; i++) { Ent.update(DT); if (Ent.cock) continue; if (Ent.twitchNow()) { moved++; continue; } still = Math.max(still, wp(B.Spine2).distanceTo(p0), wp(B.L_Hand).distanceTo(h0)); }
+        r.still = +still.toFixed(4); r.twitchFrames = moved;
+        // the same clock, the same frames: its bones a second time round
+        const sum = () => { let s = 0; for (const k of ['Head', 'Neck', 'Spine2', 'L_Clavicle', 'R_Clavicle', 'L_Finger2', 'R_Finger2']) { const q = B[k].quaternion; s += q.x * 1.1 + q.y * 2.3 + q.z * 3.7 + q.w * 5.3; } return s; };
+        const pass = () => { fresh(); Ent.t = 40; Ent.cockN = 0; Ent.rig.yawNow = undefined; Ent.rig.hasLook = false; Ent.rig.lookW = 0; Ent.rig.actions.idle.time = 0; const out = []; for (let i = 0; i < 900; i++) { Ent.update(DT); out.push(sum()); } return out; };
+        const a = pass(), b = pass(); r.replay = a.every((x, i) => Math.abs(x - b[i]) < 1e-4); r.varies = new Set(a.map((x) => x.toFixed(5))).size;
+        // the cock of its head: a third of a radian over two seconds, then past a radian inside five frames
+        fresh(); run(5); Ent.headCock(1); const rolls = []; for (let i = 0; i < 200; i++) { Ent.update(DT); rolls.push(Math.abs(Ent.cockRoll())); }
+        r.cock = { slow: +rolls[119].toFixed(2), before: +rolls[148].toFixed(2), after: +rolls[156].toFixed(2) };
+        // up from the crumple: lower than a door at first, its full height inside 0.6 s, never going back down
+        fresh(); Ent.mode = 'crumple'; Ent.side = 1; run(30); const low = crown(); Ent.mode = 'idle'; const hs = []; for (let i = 0; i < 40; i++) { Ent.update(DT); hs.push(crown()); }
+        r.rise = { low: +low.toFixed(2), first: +hs[0].toFixed(2), at03: +hs[18].toFixed(2), end: +hs[39].toFixed(2), back: hs.some((h, i) => i && h < hs[i - 1] - 0.03) };
+        // the catch: the jaw further down each frame, the head rolled another way
+        r.catch = [1, 2, 3].map((f) => { fresh(); cam.position.set(7.63, 1.32, -0.42); cam.lookAt(9.5, 1.32, -0.42); cam.updateMatrixWorld(true); Ent.root.position.set(8.83, 0, -0.42); Ent.catchPose = { frame: f, cam }; run(2); return [+Ent.head.skull.morphTargetInfluences[2].toFixed(2), +Ent.head.skull.morphTargetInfluences[0].toFixed(2), +Ent.head.selfLight.value.toFixed(2)]; });
+        // the torch: on its face, off its face, out
+        cam.position.set(3.1, 1.32, -1.6); cam.lookAt(1.2, 2.3, -1.6); cam.updateMatrixWorld(true); fresh(); run(5);
+        let spot = null; cam.traverse((o) => { if (o.isSpotLight) spot = o; }); const was = spot ? spot.intensity : 0;
+        if (spot) { spot.intensity = 26; run(20); r.shineOn = +Ent.shine.toFixed(2); cam.lookAt(5, 1.3, 2); cam.updateMatrixWorld(true); run(20); r.shineAway = +Ent.shine.toFixed(2); cam.lookAt(1.2, 2.3, -1.6); cam.updateMatrixWorld(true); spot.intensity = 0; run(20); r.shineOff = +Ent.shine.toFixed(2); spot.intensity = was; }
+        // both arms up and spread: in nothing it does on its feet
+        const spread = () => { const l = wp(B.L_Hand), rr = wp(B.R_Hand), sh = (wp(B.L_UpperArm).y + wp(B.R_UpperArm).y) / 2; return l.y > sh && rr.y > sh && l.distanceTo(rr) > 1.0; };
+        r.spread = [];
+        for (const [name, fn] of [['idle', () => {}], ['walk', () => { Ent.mode = 'walk'; Ent.speed = 0.5; }], ['run', () => { Ent.mode = 'run'; Ent.speed = 1.2; }], ['flash', () => { Ent.stun = 1; }], ['torch', () => { Ent.flinch = 1; }], ['reach', () => { Ent.reach = 1; }], ['loom', () => { Ent.lean = 0.35; Ent.tilt = 0.3; Ent.smileScale = 1.35; }], ['crouch', () => { Ent.duckHold = 1; }]]) {
+          fresh(); fn(); for (let i = 0; i < 120; i++) { Ent.update(DT); if (spread()) { r.spread.push(name); break; } }
+        }
+        fresh(); Ent.visible = false;
+        return r;
+      });
+      ok(body.parts.hands && body.parts.maps && body.parts.morphs === 3 && body.parts.fingers > 10, `the modelled head and hands: ${JSON.stringify(body.parts)}`);
+      ok(body.still < 0.002 && body.twitchFrames > 0 && body.twitchFrames < 120, `standing still: moved ${body.still} m between twitches, ${body.twitchFrames} twitch frames in 10 s`);
+      ok(body.replay && body.varies > 3, `its movements come off its clock: replay ${body.replay}, ${body.varies} poses`);
+      ok(body.cock.slow > 0.2 && body.cock.slow < 0.35 && body.cock.before < 0.35 && body.cock.after > 0.9, `the cock of its head: ${JSON.stringify(body.cock)}`);
+      ok(body.rise.first < 1.9 && body.rise.at03 < body.rise.end - 0.3 && body.rise.end > 2.4 && !body.rise.back, `the rise from the floor: ${JSON.stringify(body.rise)}`);
+      ok(body.catch[0][0] < body.catch[1][0] && body.catch[1][0] < body.catch[2][0] && body.catch[2][0] > 0.8 && body.catch.every((c) => c[2] > 0.3), `the catch's three faces [gape, grin, self light]: ${JSON.stringify(body.catch)}`);
+      ok(body.shineOn > 0.5 && body.shineAway < 0.05 && body.shineOff < 0.05, `the torch in its eyes: on ${body.shineOn}, turned away ${body.shineAway}, off ${body.shineOff}`);
+      ok(!body.spread.length, `both arms up and spread wide in: ${body.spread.join(', ')}`);
+      notes.push(`body: fingers ${body.parts.fingers} cm, still to ${body.still} m, ${body.twitchFrames} twitch frames in 10 s, cock ${body.cock.slow} then ${body.cock.after}, rise ${body.rise.first} to ${body.rise.end}, catch gape ${body.catch.map((c) => c[0]).join('/')}, shine ${body.shineOn}`);
       clean(w);
     });
     return notes.join('; ');

@@ -63,7 +63,7 @@ Settings → Pages → Source: **GitHub Actions**. `.github/workflows/static.yml
 | `js/story.js` | What Mom and Dad make of it all, which sets how the mornings talk and how night ten ends; which nights each kind of night may fall on |
 | `js/director.js` | Which night is which for a seed, and the small events that fill a night |
 | `js/hunter.js`, `js/nav.js` | How the thing shows itself, stalks, hunts and searches, and the graph of the house it walks on |
-| `js/entity.js`, `js/creature.js`, `js/mathx.js` | The thing itself: model, animation, head and eye tracking; its face, built in code; small shared math helpers |
+| `js/entity.js`, `js/creature.js`, `js/mathx.js` | The thing itself: model, animation, head and eye tracking; its face, built in code, and the modelled head and hands laid over it; small shared math helpers |
 | `js/world.js` | The early-2000s farmhouse (brown carpet, white kitchen, hall, your back-left room), furniture, yard, garage, truck, barn, lights, the road out front and the street light at the end of the drive |
 | `js/barn.js` | The barn as a place: its sliding door, the loft and its ladder, the Hollis family's things under sheets; the field gate |
 | `js/weather.js`, `js/traffic.js` | Rain, wet ground and lightning on the nights the seed makes wet; the cars that pass on the road, and the one the car-pass scare sends by |
@@ -113,7 +113,7 @@ To change a line, edit `lines.json` and run `ELEVENLABS_API_KEY=... python3 tool
 |---|---|---|
 | Mom, Dad | [Microsoft Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) adults (`Female_Adult_01`, `Male_Adult_05`), MIT | Body-language clips for standing, talking, sitting and folded arms (talking follows the loudness of the voice, and each line starts on the other mirror of the clip), hands kept on or above the table when seated, head follows you when you're near, mouth moves with their voice |
 | Grandpa | Rocketbox `Male_Adult_03`, without his hair cards, MIT | One seated clip for the vigil chair (`tools/models/sit.js`) |
-| The thing | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze, the crumple and the crawl, ducking under door heads, and each foot set on the floor or the stair tread under it |
+| The thing | A Rocketbox body (`Male_Adult_06`) in solid black, stretched to about 2.6 m with long arms, with the skull, eyes and smile on its head bone; the head's worked surface and ashen skin and the bone-thin, long-fingered hands are `assets/models/thing.glb`, made in Blender by `tools/models/thing.py` | Run, walk and idle clips, plus code for the lean, head tilt, reaching arms and gaze, the crumple and the crawl, ducking under door heads, and each foot set on the floor or the stair tread under it. It stands dead still and twitches, its walk has a hitch, its arms hang, its head stays level and on you and now and then goes over too far, it comes up off the floor in held steps, and its jaw drops at the catch |
 
 The parents' body language is Quaternius's Universal Animation Library (CC0) and the walk/run/idle clips are Mixamo animations (from the three.js example `Xbot.glb`), both retargeted onto the Rocketbox skeleton; `tools/models/` rebuilds them. Without the model files the game falls back to low-poly people and a low-poly thing. Credits and licences: [CREDITS.md](CREDITS.md).
 
