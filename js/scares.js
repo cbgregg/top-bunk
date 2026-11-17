@@ -508,13 +508,13 @@ export function createScares({ env, D, W, E, P, F, sfx, camera, gaze, hunter, ev
     tick: (D, h) => {
       if (h.stopped || now() < h.next) return;
       const f = TUNE[h.i % TUNE.length]; h.i++; h.next = now() + 0.62;
-      if (f && pd(h.v) < 13) sfx.hum({ at: h.v, f, dur: 0.52, gain: 0.2 });
+      if (f && pd(h.v) < 13) sfx.hummed({ at: h.v, f, dur: 0.52, gain: 0.2 });
     },
     reveal: { by: 'approach', within: 1.6 },
     payoff: (D, h) => {
       h.stopped = true; F.fear = Math.max(F.fear, 0.45);
       const far = VENTS.filter((v) => v !== h.v).sort((a, b) => pd(b) - pd(a))[0];
-      later(3.6, () => { if (h.alive) [523.25, 440, 392].forEach((f, i) => sfx.hum({ at: far, f, dur: i === 2 ? 1.1 : 0.52, gain: 0.16, delay: i * 0.62 })); });
+      later(3.6, () => { if (h.alive) [523.25, 440, 392].forEach((f, i) => sfx.hummed({ at: far, f, dur: i === 2 ? 1.1 : 0.52, gain: 0.16, delay: i * 0.62 })); });
       later(6.4, () => { h.done = true; });
     },
     while: () => free(), max: 70, linger: 8,

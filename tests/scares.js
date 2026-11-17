@@ -12,7 +12,8 @@
 //             While the door swings in front of the face its head stays clear of the leaf; the hand's joints are outside the rail
 //   spacing   after one jump no other may arm for seventy seconds, and the last one never again until another has been
 //   quiet     each quiet beat armed and revealed by the player's own action, paid off once, and undone
-//   sounds    the three sounds made here (a hummed note, a music box tooth, the scream down the line) play without an error
+//   sounds    the three sounds made here (a hummed note, a music box tooth, the scream down the line) play without an error, and the
+//             night's own hum is still the library's (sfx.night set once the night has started)
 //   node tests/scares.js [--port N] [--only table,nightone,dressing,jumps,spacing,quiet,sounds]
 const http = require('http');
 const path = require('path');
@@ -302,10 +303,11 @@ const HASH = '#night6&seed=F3PC-0001&type=hunted';
 
   await section('sounds', async () => {
     const { page, w, ctx } = await page6();
-    const r = await page.evaluate(() => { const s = window.__game.sfx, at = { x: 7.6, y: 1.2, z: -0.4 }; const have = ['hum', 'comb', 'lineScream'].filter((k) => typeof s[k] === 'function'); s.hum({ at, f: 440 }); s.comb({ at, f: 880 }); s.lineScream({ at, gain: 0.2 }); return { have, ctx: !!s.ctx }; });
+    const r = await page.evaluate(() => { const s = window.__game.sfx, at = { x: 7.6, y: 1.2, z: -0.4 }; const have = ['hummed', 'comb', 'lineScream'].filter((k) => typeof s[k] === 'function'); s.hummed({ at, f: 440 }); s.comb({ at, f: 880 }); s.lineScream({ at, gain: 0.2 }); return { have, ctx: !!s.ctx, night: s.ctx ? s.night : true }; });
     ok(r.have.length === 3, `the sound library has only ${r.have.join(' ')}`);
+    ok(r.night === true, 'the night never reached the sound library (sfx.night): its own hum() is not the one that runs');
     await page.waitForTimeout(600); clean(w); await ctx.close();
-    return `hum, comb and lineScream played (audio context ${r.ctx ? 'running' : 'absent: the calls are no-ops'})`;
+    return `hummed, comb and lineScream played (audio context ${r.ctx ? 'running' : 'absent: the calls are no-ops'})`;
   });
 
   await browser.close(); server.close();

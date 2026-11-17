@@ -552,7 +552,7 @@ export class Sound {
     if (!this.pick('bone_crack', { ...o, gain: 0.85 * gain, wet: 0.1, delay: 0.14, maxLen: 1.6 })) this.noiseHit({ dur: 0.07, type: 'bandpass', f: 1500, q: 2.5, gain: 0.7 * gain, attack: 0.001, wet: 0.1, delay: 0.14 });
   }
   // one hummed note in a child's voice, mouth shut: a soft tone and its octave under a low filter, a slow wobble in the pitch, heard from `at`
-  hum({ at = null, f = 440, dur = 0.6, gain = 0.2, delay = 0 } = {}) {
+  hummed({ at = null, f = 440, dur = 0.6, gain = 0.2, delay = 0 } = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = this.now + delay, g = ctx.createGain(), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 950; lp.Q.value = 1.4;
     const vib = ctx.createOscillator(), vg = ctx.createGain(); vib.frequency.value = 5.2; vg.gain.value = f * 0.012; vib.connect(vg);
